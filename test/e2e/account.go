@@ -28,8 +28,12 @@ type Account struct {
 	keys            map[string]string // project → minted key
 }
 
-// accountOrg is the organization the fake account signs the developer in to.
-const accountOrg = "11111111-1111-4111-8111-111111111111"
+// accountOrg is the organization the fake account signs the developer in to, and
+// accountUser the developer it signs in.
+const (
+	accountOrg  = "11111111-1111-4111-8111-111111111111"
+	accountUser = "22222222-2222-4222-8222-222222222222"
+)
 
 // StartAccount serves the fake account service until the test ends.
 func (sb *Sandbox) StartAccount() *Account {
@@ -45,7 +49,7 @@ func (sb *Sandbox) StartAccount() *Account {
 		}
 		switch r.URL.Path {
 		case "/v1/whoami":
-			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": accountOrg, "auth_type": "cli_token", "user_id": "u-live", "email": "live@terma.test"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": accountOrg, "auth_type": "cli_token", "user_id": accountUser, "email": "live@terma.test"})
 		case "/v1/organizations":
 			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin"}}})
 		case "/v1/projects":
@@ -103,7 +107,7 @@ func (sb *Sandbox) SignIn(profile string) {
 	}
 	creds[profile] = map[string]any{"active": accountOrg, "organizations": map[string]any{accountOrg: map[string]any{
 		"access_token": a.token, "refresh_token": "ter_clr_live", "expires_at": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
-		"auth_url": a.srv.URL, "organization_id": accountOrg, "user_email": "live@terma.test",
+		"auth_url": a.srv.URL, "organization_id": accountOrg, "user_email": "live@terma.test", "user_id": accountUser,
 	}}}
 	data, _ := json.MarshalIndent(creds, "", "  ")
 	sb.writeAbs(credsPath, string(data)+"\n")

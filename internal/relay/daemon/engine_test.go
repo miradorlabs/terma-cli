@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -150,5 +151,49 @@ func TestARunningRelayKeepsThePolicyFresh(t *testing.T) {
 	r := Deps{}.Refresher()
 	if r.Interval+r.Discover >= config.PolicyStaleAfter {
 		t.Fatalf("refresh every %v, discover every %v: a running relay's policy looks stale after %v", r.Interval, r.Discover, config.PolicyStaleAfter)
+	}
+}
+
+// The heartbeat names whoever the profile is signed in as when it beats: no one signed out,
+// signed in for another environment, or set up with a server key.
+func TestTheHeartbeatNamesTheSignedInUser(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cfg := config.Config{Dir: dir, ProfileName: config.DefaultProfile, AuthURL: "https://auth.example"}
+	user := Deps{LoadConfig: func() (*config.Config, error) { c := cfg; return &c, nil }}.UserID()
+	if got := user(); got != "" {
+		t.Fatalf("signed out, the heartbeat names %q", got)
+	}
+	signIn := func(org, id string) {
+		t.Helper()
+		if _, err := auth.SaveCredential(dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_" + org, OrganizationID: org, AuthURL: cfg.AuthURL, UserID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	signIn("org-a", "user-a")
+	if got := user(); got != "user-a" {
+		t.Fatalf("signed in, the heartbeat names %q, want user-a", got)
+	}
+	signIn("org-b", "user-b") // switched while the relay runs
+	if got := user(); got != "user-b" {
+		t.Fatalf("after a switch, the heartbeat names %q, want user-b", got)
+	}
+	cfg.ServerKeySignIn = true
+	if got := user(); got != "" {
+		t.Errorf("set up with a server key, the heartbeat names %q", got)
+	}
+	cfg.ServerKeySignIn, cfg.AuthURL = false, "https://auth.other"
+	if got := user(); got != "" {
+		t.Errorf("signed in for another environment, the heartbeat names %q", got)
+	}
+	cfg.AuthURL = "https://auth.example"
+	if err := auth.DeleteCredential(dir, cfg.ProfileName); err != nil {
+		t.Fatal(err)
+	}
+	if got := user(); got != "" {
+		t.Errorf("signed out again, the heartbeat names %q", got)
+	}
+	if (Deps{}).UserID() != nil {
+		t.Error("a relay with no configuration to read asks who is signed in")
 	}
 }

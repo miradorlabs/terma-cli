@@ -238,6 +238,10 @@ func TestSignInReusesAWorkingSession(t *testing.T) {
 	if p := file.Profiles[config.DefaultProfile]; p == nil || p.OrganizationID != orgA().ID {
 		t.Fatalf("profile should record the organization: %+v", file.Profiles)
 	}
+	// A session stored before the user's id was kept gains it from whoami.
+	if cred, err := auth.LoadIdentity(testApp.dir, config.DefaultProfile); err != nil || cred.UserID != "u-1" {
+		t.Fatalf("the reused session's user id = %v, %v; want whoami's u-1", cred, err)
+	}
 }
 
 // `terma setup --org` switches between stored sessions by name or id without a browser,

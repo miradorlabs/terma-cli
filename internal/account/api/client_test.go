@@ -123,6 +123,7 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 				"token_type":    "Bearer",
 				"expires_in":    3600,
 				"organization":  map[string]string{"id": "org-1", "name": "Acme"},
+				"user":          map[string]string{"id": "user-1"},
 			})
 			return
 		}
@@ -159,6 +160,10 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 	}
 	if saved.RefreshToken != "mir_clr_rotated" {
 		t.Errorf("stored refresh token = %q, want the rotated one", saved.RefreshToken)
+	}
+	// A credential stored without the user's id gains it from the refresh.
+	if saved.UserID != "user-1" {
+		t.Errorf("stored user id = %q, want the refresh's user-1", saved.UserID)
 	}
 }
 
@@ -388,6 +393,7 @@ func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 			"access_token": "mir_cli_x", "refresh_token": "mir_clr_x",
 			"token_type": "Bearer", "expires_in": 3600,
 			"organization": map[string]string{"id": "org-1"},
+			"user":         map[string]string{"id": "user-1", "email": "dev@example.com"},
 		})
 	}))
 	defer srv.Close()
@@ -400,6 +406,9 @@ func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 	}
 	if cred.AuthURL != srv.URL {
 		t.Errorf("AuthURL = %q, want the host that minted it (%q)", cred.AuthURL, srv.URL)
+	}
+	if cred.UserID != "user-1" {
+		t.Errorf("UserID = %q, want the token response's user-1", cred.UserID)
 	}
 }
 

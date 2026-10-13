@@ -107,6 +107,7 @@ func credentialFrom(resp *tokenResponse) *auth.Credential {
 		SessionID:      resp.SessionID,
 		OrganizationID: resp.Organization.ID,
 		UserEmail:      resp.User.Email,
+		UserID:         resp.User.ID,
 	}
 }
 

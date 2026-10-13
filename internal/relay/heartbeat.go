@@ -16,8 +16,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// The heartbeat is one log record naming the machine, with terma's version and what
-// started the relay on its resource, timestamped when sent; it goes through HeartbeatSend,
+// The heartbeat is one log record naming the machine, and the Mirador user signed in as it
+// is sent if any (terma.user.id), with terma's version and what started the relay on its
+// resource, timestamped when sent; it goes through HeartbeatSend,
 // never the outbox, and a failed beat is not kept. Its terma.relay.heartbeat.reason says why
 // it was sent. Every beat carries the counters since the previous one as
 // terma.relay.heartbeat.counter.<name> ints, and a failed beat hands its counters to the
@@ -97,6 +98,11 @@ func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb
 			{Key: semconv.TermaRelayHeartbeatReasonKey, Value: strValue(reason)},
 			{Key: semconv.HostNameKey, Value: strValue(host)},
 		}, attrs...),
+	}
+	if r.opts.UserID != nil {
+		if user := r.opts.UserID(); user != "" {
+			rec.Attributes = append(rec.Attributes, &commonpb.KeyValue{Key: semconv.TermaUserIDKey, Value: strValue(user)})
+		}
 	}
 	res := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
 		{Key: semconv.ServiceNameKey, Value: strValue(HeartbeatService)},

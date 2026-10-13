@@ -221,8 +221,9 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 			orgName = org.Name
 		}
 	}
-	if identity.Email != "" && verified.UserEmail == "" {
-		verified.UserEmail = identity.Email
+	if (identity.Email != "" && verified.UserEmail == "") || (identity.UserID != "" && verified.UserID == "") {
+		verified.UserEmail = cmp.Or(verified.UserEmail, identity.Email)
+		verified.UserID = cmp.Or(verified.UserID, identity.UserID)
 		_ = auth.UpdateCredential(app.dir, cfg.ProfileName, verified)
 	}
 	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, verified, orgName) }); err != nil {
