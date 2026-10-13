@@ -689,6 +689,17 @@ attributes:
     stability: development
     brief: The session the relay inferred for a part that named none.
     note: A resource attribute the relay stamps.
+  - key: terma.tool_call.origin.id
+    type: string
+    stability: development
+    brief: The tool call that started the process this tool call reads from or writes to.
+    note: >
+      On the record of a call that polls or writes to a process an earlier call left running,
+      such as a long command the agent yielded: that earlier call's id, in the agent's own
+      call id format, so the backend joins the poll's output to the command it belongs to. A
+      record attribute the relay stamps from the agent's span for the call, absent when no
+      such span reached the relay in time. Not content: an id, so it leaves under every policy.
+    examples: ["exec-0199d5a3-7c41-7f02-9b1e-5d2a8f3c6e10"]
   - key: terma.version
     type: string
     stability: development

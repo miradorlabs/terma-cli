@@ -68,7 +68,7 @@ var pinnedSafeKeys = []string{
 	"startup.status", "status", "stop_reason", "storage_phase", "store_mode", "subagent_type",
 	"submission.id", "success", "target", "telemetry.sdk.language", "telemetry.sdk.name",
 	"telemetry.sdk.version", "terma.account.seat.id", "terma.relay.attribution",
-	"terma.relay.session.id", "terma.version", "terminal.type", "thread.id", "thread.name",
+	"terma.relay.session.id", "terma.tool_call.origin.id", "terma.version", "terminal.type", "thread.id", "thread.name",
 	"thread_id", "tmp_mem_enabled", "to_mode", "token_type", "tool", "tool_input_size_bytes",
 	"tool_name", "tool_name_safe", "tool_namespace", "tool_origin", "tool_result_seq",
 	"tool_result_size_bytes", "tool_source", "tool_token_count", "tool_type", "tool_use_id",

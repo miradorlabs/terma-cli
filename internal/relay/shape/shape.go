@@ -31,6 +31,20 @@ type Correlation struct {
 	SessionKeys []SessionKey
 	// StartEvents may arrive long before a hook claims their session, so they wait as long as a trace.
 	StartEvents []string
+	Links       []Link
+}
+
+// Link carries a value only a span holds onto the log record of the same call: a record
+// carrying every attribute in Record waits a few seconds for the span named Span whose Key
+// matches the record's, and leaves with that span's From as its own To. A record whose span
+// never comes leaves without it.
+type Link struct {
+	Record map[string]string
+	Span   string
+	Key    string
+	From   string
+	// To is the relay's to stamp: it leaves under every policy, and an agent's own is removed.
+	To string
 }
 
 // Correlator is an agent whose telemetry the relay places by session.

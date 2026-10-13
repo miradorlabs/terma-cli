@@ -50,6 +50,12 @@ attribute_groups:
     brief: What the relay adds to an agent's record whose user.email the team's policy withholds.
     attributes:
       - ref: terma.account.seat.id
+  - id: terma.relay.link
+    visibility: public
+    stability: development
+    brief: What the relay adds to an agent's record from the agent's span for the same call.
+    attributes:
+      - ref: terma.tool_call.origin.id
 
 events:
   - name: terma.session.start

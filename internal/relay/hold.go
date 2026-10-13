@@ -88,6 +88,7 @@ func (r *Relay) evictOldestLocked() bool {
 }
 
 func (r *Relay) sweep() {
+	r.releaseLinks(false)
 	now := r.opts.Now()
 	r.mu.Lock()
 	keys := make([]string, 0, len(r.held))

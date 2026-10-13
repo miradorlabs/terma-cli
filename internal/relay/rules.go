@@ -17,6 +17,7 @@ import (
 type rules struct {
 	sessionKeys          []shape.SessionKey
 	startEvents          []string
+	links                []shape.Link
 	promptFields         []string
 	promptDropFields     []string
 	promptBodyEvents     []string
@@ -55,11 +56,15 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 			byAttr[k.Attr] = k
 		}
 		r.startEvents = union(r.startEvents, cor.StartEvents)
+		r.links = append(r.links, cor.Links...)
 	}
 	r.sessionKeys = slices.SortedFunc(maps.Values(byAttr), func(a, b shape.SessionKey) int {
 		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr))
 	})
 	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
+	for _, l := range r.links {
+		r.safeKeys[l.To] = true
+	}
 	r.metricSafeKeys = map[string][]string{}
 	all := []shape.CaptureRules{generic}
 	for _, c := range capturers {

@@ -1,6 +1,9 @@
 package codex
 
-import "github.com/miradorlabs/terma-cli/internal/relay/shape"
+import (
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+)
 
 // Correlation names a Codex thread by conversation.id, thread.id or thread_id; a numeric
 // thread id is an OS thread, never a session.
@@ -14,6 +17,16 @@ func (Agent) Correlation() shape.Correlation {
 			{Attr: "thread_id", Rank: 50, RejectNumeric: true, Claimed: true},
 		},
 		StartEvents: []string{"codex.conversation_starts"},
+		// Unified exec yields a long command after a second; its output reaches a later
+		// write_stdin poll under a call id of its own, and only the poll's span (codex-rs
+		// unified_exec/process_manager.rs) names the command's call.
+		Links: []shape.Link{{
+			Record: map[string]string{"event.name": "codex.tool_result", "tool_name": "write_stdin"},
+			Span:   "unified_exec.write_stdin",
+			Key:    "call_id",
+			From:   "original_exec_call_id",
+			To:     semconv.TermaToolCallOriginIDKey,
+		}},
 	}
 }
 

@@ -259,6 +259,8 @@ const (
 	TermaTerminationReasonKey = "terma.termination.reason"
 	// TermaToolCallCountKey is terma.tool_call.count: How many tool calls the run made.
 	TermaToolCallCountKey = "terma.tool_call.count"
+	// TermaToolCallOriginIDKey is terma.tool_call.origin.id: The tool call that started the process this tool call reads from or writes to.
+	TermaToolCallOriginIDKey = "terma.tool_call.origin.id"
 	// TermaTurnIDKey is terma.turn.id: The turn the event belongs to, in the agent's own id.
 	TermaTurnIDKey = "terma.turn.id"
 	// TermaUsageCacheReadTokensKey is terma.usage.cache_read_tokens: Cache-read input tokens as the agent reported them, in a snapshot rather than per call.

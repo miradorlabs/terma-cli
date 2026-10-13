@@ -14,8 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -130,6 +132,10 @@ type Relay struct {
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
 	stopping   chan struct{}
+
+	// linkValues and linkWaits are the span values and the records waiting for one (link.go); under mu.
+	linkValues map[linkID]linkValue
+	linkWaits  []linkWait
 }
 
 // New returns a relay. Run must be started for anything to leave.
@@ -169,7 +175,7 @@ func New(opts Options) *Relay {
 		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
-		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
+		traces: map[string]traceSession{}, linkValues: map[linkID]linkValue{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 	}
 }
@@ -298,10 +304,15 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	waits := r.rules.carveLinks(parts)
 	pid := r.senderPID(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
-	for _, p := range parts {
+	all := slices.Collect(maps.Values(parts))
+	for _, w := range waits {
+		all = append(all, w.p)
+	}
+	for _, p := range all {
 		p.pid, p.narrow = pid, narrow
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
@@ -309,6 +320,15 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			r.learnProcess(pid, p.session)
 			p.start = r.rules.conversationStart(p)
 		}
+	}
+	// A record that waited for its span leaves before the span, or the session's order would queue it behind.
+	if s == Traces {
+		for _, p := range r.linkSpans(parts) {
+			r.route(p)
+		}
+	}
+	for _, p := range r.awaitLinks(waits) {
+		r.route(p)
 	}
 	for _, p := range parts {
 		if p.session == "" {

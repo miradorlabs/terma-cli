@@ -22,7 +22,9 @@ func (r *Relay) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			// Claims that landed since the last sweep still count; the rest is dropped.
+			// Records waiting for their span leave without it; claims that landed since the last
+			// sweep still count; the rest is dropped.
+			r.releaseLinks(true)
 			r.sweep()
 			r.dropHeldAtExit()
 			close(r.stopping)
@@ -118,7 +120,7 @@ func (r *Relay) Holding() bool {
 func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+	if r.heldN > 0 || len(r.linkWaits) > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false
 	}
 	r.refusing = true
