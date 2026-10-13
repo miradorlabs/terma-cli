@@ -159,7 +159,9 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 		selfupdate.SaveCache(dir, cache)
 		return false, err
 	}
-	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: current, Latest: rel.Version(), Published: rel.PublishedAt})
+	cache := selfupdate.Cache{CheckedAt: time.Now(), Current: current}
+	cache.Found(rel)
+	selfupdate.SaveCache(dir, cache)
 	if !selfupdate.IsRelease(current) {
 		if check {
 			fmt.Fprintf(out, "terma %s is a development build; latest release is %s. Use `terma update --force` to switch to it.\n", current, rel.Version())
@@ -171,6 +173,10 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 		}
 	} else if !selfupdate.Newer(current, rel.TagName) {
 		fmt.Fprintf(out, "terma %s is up to date (latest %s).\n", current, rel.Version())
+		return false, nil
+	}
+	if check && cache.Unbuilt {
+		fmt.Fprintf(out, "terma %s → %s is published, but still being built and signed: `terma update` installs it once it is.\n", current, rel.Version())
 		return false, nil
 	}
 	if check {

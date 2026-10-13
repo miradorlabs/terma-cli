@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -239,7 +240,7 @@ func TestNoticeUsesCache(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/"+Repo+"/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
 		calls++
-		_, _ = w.Write([]byte(`{"tag_name":"v2.0.0","assets":[]}`))
+		_ = json.NewEncoder(w).Encode(Release{TagName: "v2.0.0", Assets: builtAssets()})
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()

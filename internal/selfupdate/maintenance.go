@@ -65,6 +65,13 @@ type Cache struct {
 	AttemptedBy string `json:"attempted_by,omitempty"`
 }
 
+// Found records rel as the latest release, with whether its files are there yet (Unbuilt):
+// every look that fetches a release records it so, `terma update`'s as much as the relay's.
+func (c *Cache) Found(rel *Release) {
+	_, _, _, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH)
+	c.Latest, c.Published, c.Unbuilt = rel.Version(), rel.PublishedAt, errors.Is(err, ErrNotReady)
+}
+
 // held reports whether latest is a release whose install failed less than AttemptInterval
 // ago, tried by this build (running) or a later one, so that it is not tried again yet.
 func (c Cache) held(running string) bool {
@@ -189,8 +196,13 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string, every tim
 		interval = retryAfter(cache.Failures)
 	}
 	if time.Since(cache.CheckedAt) >= interval || cache.CheckedAt.After(time.Now()) {
+		before := cache
 		var err error
 		release, err = c.look(ctx, &cache)
+		// A look its process was stopped during is no look, failed or otherwise.
+		if err != nil && ctx.Err() != nil {
+			return before, nil
+		}
 		cache.CheckedAt, cache.Current, cache.Failed = time.Now(), current, err != nil
 		if err != nil {
 			cache.Failures++
@@ -235,13 +247,14 @@ func (c *Client) look(ctx context.Context, cache *Cache) (*Release, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, _, _, pick := PickAsset(release, runtime.GOOS, runtime.GOARCH)
-	cache.Latest, cache.Published, cache.Unbuilt = release.Version(), release.PublishedAt, errors.Is(pick, ErrNotReady)
+	cache.Found(release)
 	return release, nil
 }
 
+// notice names a newer release for the developer to install with `terma update`: not one
+// without its files yet, which that could not install either.
 func notice(cache Cache, current string) string {
-	if !Newer(current, cache.Latest) {
+	if cache.Unbuilt || !Newer(current, cache.Latest) {
 		return ""
 	}
 	return fmt.Sprintf("A newer terma is available (%s → %s). Run `terma update`.", current, cache.Latest)
@@ -336,12 +349,7 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 		return Outcome{Replaced: true}
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
-	// The latest release has no files yet: nothing to install, and nothing to say, as `terma
-	// update` could not install it either.
-	if cache.Unbuilt {
-		return Outcome{}
-	}
-	if !p.Auto || c.Binary == nil || !Newer(current, cache.Latest) || !UpdatesItself(exe) || cache.held(c.Version) ||
+	if !p.Auto || c.Binary == nil || cache.Unbuilt || !Newer(current, cache.Latest) || !UpdatesItself(exe) || cache.held(c.Version) ||
 		Soaking(current, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, current)}
 	}
@@ -353,23 +361,21 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 			return Outcome{Notice: notice(cache, current)}
 		}
 		if rel, err = c.Latest(updateCtx); err != nil {
-			// A failed lookup, retried as a failed check is, not held back a day as an install.
-			cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
-			SaveCache(stateDir, cache)
+			// A failed lookup, retried as a failed check is, not held back a day as an install;
+			// one its process was stopped during is neither.
+			if ctx.Err() == nil {
+				cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
+				SaveCache(stateDir, cache)
+			}
 			return Outcome{Err: err}
 		}
 		// The release may have been pulled, or followed by another, since the check.
-		cache.Latest, cache.Published = rel.Version(), rel.PublishedAt
+		cache.Found(rel)
 	}
-	if !Newer(current, rel.TagName) || Soaking(current, rel.Version(), rel.PublishedAt, time.Now()) {
+	// One that followed may be without its files still, or not be one to install by itself.
+	if cache.Unbuilt || !Newer(current, rel.TagName) || Soaking(current, rel.Version(), rel.PublishedAt, time.Now()) {
 		SaveCache(stateDir, cache)
 		return Outcome{Notice: notice(cache, current)}
-	}
-	// The one that followed may be without its files still: the next look asks after them.
-	if _, _, _, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH); errors.Is(err, ErrNotReady) {
-		cache.Unbuilt = true
-		SaveCache(stateDir, cache)
-		return Outcome{}
 	}
 	cache.AttemptAt, cache.Attempted, cache.AttemptedBy = time.Now(), rel.Version(), c.Version
 	SaveCache(stateDir, cache)

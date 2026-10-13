@@ -275,7 +275,9 @@ func TestUpdateRefusesOnceAnotherInstallReplacedTerma(t *testing.T) {
 }
 
 // `terma update` on a release GitHub already names the latest, but whose build has not
-// uploaded its files yet, says the release is still being built, and leaves the binary alone.
+// uploaded its files yet, says the release is still being built, and leaves the binary alone;
+// so does --check, rather than call it available. Both record it as unbuilt, as the
+// background look does, so no later command announces it.
 func TestUpdateSaysWhenTheLatestReleaseIsStillBeingBuilt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("in-place updates are Unix-only")
@@ -290,9 +292,22 @@ func TestUpdateSaysWhenTheLatestReleaseIsStillBeingBuilt(t *testing.T) {
 	}
 	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
 	var out bytes.Buffer
-	installed, err := testApp.runUpdate(context.Background(), c, t.TempDir(), exe, &out, false, false)
+	stateDir := t.TempDir()
+	if _, err := testApp.runUpdate(context.Background(), c, stateDir, exe, &out, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "still being built") || strings.Contains(out.String(), "available") {
+		t.Fatalf("--check said %q of a release with no files yet", &out)
+	}
+	if cache := selfupdate.LoadCache(stateDir); !cache.Unbuilt || cache.Latest != "1.0.1" {
+		t.Fatalf("--check recorded %+v, want 1.0.1 unbuilt", cache)
+	}
+	installed, err := testApp.runUpdate(context.Background(), c, stateDir, exe, &out, false, false)
 	if !errors.Is(err, selfupdate.ErrNotReady) || !strings.Contains(err.Error(), "still being built") || installed {
 		t.Fatalf("runUpdate = %v, %v; want the release named as still being built", installed, err)
+	}
+	if !selfupdate.LoadCache(stateDir).Unbuilt {
+		t.Fatal("update recorded a release with no files as built")
 	}
 	if got, _ := os.ReadFile(exe); string(got) != "1.0.0" {
 		t.Fatalf("the installed binary is now %q", got)

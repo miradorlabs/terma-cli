@@ -66,6 +66,9 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 		}
 		version, err := u.Update(ctx)
 		switch {
+		case err != nil && ctx.Err() != nil:
+			// Cut short by the relay stopping, which is no failure to report.
+			return
 		case err != nil:
 			logf("automatic update failed: %v", err)
 		case version != "":

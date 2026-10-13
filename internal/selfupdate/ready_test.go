@@ -123,6 +123,11 @@ func (p *publishing) askedAs() []string {
 	return slices.Sorted(maps.Keys(p.agents))
 }
 
+// builtAssets are the files of a release whose build has finished, for this platform.
+func builtAssets() []Asset {
+	return []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH)}, {Name: checksumsName}, {Name: SignatureName}}
+}
+
 // installedAt is the terma now at exe.
 func installedAt(t *testing.T, exe string) string {
 	t.Helper()
@@ -283,6 +288,61 @@ func TestAReleaseTheAPIStillListsAsUploadingIsWaitedFor(t *testing.T) {
 	}
 }
 
+// A release that followed the one the last look found, and has no files yet, is not tried in
+// its place: a command within the hour of that look still looks the release up before it
+// installs, finds the follower, and leaves it for the next look to ask after.
+func TestAReleaseThatFollowedUnbuiltIsNotAttempted(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	var github publishing
+	srv := github.serve(t, "v1.0.2", false)
+	stateDir := t.TempDir()
+	exe, started := oldBinary(t)
+	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "1.0.1", Published: time.Now()})
+	c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+	var out bytes.Buffer
+	c.Maintain(context.Background(), t.TempDir(), stateDir, exe, &out)
+	cache := LoadCache(stateDir)
+	if cache.Latest != "1.0.2" || !cache.Unbuilt || cache.Attempted != "" || cache.Failed || out.Len() != 0 || installedAt(t, exe) != "old binary" {
+		t.Fatalf("the check records %+v and the command said %q; want 1.0.2 found unbuilt, nothing tried or said", cache, &out)
+	}
+}
+
+// A look or a lookup its process was stopped during, as a relay's is that restarts, is not
+// one that failed: nothing is recorded, so the next process looks at once rather than after
+// a failed look's backoff.
+func TestALookCutShortByItsProcessStoppingIsNoFailedLook(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		every time.Duration
+		last  Cache
+	}{
+		{"during the look", 0, Cache{CheckedAt: time.Now().Add(-time.Minute), Current: "1.0.0", Latest: "1.0.0", Published: time.Now()}},
+		{"during the lookup before an install", CommandCheckInterval, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "1.0.1", Published: time.Now()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var github publishing
+			srv := github.serve(t, "v1.0.1", true)
+			stateDir := t.TempDir()
+			exe, started := oldBinary(t)
+			SaveCache(stateDir, tc.last)
+			stopped, stop := context.WithCancel(context.Background())
+			stop()
+			c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+			if o := c.auto(stopped, tc.every, t.TempDir(), stateDir, exe, nil); o.Installed != "" {
+				t.Fatalf("auto = %+v from a process told to stop", o)
+			}
+			if cache := LoadCache(stateDir); cache.Failed || cache.Failures != 0 || !cache.CheckedAt.Equal(tc.last.CheckedAt) {
+				t.Fatalf("a look its process was stopped during left %+v, want the record as it was", cache)
+			}
+		})
+	}
+}
+
 // Asking after a release's files and being refused, as a throttled address is, is a failed
 // look: it backs off as one does, and is not followed by a lookup in the rate-limited API.
 func TestARefusedDownloadProbeIsAFailedLook(t *testing.T) {
@@ -385,7 +445,21 @@ func TestABinaryChangedInPlaceIsAnotherInstalls(t *testing.T) {
 	if c.Replaced(exe) {
 		t.Fatal("the binary the process started from counts as replaced")
 	}
+	// The same length a minute on: its time alone says it is another's.
+	later := started.ModTime().Add(time.Minute)
+	if err := os.Chtimes(exe, later, later); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Replaced(exe) {
+		t.Fatal("a binary of the same size and a later time still counts as the one the process started from")
+	}
+	if err := os.Chtimes(exe, started.ModTime(), started.ModTime()); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(exe, []byte("another install's, written over it"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(exe, started.ModTime(), started.ModTime()); err != nil {
 		t.Fatal(err)
 	}
 	if !c.Replaced(exe) {

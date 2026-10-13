@@ -17,8 +17,10 @@ const checksumsName = "checksums.txt"
 // moment it is published, while its files come from a build that starts only once a reviewer
 // approves it and then takes minutes; the signature is made nowhere else, as the signing
 // key is that build's alone. So a release without them has not been through approval yet:
-// it is asked about again at the next pass, rather than tried and then held back as an
-// install that failed (AttemptInterval).
+// it is asked about again at the next look, rather than tried and then held back as an
+// install that failed (AttemptInterval). A release that never gets them, as one for a
+// platform terma is not built for would be, is asked about so for good; every platform a
+// release build runs on is built.
 var ErrNotReady = errors.New("the release is still being built and signed; try again in a few minutes")
 
 // head asks github.com for the page at path without following where it redirects, which is

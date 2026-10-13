@@ -110,6 +110,24 @@ func TestTheUpdaterNeverOutlivesTheRelayToSayWhatItInstalled(t *testing.T) {
 	}
 }
 
+// A pass the relay cut short by stopping is no failed update to report in its log.
+func TestAPassCutShortByTheRelayStoppingIsNoFailure(t *testing.T) {
+	t.Parallel()
+	ctx, stop := context.WithCancel(t.Context())
+	defer stop()
+	var logged []string
+	u := Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
+		Logf: func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
+		Update: func(ctx context.Context) (string, error) {
+			stop()
+			return "", ctx.Err()
+		}}
+	u.Run(ctx, make(chan string, 1))
+	if len(logged) != 0 {
+		t.Fatalf("logged %q for a pass the relay cut short", logged)
+	}
+}
+
 // A relay stopping before the updater's first wait is over makes no attempt.
 func TestTheUpdaterStopsWithTheRelay(t *testing.T) {
 	t.Parallel()
