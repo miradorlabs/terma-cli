@@ -83,15 +83,39 @@ func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 	return filepath.Clean(lines[0]), filepath.Clean(lines[1]), nil
 }
 
-// StagedFiles lists the repo-relative paths added, modified or renamed in the index.
-func StagedFiles(ctx context.Context, dir string) ([]string, error) {
-	out, err := run(ctx, dir, "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
+// StagedFile is one path added, modified or renamed in the index.
+type StagedFile struct {
+	Path string
+	// OldPath is the path a rename moved the file from, "" for anything else.
+	OldPath string
+}
+
+// StagedFiles lists the repo-relative paths added, modified or renamed in the index; -M
+// keeps rename detection on whatever diff.renames says, so a rename names its old path.
+func StagedFiles(ctx context.Context, dir string) ([]StagedFile, error) {
+	out, err := run(ctx, dir, "diff", "--cached", "--name-status", "-M", "--diff-filter=ACMR", "-z")
 	if err != nil {
 		return nil, err
 	}
-	var files []string
-	for f := range strings.SplitSeq(out, "\x00") {
-		if f = strings.TrimSpace(f); f != "" {
+	// Each record is a status then its path, NUL-separated; a rename's status is followed
+	// by its old path and its new one. Paths are raw, so nothing trims them.
+	records := strings.Split(out, "\x00")
+	var files []StagedFile
+	for i := 0; i < len(records); i++ {
+		status := records[i]
+		if status == "" || i+1 >= len(records) {
+			continue
+		}
+		f := StagedFile{Path: records[i+1]}
+		i++
+		if status[0] == 'R' {
+			if i+1 >= len(records) {
+				break
+			}
+			f.OldPath, f.Path = f.Path, records[i+1]
+			i++
+		}
+		if f.Path != "" {
 			files = append(files, f)
 		}
 	}

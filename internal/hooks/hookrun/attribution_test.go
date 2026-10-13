@@ -225,6 +225,48 @@ func TestAMixedCommitKeepsEachSessionsAgent(t *testing.T) {
 	}
 }
 
+// A session edits a file, then `git mv`s it and commits with `git add -A`: the index names
+// only the new path, the manifest the old one. The rename is the session's, and the commit
+// retires the old path.
+func TestARenamedEditIsTheSessions(t *testing.T) {
+	t.Parallel()
+	root, stateDir, sp := hookruntest.Project(t)
+	now := time.Now()
+	env := func(args ...string) Env {
+		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Spool: sp, Team: hookruntest.Team}
+	}
+	const body = "one\ntwo\nthree\nfour\nfive\n"
+	hookruntest.WriteFile(t, root, "src/store.ts", body)
+	commitAs(t, env, root, "add store", "-A")
+	store := hookruntest.Store(t, root)
+	sess := session.Session{ID: claudeSession, Tool: "claude-code", ToolVersion: "2.1.3"}
+	if err := store.Touch(sess, []string{"src/store.ts"}, now); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "src/store.ts", body+"six\n")
+	if _, err := gitx.Git(context.Background(), root, "mv", "src/store.ts", "src/storage.ts"); err != nil {
+		t.Fatal(err)
+	}
+	commitAs(t, env, root, "rename store", "-A")
+
+	msg, _ := gitx.Git(context.Background(), root, "log", "-1", "--format=%B")
+	if got := trailer.Parse(msg, "#"); !reflect.DeepEqual(got, []trailer.Trailer{{SessionID: claudeSession, Tool: "claude-code/2.1.3"}}) {
+		t.Fatalf("trailers = %+v", got)
+	}
+	commits := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaCommitEvent)
+	if len(commits) != 1 {
+		t.Fatalf("%d terma.commit events", len(commits))
+	}
+	if got := sessionMaps(commits[0].Attrs[semconv.TermaCommitFileStatsKey]); len(got) != 1 ||
+		got[0]["path"] != "src/storage.ts" || got[0]["session_id"] != claudeSession {
+		t.Errorf("file stats = %v, want src/storage.ts owned by the session", got)
+	}
+	manifests, _ := store.Manifests()
+	if len(manifests) != 1 || len(manifests[0].Files) != 0 {
+		t.Errorf("manifests = %+v, want the session's emptied", manifests)
+	}
+}
+
 // A session stamped without Agent-Tool, which terma never writes, is exported as it is: no
 // agent, rather than another session's or a stand-in.
 func TestASessionWithNoAgentHasNoAgent(t *testing.T) {

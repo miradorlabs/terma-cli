@@ -262,7 +262,9 @@ func configValues(path, section, key string) []string {
 
 // FileStat is one path in a commit with git's line delta for it, whoever wrote the lines.
 type FileStat struct {
-	Path    string
+	Path string
+	// OldPath is the path a rename moved the file from, "" for anything else.
+	OldPath string
 	Added   int
 	Deleted int
 	// Binary means git printed "-": the counts are absent, never report them as 0.
@@ -308,9 +310,10 @@ func (c Commit) Paths() []string {
 }
 
 // LastCommit reads HEAD's sha, author, refs, parents, message and numstat in one git
-// call (~13.5 ms, nearly all process start).
+// call (~13.5 ms, nearly all process start); -M detects renames, never copies, whatever
+// diff.renames says.
 func LastCommit(ctx context.Context, dir string) (Commit, error) {
-	out, err := run(ctx, dir, "log", "-1", "-z", "--format=%H%x1f%ae%x1f%D%x1f%P%x1f%B%x1e", "--numstat", "HEAD")
+	out, err := run(ctx, dir, "log", "-1", "-z", "--format=%H%x1f%ae%x1f%D%x1f%P%x1f%B%x1e", "--numstat", "-M", "HEAD")
 	if err != nil {
 		return Commit{}, err
 	}
@@ -330,8 +333,8 @@ func LastCommit(ctx context.Context, dir string) (Commit, error) {
 }
 
 // parseNumstat reads the `--numstat -z` block. A rename spans three records (counts
-// with an empty path, old path, new path) and is recorded under the new path; paths
-// are raw, so nothing trims them.
+// with an empty path, old path, new path) and is recorded under the new path, with the
+// old one beside it; paths are raw, so nothing trims them.
 func parseNumstat(block string) []FileStat {
 	// The NUL and newline after the --format record are framing, not the first path.
 	block = strings.TrimPrefix(block, "\x00")
@@ -351,12 +354,13 @@ func parseNumstat(block string) []FileStat {
 		if !ok {
 			continue
 		}
+		oldPath := ""
 		if path == "" {
-			// Rename or copy: the next two records are the old and the new path.
+			// Rename: the next two records are the old and the new path.
 			if i+2 >= len(records) {
 				break
 			}
-			path = records[i+2]
+			oldPath, path = records[i+1], records[i+2]
 			i += 2
 		}
 		if path == "" {
@@ -366,6 +370,7 @@ func parseNumstat(block string) []FileStat {
 		deleted, deletedOK := parseCount(deletedField)
 		out = append(out, FileStat{
 			Path:    path,
+			OldPath: oldPath,
 			Added:   added,
 			Deleted: deleted,
 			Binary:  !addedOK || !deletedOK,

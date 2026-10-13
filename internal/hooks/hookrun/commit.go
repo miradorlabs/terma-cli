@@ -49,7 +49,15 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 		env.Logf("staged files: %v", err)
 		return nil
 	}
-	attributions := session.Attribute(staged, manifests)
+	// A rename touches both its paths: a session that edited the file before moving it wrote it.
+	paths := make([]string, 0, len(staged))
+	for _, f := range staged {
+		paths = append(paths, f.Path)
+		if f.OldPath != "" {
+			paths = append(paths, f.OldPath)
+		}
+	}
+	attributions := session.Attribute(paths, manifests)
 	if len(attributions) == 0 {
 		return nil
 	}
@@ -104,7 +112,13 @@ func PostCommit(ctx context.Context, env Env) error {
 		emitUnattributedCommit(env, r, head) // human-only commit: no manifest to retire
 		return nil
 	}
+	// A rename retires the old path too, which is where the session recorded its edit.
 	files := head.Paths()
+	for _, f := range head.Files {
+		if f.OldPath != "" {
+			files = append(files, f.OldPath)
+		}
+	}
 	keys := make([]session.Key, 0, len(stamped))
 	for _, t := range stamped {
 		agent, _ := t.Agent()
@@ -255,7 +269,11 @@ func addFileStats(attrs map[string]any, stats []gitx.FileStat, owners map[string
 	for _, f := range reported {
 		e := map[string]any{"path": f.Path}
 		// The stamped session whose manifest names the file; a hand edit beside an agent's has none.
-		if k, ok := owners[session.Normalize(f.Path)]; ok {
+		k, ok := owners[session.Normalize(f.Path)]
+		if !ok && f.OldPath != "" {
+			k, ok = owners[session.Normalize(f.OldPath)]
+		}
+		if ok {
 			e["session_id"], e["agent"] = k.ID, k.Tool
 		}
 		if !f.Binary {
