@@ -334,8 +334,7 @@ func LastCommit(ctx context.Context, dir string) (Commit, error) {
 
 // parseNumstat reads the `--numstat -z` block. A rename spans three records (counts
 // with an empty path, old path, new path) and is recorded under the new path, with the
-// old one beside it; paths
-// are raw, so nothing trims them.
+// old one beside it; paths are raw, so nothing trims them.
 func parseNumstat(block string) []FileStat {
 	// The NUL and newline after the --format record are framing, not the first path.
 	block = strings.TrimPrefix(block, "\x00")
