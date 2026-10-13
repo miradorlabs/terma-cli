@@ -45,7 +45,7 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	acct.denyMints.Store(o.NoKey)
 	if acct.withholdContent.Swap(!o.Content) != !o.Content {
 		// The team's policy changed since setup fetched it: set up again, as a developer would.
-		sb.Setup(nil, "--team", sb.ProjectID, "--harness", setupHarnesses)
+		sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
 		sb.Receiver.Reset()
 	}
 	sb.relayed = true
@@ -69,7 +69,7 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 		t.Fatal(err)
 	}
 	// The relay withholds a claimed session of an agent the developer did not choose, and
-	// setup records only Claude Code and Codex (the rest are Coming Soon): the profile
+	// setup records only the agents it offers (the rest are Coming Soon): the profile
 	// names every agent pointed at the relay, as setup would once it offers them.
 	agents := append([]string{"claude", "codex", "opencode"}, sb.RelayAgents...)
 	sb.recordHarnesses(agents)
