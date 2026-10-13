@@ -127,9 +127,10 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
 	for _, tc := range []struct {
 		name, tool, input, response string
+		write                       bool
 	}{
-		{"view_image", "view_image", `{"path":%s}`, `"image displayed successfully"`},
-		{"mcp file_path", "mcp__filesystem__write_file", `{"file_path":%s,"content":"x"}`, `"ok"`},
+		{"view_image", "view_image", `{"path":%s}`, `"image displayed successfully"`, false},
+		{"mcp file_path", "mcp__filesystem__write_file", `{"file_path":%s,"content":"x"}`, `"ok"`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := hookruntest.InitRepo(t)
@@ -151,6 +152,9 @@ func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
 			if got := touched[0].Attrs[semconv.TermaCheckoutIDKey]; got != nil {
 				t.Fatalf("%s confirmed no edit, yet names checkout %v", tc.tool, got)
 			}
+			if !tc.write {
+				return
+			}
 
 			hookruntest.WriteFile(t, root, "diagram.png", "png v2")
 			if _, err := gitx.Git(ctx, root, "add", "diagram.png"); err != nil {
@@ -163,7 +167,7 @@ func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
 				t.Fatal(err)
 			}
 			if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
-				t.Fatalf("a tool's path no longer stamps its commit:\n%s", data)
+				t.Fatalf("an MCP write no longer stamps its commit:\n%s", data)
 			}
 		})
 	}

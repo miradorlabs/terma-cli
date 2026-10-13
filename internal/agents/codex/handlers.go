@@ -245,6 +245,10 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		// a path argument that may only have been read (view_image, an MCP tool). Only the
 		// session's own manifest records them, and only a shell call's has a before-state
 		// for the turn's Stop to withdraw the unchanged ones (expected.go).
+		// Accepted risk: a path another tool only read (view_image) stays claimed until
+		// retention, so the developer's own later commit of it is stamped too; recording no
+		// claim would stop an MCP write stamping its commit. Upgrade path: Report alone for
+		// Codex's read-only built-ins.
 		env.Expect(r, sess, candidates)
 		env.Report(r, sess, in.ToolName, candidates, attrs)
 		return nil
