@@ -72,6 +72,13 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 	e.report(r, sess, toolName, paths, extra, true)
 }
 
+// TouchGuessed records and spools paths as Touch does, mirroring them into another checkout's
+// manifest too, without naming a checkout id: the tool may only have read them.
+func (e Env) TouchGuessed(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
+	e.record(r, sess, paths, true)
+	e.report(r, sess, toolName, paths, extra, false)
+}
+
 // Expect records in sess's manifest the files of r among paths, without reporting them, and
 // returns them repo-relative: a hook before a tool call records what a commit in the call
 // will take in. Only r's manifest records a prediction, since only there can settling it

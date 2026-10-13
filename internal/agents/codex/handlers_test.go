@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -118,6 +119,103 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
 		t.Fatalf("commit of a shell-written file not stamped:\n%s", data)
+	}
+}
+
+// A tool other than apply_patch confirms no edit: its path may be a read (view_image) or an
+// MCP tool's argument, so it names no checkout id. An MCP write still stamps its commit.
+func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
+	for _, tc := range []struct {
+		name, tool, input, response string
+		write                       bool
+	}{
+		{"view_image", "view_image", `{"path":%s}`, `"image displayed successfully"`, false},
+		{"mcp file_path", "mcp__filesystem__write_file", `{"file_path":%s,"content":"x"}`, `"ok"`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := hookruntest.InitRepo(t)
+			stateDir := t.TempDir()
+			ctx := context.Background()
+			sp, _ := spool.Open(t.TempDir())
+			const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
+			hookruntest.WriteFile(t, root, "diagram.png", "png")
+			input := fmt.Sprintf(tc.input, strconv.Quote(filepath.Join(root, "diagram.png")))
+			env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+				Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"tool_name":"` + tc.tool + `","tool_use_id":"call_read","tool_input":` + input + `,"tool_response":` + tc.response + `}`)}
+			if err := postToolUse(ctx, env); err != nil {
+				t.Fatal(err)
+			}
+			touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+			if len(touched) != 1 || touched[0].Attrs[semconv.GenAIToolNameKey] != tc.tool || hookruntest.Joined(touched[0].Attrs[semconv.TermaFilesPathsKey]) != "diagram.png" {
+				t.Fatalf("touched = %+v", touched)
+			}
+			if got := touched[0].Attrs[semconv.TermaCheckoutIDKey]; got != nil {
+				t.Fatalf("%s confirmed no edit, yet names checkout %v", tc.tool, got)
+			}
+			if !tc.write {
+				return
+			}
+
+			hookruntest.WriteFile(t, root, "diagram.png", "png v2")
+			if _, err := gitx.Git(ctx, root, "add", "diagram.png"); err != nil {
+				t.Fatal(err)
+			}
+			msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+			_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
+			commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+			if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+				t.Fatal(err)
+			}
+			if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
+				t.Fatalf("an MCP write no longer stamps its commit:\n%s", data)
+			}
+		})
+	}
+}
+
+// An MCP write from a session in the main checkout into a linked worktree of the same
+// repository is mirrored to the worktree's manifest, so a commit there carries the session's
+// trailer, though the touch names no checkout.
+func TestCodexMCPWriteIntoASiblingWorktreeStampsItsCommit(t *testing.T) {
+	main := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(main, ".claude", "worktrees", "feature-m")
+	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	const id = "01a08bd5-0487-74b1-9d82-45e619c574fc"
+	hookruntest.WriteFile(t, wt, "src/m.go", "package src\n")
+	input := `{"file_path":` + strconv.Quote(filepath.Join(wt, "src", "m.go")) + `,"content":"package src\\n"}`
+	pol := hookruntest.Admitting(main)
+	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: main, Policy: pol, Spool: sp, Version: "test",
+		Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(main) + `,"tool_name":"mcp__filesystem__write_file","tool_use_id":"call_mcp","tool_input":` + input + `,"tool_response":"ok"}`)}
+	if err := postToolUse(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+	if len(touched) != 1 || hookruntest.Joined(touched[0].Attrs[semconv.TermaFilesPathsKey]) != "src/m.go" {
+		t.Fatalf("touched = %+v", touched)
+	}
+	if got := touched[0].Attrs[semconv.TermaCheckoutIDKey]; got != nil {
+		t.Fatalf("an MCP write confirmed no edit, yet names checkout %v", got)
+	}
+
+	if _, err := gitx.Git(ctx, wt, "add", "src/m.go"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
+	commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: wt, Policy: pol, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
+		t.Fatalf("an MCP write into a sibling worktree no longer stamps its commit there:\n%s", data)
 	}
 }
 
