@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -269,6 +270,31 @@ func TestUpdateRefusesOnceAnotherInstallReplacedTerma(t *testing.T) {
 		t.Fatalf("runUpdate = %v, %v after %d lookups; want a refusal and no lookup", installed, err, calls)
 	}
 	if got, _ := os.ReadFile(exe); string(got) != "1.0.1" {
+		t.Fatalf("the installed binary is now %q", got)
+	}
+}
+
+// `terma update` on a release GitHub already names the latest, but whose build has not
+// uploaded its files yet, says the release is still being built, and leaves the binary alone.
+func TestUpdateSaysWhenTheLatestReleaseIsStillBeingBuilt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"tag_name":"v1.0.1","assets":[]}`)
+	}))
+	defer srv.Close()
+	exe := filepath.Join(t.TempDir(), "terma")
+	if err := os.WriteFile(exe, []byte("1.0.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	var out bytes.Buffer
+	installed, err := testApp.runUpdate(context.Background(), c, t.TempDir(), exe, &out, false, false)
+	if !errors.Is(err, selfupdate.ErrNotReady) || !strings.Contains(err.Error(), "still being built") || installed {
+		t.Fatalf("runUpdate = %v, %v; want the release named as still being built", installed, err)
+	}
+	if got, _ := os.ReadFile(exe); string(got) != "1.0.0" {
 		t.Fatalf("the installed binary is now %q", got)
 	}
 }

@@ -149,20 +149,10 @@ func (c *Client) web() string {
 // included, which machines sharing an address and checking every few minutes would spend;
 // the page is not held to that published limit, so the frequent check asks it first.
 func (c *Client) latestTag(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, c.web()+"/"+Repo+"/releases/latest", nil)
+	resp, err := c.head(ctx, "/releases/latest")
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", userAgentPrefix+c.Version)
-	client := c.httpClient()
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	_ = resp.Body.Close()
 	if resp.StatusCode >= http.StatusBadRequest {
 		return "", fmt.Errorf("github latest release page: HTTP %d", resp.StatusCode)
 	}
@@ -260,14 +250,18 @@ type Outcome struct {
 // off in configDir; the check's records go in stateDir. A new minor or major version waits
 // out SoakTime first, and is looked up again before it is installed, so a release pulled
 // since the check is not. Each release is attempted once per AttemptInterval at most, so a
-// failing install is not retried at every pass. progress, when set, is told of the download.
+// failing install is not retried at every pass; a release still being built and signed
+// (ErrNotReady) is no attempt, and is asked about again at the next. A process that installed
+// a release goes on as it (current), so its later passes install the releases after it.
+// progress, when set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	return c.auto(ctx, 0, configDir, stateDir, exe, progress)
 }
 
 // auto is Auto with every as the least time between looks.
 func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
-	if !IsRelease(c.Version) {
+	current := c.current()
+	if !IsRelease(current) {
 		return Outcome{}
 	}
 	p, err := LoadPreferences(configDir)
@@ -284,20 +278,29 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	if c.Replaced(exe) {
 		return Outcome{Replaced: true}
 	}
-	cache, rel := c.cachedCheck(ctx, stateDir, c.Version, every)
+	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
 	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < AttemptInterval
-	if !p.Auto || c.Binary == nil || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
-		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
-		return Outcome{Notice: notice(cache, c.Version)}
+	if !p.Auto || c.Binary == nil || !Newer(current, cache.Latest) || !UpdatesItself(exe) || attempted ||
+		Soaking(current, cache.Latest, cache.Published, time.Now()) {
+		return Outcome{Notice: notice(cache, current)}
 	}
 	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	if rel == nil {
 		// A check that failed waits out its backoff before any lookup, this one included.
 		if cache.Failed {
-			return Outcome{Notice: notice(cache, c.Version)}
+			return Outcome{Notice: notice(cache, current)}
 		}
-		if rel, err = c.Latest(updateCtx); err != nil {
+		// Its files are asked after before the API is: a release an earlier pass found
+		// unbuilt is looked up again only once they are there.
+		ready, err := c.built(updateCtx, cache.Latest)
+		if err == nil && !ready {
+			return Outcome{}
+		}
+		if err == nil {
+			rel, err = c.Latest(updateCtx)
+		}
+		if err != nil {
 			// A failed lookup, retried as a failed check is, not held back a day as an install.
 			cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
 			SaveCache(stateDir, cache)
@@ -306,14 +309,20 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 		// The release may have been pulled, or followed by another, since the check.
 		cache.Latest, cache.Published = rel.Version(), rel.PublishedAt
 	}
-	if !Newer(c.Version, rel.TagName) || Soaking(c.Version, rel.Version(), rel.PublishedAt, time.Now()) {
+	if !Newer(current, rel.TagName) || Soaking(current, rel.Version(), rel.PublishedAt, time.Now()) {
 		SaveCache(stateDir, cache)
-		return Outcome{Notice: notice(cache, c.Version)}
+		return Outcome{Notice: notice(cache, current)}
+	}
+	// Published, but its build has not been approved or has not finished: nothing to try yet,
+	// and nothing to say, as `terma update` could not install it either.
+	if _, _, _, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH); errors.Is(err, ErrNotReady) {
+		SaveCache(stateDir, cache)
+		return Outcome{}
 	}
 	cache.AttemptAt, cache.Attempted = time.Now(), rel.Version()
 	SaveCache(stateDir, cache)
 	if progress != nil {
-		fmt.Fprintf(progress, "Updating terma %s → %s…\n", c.Version, rel.Version())
+		fmt.Fprintf(progress, "Updating terma %s → %s…\n", current, rel.Version())
 	}
 	if _, err := c.Apply(updateCtx, rel, exe, progress); errors.Is(err, ErrReplaced) {
 		// No attempt was made on the binary now in place: its own process may try at once.
