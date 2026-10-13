@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -79,10 +80,13 @@ func recordSteps(t *testing.T, fail string) *[][]string {
 	return &steps
 }
 
+// latestRelease is a client whose latest release is tag, with its files all there: one
+// without them is still being built, and no update is tried on it.
 func latestRelease(t *testing.T, tag string) *selfupdate.Client {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"tag_name":"` + tag + `","assets":[]}`))
+		_ = json.NewEncoder(w).Encode(selfupdate.Release{TagName: tag, Assets: []selfupdate.Asset{
+			{Name: selfupdate.AssetName(runtime.GOOS, runtime.GOARCH)}, {Name: "checksums.txt"}, {Name: selfupdate.SignatureName}}})
 	}))
 	t.Cleanup(srv.Close)
 	return &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}

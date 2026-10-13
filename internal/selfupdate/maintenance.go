@@ -72,6 +72,22 @@ func (c *Cache) Found(rel *Release) {
 	c.Latest, c.Published, c.Unbuilt = rel.Version(), rel.PublishedAt, errors.Is(err, ErrNotReady)
 }
 
+// attempt is the record of the last install tried alone, which outlives what a look found.
+func (c Cache) attempt() Cache {
+	return Cache{AttemptAt: c.AttemptAt, Attempted: c.Attempted, AttemptedBy: c.AttemptedBy}
+}
+
+// Checked records in dir a look that `terma update` made for itself, which found rel for a
+// terma at current, and returns the record. It keeps the last install tried, as every look
+// does: a release held back after a failed install stays so.
+func Checked(dir, current string, rel *Release) Cache {
+	cache := LoadCache(dir).attempt()
+	cache.CheckedAt, cache.Current = time.Now(), current
+	cache.Found(rel)
+	SaveCache(dir, cache)
+	return cache
+}
+
 // held reports whether latest is a release whose install failed less than AttemptInterval
 // ago, tried by this build (running) or a later one, so that it is not tried again yet.
 func (c Cache) held(running string) bool {
@@ -189,7 +205,7 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string, every tim
 	cache := LoadCache(dir)
 	var release *Release
 	if cache.Current != "" && cache.Current != current {
-		cache = Cache{AttemptAt: cache.AttemptAt, Attempted: cache.Attempted, AttemptedBy: cache.AttemptedBy}
+		cache = cache.attempt()
 	}
 	interval := every
 	if cache.Failed {
