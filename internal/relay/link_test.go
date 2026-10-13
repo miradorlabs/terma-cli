@@ -192,8 +192,8 @@ func TestLinkStopSendsWaitingPolls(t *testing.T) {
 	u := newUpstream(t)
 	r, srv, _, _, stop := linkRelay(t, u)
 	postProto(t, srv, "/v1/logs", toolResults("exec-poll"))
-	if r.Quiesce(0) {
-		t.Fatal("quiesced with a poll waiting for its span")
+	if r.Quiesce(0) || !r.Holding() {
+		t.Fatal("quiesced or not holding with a poll waiting for its span")
 	}
 	stop()
 	if c := r.Stats().Snapshot().Counters; c["unlinked_records"] != 1 || c["forwarded.logs"] != 1 {

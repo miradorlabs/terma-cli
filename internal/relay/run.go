@@ -106,11 +106,11 @@ func (r *Relay) countQueuedAtExit() {
 	}
 }
 
-// Holding reports whether any part waits in the hold.
+// Holding reports whether any part waits in the hold, or any record for its span.
 func (r *Relay) Holding() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.heldN > 0
+	return r.heldN > 0 || len(r.linkWaits) > 0
 }
 
 // Quiesce prepares the relay to stop without losing what it holds in memory: when nothing is

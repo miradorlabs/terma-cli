@@ -159,9 +159,10 @@ func (r *Relay) awaitLinks(waits []linkWait) []*part {
 	if len(waits) == 0 {
 		return nil
 	}
-	now := r.opts.Now()
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// Read under mu, so the waits stay oldest first for releaseLinks.
+	now := r.opts.Now()
 	var out []*part
 	for _, w := range waits {
 		if v, ok := r.linkValues[w.id]; ok {
