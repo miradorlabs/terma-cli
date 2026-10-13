@@ -346,20 +346,24 @@ listed does not leave. An edit the agent's hook saw names its checkout by
 `terma.checkout.id`, a hash of the working tree's path, under any policy: it names no path,
 though anyone who can guess the path can recompute it.
 
-GitHub Copilot exports from two places, and setup configures each where it reads. VS
-Code takes its exporters from its user `settings.json`: setup adds
-`github.copilot.chat.otel.*` (Copilot Chat's own agent) and `chat.agentHost.otel.*` (the
-Copilot runtime VS Code hosts), and lists them under `settingsSync.ignoredSettings`, since
-they name this machine's relay. It changes no other byte of the file, comments included,
-and `terma teardown` puts back what those settings held before; restart VS Code after
-setup. VS Code's own `telemetry.telemetryLevel: off` also switches Copilot's export off
-there, which `terma doctor` reports. The Copilot CLI reads its exporter only from its
-environment, so setup defines a `copilot` shell function in your shell's startup file
-(zsh, bash or fish) that starts it through `terma launch copilot`: the variables reach
-that one process, never your shell or other programs, and the file holds no endpoint or
-token. A `copilot` started another way (a script, an absolute path, an editor) is still
-claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the function
-out of your startup files. Copilot reports token counts and AI credits, not a cost.
+GitHub Copilot runs the same runtime in two places, and setup points each one's exporter
+where it reads it. VS Code runs it in its agent host, configured from the user
+`settings.json`: setup adds `chat.agentHost.otel.*` and lists those settings under
+`settingsSync.ignoredSettings`, since they name this machine's relay. It changes no other
+byte of the file, comments included, and `terma teardown` puts back what the settings
+held before; restart VS Code after setup. VS Code reads an exporter endpoint from its
+environment ahead of its settings, so where `OTEL_EXPORTER_OTLP_ENDPOINT` in your shell
+names a collector off this machine, setup leaves VS Code's settings alone and says so.
+Copilot Chat's own exporter (`github.copilot.chat.otel.*`) is never switched on: VS Code
+would copy its endpoint into every extension's environment. The Copilot CLI reads its
+exporter only from its environment, so setup defines a `copilot` shell function in your
+shell's startup file (zsh, bash or fish) that starts it through `terma launch copilot`:
+the variables reach that one process, never your shell or other programs, and the file
+holds no endpoint or token. An alias or function of your own named `copilot` is left as
+it is, and a `copilot` started another way (a script, an absolute path, an editor) is
+still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the
+function out of your startup files. Copilot reports token counts and AI credits, not a
+cost, and a file one of its shell commands writes is not attributed to its session.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

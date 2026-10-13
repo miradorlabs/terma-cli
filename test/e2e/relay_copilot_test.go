@@ -107,7 +107,8 @@ func TestRelayCopilotOutsideARepository(t *testing.T) {
 }
 
 // Nothing Copilot runs inherits the relay's endpoint or token: `terma launch` puts them
-// in the CLI's environment, and the CLI keeps its exporter's settings out of its tools'.
+// in the CLI's environment, and the CLI keeps every exporter variable out of its tools':
+// none named OTEL_* or COPILOT_OTEL*, and none whose value names the relay's address.
 func TestRelayCopilotToolsGetNoExporter(t *testing.T) {
 	forEachCopilot(t, func(t *testing.T, b Binary) {
 		ProvesAll(t, b, "relay.tools_no_token")
@@ -116,13 +117,14 @@ func TestRelayCopilotToolsGetNoExporter(t *testing.T) {
 		t.Cleanup(func() { _ = os.Remove(out) })
 		sb := copilotSandbox(t, b)
 		sb.UseRelay(RelayOptions{Start: true})
-		sb.CopilotRun(sb.Repo, "Run exactly this one shell command, then reply with exactly: done.\nenv | cut -d= -f1 | grep '^OTEL_EXPORTER' > "+out+"; printf ran >> "+out)
+		sb.CopilotRun(sb.Repo, "Run exactly this one shell command, then reply with exactly: done.\nenv | cut -d= -f1 | grep -E '^(OTEL_|COPILOT_OTEL)' > "+out+"; env | grep -c "+sb.relayAddr+" >> "+out+"; printf ran >> "+out)
 		data, _ := os.ReadFile(out)
 		if !strings.Contains(string(data), "ran") {
 			t.Fatalf("Copilot's shell tool never ran: %q", data)
 		}
-		if names := strings.Fields(strings.ReplaceAll(string(data), "ran", "")); len(names) > 0 {
-			t.Errorf("Copilot's tools inherited exporter settings: %v", names)
+		// The exporter variables' names, then how many variables name the relay's address.
+		if seen := strings.Fields(strings.ReplaceAll(string(data), "ran", "")); len(seen) != 1 || seen[0] != "0" {
+			t.Errorf("Copilot's tools inherited exporter settings: %q", data)
 		}
 		sb.StopRelay()
 	})
