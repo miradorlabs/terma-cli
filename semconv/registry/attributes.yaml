@@ -133,7 +133,7 @@ attributes:
     stability: development
     brief: Where the evidence the record carries was read, named by the agent's package.
     note: >
-      Each agent has its own: claude_account, claude_statusline, claude_stop_failure,
+      Each agent has its own: claude_account, claude_hook, claude_statusline, claude_stop_failure,
       claude_transcript, codex_rollout, codex_hook, codex_session_index, cursor_hook and antigravity_hook.
     examples: ["codex_rollout", "cursor_hook"]
   - key: terma.evidence.status
@@ -278,6 +278,26 @@ attributes:
     type: int
     stability: development
     brief: How many tool calls the run made.
+  - key: terma.scheduled_loop.id
+    type: string
+    stability: development
+    brief: The scheduled loop a woken turn belongs to, the same for each of its turns in the session.
+    note: >
+      Random and opaque, minted by terma: nothing in it is derived from the loop's prompt.
+      Unrelated to terma.loop.count, which counts the model and tool steps of one run.
+  - key: terma.scheduled_loop.trigger
+    type:
+      members:
+        - id: loop_wakeup
+          value: loop_wakeup
+          brief: The agent woke itself at a time it chose, a self-paced loop.
+          stability: development
+        - id: schedule_wakeup
+          value: schedule_wakeup
+          brief: A scheduled task fired, such as a cron task.
+          stability: development
+    stability: development
+    brief: What woke the session for the turn, in the agent's own word.
   - key: terma.step.index
     type: int
     stability: development

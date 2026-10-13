@@ -245,6 +245,10 @@ const (
 	TermaRepositoryWorktreeLinkedKey = "terma.repository.worktree.linked"
 	// TermaRepositoryWorktreeNameKey is terma.repository.worktree.name: Git's name for the linked worktree the session's hooks last ran in.
 	TermaRepositoryWorktreeNameKey = "terma.repository.worktree.name"
+	// TermaScheduledLoopIDKey is terma.scheduled_loop.id: The scheduled loop a woken turn belongs to, the same for each of its turns in the session.
+	TermaScheduledLoopIDKey = "terma.scheduled_loop.id"
+	// TermaScheduledLoopTriggerKey is terma.scheduled_loop.trigger: What woke the session for the turn, in the agent's own word.
+	TermaScheduledLoopTriggerKey = "terma.scheduled_loop.trigger"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
@@ -317,6 +321,8 @@ const (
 	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
 	TermaRelayHeartbeatEvent = "terma.relay.heartbeat"
+	// TermaScheduledLoopIterationEvent is terma.scheduled_loop.iteration: A schedule, not the developer, started the turn; one record per turn it woke.
+	TermaScheduledLoopIterationEvent = "terma.scheduled_loop.iteration"
 	// TermaSessionAccountEvent is terma.session.account: The account state the session's agent holds.
 	TermaSessionAccountEvent = "terma.session.account"
 	// TermaSessionCaptureEvent is terma.session.capture: How a capture is going, kept apart from what it captured.
@@ -401,6 +407,10 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaScheduledLoopTriggerLoopWakeup is terma.scheduled_loop.trigger loop_wakeup: The agent woke itself at a time it chose, a self-paced loop.
+	TermaScheduledLoopTriggerLoopWakeup = "loop_wakeup"
+	// TermaScheduledLoopTriggerScheduleWakeup is terma.scheduled_loop.trigger schedule_wakeup: A scheduled task fired, such as a cron task.
+	TermaScheduledLoopTriggerScheduleWakeup = "schedule_wakeup"
 	// TermaUsageScopeParentTurn is terma.usage.scope parent_turn: The parent conversation's turn, subagents excluded.
 	TermaUsageScopeParentTurn = "parent_turn"
 	// TermaUsageSemanticsSnapshot is terma.usage.semantics snapshot: A repeated snapshot, never an additive delta.

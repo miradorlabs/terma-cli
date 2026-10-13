@@ -38,6 +38,10 @@ type claudeHookInput struct {
 	// ToolResponse is opened only for the Agent tool, into claudeAgentResult: for an edit it holds
 	// file content.
 	ToolResponse json.RawMessage `json:"tool_response"`
+	// Prompt is read only to tell a woken turn's scheduled tasks apart, on this machine.
+	Prompt string `json:"prompt"`
+	// SessionCrons is Stop's list of the schedules that will wake the session; nil when unreported.
+	SessionCrons *[]struct{} `json:"session_crons"`
 }
 
 func readClaudeInput(r io.Reader) (*claudeHookInput, error) {
@@ -87,13 +91,15 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// stop refreshes account evidence and the session's title before the dispatcher starts delivery.
+// stop ends the session's scheduled loops when nothing is left to wake it, and refreshes account
+// evidence and the session's title before the dispatcher starts delivery.
 func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
 	}
+	endScheduledLoops(env, in)
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
