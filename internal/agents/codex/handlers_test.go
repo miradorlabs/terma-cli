@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -118,6 +119,53 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
 		t.Fatalf("commit of a shell-written file not stamped:\n%s", data)
+	}
+}
+
+// A tool other than apply_patch confirms no edit: its path may be a read (view_image) or an
+// MCP tool's argument, so it names no checkout id. An MCP write still stamps its commit.
+func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
+	for _, tc := range []struct {
+		name, tool, input, response string
+	}{
+		{"view_image", "view_image", `{"path":%s}`, `"image displayed successfully"`},
+		{"mcp file_path", "mcp__filesystem__write_file", `{"file_path":%s,"content":"x"}`, `"ok"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := hookruntest.InitRepo(t)
+			stateDir := t.TempDir()
+			ctx := context.Background()
+			sp, _ := spool.Open(t.TempDir())
+			const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
+			hookruntest.WriteFile(t, root, "diagram.png", "png")
+			input := fmt.Sprintf(tc.input, strconv.Quote(filepath.Join(root, "diagram.png")))
+			env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+				Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"tool_name":"` + tc.tool + `","tool_use_id":"call_read","tool_input":` + input + `,"tool_response":` + tc.response + `}`)}
+			if err := postToolUse(ctx, env); err != nil {
+				t.Fatal(err)
+			}
+			touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+			if len(touched) != 1 || touched[0].Attrs[semconv.GenAIToolNameKey] != tc.tool || hookruntest.Joined(touched[0].Attrs[semconv.TermaFilesPathsKey]) != "diagram.png" {
+				t.Fatalf("touched = %+v", touched)
+			}
+			if got := touched[0].Attrs[semconv.TermaCheckoutIDKey]; got != nil {
+				t.Fatalf("%s confirmed no edit, yet names checkout %v", tc.tool, got)
+			}
+
+			hookruntest.WriteFile(t, root, "diagram.png", "png v2")
+			if _, err := gitx.Git(ctx, root, "add", "diagram.png"); err != nil {
+				t.Fatal(err)
+			}
+			msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+			_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
+			commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+			if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+				t.Fatal(err)
+			}
+			if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
+				t.Fatalf("a tool's path no longer stamps its commit:\n%s", data)
+			}
+		})
 	}
 }
 

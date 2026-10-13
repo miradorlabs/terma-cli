@@ -237,14 +237,16 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	if len(commits) == 0 {
-		if in.ToolName == codexShellTool {
-			// A shell command's targets are guesses, written or not: only the session's own manifest records them,
-			// where the turn's Stop withdraws the unchanged ones (expected.go).
-			env.Expect(r, sess, candidates)
-			env.Report(r, sess, in.ToolName, candidates, attrs)
+		if in.ToolName == codexPatchTool {
+			env.Touch(r, sess, in.ToolName, candidates, attrs)
 			return nil
 		}
-		env.Touch(r, sess, in.ToolName, candidates, attrs)
+		// Any other tool's paths are guesses, written or not: a shell command's targets, or
+		// a path argument that may only have been read (view_image, an MCP tool). Only the
+		// session's own manifest records them, and only a shell call's has a before-state
+		// for the turn's Stop to withdraw the unchanged ones (expected.go).
+		env.Expect(r, sess, candidates)
+		env.Report(r, sess, in.ToolName, candidates, attrs)
 		return nil
 	}
 	// The call's commits took in what it wrote before them: recording those files again
@@ -309,6 +311,10 @@ func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits [
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).
 const codexShellTool = "Bash"
+
+// codexPatchTool is the tool_name Codex gives apply_patch, its one edit tool: only its
+// paths are confirmed edits.
+const codexPatchTool = "apply_patch"
 
 const codexContentLimit = 16 << 10
 
