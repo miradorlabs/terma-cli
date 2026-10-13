@@ -105,8 +105,8 @@ events:
         note: >
           The checkout the files are in, on an edit the agent's hook confirmed (an edit
           tool's, such as Codex's apply_patch); absent on files a hook only guessed (a shell
-          command's targets, or a path argument of any other tool, which may only have read
-          it) and outside git.
+          command's targets, or a path argument of any other Codex tool, which may only have
+          read it) and outside git.
 
   - name: terma.commit.stamped
     stability: development
