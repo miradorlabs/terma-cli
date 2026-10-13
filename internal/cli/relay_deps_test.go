@@ -19,9 +19,10 @@ import (
 )
 
 // Only a beat that goes with the key of the team whose validated policy the login fetched names
-// the signed-in user: a beat that falls back to another key held here, goes with a key
-// TERMA_TEAM_ID alone picked or to another environment's ingest, names no one, and so does one
-// sent while the login is another organization's.
+// the signed-in user, unpinned too: a beat that falls back to another key held here, goes with a
+// key TERMA_TEAM_ID alone picked, to another environment's ingest or with a key another
+// deployment's API host filed, names no one, and so does one sent while the login is another
+// organization's.
 func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	var sent []string // "<key>=<terma.user.id>" per beat the ingest accepted
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +91,19 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	// this test ingest's hosts: another environment's, so the beat goes there naming no one.
 	t.Setenv("TERMA_OTLP_URL", "")
 	send()
-	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team=", "ter_srv_elsewhere=", "ter_srv_team="}
+	// The profile's own ingest is the one the team's key was filed with: named.
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OTLPURL = srv.URL }); err != nil {
+		t.Fatal(err)
+	}
+	send()
+	// Another deployment sharing that ingest, by its API host, filed the next team's key.
+	if err := keystore.Set(testApp.dir, "team2", "ter_srv_team2", keystore.Hosts{OTLP: srv.URL, API: "https://api.other.example"}); err != nil {
+		t.Fatal(err)
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team2", Revision: 1, FetchedAt: time.Now()})
+	send()
+	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team=", "ter_srv_elsewhere=", "ter_srv_team=",
+		"ter_srv_team=user-a", "ter_srv_team2="}
 	if strings.Join(sent, " ") != strings.Join(want, " ") {
 		t.Fatalf("beats sent %q, want %q", sent, want)
 	}

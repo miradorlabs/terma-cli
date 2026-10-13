@@ -64,10 +64,7 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
-// Only a beat that goes with the key of the team whose validated policy this login fetched, to
-// this profile's own ingest, names the signed-in user: any other key held here, TERMA_TEAM_ID's
-// included, or a key filed with another environment's hosts may be another organization's or
-// environment's.
+// It sends once, so the user heartbeatUser names never rides on to another key.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
@@ -88,14 +85,29 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 		}
 		if projectID != "" && key != "" {
 			endpoint := app.delivery().Endpoint(cfg, projectID)
-			if projectID == cfg.Policy.Team() && cfg.Policy.Validated() && strings.TrimRight(endpoint, "/") == strings.TrimRight(cfg.OTLPURL, "/") {
-				relay.NameHeartbeatUser(beat, signedInUser(cfg))
-			}
+			relay.NameHeartbeatUser(beat, app.heartbeatUser(cfg, projectID, endpoint))
 			return sendHeartbeat(ctx, endpoint, key, beat)
 		}
 	}
 	return relay.ErrNoKey
 }
+
+// heartbeatUser is who a beat sent with projectID's key to endpoint names: the signed-in user,
+// only for the key of the team whose validated policy this login fetched, going to this
+// profile's own ingest and filed, if with hosts at all, with this profile's API host. Any other
+// key held here, TERMA_TEAM_ID's included, or one filed with another deployment's hosts may be
+// another organization's or environment's, so its beat names no one.
+func (app *App) heartbeatUser(cfg *config.Config, projectID, endpoint string) string {
+	if projectID != cfg.Policy.Team() || !cfg.Policy.Validated() || !sameHost(endpoint, cfg.OTLPURL) {
+		return ""
+	}
+	if h, ok := keystore.HostsFor(app.dir, projectID); ok && h.API != "" && !sameHost(h.API, cfg.APIURL) {
+		return ""
+	}
+	return signedInUser(cfg)
+}
+
+func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
 
 // signedInUser is the Mirador user cfg's profile is signed in as, from credentials.json alone,
 // never the keychain: "" when it is signed out, signed in for another organization or

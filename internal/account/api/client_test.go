@@ -167,6 +167,36 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 	}
 }
 
+// A refresh that names no user keeps the session's: it is the same sign-in.
+func TestClient_RefreshKeepsTheSessionsUser(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == tokenPath {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated",
+				"token_type": "Bearer", "expires_in": 3600,
+				"organization": map[string]string{"id": "org-1"},
+			})
+			return
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", OrganizationID: "org-1", RefreshToken: "mir_clr_stale",
+		ExpiresAt: time.Now().Add(-time.Hour), UserID: "user-1"}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	saved, err := auth.LoadCredential(client.dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatalf("LoadCredential: %v", err)
+	}
+	if saved.RefreshToken != "mir_clr_rotated" || saved.UserID != "user-1" {
+		t.Errorf("stored %q / user %q, want the rotated pair and user-1 kept", saved.RefreshToken, saved.UserID)
+	}
+}
+
 func TestClient_RetriesOnceAfterUnexpected401(t *testing.T) {
 	t.Parallel()
 	var reads atomic.Int32
