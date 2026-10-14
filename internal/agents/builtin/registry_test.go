@@ -49,7 +49,7 @@ func TestRegistryIsConsistent(t *testing.T) {
 	if len(reg.Handlers()) != len(owners) {
 		t.Errorf("reg.Handlers() has %d entries, adapters declare %d", len(reg.Handlers()), len(owners))
 	}
-	for _, name := range []string{"claude", "cursor", "codex", "opencode", "omp", "antigravity"} {
+	for _, name := range []string{"claude", "cursor", "codex", "copilot", "opencode", "omp", "antigravity"} {
 		if _, ok := reg.Lookup(name); !ok {
 			t.Errorf("reg.Lookup(%q) failed", name)
 		}
@@ -66,6 +66,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"antigravity-post-invocation", "antigravity-post-tool-use", "antigravity-pre-invocation", "antigravity-stop",
 		"codex-notify", "codex-permission-request", "codex-post-tool-use", "codex-pre-tool-use", "codex-session-end", "codex-session-start", "codex-stop",
 		"codex-subagent-start", "codex-subagent-stop", "codex-user-prompt-submit",
+		"copilot-post-tool-use", "copilot-prompt", "copilot-session-end", "copilot-session-start", "copilot-stop",
 		"cursor-after-agent-response", "cursor-before-submit-prompt", "cursor-file-edit", "cursor-post-tool-use",
 		"cursor-post-tool-use-failure", "cursor-pre-compact", "cursor-session-end", "cursor-session-start",
 		"cursor-stop", "cursor-subagent-stop",
@@ -82,12 +83,12 @@ func TestEventNamesAreStable(t *testing.T) {
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("event names changed:\n got %v\nwant %v", got, want)
 	}
-	for _, event := range []string{"stop", "cursor-stop", "codex-stop", "antigravity-stop", "session-end"} {
+	for _, event := range []string{"stop", "cursor-stop", "codex-stop", "copilot-stop", "antigravity-stop", "session-end"} {
 		if !reg.FlushesAfter(event) {
 			t.Errorf("%s should flush the spool", event)
 		}
 	}
-	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") {
+	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") || reg.FlushesAfter("copilot-post-tool-use") {
 		t.Error("a per-tool-call hook must not start a flush")
 	}
 }

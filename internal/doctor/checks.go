@@ -233,7 +233,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	}
 	for _, e := range reg.With[agents.RelayExporter]() {
 		if c, ok := e.(agents.RelayChecker); ok && mine(e) {
-			if detail, fix, problem := c.RelayProblem(); problem {
+			if detail, fix, problem := c.RelayProblem(addr); problem {
 				return Check{Status: Warn, Detail: detail, Fix: fix}
 			}
 		}

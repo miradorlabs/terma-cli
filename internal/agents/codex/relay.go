@@ -89,7 +89,7 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 }
 
 // RelayProblem reports a daemon started before Codex was pointed at the relay.
-func (a Agent) RelayProblem() (string, string, bool) {
+func (a Agent) RelayProblem(string) (string, string, bool) {
 	d, ok := a.daemonPredates()
 	if !ok {
 		return "", "", false

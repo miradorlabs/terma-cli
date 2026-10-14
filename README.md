@@ -7,7 +7,7 @@
 
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
-(CLI and Desktop) and **Codex** (CLI and Desktop).
+(CLI and Desktop), **Codex** (CLI and Desktop) and **GitHub Copilot** (CLI and VS Code).
 
 ## Get started
 
@@ -81,7 +81,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "claims the session<br/>for your team" --> relay
@@ -209,7 +209,7 @@ the latest release, `terma update` does just that refresh.
 Every question `terma setup` asks has a flag:
 
 ```bash
-terma setup --org acme --team platform --harness claude,codex --yes
+terma setup --org acme --team platform --harness claude,codex,copilot --yes
 ```
 
 - `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
@@ -217,7 +217,7 @@ terma setup --org acme --team platform --harness claude,codex --yes
 - `--team <name-or-id>` sets up that team; without it, setup asks when your organization
   has several teams, with the one you chose before as the default, else takes the only
   one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
-- `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips the browser prompt and the organization and agents questions. The team
@@ -353,6 +353,30 @@ leaves without the content it no longer collects, and one from a repository no l
 listed does not leave. An edit the agent's hook saw names its checkout by
 `terma.checkout.id`, a hash of the working tree's path, under any policy: it names no path,
 though anyone who can guess the path can recompute it.
+
+GitHub Copilot runs the same runtime in two places, and setup points each one's exporter
+where it reads it. VS Code runs it in its agent host, configured from the user
+`settings.json`: setup adds `chat.agentHost.otel.*` (the OTLP/HTTP exporter, replacing
+a file or console one of yours) and lists those settings under
+`settingsSync.ignoredSettings`, since they name this machine's relay. It changes no
+other byte of the file, comments included, and `terma teardown` puts back what the
+settings held before; restart VS Code after setup. VS Code reads an exporter from its
+environment ahead of its settings, so where `OTEL_EXPORTER_OTLP_ENDPOINT` in your shell
+names a collector of your own, or `COPILOT_OTEL_EXPORTER_TYPE` any exporter but
+`otlp-http`, setup writes none of its settings into VS Code and says so: Copilot there
+already exports where that says, and terma's settings would only add what was said to
+it. The agent host's exporter is VS Code's, not Copilot's alone: the Claude and Codex
+agents you have VS Code host there are handed the same one.
+Copilot Chat's own exporter (`github.copilot.chat.otel.*`) is never switched on: VS Code
+would copy its endpoint into every extension's environment. The Copilot CLI reads its
+exporter only from its environment, so setup defines a `copilot` shell function in your
+shell's startup file (zsh, bash or fish) that starts it through `terma launch copilot`:
+the variables reach that one process, never your shell or other programs, and the file
+holds no endpoint or token. An alias or function of your own named `copilot` is left as
+it is, and a `copilot` started another way (a script, an absolute path, an editor) is
+still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the
+function out of your startup files. Copilot reports token counts and AI credits, not a
+cost, and a file one of its shell commands writes is not attributed to its session.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

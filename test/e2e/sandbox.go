@@ -87,6 +87,9 @@ type Sandbox struct {
 	// ExtraEnv is appended to every environment the sandbox builds, so a setting
 	// reaches the agents and the hooks and relays they start.
 	ExtraEnv []string
+	// SetupAgents are chosen at setup too, beyond setupHarnesses: an agent whose hooks are
+	// the machine-wide ones only `terma setup` writes.
+	SetupAgents []string
 	// RelayAgents are pointed at the relay too, beyond Claude Code, Codex and OpenCode
 	// (UseRelay).
 	RelayAgents []string
@@ -115,8 +118,13 @@ func WithRepositories(repos ...string) Option {
 	return func(sb *Sandbox) { sb.Repositories = repos }
 }
 
-// setupHarnesses are the agents every sandbox's setup records: all setup offers.
+// setupHarnesses are the agents every sandbox's setup records.
 const setupHarnesses = "claude,codex"
+
+// setupList is what this sandbox's setup records: setupHarnesses and its SetupAgents.
+func (sb *Sandbox) setupList() string {
+	return strings.Join(append([]string{setupHarnesses}, sb.SetupAgents...), ",")
+}
 
 const (
 	// liveKey is the server key the agents and the spool export with: a syntactically

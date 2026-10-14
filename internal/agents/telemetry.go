@@ -8,7 +8,9 @@ import (
 )
 
 // RelayConfig is where an agent's telemetry reaches the local relay. Token is never
-// printed or put in an agent's tool environment.
+// printed, and stays out of the environment an agent gives its tools wherever the agent
+// lets it: one that takes its exporter only from its own environment is handed the token
+// there, and what its tools then see is that agent's doing.
 type RelayConfig struct {
 	Endpoint    string
 	Token       string
@@ -34,10 +36,10 @@ type RelayExporter interface {
 	RelayPointed(addr string) (pointed, known bool)
 }
 
-// RelayChecker is an agent with a condition that keeps its telemetry from the relay
-// after setup.
+// RelayChecker is an agent with a condition that keeps its telemetry from the relay at
+// addr after setup.
 type RelayChecker interface {
-	RelayProblem() (detail, fix string, ok bool)
+	RelayProblem(addr string) (detail, fix string, ok bool)
 }
 
 // Labeled is an agent whose hooks and trailers use a label other than its name.
