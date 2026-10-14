@@ -31,6 +31,9 @@ type Router struct {
 	Policy func(ctx context.Context, cfg *config.Config, team string) (config.Policy, error)
 	// Consent asks the agent behind tool whether a reply or title it spooled may leave.
 	Consent func(tool string, c hookrun.Consent) bool
+	// User is who events sent to projectID at endpoint name, by Mirador user id; "" or a nil
+	// User names no one.
+	User func(cfg *config.Config, projectID, endpoint string) string
 }
 
 // Result summarizes one delivery pass; its counters are disjoint, one per reason.
@@ -136,6 +139,9 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			}
 			endpoint := r.Endpoint(cfg, id)
 			sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: r.Version}
+			if r.User != nil {
+				sender.UserID = r.User(cfg, id, endpoint)
+			}
 			if _, err := sender.Send(ctx, wire(batch)); err != nil {
 				failed[id] = true
 				f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}

@@ -148,6 +148,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
 	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
+	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {

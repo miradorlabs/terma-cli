@@ -32,6 +32,7 @@ func (app *App) relayDeps() daemon.Deps {
 		AgentName:     app.agents.NameForTool,
 		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
+		User:          app.relayUser,
 		CreateKey:     app.createProjectKey,
 		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    app.hookPolicy,
@@ -64,7 +65,7 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
-// It sends once, so the user heartbeatUser names never rides on to another key.
+// It sends once, so the user teamUser names never rides on to another key.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
@@ -85,19 +86,30 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 		}
 		if projectID != "" && key != "" {
 			endpoint := app.delivery().Endpoint(cfg, projectID)
-			relay.NameHeartbeatUser(beat, app.heartbeatUser(cfg, projectID, endpoint))
+			relay.NameHeartbeatUser(beat, app.teamUser(cfg, projectID, endpoint))
 			return sendHeartbeat(ctx, endpoint, key, beat)
 		}
 	}
 	return relay.ErrNoKey
 }
 
-// heartbeatUser is who a beat sent with projectID's key to endpoint names: the signed-in user,
-// only for the key of the team whose validated policy this login fetched, going to this
-// profile's own ingest and filed, if with hosts at all, with this profile's API host. Any other
-// key held here, TERMA_TEAM_ID's included, or one filed with another deployment's hosts may be
-// another organization's or environment's, so its beat names no one.
-func (app *App) heartbeatUser(cfg *config.Config, projectID, endpoint string) string {
+// relayUser is who the relay's parts sent to projectID at endpoint name: teamUser, under the
+// configuration as it is now, as a heartbeat reads it.
+func (app *App) relayUser(projectID, endpoint string) string {
+	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
+	if err != nil {
+		return ""
+	}
+	return app.teamUser(cfg, projectID, endpoint)
+}
+
+// teamUser is who what terma sends with projectID's key to endpoint names (a heartbeat, a
+// relayed part, a hook event), by Mirador user id: the signed-in user, only for the key of the
+// team whose validated policy this login fetched, going to this profile's own ingest and filed,
+// if with hosts at all, with this profile's API host. Any other key held here, TERMA_TEAM_ID's
+// included, or one filed with another deployment's hosts may be another organization's or
+// environment's, so what it sends names no one.
+func (app *App) teamUser(cfg *config.Config, projectID, endpoint string) string {
 	if projectID != cfg.Policy.Team() || !cfg.Policy.Validated() || !sameHost(endpoint, cfg.OTLPURL) {
 		return ""
 	}

@@ -36,6 +36,8 @@ type Deps struct {
 	RelayTargets func(selected []string) []string
 	// Endpoint is a project's ingest host.
 	Endpoint func(cfg *config.Config, projectID string) string
+	// User is who parts sent to projectID at endpoint name, by Mirador user id.
+	User func(projectID, endpoint string) string
 	// CreateKey mints a project's key under cfg's sign-in.
 	CreateKey func(ctx context.Context, cfg *config.Config, projectID string) (string, error)
 	// SendHeartbeat delivers a heartbeat with a project's key.
@@ -98,7 +100,7 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 // Resolver turns a claim into its session's policy, minting a missing key with mint.
 func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
 	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName, RelayTargets: d.RelayTargets,
-		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) }})
+		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) }, User: d.User})
 }
 
 // CatchAll is global mode's claim for everything an agent exports.
