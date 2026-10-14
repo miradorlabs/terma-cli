@@ -243,7 +243,8 @@ func TestLauncherBlockIsSafeToSource(t *testing.T) {
 	}
 }
 
-// fish reads its own syntax, from a file of terma's own.
+// fish reads its own syntax, from a file of terma's own, and defines the function only where
+// the developer has none of that name.
 func TestLauncherBlockForFish(t *testing.T) {
 	home := rcSandbox(t, "fish")
 	changed, err := InstallLauncher("agentx")
@@ -252,7 +253,7 @@ func TestLauncherBlockForFish(t *testing.T) {
 		t.Fatalf("install changed %v, %v", changed, err)
 	}
 	data, _ := os.ReadFile(want)
-	for _, line := range []string{"function agentx\n", "terma launch agentx -- $argv\n", "command agentx $argv\n"} {
+	for _, line := range []string{"if not functions -q agentx\n", "    function agentx\n", "terma launch agentx -- $argv\n", "command agentx $argv\n"} {
 		if !strings.Contains(string(data), line) {
 			t.Errorf("fish block lacks %q:\n%s", line, data)
 		}

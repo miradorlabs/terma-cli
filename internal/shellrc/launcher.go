@@ -40,11 +40,16 @@ func (rc RC) LauncherBlock(name string) string {
 	note := "# Runs " + name + " through terma, which adds its telemetry settings; without terma it runs as before."
 	var body string
 	if rc.Shell == "fish" {
-		body = "function " + name + "\n" +
-			"    if command -q terma\n" +
-			"        terma launch " + name + " -- $argv\n" +
-			"    else\n" +
-			"        command " + name + " $argv\n" +
+		// A function or alias the developer already gave the name stays theirs: conf.d runs
+		// before their functions directory autoloads one and before config.fish, so the
+		// function is defined only where `functions -q`, which autoloads, finds none.
+		body = "if not functions -q " + name + "\n" +
+			"    function " + name + "\n" +
+			"        if command -q terma\n" +
+			"            terma launch " + name + " -- $argv\n" +
+			"        else\n" +
+			"            command " + name + " $argv\n" +
+			"        end\n" +
 			"    end\n" +
 			"end"
 	} else {
