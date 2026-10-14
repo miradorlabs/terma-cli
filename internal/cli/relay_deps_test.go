@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -109,27 +110,76 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	}
 }
 
-// signedInUser names the profile's login from credentials.json: no one signed out, signed
-// in for another organization or environment, or set up with a server key.
+// signedInUser names the profile's login from credentials.json, by id and email: no one signed
+// out, signed in for another organization or environment, set up with a server key, or with a
+// credential that has not learnt its user's id, whose email alone names no one.
 func TestSignedInUser(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	cfg := config.Config{Dir: testApp.dir, ProfileName: config.DefaultProfile, AuthURL: "https://auth.example", OrganizationID: "org-a"}
-	if got := signedInUser(&cfg); got != "" {
-		t.Fatalf("signed out, named %q", got)
+	if got := signedInUser(&cfg); got != (relay.User{}) {
+		t.Fatalf("signed out, named %+v", got)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_a", OrganizationID: "org-a", AuthURL: cfg.AuthURL, UserID: "user-a"}); err != nil {
-		t.Fatal(err)
+	save := func(user string) {
+		t.Helper()
+		if _, err := auth.SaveCredential(testApp.dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_a", OrganizationID: "org-a",
+			AuthURL: cfg.AuthURL, UserID: user, UserEmail: "a@example.com"}); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if got := signedInUser(&cfg); got != "user-a" {
-		t.Fatalf("signed in, named %q, want user-a", got)
+	save("")
+	if got := signedInUser(&cfg); got != (relay.User{}) {
+		t.Fatalf("signed in with no user id, named %+v", got)
+	}
+	save("user-a")
+	if got, want := signedInUser(&cfg), (relay.User{ID: "user-a", Email: "a@example.com"}); got != want {
+		t.Fatalf("signed in, named %+v, want %+v", got, want)
 	}
 	for name, c := range map[string]config.Config{
 		"server key":          {Dir: cfg.Dir, ProfileName: cfg.ProfileName, AuthURL: cfg.AuthURL, OrganizationID: "org-a", ServerKeySignIn: true},
 		"another environment": {Dir: cfg.Dir, ProfileName: cfg.ProfileName, AuthURL: "https://auth.other", OrganizationID: "org-a"},
 		"another org":         {Dir: cfg.Dir, ProfileName: cfg.ProfileName, AuthURL: cfg.AuthURL, OrganizationID: "org-b"},
 	} {
-		if got := signedInUser(&c); got != "" {
-			t.Errorf("%s: named %q", name, got)
+		if got := signedInUser(&c); got != (relay.User{}) {
+			t.Errorf("%s: named %+v", name, got)
 		}
+	}
+}
+
+// An anonymous agent's parts name the signed-in user, email and all, under the rule a heartbeat
+// names them by: only those bound for the selected team's validated policy at this profile's
+// ingest, as the configuration is when the relay asks, not as it started.
+func TestRelayUserFollowsTheHeartbeatsRule(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	authSandbox(t, &fakeAuth{srv: srv})
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
+		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, OrganizationID: "org-a", UserID: "user-a", UserEmail: "a@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("org-a", "A"); p.OTLPURL = srv.URL }); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TERMA_OTLP_URL", "")
+	if got := testApp.relayUser("team", srv.URL); got != (relay.User{}) {
+		t.Fatalf("with no team policy fetched, named %+v", got)
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	want := relay.User{ID: "user-a", Email: "a@example.com"}
+	if got := testApp.relayUser("team", srv.URL); got != want {
+		t.Fatalf("bound for the team, named %+v, want %+v", got, want)
+	}
+	for name, to := range map[string][2]string{
+		"another team":   {"elsewhere", srv.URL},
+		"another ingest": {"team", "https://otel.other.example"},
+	} {
+		if got := testApp.relayUser(to[0], to[1]); got != (relay.User{}) {
+			t.Errorf("%s: named %+v", name, got)
+		}
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = true }); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.relayUser("team", srv.URL); got != (relay.User{}) {
+		t.Errorf("set up with a server key, named %+v", got)
 	}
 }

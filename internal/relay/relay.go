@@ -50,6 +50,15 @@ type Policy struct {
 	RequireClaim bool
 	// Unadmitted is a claim whose repository the team policy no longer lists: its records drop.
 	Unadmitted bool
+	// Anonymous is a claim of an agent whose telemetry names no user (shape.Anonymous): its
+	// parts lose any user they name, and name User when its ID is set.
+	Anonymous bool
+	User      User
+}
+
+// User is the Mirador user a part names.
+type User struct {
+	ID, Email string
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.

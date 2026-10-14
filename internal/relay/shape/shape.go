@@ -82,3 +82,10 @@ func SeatID(scope, email string) string {
 type Capturer interface {
 	CaptureRules() CaptureRules
 }
+
+// Anonymous is an agent whose telemetry names no one the platform can key a person on, only
+// a pseudonymous account of its own: the relay names the signed-in user on what it sends to
+// the signed-in team, and takes out any user a record of its claims to be.
+type Anonymous interface {
+	Anonymous()
+}

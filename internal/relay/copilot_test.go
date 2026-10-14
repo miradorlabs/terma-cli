@@ -12,10 +12,12 @@ import (
 	"testing"
 	"time"
 
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // testdata/copilot_cli_traces.json is one traces export as Copilot CLI 1.0.96 sent it
@@ -251,5 +253,91 @@ func TestRelayKeepsWhatNamesCopilotsAgentHost(t *testing.T) {
 	}
 	if server, name := attr(tool.GetAttributes(), "github.copilot.tool.parameters.mcp_server_name"), attr(tool.GetAttributes(), "github.copilot.tool.parameters.mcp_tool_name"); server != "MCP-SERVER" || name != "MCP-TOOL" {
 		t.Errorf("the tool span left naming MCP server %q and tool %q", server, name)
+	}
+}
+
+// copilotExportNaming is the CLI's export with its resource naming a user of its own, as
+// nothing of Copilot's does today: a spoof the relay must not pass on as the signed-in user.
+func copilotExportNaming(t *testing.T, id, email string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "copilot_cli_traces.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var export map[string]any
+	if err := json.Unmarshal(raw, &export); err != nil {
+		t.Fatal(err)
+	}
+	for _, rs := range export["resourceSpans"].([]any) {
+		resource := rs.(map[string]any)["resource"].(map[string]any)
+		resource["attributes"] = append(resource["attributes"].([]any),
+			map[string]any{"key": semconv.TermaUserIDKey, "value": map[string]any{"stringValue": id}},
+			map[string]any{"key": semconv.UserEmailKey, "value": map[string]any{"stringValue": email}})
+	}
+	body, err := json.Marshal(export)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+// Copilot names no one the platform can key a person on, so the relay names the user its
+// resolver found: by id under any policy, by email only with content collected. Whatever user
+// the export named goes first, and a part the relay names no one on names none at all.
+func TestRelayNamesTheSignedInUserOnCopilot(t *testing.T) {
+	t.Parallel()
+	user := User{ID: "user-a", Email: "a@example.com"}
+	for _, tc := range []struct {
+		name      string
+		pol       Policy
+		id, email string
+	}{
+		{name: "collected", pol: Policy{IncludePrompts: true, IncludeToolContent: true, Anonymous: true, User: user}, id: "user-a", email: "a@example.com"},
+		{name: "prompts withheld", pol: Policy{IncludeToolContent: true, Anonymous: true, User: user}, id: "user-a"},
+		{name: "content withheld", pol: Policy{Anonymous: true, User: user}, id: "user-a"},
+		{name: "no one signed in", pol: Policy{IncludePrompts: true, IncludeToolContent: true, Anonymous: true}},
+		// Not an anonymous agent's: the relay names no one, and keeps the agent's own email.
+		{name: "an agent that names its user", pol: Policy{IncludePrompts: true, IncludeToolContent: true, User: user}, email: "SPOOF@example.com"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r, u, _ := copilotRelayOf(t, tc.pol, true, copilotConversation, copilotExportNaming(t, "SPOOF-ID", "SPOOF@example.com"))
+			waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.traces"] == 8 })
+			_, resources := u.spans(t)
+			if len(resources) == 0 {
+				t.Fatal("no resource left")
+			}
+			for _, rs := range resources {
+				attrs := rs.GetResource().GetAttributes()
+				if id, email := attr(attrs, semconv.TermaUserIDKey), attr(attrs, semconv.UserEmailKey); id != tc.id || email != tc.email {
+					t.Errorf("a resource left naming %q <%s>, want %q <%s>", id, email, tc.id, tc.email)
+				}
+			}
+			if sent := u.sent(); strings.Contains(sent, "SPOOF-ID") {
+				t.Error("the export's own terma.user.id left the machine")
+			}
+		})
+	}
+}
+
+// A queued part is checked again against the policy when it is sent: a stricter one by then
+// takes the email, never the id the relay named.
+func TestQueuedCopilotPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
+	t.Parallel()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token})
+	p := &part{signal: Traces, msg: &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{}}}}}
+	nameUser(p, Policy{IncludePrompts: true, IncludeToolContent: true, Anonymous: true, User: User{ID: "user-a", Email: "a@example.com"}})
+	body, err := proto.Marshal(p.msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _ := r.withholdQueued(Traces, body, Policy{})
+	var sent tracepb.TracesData
+	if err := proto.Unmarshal(out, &sent); err != nil {
+		t.Fatal(err)
+	}
+	attrs := sent.ResourceSpans[0].GetResource().GetAttributes()
+	if id, email := attr(attrs, semconv.TermaUserIDKey), attr(attrs, semconv.UserEmailKey); id != "user-a" || email != "" {
+		t.Errorf("the queued part left naming %q <%s>, want user-a and no email", id, email)
 	}
 }
