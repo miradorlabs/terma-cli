@@ -48,7 +48,7 @@ func (a Agent) configureVSCode(cfg agents.RelayConfig, out *agents.RelayResult) 
 		if len(dirs) == 0 && !took {
 			return
 		}
-		note := variable + " is exported in your shell, and VS Code reads it ahead of its settings: Copilot there exports to it, not to the relay, and terma's settings would add what was said to that export. Terma wrote none of its settings into VS Code"
+		note := variable + " is exported in your shell, and VS Code reads it ahead of its settings: Copilot there exports where it says, not to the relay, and terma's settings would add what was said to that export. Terma wrote none of its settings into VS Code"
 		if took {
 			note += ", and took out the ones an earlier setup wrote; restart VS Code so it stops using them"
 		}
@@ -148,7 +148,7 @@ func (Agent) RelayPointed(addr string) (pointed, known bool) {
 // RelayProblem names what still keeps Copilot's telemetry from the relay at addr after setup.
 func (Agent) RelayProblem(addr string) (detail, fix string, ok bool) {
 	if variable, set := shellEndpoint(addr); set && len(vscodeUserDirs(false)) > 0 {
-		return variable + " is exported in your shell, and VS Code reads it ahead of its settings, so Copilot in VS Code exports to it and not to the relay",
+		return variable + " is exported in your shell, and VS Code reads it ahead of its settings, so Copilot in VS Code exports where it says and not to the relay",
 			"unset " + variable + " where VS Code starts, then run `terma setup`", true
 	}
 	if _, err := exec.LookPath(command); err == nil && !shellrc.LauncherInstalled(command) {

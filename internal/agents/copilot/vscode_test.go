@@ -518,15 +518,42 @@ func TestVSCodePointedNeedsTheOTLPExporter(t *testing.T) {
 }
 
 // An exporter type inherited from the shell picks the agent host's exporter ahead of the
-// settings: a file or the console keeps the spans from the relay, OTLP does not.
+// settings: anything but OTLP/HTTP keeps the spans from the relay, which has no gRPC listener.
 func TestShellExporterTypeIsAConflict(t *testing.T) {
 	for _, name := range shellEndpoints {
 		t.Setenv(name, "")
 	}
-	for value, conflict := range map[string]bool{"": false, "otlp-http": false, "otlp-grpc": false, "file": true, " Console ": true} {
+	for value, conflict := range map[string]bool{"": false, "otlp-http": false, " OTLP-HTTP ": false, "otlp-grpc": true, "file": true, " Console ": true} {
 		t.Setenv(shellExporterType, value)
 		if got, set := shellEndpoint("127.0.0.1:43180"); set != conflict || set && got != shellExporterType {
 			t.Errorf("%s=%q: shellEndpoint = %q, %v; want a conflict %v", shellExporterType, value, got, set, conflict)
 		}
+	}
+}
+
+// A setup run again after the developer took one of terma's names out of the sync-ignore list
+// puts it back and keeps owning the others: the undo takes every one of them out again.
+func TestSetupAgainKeepsOwningItsSyncNames(t *testing.T) {
+	a, settings := sandbox(t)
+	mine := "{\n  \"settingsSync.ignoredSettings\": [\"editor.fontSize\"]\n}\n"
+	if err := os.WriteFile(settings, []byte(mine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	configure(t, a)
+	data, _ := os.ReadFile(settings)
+	if !strings.Contains(string(data), `,"`+hostContent+`"`) {
+		t.Fatalf("the list is not written as this test expects:\n%s", data)
+	}
+	if err := os.WriteFile(settings, []byte(strings.Replace(string(data), `,"`+hostContent+`"`, "", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	configure(t, a)
+	if undone := unconfigure(t, a, relay.Token); len(undone.Paths) != 1 {
+		t.Fatalf("unconfigure: %+v", undone)
+	}
+	if after := settingsOf(t, settings); len(after) != 1 {
+		t.Fatalf("settings after undo: %v", after)
+	} else if got, _ := json.Marshal(after[syncIgnored]); string(got) != `["editor.fontSize"]` {
+		t.Fatalf("sync-ignore list after undo: %s", got)
 	}
 }

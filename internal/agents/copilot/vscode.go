@@ -118,10 +118,9 @@ func shellEndpoint(addr string) (string, bool) {
 			return name, true
 		}
 	}
-	// Copilot's runtime sends otlp-grpc over OTLP/HTTP, to the same endpoint.
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(shellExporterType))) {
-	case "", otlpHTTP, "otlp-grpc":
-	default:
+	// Copilot's runtime would send otlp-grpc over OTLP/HTTP, but the Claude and Codex agents
+	// VS Code hosts take the same exporter, and the relay has no gRPC listener.
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv(shellExporterType))); v != "" && v != otlpHTTP {
 		return shellExporterType, true
 	}
 	return "", false
@@ -199,6 +198,14 @@ func (a Agent) connectVSCode(dir string, cfg agents.RelayConfig) (path string, c
 	case own:
 		installing[syncIgnored] = rawList(exporterKeys)
 	case len(added) > 0:
+		// The names an earlier setup added stay its: this record replaces that one.
+		if previous != nil {
+			for _, name := range listOf(previous.Installed[syncIgnored]) {
+				if !slices.Contains(added, name) {
+					added = append(added, name)
+				}
+			}
+		}
 		installing[syncIgnored] = rawList(added)
 	}
 	// The record first, so no write leaves settings terma cannot undo; a write that then
