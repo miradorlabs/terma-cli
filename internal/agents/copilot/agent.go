@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 const (
@@ -60,8 +61,16 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "native OTLP through the local relay only; AI credits, no cost; the CLI exports when started through the shell function setup writes, VS Code from its agent host, and Copilot Chat's own agent in VS Code not at all"}
 }
 
+// StateDirs are the directories its hooks keep state in.
+func (Agent) StateDirs() []string { return []string{copilotTitleStateDir} }
+
+// ContentConsented is the consent session titles travel under.
+func (Agent) ContentConsented(c hookrun.Consent) bool { return titleConsented(c) }
+
 var (
-	_ agents.Covered  = Agent{}
-	_ agents.Surfaced = Agent{}
-	_ agents.Agent    = Agent{}
+	_ agents.Covered        = Agent{}
+	_ agents.Surfaced       = Agent{}
+	_ agents.Agent          = Agent{}
+	_ agents.StateKeeper    = Agent{}
+	_ agents.ContentConsent = Agent{}
 )

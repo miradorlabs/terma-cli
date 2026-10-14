@@ -121,10 +121,19 @@ func editedPaths(raw json.RawMessage) []string {
 	return out
 }
 
-// stop is the end of a turn: the caller claims the session and flushes the spool; nothing
-// is recorded.
-func stop(_ context.Context, env hookrun.Env) error {
-	_, _ = readInput(env)
+// stop is the end of a turn: the caller claims the session and flushes the spool; the
+// session's name is recorded when new or renamed.
+func stop(ctx context.Context, env hookrun.Env) error {
+	in, ok := readInput(env)
+	if !ok {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	r, err := env.Repo(ctx)
+	if err != nil {
+		return nil
+	}
+	captureTitle(env, r, in.SessionID)
 	return nil
 }
 
@@ -139,6 +148,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
+	captureTitle(env, r, in.SessionID)
 	env.EndSession(r, in.SessionID, name)
 	return nil
 }
