@@ -85,6 +85,21 @@ func (r *Relay) StopHeartbeat(ctx context.Context, exit string) error {
 	return r.heartbeat(ctx, semconv.TermaRelayHeartbeatReasonExit, exit)
 }
 
+// NameHeartbeatUser names user, the Mirador user terma is signed in as, on beat's record as
+// terma.user.id; "" names no one.
+func NameHeartbeatUser(beat *logspb.LogsData, user string) {
+	if user == "" {
+		return
+	}
+	for _, rl := range beat.GetResourceLogs() {
+		for _, sl := range rl.GetScopeLogs() {
+			for _, rec := range sl.GetLogRecords() {
+				rec.Attributes = append(rec.Attributes, &commonpb.KeyValue{Key: semconv.TermaUserIDKey, Value: strValue(user)})
+			}
+		}
+	}
+}
+
 func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb.LogsData {
 	host, _ := os.Hostname()
 	now := uint64(r.opts.Now().UnixNano())

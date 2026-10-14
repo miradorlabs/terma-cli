@@ -159,7 +159,7 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 		selfupdate.SaveCache(dir, cache)
 		return false, err
 	}
-	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: current, Latest: rel.Version(), Published: rel.PublishedAt})
+	cache := selfupdate.Checked(dir, current, rel)
 	if !selfupdate.IsRelease(current) {
 		if check {
 			fmt.Fprintf(out, "terma %s is a development build; latest release is %s. Use `terma update --force` to switch to it.\n", current, rel.Version())
@@ -173,9 +173,18 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 		fmt.Fprintf(out, "terma %s is up to date (latest %s).\n", current, rel.Version())
 		return false, nil
 	}
+	if check && cache.Unbuilt {
+		fmt.Fprintf(out, "terma %s → %s is published, but still being built and signed: `terma update` installs it once it is.\n", current, rel.Version())
+		return false, nil
+	}
 	if check {
 		fmt.Fprintf(out, "terma %s → %s available.\n", current, rel.Version())
 		return false, nil
+	}
+	// However terma was installed: the package a package manager would install comes from the
+	// same build as the archives, so asking it now would only install this version again.
+	if cache.Unbuilt {
+		return false, fmt.Errorf("terma %s is published, but %w", rel.Version(), selfupdate.ErrNotReady)
 	}
 	if m, ok := selfupdate.ManagedBy(exe); ok {
 		return true, app.upgradeManaged(ctx, m, current, rel.Version(), out)

@@ -144,12 +144,20 @@ the new binary. It never restarts while it holds anything, so the restart loses 
 what it has queued for delivery is on disk, and the new relay sends it; an export that
 arrives as it stops is answered "try again", and the agent sends it to the new relay. A
 relay that a hook started, rather than the background service, starts its successor
-itself.
+itself. While it waits to restart it goes on looking, so a release published meanwhile is
+installed too, and every hook and command runs the latest.
 
 A patch release (1.4.2 → 1.4.3) installs as soon as it is found, within 10 minutes of
-publishing on a machine whose relay runs. A new minor or major
+its build finishing on a machine whose relay runs. A new minor or major
 version (1.4 → 1.5, 1 → 2) installs once it has been out for 24 hours, so one that breaks
 can be pulled before it reaches every machine. `terma update` never waits.
+
+A release is installed only once it is whole. GitHub names a release the latest from the
+moment it is published, but its archives, checksums and signature come from a build that
+starts once a reviewer approves it, and the signing key exists nowhere else: a release
+without them has not been through that approval yet. terma tries nothing until they are
+all there; it asks again at its next look, and `terma update` says the release is still
+being built.
 
 ```bash
 terma update --check        # check without installing

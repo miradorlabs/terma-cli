@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -107,6 +108,7 @@ func credentialFrom(resp *tokenResponse) *auth.Credential {
 		SessionID:      resp.SessionID,
 		OrganizationID: resp.Organization.ID,
 		UserEmail:      resp.User.Email,
+		UserID:         resp.User.ID,
 	}
 }
 
@@ -165,6 +167,7 @@ func (c *Client) refresh(ctx context.Context) error {
 
 	cred := c.credentialFrom(resp)
 	c.mu.Lock()
+	cred.UserID = cmp.Or(cred.UserID, c.credential.UserID) // a refresh keeps the session's user
 	c.credential = cred
 	c.tokenGen++
 	c.mu.Unlock()

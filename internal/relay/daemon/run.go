@@ -372,7 +372,11 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			}
 			return stopServeFailed, err
 		case <-updated:
-			upgraded = time.Now()
+			// From the first release it installed: one installed while it waits to restart is
+			// no reason to keep running the release they both replaced any longer.
+			if upgraded.IsZero() {
+				upgraded = time.Now()
+			}
 		case <-tick.C:
 		}
 		if !setUp(stateDir) {

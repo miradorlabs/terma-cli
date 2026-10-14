@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
@@ -62,6 +64,7 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
+// It sends once, so the user heartbeatUser names never rides on to another key.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
@@ -81,10 +84,43 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 			return err // every key sits in the one keychain: asking for the next would wait as long
 		}
 		if projectID != "" && key != "" {
-			return sendHeartbeat(ctx, app.delivery().Endpoint(cfg, projectID), key, beat)
+			endpoint := app.delivery().Endpoint(cfg, projectID)
+			relay.NameHeartbeatUser(beat, app.heartbeatUser(cfg, projectID, endpoint))
+			return sendHeartbeat(ctx, endpoint, key, beat)
 		}
 	}
 	return relay.ErrNoKey
+}
+
+// heartbeatUser is who a beat sent with projectID's key to endpoint names: the signed-in user,
+// only for the key of the team whose validated policy this login fetched, going to this
+// profile's own ingest and filed, if with hosts at all, with this profile's API host. Any other
+// key held here, TERMA_TEAM_ID's included, or one filed with another deployment's hosts may be
+// another organization's or environment's, so its beat names no one.
+func (app *App) heartbeatUser(cfg *config.Config, projectID, endpoint string) string {
+	if projectID != cfg.Policy.Team() || !cfg.Policy.Validated() || !sameHost(endpoint, cfg.OTLPURL) {
+		return ""
+	}
+	if h, ok := keystore.HostsFor(app.dir, projectID); ok && h.API != "" && !sameHost(h.API, cfg.APIURL) {
+		return ""
+	}
+	return signedInUser(cfg)
+}
+
+func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
+
+// signedInUser is the Mirador user cfg's profile is signed in as, from credentials.json alone,
+// never the keychain: "" when it is signed out, signed in for another organization or
+// environment, or set up with a server key, which is no one's.
+func signedInUser(cfg *config.Config) string {
+	if cfg.ServerKeySignIn {
+		return ""
+	}
+	cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
+	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.OrganizationID != cfg.OrganizationID {
+		return ""
+	}
+	return cred.UserID
 }
 
 func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsData) error {

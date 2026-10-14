@@ -45,7 +45,7 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 					w.WriteHeader(status)
 					return
 				}
-				fmt.Fprint(w, `{"tag_name":"v2.0.0","assets":[]}`)
+				_ = json.NewEncoder(w).Encode(Release{TagName: "v2.0.0", Assets: builtAssets()})
 			}))
 			defer srv.Close()
 			c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
