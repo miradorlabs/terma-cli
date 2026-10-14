@@ -156,7 +156,6 @@ func (app *App) delivery() delivery.Router {
 		Version:    app.version,
 		OTLPPinned: app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
 		Policy:     app.policies().Current,
-		User:       app.teamUser,
 		Consent: func(tool string, c hookrun.Consent) bool {
 			a, ok := app.agents.ForTool(tool)
 			if !ok {

@@ -24,9 +24,7 @@ type otlpSender struct {
 	APIKey    string
 	ProjectID string
 	Version   string
-	// UserID, set, names the Mirador user on the resource as terma.user.id, as the relay does.
-	UserID string
-	HTTP   *http.Client
+	HTTP      *http.Client
 }
 
 const (
@@ -159,18 +157,14 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 		}
 		records = append(records, record)
 	}
-	resource := []otlpAttr{
-		attrOf(semconv.ServiceNameKey, serviceName),
-		attrOf(semconv.ServiceVersionKey, o.Version),
-		attrOf(semconv.MiradorProjectIDKey, o.ProjectID),
-		attrOf(semconv.TermaSchemaVersionKey, semconv.SchemaVersion),
-	}
-	if o.UserID != "" {
-		resource = append(resource, attrOf(semconv.TermaUserIDKey, o.UserID))
-	}
 	payload := map[string]any{
 		"resourceLogs": []map[string]any{{
-			"resource": map[string]any{"attributes": resource},
+			"resource": map[string]any{"attributes": []otlpAttr{
+				attrOf(semconv.ServiceNameKey, serviceName),
+				attrOf(semconv.ServiceVersionKey, o.Version),
+				attrOf(semconv.MiradorProjectIDKey, o.ProjectID),
+				attrOf(semconv.TermaSchemaVersionKey, semconv.SchemaVersion),
+			}},
 			"scopeLogs": []map[string]any{{
 				"scope":      map[string]string{"name": serviceName, "version": o.Version},
 				"logRecords": records,
