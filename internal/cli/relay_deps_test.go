@@ -133,3 +133,50 @@ func TestSignedInUser(t *testing.T) {
 		}
 	}
 }
+
+// A relayed part names the signed-in user under the rule a heartbeat names them by: only one
+// bound for the selected team's validated policy at this profile's ingest, under the
+// configuration as it is when the relay asks, not as it started.
+func TestRelayUserFollowsTheHeartbeatsRule(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	authSandbox(t, &fakeAuth{srv: srv})
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
+		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, OrganizationID: "org-a", UserID: "user-a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("org-a", "A") }); err != nil {
+		t.Fatal(err)
+	}
+	relay := &config.Config{ProfileName: config.DefaultProfile}
+	if got := testApp.relayUser(relay, "team", srv.URL); got != "" {
+		t.Fatalf("with no team policy fetched, named %q", got)
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	if got := testApp.relayUser(relay, "team", srv.URL); got != "user-a" {
+		t.Fatalf("bound for the team, named %q, want user-a", got)
+	}
+	for name, to := range map[string][2]string{
+		"another team":   {"elsewhere", srv.URL},
+		"another ingest": {"team", "https://otel.other.example"},
+	} {
+		if got := testApp.relayUser(relay, to[0], to[1]); got != "" {
+			t.Errorf("%s: named %q", name, got)
+		}
+	}
+	// The relay asks about its own profile, whichever profile is active now.
+	t.Setenv("TERMA_PROFILE", "other")
+	if got := testApp.relayUser(relay, "team", srv.URL); got != "user-a" {
+		t.Errorf("with another profile active, named %q, want the relay's own profile's user-a", got)
+	}
+	if got := testApp.relayUser(&config.Config{ProfileName: "other"}, "team", srv.URL); got != "" {
+		t.Errorf("for a profile with no login, named %q", got)
+	}
+	t.Setenv("TERMA_PROFILE", "")
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = true }); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.relayUser(relay, "team", srv.URL); got != "" {
+		t.Errorf("set up with a server key, named %q", got)
+	}
+}

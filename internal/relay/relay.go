@@ -50,6 +50,8 @@ type Policy struct {
 	RequireClaim bool
 	// Unadmitted is a claim whose repository the team policy no longer lists: its records drop.
 	Unadmitted bool
+	// User is the Mirador user every part sent under this policy names, by id; "" names no one.
+	User string
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
