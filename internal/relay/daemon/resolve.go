@@ -26,10 +26,6 @@ type ResolverDeps struct {
 	RelayTargets func(selected []string) []string
 	// Endpoint is the ingest host a project's telemetry goes to.
 	Endpoint func(projectID string) string
-	// Anonymous reports whether an agent's telemetry names no user (shape.Anonymous).
-	Anonymous func(agent string) bool
-	// User is who an anonymous agent's parts sent to projectID at endpoint name; zero names no one.
-	User func(projectID, endpoint string) relay.User
 }
 
 // Resolver turns a claim into a Policy: the project's ingest host, the claiming agent's key
@@ -98,12 +94,6 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		}
 		pol := CapturePolicy(in)
 		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
-		if in.Harness != "" && r.Anonymous != nil && r.Anonymous(in.Harness) {
-			pol.Anonymous = true
-			if r.User != nil {
-				pol.User = r.User(c.ProjectID, pol.Endpoint)
-			}
-		}
 		return pol, nil
 	}
 }

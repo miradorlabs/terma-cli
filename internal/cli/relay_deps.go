@@ -32,8 +32,6 @@ func (app *App) relayDeps() daemon.Deps {
 		AgentName:     app.agents.NameForTool,
 		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
-		Anonymous:     func(agent string) bool { _, ok := app.agents.Find[shape.Anonymous](agent); return ok },
-		User:          app.relayUser,
 		CreateKey:     app.createProjectKey,
 		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    app.hookPolicy,
@@ -94,32 +92,17 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 	return relay.ErrNoKey
 }
 
-// heartbeatUser is who a beat sent with projectID's key to endpoint names: teamUser's id.
-func (app *App) heartbeatUser(cfg *config.Config, projectID, endpoint string) string {
-	return app.teamUser(cfg, projectID, endpoint).ID
-}
-
-// relayUser is who an anonymous agent's parts sent to projectID at endpoint name: teamUser,
-// under the configuration as it is now, as a heartbeat reads it.
-func (app *App) relayUser(projectID, endpoint string) relay.User {
-	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
-	if err != nil {
-		return relay.User{}
-	}
-	return app.teamUser(cfg, projectID, endpoint)
-}
-
-// teamUser is who telemetry sent with projectID's key to endpoint names: the signed-in user,
+// heartbeatUser is who a beat sent with projectID's key to endpoint names: the signed-in user,
 // only for the key of the team whose validated policy this login fetched, going to this
 // profile's own ingest and filed, if with hosts at all, with this profile's API host. Any other
 // key held here, TERMA_TEAM_ID's included, or one filed with another deployment's hosts may be
-// another organization's or environment's, so what it sends names no one.
-func (app *App) teamUser(cfg *config.Config, projectID, endpoint string) relay.User {
+// another organization's or environment's, so its beat names no one.
+func (app *App) heartbeatUser(cfg *config.Config, projectID, endpoint string) string {
 	if projectID != cfg.Policy.Team() || !cfg.Policy.Validated() || !sameHost(endpoint, cfg.OTLPURL) {
-		return relay.User{}
+		return ""
 	}
 	if h, ok := keystore.HostsFor(app.dir, projectID); ok && h.API != "" && !sameHost(h.API, cfg.APIURL) {
-		return relay.User{}
+		return ""
 	}
 	return signedInUser(cfg)
 }
@@ -127,17 +110,17 @@ func (app *App) teamUser(cfg *config.Config, projectID, endpoint string) relay.U
 func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
 
 // signedInUser is the Mirador user cfg's profile is signed in as, from credentials.json alone,
-// never the keychain: no one when it is signed out, signed in for another organization or
-// environment, or set up with a server key, which is no one's. The email goes only with the id.
-func signedInUser(cfg *config.Config) relay.User {
+// never the keychain: "" when it is signed out, signed in for another organization or
+// environment, or set up with a server key, which is no one's.
+func signedInUser(cfg *config.Config) string {
 	if cfg.ServerKeySignIn {
-		return relay.User{}
+		return ""
 	}
 	cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
-	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.OrganizationID != cfg.OrganizationID || cred.UserID == "" {
-		return relay.User{}
+	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.OrganizationID != cfg.OrganizationID {
+		return ""
 	}
-	return relay.User{ID: cred.UserID, Email: cred.UserEmail}
+	return cred.UserID
 }
 
 func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsData) error {

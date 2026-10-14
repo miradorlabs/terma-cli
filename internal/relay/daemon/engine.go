@@ -36,10 +36,6 @@ type Deps struct {
 	RelayTargets func(selected []string) []string
 	// Endpoint is a project's ingest host.
 	Endpoint func(cfg *config.Config, projectID string) string
-	// Anonymous reports whether an agent's telemetry names no user (shape.Anonymous).
-	Anonymous func(agent string) bool
-	// User is who an anonymous agent's parts sent to projectID at endpoint name.
-	User func(projectID, endpoint string) relay.User
 	// CreateKey mints a project's key under cfg's sign-in.
 	CreateKey func(ctx context.Context, cfg *config.Config, projectID string) (string, error)
 	// SendHeartbeat delivers a heartbeat with a project's key.
@@ -102,8 +98,7 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 // Resolver turns a claim into its session's policy, minting a missing key with mint.
 func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
 	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName, RelayTargets: d.RelayTargets,
-		Endpoint:  func(projectID string) string { return d.Endpoint(cfg, projectID) },
-		Anonymous: d.Anonymous, User: d.User})
+		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) }})
 }
 
 // CatchAll is global mode's claim for everything an agent exports.

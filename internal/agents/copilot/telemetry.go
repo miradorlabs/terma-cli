@@ -48,12 +48,7 @@ func (Agent) CaptureRules() shape.CaptureRules {
 	}
 }
 
-// Anonymous: the runtime names its account only by enduser.pseudo.id, an opaque hash the
-// platform cannot tell a person by, so the relay names the signed-in user.
-func (Agent) Anonymous() {}
-
 var (
 	_ shape.Correlator = Agent{}
 	_ shape.Capturer   = Agent{}
-	_ shape.Anonymous  = Agent{}
 )
