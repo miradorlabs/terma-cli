@@ -2,6 +2,7 @@ package copilot
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -95,14 +96,14 @@ func TestCopilotTitleReadsWhatTheRuntimeWrites(t *testing.T) {
 	if titles := endTitles(t, env, "Stop"); len(titles) != 1 || titles[0].Attrs[semconv.TermaSessionTitleKey] != "Fix the build\nthen run the tests" {
 		t.Fatalf("got %+v", titles)
 	}
-	long := strings.Repeat("é", copilotTitleMaxText)
+	long := strings.Repeat("é", hookrun.TitleMaxBytes)
 	workspaceYAML(t, home, copilotSession, "'"+long+"'", false)
 	titles := endTitles(t, env, "Stop")
 	if len(titles) != 1 {
 		t.Fatalf("expected the long name, got %+v", titles)
 	}
 	got, _ := titles[0].Attrs[semconv.TermaSessionTitleKey].(string)
-	if len(got) > copilotTitleMaxText || !strings.HasPrefix(long, got) || got == "" {
+	if len(got) > hookrun.TitleMaxBytes || !strings.HasPrefix(long, got) || got == "" {
 		t.Fatalf("a long name left as %d bytes: %q", len(got), got)
 	}
 }
@@ -150,5 +151,36 @@ func TestCopilotTitleConsent(t *testing.T) {
 		if got := (Agent{}).ContentConsented(c.consent); got != c.want {
 			t.Errorf("ContentConsented(%+v) = %v, want %v", c.consent, got, c.want)
 		}
+	}
+}
+
+// A workspace.yaml past the read's bound is not read: no title, and the hook goes on.
+func TestCopilotTitleSkipsAnOversizedWorkspace(t *testing.T) {
+	env, home := titleEnv(t)
+	workspaceYAML(t, home, copilotSession, "'"+strings.Repeat("x", workspaceMaxBytes)+"'", false)
+	if titles := endTitles(t, env, "Stop"); len(titles) != 0 {
+		t.Fatalf("an oversized workspace spooled %+v", titles)
+	}
+}
+
+// The state that keeps an unchanged name from being sent again holds a hash of it, never the
+// name, which restates the first prompt.
+func TestCopilotTitleStateKeepsNoName(t *testing.T) {
+	env, home := titleEnv(t)
+	workspaceYAML(t, home, copilotSession, "'a private first prompt'", false)
+	if titles := endTitles(t, env, "Stop"); len(titles) != 1 {
+		t.Fatalf("expected the title, got %+v", titles)
+	}
+	err := filepath.WalkDir(filepath.Join(env.StateDir, copilotTitleStateDir), func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if b, _ := os.ReadFile(path); strings.Contains(string(b), "private first prompt") {
+			t.Errorf("%s keeps the name", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
