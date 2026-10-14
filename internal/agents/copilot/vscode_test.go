@@ -113,9 +113,10 @@ func TestConnectChangesOnlyItsOwnSettings(t *testing.T) {
 	data, _ := os.ReadFile(settings)
 	added := `
   "chat.agentHost.otel.enabled": true,
+  "chat.agentHost.otel.exporterType": "otlp-http",
   "chat.agentHost.otel.otlpEndpoint": "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces",
   "chat.agentHost.otel.captureContent": true,
-  "settingsSync.ignoredSettings": ["chat.agentHost.otel.enabled","chat.agentHost.otel.otlpEndpoint","chat.agentHost.otel.captureContent"],`
+  "settingsSync.ignoredSettings": ["chat.agentHost.otel.enabled","chat.agentHost.otel.exporterType","chat.agentHost.otel.otlpEndpoint","chat.agentHost.otel.captureContent"],`
 	if want := strings.Replace(handWritten, "{", "{"+added, 1); string(data) != want {
 		t.Fatalf("settings after setup:\n%s\nwant:\n%s", data, want)
 	}
@@ -152,6 +153,7 @@ func TestDisconnectRestoresTheDevelopersOwn(t *testing.T) {
 	a, settings := sandbox(t)
 	mine := `{
 	"chat.agentHost.otel.otlpEndpoint": "http://localhost:4318", // ours
+	"chat.agentHost.otel.exporterType": "file",
 	"chat.agentHost.otel.captureContent": false,
 	"settingsSync.ignoredSettings": [
 		"editor.fontSize" // per machine
@@ -164,7 +166,7 @@ func TestDisconnectRestoresTheDevelopersOwn(t *testing.T) {
 	configure(t, a)
 	doc := settingsOf(t, settings)
 	ignored, _ := doc[syncIgnored].([]any)
-	if doc[hostEndpoint] != "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces" || doc[hostContent] != true || len(ignored) != 4 || ignored[0] != "editor.fontSize" {
+	if doc[hostEndpoint] != "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces" || doc[hostExporter] != otlpHTTP || doc[hostContent] != true || len(ignored) != 5 || ignored[0] != "editor.fontSize" {
 		t.Fatalf("settings after setup: %v", doc)
 	}
 	if data, _ := os.ReadFile(settings); !strings.Contains(string(data), "// ours") {
@@ -279,7 +281,7 @@ func TestConnectCreatesSettingsAndUndoesWithoutItsRecord(t *testing.T) {
 	}
 
 	configure(t, a)
-	if doc := settingsOf(t, settings); len(doc) != 4 || doc[hostEndpoint] != "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces" {
+	if doc := settingsOf(t, settings); len(doc) != 5 || doc[hostEndpoint] != "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces" {
 		t.Fatalf("new settings: %v", doc)
 	}
 	if err := os.RemoveAll(filepath.Join(a.ConfigDir, "setup")); err != nil {
@@ -463,11 +465,13 @@ func TestUndoTakesItsNamesOutOfAnEditedSyncList(t *testing.T) {
 	configure(t, a)
 	reflowed := `{
   "chat.agentHost.otel.enabled": true,
+  "chat.agentHost.otel.exporterType": "otlp-http",
   "chat.agentHost.otel.otlpEndpoint": "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces",
   "chat.agentHost.otel.captureContent": true,
   "settingsSync.ignoredSettings": [
     "window.zoomLevel", // this screen only
     "chat.agentHost.otel.enabled",
+    "chat.agentHost.otel.exporterType",
     "chat.agentHost.otel.otlpEndpoint",
     "chat.agentHost.otel.captureContent",
     "editor.fontSize",
@@ -493,5 +497,36 @@ func TestUndoTakesItsNamesOutOfAnEditedSyncList(t *testing.T) {
 `
 	if data, _ := os.ReadFile(settings); string(data) != want {
 		t.Fatalf("settings after undo:\n%s\nwant:\n%s", data, want)
+	}
+}
+
+// An exporter type the developer set to write a file sends no span to the endpoint: setup
+// writes OTLP/HTTP, and a VS Code still writing a file is not pointed at the relay.
+func TestVSCodePointedNeedsTheOTLPExporter(t *testing.T) {
+	a, settings := sandbox(t)
+	configure(t, a)
+	if !vscodePointed(settings, "127.0.0.1:43180") {
+		t.Fatal("not pointed after setup")
+	}
+	data, _ := os.ReadFile(settings)
+	if err := os.WriteFile(settings, []byte(strings.Replace(string(data), `"otlp-http"`, `"file"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if vscodePointed(settings, "127.0.0.1:43180") {
+		t.Fatal("a file exporter read as pointed at the relay")
+	}
+}
+
+// An exporter type inherited from the shell picks the agent host's exporter ahead of the
+// settings: a file or the console keeps the spans from the relay, OTLP does not.
+func TestShellExporterTypeIsAConflict(t *testing.T) {
+	for _, name := range shellEndpoints {
+		t.Setenv(name, "")
+	}
+	for value, conflict := range map[string]bool{"": false, "otlp-http": false, "otlp-grpc": false, "file": true, " Console ": true} {
+		t.Setenv(shellExporterType, value)
+		if got, set := shellEndpoint("127.0.0.1:43180"); set != conflict || set && got != shellExporterType {
+			t.Errorf("%s=%q: shellEndpoint = %q, %v; want a conflict %v", shellExporterType, value, got, set, conflict)
+		}
 	}
 }

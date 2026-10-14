@@ -31,14 +31,20 @@ import (
 // the same exporter to the Claude and Codex agents a developer has it host there.
 const (
 	hostEnabled  = "chat.agentHost.otel.enabled"
+	hostExporter = "chat.agentHost.otel.exporterType"
 	hostEndpoint = "chat.agentHost.otel.otlpEndpoint"
 	hostContent  = "chat.agentHost.otel.captureContent"
+	// otlpHTTP is the exporter type that sends to the endpoint, over OTLP/HTTP; VS Code's
+	// others write a file or the console, or (for Copilot's runtime) fall back to it.
+	otlpHTTP = "otlp-http"
 	// syncIgnored lists the settings Settings Sync leaves on this machine.
 	syncIgnored = "settingsSync.ignoredSettings"
 )
 
-// exporterKeys are the exporter settings terma writes, in the order it writes them.
-var exporterKeys = []string{hostEnabled, hostEndpoint, hostContent}
+// exporterKeys are the exporter settings terma writes, in the order it writes them. The
+// exporter type is among them: a developer's file or console exporter would keep the spans
+// from the endpoint, so it is replaced, and restored by an undo, like the rest.
+var exporterKeys = []string{hostEnabled, hostExporter, hostEndpoint, hostContent}
 
 // vscodeFlavors are the VS Code builds that ship Copilot, by their data directory's name.
 var vscodeFlavors = []string{"Code", "Code - Insiders"}
@@ -94,18 +100,29 @@ func (a Agent) undoPaths() []string {
 // settings give its agent host.
 var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "COPILOT_OTEL_ENDPOINT"}
 
-// shellEndpoint names an OTLP endpoint variable exported where terma runs that is not the
-// relay at addr. VS Code applies its settings only to the variables its own environment
-// leaves unset, and takes that environment from the developer's shell: with one set, the
-// agent host exports there already, and terma's settings would only add what was said to
-// it. A collector on this machine is no exception, since it is there to forward. The
-// relay's own address is: another agent's exporter names it in the environment terma is
-// started from. The value may hold a credential, so only the name is returned.
+// shellExporterType is the variable that picks the agent host's exporter ahead of
+// chat.agentHost.otel.exporterType.
+const shellExporterType = "COPILOT_OTEL_EXPORTER_TYPE"
+
+// shellEndpoint names an exporter variable exported where terma runs that sends the agent
+// host's spans elsewhere than the relay at addr: an OTLP endpoint that is not the relay's, or
+// an exporter type that writes a file or the console. VS Code applies its settings only to the
+// variables its own environment leaves unset, and takes that environment from the developer's
+// shell: with one set, the agent host exports there already, and terma's settings would only
+// add what was said to it. A collector on this machine is no exception, since it is there to
+// forward. The relay's own address is: another agent's exporter names it in the environment
+// terma is started from. The value may hold a credential, so only the name is returned.
 func shellEndpoint(addr string) (string, bool) {
 	for _, name := range shellEndpoints {
 		if v := os.Getenv(name); v != "" && !relayURL(v, addr) {
 			return name, true
 		}
+	}
+	// Copilot's runtime sends otlp-grpc over OTLP/HTTP, to the same endpoint.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(shellExporterType))) {
+	case "", otlpHTTP, "otlp-grpc":
+	default:
+		return shellExporterType, true
 	}
 	return "", false
 }
@@ -123,6 +140,7 @@ func relayURL(raw, addr string) bool {
 func exporterSettings(cfg agents.RelayConfig) map[string]string {
 	return map[string]string{
 		hostEnabled:  "true",
+		hostExporter: string(hujson.String(otlpHTTP)),
 		hostEndpoint: string(hujson.String(cfg.Endpoint + "/" + cfg.Token + "/v1/traces")),
 		hostContent:  "true",
 	}
@@ -287,7 +305,9 @@ func vscodePointed(path, addr string) bool {
 	}
 	enabled, _ := doc.raw(hostEnabled)
 	endpoint, _ := doc.text(hostEndpoint)
-	return enabled == "true" && strings.HasPrefix(endpoint, "http://"+addr+"/")
+	// Unset, the exporter type is VS Code's default, OTLP/HTTP.
+	exporter, set := doc.text(hostExporter)
+	return enabled == "true" && (!set || exporter == otlpHTTP) && strings.HasPrefix(endpoint, "http://"+addr+"/")
 }
 
 // unrecorded stands in for a lost record of a file still holding the relay's token: the
@@ -297,7 +317,7 @@ func (d *settingsDoc) unrecorded(path, token string) *harness.Journal {
 	installed := map[string]string{}
 	if endpoint, _ := d.text(hostEndpoint); strings.Contains(endpoint, "/"+token) {
 		for _, key := range exporterKeys {
-			if raw, ok := d.raw(key); ok && (key == hostEndpoint || raw == "true") {
+			if raw, ok := d.raw(key); ok && (key == hostEndpoint || raw == "true" || raw == string(hujson.String(otlpHTTP))) {
 				installed[key] = raw
 			}
 		}
