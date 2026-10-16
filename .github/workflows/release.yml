@@ -35,7 +35,9 @@ jobs:
 
       - uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> v2"
+          # Pinned: shadybin rebuilds the release with this same version (its project.json
+          # for terma names it), and a different GoReleaser can package differently.
+          version: "v2.18.3"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,6 +61,23 @@ jobs:
             dist/checksums.txt
             dist/checksums.txt.sig
             install.sh
+
+  # shadybin rebuilds the release from its tag, checks the archives are the ones just
+  # published, has Claude review the code that goes into them, and attaches its signed-off
+  # statement and report to the release. It runs on this repository's Actions minutes and
+  # Claude API key; the badge at shadybin.dev then shows the release's verdict. v1 moves
+  # to each compatible shadybin release, so this needs no updating.
+  shadybin:
+    needs: goreleaser
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    uses: shadybin/shadybin/.github/workflows/certify.yml@v1
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   # The npm shim (`npx @miradorlabs/terma`) downloads this exact release at
   # install time, so it is published after the archives exist.
