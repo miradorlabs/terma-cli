@@ -32,6 +32,9 @@ type Status struct {
 	// skipped; UntestedNew says it is tested for the first time.
 	Untested    string `json:"untested,omitempty"`
 	UntestedNew bool   `json:"untested_new,omitempty"`
+	// Why says why the build that ran no checks did not, Untested or Version itself, where
+	// its scenario said (e2e.SkipBuild).
+	Why string `json:"why,omitempty"`
 	// Regressed says a check Version passed before failed tonight (CompatChange); Fixed, that
 	// it failed checks before and every one of them passed tonight (the history), none left
 	// unchecked.
@@ -51,6 +54,7 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange, hist ma
 	checks := map[build]map[FailedCheck]bool{}
 	failed := map[build][]FailedCheck{}
 	passed := map[build]map[FailedCheck]bool{}
+	why := map[build]string{}
 	newest, newestRun := map[string]string{}, map[string]string{}
 	for _, r := range rows {
 		b := build{r.Harness, r.Version}
@@ -58,6 +62,9 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange, hist ma
 			newest[r.Harness] = r.Version
 		}
 		if r.Result == "not run" {
+			if r.Why != "" {
+				why[b] = r.Why
+			}
 			continue
 		}
 		if v, ok := newestRun[r.Harness]; !ok || versionLess(v, r.Version) {
@@ -89,6 +96,9 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange, hist ma
 		if latest != v {
 			s.Untested = latest
 			s.UntestedNew = slices.ContainsFunc(rs, func(r Release) bool { return r.Harness == harness && r.Version == latest })
+		}
+		if s.Checks == 0 || s.Untested != "" {
+			s.Why = why[build{harness, latest}]
 		}
 		for _, c := range compat {
 			if c.Harness == harness && c.Version == v {
@@ -140,6 +150,8 @@ func (s Status) line(strong func(string) string) string {
 		verdict = ": passes its 1 check"
 	}
 	switch {
+	case s.Checks == 0 && s.Why != "":
+		mark, verdict = "⚪", ": not tested, "+s.Why
 	case s.Checks == 0:
 		mark, verdict = "⚪", ": no checks ran"
 	case len(s.Failed) > 0:
@@ -163,11 +175,16 @@ func (s Status) line(strong func(string) string) string {
 		}
 	}
 	line := mark + " " + build + verdict
-	switch {
-	case s.Untested != "" && s.UntestedNew:
-		line += " · " + s.Untested + " (new) ran no checks"
-	case s.Untested != "":
-		line += " · " + s.Untested + " ran no checks"
+	if s.Untested != "" {
+		line += " · " + s.Untested
+		if s.UntestedNew {
+			line += " (new)"
+		}
+		if s.Why != "" {
+			line += " not tested, " + s.Why
+		} else {
+			line += " ran no checks"
+		}
 	}
 	if len(s.OlderFailed) > 0 {
 		line += " · older builds failing: " + strings.Join(s.OlderFailed, ", ")

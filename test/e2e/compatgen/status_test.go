@@ -134,3 +134,23 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 		t.Errorf("drift.md does not say the key:\n%s", md)
 	}
 }
+
+// A build its scenario skipped, saying why, says why beside its ⚪: a harness the driver
+// cannot drive, and a newer major terma does not support yet beside the build that passed.
+func TestAnUntestedBuildSaysWhy(t *testing.T) {
+	t3 := check("t3", "0.1.0", "relay.telemetry", "darwin/arm64", "not run")
+	t3.Why = "the test driver can't drive this version yet"
+	oc2 := check("opencode", "2.0.30", "relay.telemetry", "darwin/arm64", "not run")
+	oc2.Why = "terma doesn't support OpenCode 2 yet"
+	rows := []e2e.CompatRow{t3, oc2, check("opencode", "1.19.2", "relay.telemetry", "darwin/arm64", "pass")}
+	lines := map[string]string{}
+	for _, s := range statuses(rows, nil, nil, nil) {
+		lines[s.Harness] = s.line(func(s string) string { return s })
+	}
+	if want := "⚪ T3 Code 0.1.0: not tested, the test driver can't drive this version yet"; lines["t3"] != want {
+		t.Errorf("t3: %q, want %q", lines["t3"], want)
+	}
+	if want := "✅ OpenCode 1.19.2: passes its 1 check · 2.0.30 not tested, terma doesn't support OpenCode 2 yet"; lines["opencode"] != want {
+		t.Errorf("opencode: %q, want %q", lines["opencode"], want)
+	}
+}

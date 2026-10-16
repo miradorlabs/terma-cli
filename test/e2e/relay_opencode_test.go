@@ -94,7 +94,7 @@ func TestRelayOpenCode2(t *testing.T) {
 	b := Binary{Harness: "opencode", Version: v}
 	t.Run(b.Label(), func(t *testing.T) {
 		ProvesAll(t, b, "relay.telemetry", "relay.content_allowed", "relay.content_withheld")
-		SkipBuild(t, "terma doesn't support OpenCode 2 yet: its plugin is OpenCode 1's")
+		SkipBuild(t, "terma doesn't support OpenCode 2 yet (its plugin is OpenCode 1's)")
 	})
 }
 

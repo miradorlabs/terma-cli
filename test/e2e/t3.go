@@ -122,7 +122,7 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 	x.token = strings.TrimSpace(string(tok))
 	// 0.1.0 answers the old snapshot route with its web app, and only the dispatch with a 404.
 	if !x.servesJSON("/api/orchestration/snapshot") {
-		SkipBuild(t, "the test driver can't drive T3 "+b.Version+" yet: it no longer serves /api/orchestration")
+		SkipBuild(t, "the test driver can't drive this version yet (it no longer serves /api/orchestration)")
 	}
 	return x
 }

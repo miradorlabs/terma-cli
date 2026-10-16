@@ -227,7 +227,11 @@ newest build tested tonight send all the telemetry terma expects? ✅ where ever
 check it ran passed (each capability on each platform once; a skipped one is not counted), ❌
 naming the checks it failed and whether it passed them before, ⚪ where it ran none; a newer
 build whose every check was skipped is named beside the newest that ran, and older builds
-tested tonight that failed are named too. A build tested for the first time, and newer than
+tested tonight that failed are named too. A scenario that cannot drive a build skips it
+through `SkipBuild`, saying why, and the reason goes beside its ⚪: T3 0.1.0, whose API the
+driver does not speak yet, and the newest OpenCode 2 (npm's `@opencode/cli`), which terma's
+plugin does not support yet, so a release is untested in the open, never failed or unseen. A
+build tested for the first time, and newer than
 any tested before (an older one, re-run or backported, is no news), is marked new, against the
 newest build known before it. Red comes first, and the list is split across Slack sections
 rather than cut. The notification says whether every harness sends what terma expects, or how
