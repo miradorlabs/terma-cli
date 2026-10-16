@@ -50,6 +50,8 @@ type Entry struct {
 	FirstPassed time.Time `json:"first_passed,omitzero"`
 	Terma       string    `json:"terma,omitempty"`
 	Test        string    `json:"test,omitempty"`
+	// Why says why a check did not run, where its scenario said (e2e.SkipBuild).
+	Why string `json:"why,omitempty"`
 }
 
 func (e Entry) key() string {
@@ -156,7 +158,7 @@ func run(c config, now time.Time) error {
 	}
 	for _, r := range compatRows {
 		merge(hist, Entry{Harness: r.Harness, Version: r.Version, Platform: r.Platform, Capability: r.Capability,
-			Result: r.Result, LastRun: r.At, Terma: r.Terma, Test: r.Test})
+			Result: r.Result, LastRun: r.At, Terma: r.Terma, Test: r.Test, Why: r.Why})
 	}
 	if len(fieldRows) > 0 || len(catalog.Fields) > 0 {
 		mergeFields(&catalog, fieldRows, ran.failed)
@@ -194,13 +196,15 @@ func writeDigest(dir string, d Drift) error {
 }
 
 // merge files e in the history: a newer result replaces an older one; the first pass
-// is remembered; a run that did not get to a capability keeps what was known of it.
+// is remembered; a run that did not get to a capability keeps what was known of it, unless
+// it says why: a scenario that cannot drive the build (e2e.SkipBuild) says the build is
+// untested, and what was known of it came from a driver that could not drive it either.
 func merge(hist map[string]Entry, e Entry) {
 	prev, ok := hist[e.key()]
 	if ok && prev.LastRun.After(e.LastRun) {
 		return
 	}
-	if ok && e.Result == "not run" && prev.Result != "not run" {
+	if ok && e.Result == "not run" && e.Why == "" && prev.Result != "not run" {
 		return
 	}
 	if ok {
@@ -251,8 +255,19 @@ func render(entries []Entry, now time.Time) string {
 			fmt.Fprintf(&b, "| %s | — | not yet covered | — |\n", h.Name)
 			continue
 		}
-		versions := versionsOf(es)
-		newest := versions[0]
+		// The newest build verified is the newest that ran a check: one every check of which
+		// was skipped (a driver that cannot drive it yet) is in its table, not here.
+		var ran []Entry
+		for _, e := range es {
+			if e.Result != "not run" {
+				ran = append(ran, e)
+			}
+		}
+		if len(ran) == 0 {
+			fmt.Fprintf(&b, "| %s | — | none run yet | — |\n", h.Name)
+			continue
+		}
+		newest := versionsOf(ran)[0]
 		pass, tested := 0, 0
 		var last time.Time
 		for _, c := range e2e.Capabilities {

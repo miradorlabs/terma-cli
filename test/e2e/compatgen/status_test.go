@@ -231,3 +231,28 @@ func TestAnUntestedBuildSaysWhy(t *testing.T) {
 		t.Errorf("opencode: %q, want %q", lines["opencode"], want)
 	}
 }
+
+// A reasoned skip replaces what the history knew of the build, and the matrix's newest build
+// verified is the newest that ran a check; a skip with no reason keeps what was known.
+func TestAReasonedSkipReplacesTheHistory(t *testing.T) {
+	day := time.Date(2026, 10, 16, 5, 0, 0, 0, time.UTC)
+	hist := map[string]Entry{}
+	merge(hist, Entry{Harness: "t3", Version: "0.0.45", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass", LastRun: day.Add(-48 * time.Hour)})
+	merge(hist, Entry{Harness: "t3", Version: "0.1.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "fail", LastRun: day.Add(-24 * time.Hour)})
+	merge(hist, Entry{Harness: "t3", Version: "0.0.45", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "not run", LastRun: day})
+	merge(hist, Entry{Harness: "t3", Version: "0.1.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "not run", LastRun: day, Why: "the test driver can't drive this version yet"})
+	if e := hist["t3|0.0.45|darwin/arm64|relay.telemetry"]; e.Result != "pass" {
+		t.Errorf("0.0.45: %q, want the pass kept beside a skip that says no reason", e.Result)
+	}
+	if e := hist["t3|0.1.0|darwin/arm64|relay.telemetry"]; e.Result != "not run" || e.Why == "" {
+		t.Errorf("0.1.0: %+v, want the reasoned skip in place of the driver's failure", e)
+	}
+	var entries []Entry
+	for _, e := range hist {
+		entries = append(entries, e)
+	}
+	md := render(entries, day)
+	if !strings.Contains(md, "| T3 Code | 0.0.45 | 1 of 1 |") {
+		t.Errorf("the glance does not name 0.0.45 as the newest build verified:\n%s", md)
+	}
+}

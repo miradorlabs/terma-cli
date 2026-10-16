@@ -230,8 +230,9 @@ naming the checks it failed and whether it passed them before, ⚪ where it ran 
 build whose every check was skipped is named beside the newest that ran, and older builds
 tested tonight that failed are named too. A scenario that cannot drive a build skips it
 through `SkipBuild`, saying why, and the reason goes beside its ⚪: T3 0.1.0, whose API the
-driver does not speak yet, and the newest OpenCode 2 (npm's `@opencode/cli`), which terma's
-plugin does not support yet, so a release is untested in the open, never failed or unseen. A
+driver does not speak yet, is untested in the open, never failed. The history keeps the
+reason, and it replaces what an earlier run recorded of that build; the matrix's newest build
+verified is the newest that ran a check. A
 build tested for the first time, and newer than
 any tested before (an older one, re-run or backported, is no news), is marked new, against the
 newest build known before it. Red comes first, and the list is split across Slack sections

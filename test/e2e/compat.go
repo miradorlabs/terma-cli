@@ -162,7 +162,7 @@ func WriteCompat(dir, terma string) error {
 		k := [4]string{r.Harness, r.Version, r.Platform, r.Capability}
 		prev, seen := merged[k]
 		// Of two that did not run, the one that says why.
-		if !seen || rank(r.Result) > rank(prev.Result) || r.Result == prev.Result && prev.Why == "" && r.Why != "" {
+		if !seen || rank(r.Result) > rank(prev.Result) || (r.Result == prev.Result && prev.Why == "" && r.Why != "") {
 			merged[k] = r
 		}
 	}
