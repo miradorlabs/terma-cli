@@ -55,20 +55,35 @@ var Harnesses = []struct{ ID, Name string }{
 
 // CompatRow is one proven (or failed) capability for one build, from one run.
 type CompatRow struct {
-	Harness    string    `json:"harness"`
-	Version    string    `json:"version"`
-	Capability string    `json:"capability"`
-	Result     string    `json:"result"` // pass | fail | not run
-	Platform   string    `json:"platform"`
-	Test       string    `json:"test"`
-	Terma      string    `json:"terma,omitempty"`
-	At         time.Time `json:"at"`
+	Harness    string `json:"harness"`
+	Version    string `json:"version"`
+	Capability string `json:"capability"`
+	Result     string `json:"result"` // pass | fail | not run
+	Platform   string `json:"platform"`
+	Test       string `json:"test"`
+	Terma      string `json:"terma,omitempty"`
+	// Why says why a check did not run, where its scenario said (SkipBuild).
+	Why string    `json:"why,omitempty"`
+	At  time.Time `json:"at"`
 }
 
 var (
 	compatMu   sync.Mutex
 	compatRows []CompatRow
+	skipWhy    = map[string]string{} // test → why it skipped its build (SkipBuild)
 )
+
+// SkipBuild skips t, a scenario that cannot drive its build, and says why on the build's
+// rows, so the digest says it beside the build's ⚪, not only the run's log. A build the
+// scenario cannot drive is untested, not failing: the harness may send all it should.
+func SkipBuild(t *testing.T, why string) {
+	t.Helper()
+	compatMu.Lock()
+	skipWhy[t.Name()] = why
+	compatMu.Unlock()
+	Record(t.Name(), "not run", why)
+	t.Skip(why)
+}
 
 // Proves records that t proves capability for harness at version: a pass when t
 // passes, a failure when it fails, "not run" when it is skipped. Call it where the
@@ -92,8 +107,12 @@ func Proves(t *testing.T, harness, version, capability string) {
 		}
 		compatMu.Lock()
 		defer compatMu.Unlock()
+		var why string
+		if result == "not run" {
+			why = skipWhy[t.Name()]
+		}
 		compatRows = append(compatRows, CompatRow{Harness: harness, Version: version, Capability: capability,
-			Result: result, Platform: runtime.GOOS + "/" + runtime.GOARCH, Test: t.Name(), At: time.Now().UTC()})
+			Result: result, Platform: runtime.GOOS + "/" + runtime.GOARCH, Test: t.Name(), Why: why, At: time.Now().UTC()})
 	})
 }
 
@@ -116,7 +135,8 @@ func WriteCompat(dir, terma string) error {
 		r.Terma = terma
 		k := [4]string{r.Harness, r.Version, r.Platform, r.Capability}
 		prev, seen := merged[k]
-		if !seen || rank(r.Result) > rank(prev.Result) {
+		// Of two that did not run, the one that says why.
+		if !seen || rank(r.Result) > rank(prev.Result) || r.Result == prev.Result && prev.Why == "" && r.Why != "" {
 			merged[k] = r
 		}
 	}
