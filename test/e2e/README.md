@@ -101,8 +101,9 @@ The main CI workflow runs this module's offline contracts with the race detector
 and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
-`E2E harness contracts` (`live.yml`) runs nightly and on manual dispatch against the latest
-three releases. Every contract that needs no account runs against local fixture providers, as
+`E2E harness contracts` (`live.yml`) runs nightly and on manual dispatch against the newest
+build of each harness the published history checked on macOS and every release since
+(`checked`, below); DeepSeek, which ships prereleases alone, against its newest build. Every contract that needs no account runs against local fixture providers, as
 PR CI's do: the relay and hook contracts, the field census and the drift digest. One that needs
 an account runs where the `live-harnesses` environment has its secret, `OPENAI_API_KEY` for
 Codex's real API scenarios and `ANTHROPIC_API_KEY` for Claude's, and is skipped where it has
@@ -241,7 +242,10 @@ A field the relay has not classified is never a failure there: the nightly runs 
 tripwire for one (`failUnclassified`) with `TERMA_E2E_UNCLASSIFIED=note`, so the field is
 withheld, as always, and noted, and the harness stays green. Each run writes what it noted to
 `report/notes.json`, which both platforms upload, so a key only the Linux machines met is
-still said under what is to note. Pull-request CI leaves it unset, so a pinned build bumped
+still said under what is to note. A key is noted with the harness of the scenario that met it
+(each `forEach…` helper's build says it, and `Proves`), and weighed against that harness's census alone: one harness withholding `state`
+does not hide another meeting it, even on a night the other's census is missing. T3 Code and
+the desktop apps, which take no census, are weighed against the census of the agents they run. Pull-request CI leaves it unset, so a pinned build bumped
 past a new field fails until the field is classified.
 
 What is to note follows, never red: the fields new tonight that the relay withholds until
@@ -313,8 +317,14 @@ starts, so those cells fail by design; what they lost is the measurement.
 ## Versions
 
 Each scenario runs against the installed binary and the last three releases
-(`TERMA_E2E_CLAUDE_VERSIONS`, `TERMA_E2E_CODEX_VERSIONS`: `installed`, `lastN`,
-or a comma list), oldest first. Version lists come from the npm registry;
+(`TERMA_E2E_CLAUDE_VERSIONS`, `TERMA_E2E_CODEX_VERSIONS`, and each harness's own: `installed`,
+`lastN`, `checked`, or a comma list), oldest first. `checked` is what the nightly runs: the
+newest release the history at `TERMA_E2E_CHECKED` has a pass or a failure of on this platform
+(the Linux machine job's rows say nothing of what macOS checked), and every release since. It
+keeps terma tested on the build people run, and judges what is new against it on the same
+night. Of a burst of more than five releases between nights, only the newest five are tested,
+and the next night starts from the newest. Where the history has no release of a harness on
+this platform, or cannot be read, it is the last three, and the report says why. Version lists come from the npm registry;
 binaries come from Claude Code's download service (manifest checksum) and
 Codex's GitHub release tarballs (CLI and code-mode host), cached under `versions/`. A recording shim in
 front of `terma` keeps every hook payload each build sends, so payload shapes

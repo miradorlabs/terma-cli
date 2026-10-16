@@ -130,8 +130,9 @@ func failUnclassified(t *testing.T, c map[string]int) {
 	msg := fmt.Sprintf("withheld content met %d unclassified key(s) — classify each in internal/relay/allow.go as safe, or as content in content.go: %s", len(keys), strings.Join(keys, ", "))
 	if os.Getenv("TERMA_E2E_UNCLASSIFIED") == "note" {
 		t.Log(msg)
+		h := harnessOf(t)
 		for _, k := range keys {
-			Note(UnclassifiedNotes, k)
+			Note(UnclassifiedNotes, UnclassifiedNote(h, k))
 		}
 		return
 	}

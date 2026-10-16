@@ -41,7 +41,7 @@ func forEachT3(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("t3 is not installed")
 	}
 	b := Binary{Harness: "t3", Version: t3Version(path), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 }
 
 // t3Version reads the npm package's version: `t3 <anything> --help` starts the server.

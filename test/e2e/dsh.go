@@ -73,7 +73,7 @@ func forEachDsh(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("no dsh build to test")
 	}
 	for _, b := range builds {
-		t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 	}
 }
 

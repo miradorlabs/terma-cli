@@ -188,12 +188,15 @@ func (h HarnessDrift) fieldsOf(v string, rows []e2e.FieldRow, ran censusRuns) *R
 	return f
 }
 
-// otherCompat are the compatibility changes of builds no verdict names: a harness's newest
-// build tonight has its own line (Status), and a release's first failures are said there or
-// among the older builds failing.
+// otherCompat are the compatibility changes no verdict says: a harness's newest build tonight
+// has its own line (Status), which names each check it fails, newly or not, and says it fixed
+// only where every earlier failure passed; a fix beside a failure it still has is said here.
+// A release's first failures are said on its line or among the older builds failing.
 func (d Drift) otherCompat() []CompatChange {
 	return slices.DeleteFunc(slices.Clone(d.Compat), func(c CompatChange) bool {
-		verdict := slices.ContainsFunc(d.Status, func(s Status) bool { return s.Harness == c.Harness && s.Version == c.Version })
-		return verdict || c.From == "" && slices.ContainsFunc(d.Releases, func(r Release) bool { return r.Harness == c.Harness && r.Version == c.Version })
+		if i := slices.IndexFunc(d.Status, func(s Status) bool { return s.Harness == c.Harness && s.Version == c.Version }); i >= 0 {
+			return !(c.From == "fail" && c.To == "pass" && !d.Status[i].Fixed)
+		}
+		return c.From == "" && slices.ContainsFunc(d.Releases, func(r Release) bool { return r.Harness == c.Harness && r.Version == c.Version })
 	})
 }

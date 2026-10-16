@@ -32,9 +32,10 @@ type Drift struct {
 	Status    []Status       `json:"status,omitempty"`
 	Releases  []Release      `json:"releases,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
-	// Unclassified are the keys the night's tripwires met unclassified that no census found
-	// new: one a scenario without a census met, the Linux machines' among them.
-	Unclassified []string `json:"unclassified,omitempty"`
+	// Unclassified are the keys the night's tripwires met unclassified that the census of the
+	// harness that met them does not say withheld: one a scenario without a census met, the
+	// Linux machines' among them.
+	Unclassified []MetKey `json:"unclassified,omitempty"`
 	// SourceErrors are the builds whose source could not be read, their findings unlinked.
 	SourceErrors []string       `json:"source_errors,omitempty"`
 	Compat       []CompatChange `json:"compat"`

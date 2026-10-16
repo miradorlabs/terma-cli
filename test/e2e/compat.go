@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -70,8 +71,32 @@ type CompatRow struct {
 var (
 	compatMu   sync.Mutex
 	compatRows []CompatRow
+	scenarios  = map[string]string{} // test → the harness it is a scenario of (scenarioOf)
 	skipWhy    = map[string]string{} // test → why it skipped its build (SkipBuild)
 )
+
+// scenarioOf says t is a scenario of harness: each forEach helper's build, and Proves.
+func scenarioOf(t *testing.T, harness string) {
+	compatMu.Lock()
+	defer compatMu.Unlock()
+	scenarios[t.Name()] = harness
+}
+
+// harnessOf is the harness t, or a scenario t runs in, is a scenario of, "" where none is.
+func harnessOf(t *testing.T) string {
+	compatMu.Lock()
+	defer compatMu.Unlock()
+	for name := t.Name(); ; {
+		if h, ok := scenarios[name]; ok {
+			return h
+		}
+		i := strings.LastIndexByte(name, '/')
+		if i < 0 {
+			return ""
+		}
+		name = name[:i]
+	}
+}
 
 // SkipBuild skips t, a scenario that cannot drive its build, and says why on the build's
 // rows, so the digest says it beside the build's ⚪, not only the run's log. A build the
@@ -97,6 +122,7 @@ func Proves(t *testing.T, harness, version, capability string) {
 	if !known {
 		t.Fatalf("Proves: unknown capability %q: add it to Capabilities", capability)
 	}
+	scenarioOf(t, harness)
 	t.Cleanup(func() {
 		result := "pass"
 		switch {

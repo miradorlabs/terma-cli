@@ -108,30 +108,107 @@ func TestFixedNeedsEveryEarlierFailureToPass(t *testing.T) {
 	}
 }
 
-// A key a tripwire met that no census found new, the Linux machines' say, is to note; one the
-// census found new is said once, with the census's.
+// A key a tripwire met that the census of the harness that met it does not say withheld, the
+// Linux machines' say, is to note; one that census found, new or before, is said with it.
 func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
-	hs := []HarnessDrift{{Harness: "codex", Name: "Codex",
-		Withheld:      []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}},
-		StillWithheld: []FieldChange{{Surface: "log:codex.decision", Key: "decision_type"}, {Surface: "resource", Key: "host.id"}}}}
-	met := map[string]bool{"tool_mode": true, "decision_type": true, "resource/host.id": true, "exposure": true}
-	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
-	if !slices.Equal(d.Unclassified, []string{"exposure"}) {
-		t.Fatalf("unclassified %q, want only the key no census says withheld, new or before", d.Unclassified)
+	hs := []HarnessDrift{
+		{Harness: "codex", Name: "Codex",
+			Withheld:      []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}},
+			StillWithheld: []FieldChange{{Surface: "log:codex.decision", Key: "decision_type"}, {Surface: "resource", Key: "host.id"}}},
+		{Harness: "claude", Name: "Claude Code", StillWithheld: []FieldChange{{Surface: "log:claude_code.tool_decision", Key: "state"}}},
 	}
-	// A night that met only keys the census says withheld is quiet.
-	if q := (Drift{Harnesses: []HarnessDrift{{Harness: "claude"}}, Unclassified: unclassified(map[string]bool{"decision_type": true}, hs)}); !q.Quiet() {
+	met := map[MetKey]bool{
+		{"codex", "tool_mode"}: true, {"codex", "decision_type"}: true, {"codex", "resource/host.id"}: true,
+		{"codex", "exposure"}: true,
+		// Claude's census has state withheld, Codex's does not: Codex's is news.
+		{"codex", "state"}: true,
+		// A scenario that proves no harness: any census that has it withheld says it. One of a
+		// harness with no census of its own, the census of the harness it runs (T3 Code runs
+		// Codex).
+		{"", "state"}: true, {"", "overflowed"}: true, {"t3", "decision_type"}: true,
+		// Pi's census is missing tonight: Claude's withholding state does not hide Pi's.
+		{"pi", "state"}: true,
+		// A record's host.id is not the resource's, which the relay names resource/host.id.
+		{"codex", "host.id"}: true,
+	}
+	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
+	want := []MetKey{{"codex", "exposure"}, {"codex", "host.id"}, {"codex", "state"}, {"pi", "state"}, {"", "overflowed"}}
+	if !slices.Equal(d.Unclassified, want) {
+		t.Fatalf("unclassified %+v, want %+v", d.Unclassified, want)
+	}
+	// A night that met only keys their harness's census says withheld is quiet.
+	if q := (Drift{Harnesses: []HarnessDrift{{Harness: "pi"}}, Unclassified: unclassified(map[MetKey]bool{{"codex", "decision_type"}: true}, hs)}); !q.Quiet() {
 		t.Errorf("%+v: a night meeting only keys withheld before is not quiet", q.Unclassified)
 	}
 	if d.Quiet() {
 		t.Error("a night that met an unclassified key is quiet")
 	}
+	said := "Unclassified keys the checks met, withheld until classified: Codex CLI: `exposure`, `host.id`, `state`; Pi: `state`; other scenarios: `overflowed`."
 	data, _ := json.Marshal(d.slack())
-	if !strings.Contains(string(data), "Unclassified keys the checks met, withheld until classified: `exposure`") {
-		t.Errorf("slack does not say the key:\n%s", data)
+	if !strings.Contains(string(data), said) {
+		t.Errorf("slack does not say %q:\n%s", said, data)
 	}
-	if md := d.markdown(); !strings.Contains(md, "`exposure`") {
-		t.Errorf("drift.md does not say the key:\n%s", md)
+	if md := d.markdown(); !strings.Contains(md, said) {
+		t.Errorf("drift.md does not say %q:\n%s", said, md)
+	}
+}
+
+// A build that fixed one check and still fails another is not fixed: its line names the
+// failure, and the fix is said among the compatibility changes, not lost.
+func TestAFixBesideAFailureIsSaid(t *testing.T) {
+	hist := map[string]Entry{}
+	e := Entry{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "fail"}
+	hist[e.key()] = e
+	rows := []e2e.CompatRow{
+		check("pi", "1.3.0", "relay.telemetry", "darwin/arm64", "pass"),
+		check("pi", "1.3.0", "relay.content_withheld", "darwin/arm64", "fail"),
+	}
+	compat := []CompatChange{
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", From: "fail", To: "pass"},
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.content_withheld", From: "pass", To: "fail"},
+	}
+	d := Drift{Compat: compat, Status: statuses(rows, nil, compat, hist)}
+	if d.Status[0].Fixed {
+		t.Fatalf("%+v: fixed, still failing a check", d.Status[0])
+	}
+	if got := d.otherCompat(); len(got) != 1 || got[0].Capability != "relay.telemetry" {
+		t.Errorf("other compatibility changes %+v, want only the fix the verdict does not say", got)
+	}
+	// Fixed outright, the verdict says it.
+	rows[1].Result = "pass"
+	d = Drift{Compat: compat[:1], Status: statuses(rows, nil, compat[:1], hist)}
+	if got := d.otherCompat(); len(got) != 0 {
+		t.Errorf("other compatibility changes %+v, want none beside a fixed verdict", got)
+	}
+}
+
+// A night that tests several releases of a harness for the first time says each: the newest on
+// the verdict, an older one that failed among the older builds failing, the rest beside it.
+func TestEveryReleaseOfTheNightIsSaid(t *testing.T) {
+	rows := []e2e.CompatRow{
+		check("pi", "1.3.0", "relay.telemetry", "darwin/arm64", "pass"),
+		check("pi", "1.3.1", "relay.telemetry", "darwin/arm64", "fail"),
+		check("pi", "1.3.2", "relay.telemetry", "darwin/arm64", "pass"),
+	}
+	// 1.2.9 took a census and ran no checks.
+	rs := []Release{{Harness: "pi", Version: "1.2.9"}, {Harness: "pi", Version: "1.3.0"}, {Harness: "pi", Version: "1.3.1"}, {Harness: "pi", Version: "1.3.2"}}
+	line := statuses(rows, rs, nil, nil)[0].line(func(s string) string { return s })
+	for _, want := range []string{"Pi 1.3.2 · new", "older builds failing: 1.3.1", "also new tonight, failing nothing: 1.3.0", "also new tonight, no checks ran: 1.2.9"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("%q does not say %q", line, want)
+		}
+	}
+}
+
+// A release only a census saw has a verdict: no checks ran, never left unsaid.
+func TestACensusOnlyReleaseHasAVerdict(t *testing.T) {
+	ss := statuses(nil, []Release{{Harness: "pi", Version: "1.3.0"}}, nil, nil)
+	if len(ss) != 1 || ss[0].Version != "1.3.0" || ss[0].Checks != 0 {
+		t.Fatalf("statuses %+v, want Pi 1.3.0 with no checks", ss)
+	}
+	ss = statuses([]e2e.CompatRow{check("pi", "1.2.0", "relay.telemetry", "darwin/arm64", "pass")}, []Release{{Harness: "pi", Version: "1.3.0"}}, nil, nil)
+	if len(ss) != 1 || ss[0].Version != "1.2.0" || ss[0].Untested != "1.3.0" || !ss[0].UntestedNew {
+		t.Errorf("statuses %+v, want Pi 1.2.0 passing with 1.3.0 new and untested beside it", ss)
 	}
 }
 
