@@ -112,7 +112,7 @@ func forEachOpenCode(t *testing.T, run func(t *testing.T, b Binary, newest bool)
 		t.Skip("no OpenCode build to test")
 	}
 	for i, b := range builds {
-		t.Run(b.Label(), func(t *testing.T) { run(t, b, i == len(builds)-1) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b, i == len(builds)-1) })
 	}
 }
 

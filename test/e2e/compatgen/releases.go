@@ -2,7 +2,6 @@ package main
 
 import (
 	"cmp"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -189,102 +188,15 @@ func (h HarnessDrift) fieldsOf(v string, rows []e2e.FieldRow, ran censusRuns) *R
 	return f
 }
 
-// line says a release: its build, whether it passed its checks, and what its census found;
-// strong wraps the build as each format makes text bold.
-func (r Release) line(strong func(string) string) string {
-	mark, verdict := "✅", fmt.Sprintf("passes all %s", plural(r.Checks, "check"))
-	switch {
-	case r.Checks == 0:
-		mark, verdict = "⚪", "no checks ran"
-	case len(r.Failed) > 0:
-		mark = "❌"
-		// A platform by its short name, unless two of the failures' share one (linux/amd64
-		// and linux/arm64), which then name the architecture.
-		short := map[string][]string{}
-		for _, c := range r.Failed {
-			if s := platformShort(c.Platform); !slices.Contains(short[s], c.Platform) {
-				short[s] = append(short[s], c.Platform)
-			}
-		}
-		var names []string
-		for _, c := range r.Failed {
-			where := platformShort(c.Platform)
-			if len(short[where]) > 1 {
-				where = c.Platform
-			}
-			names = append(names, capabilityLabel(c.Capability)+" ("+where+")")
-		}
-		if len(names) > 3 {
-			names = append(names[:3], fmt.Sprintf("+%d more", len(names)-3))
-		}
-		verdict = fmt.Sprintf("fails %d of %s: %s", len(r.Failed), plural(r.Checks, "check"), strings.Join(names, "; "))
-	}
-	build := r.Version
-	switch {
-	case r.Previous != "" && r.Compare != "":
-		build += " (was " + r.Previous + ", " + link(r.Compare, "diff") + ")"
-	case r.Previous != "":
-		build += " (was " + r.Previous + ")"
-	default:
-		build += " (first build seen)"
-	}
-	return mark + " " + strong(r.Name+" "+build) + ": " + verdict + " · fields: " + r.Fields.said()
-}
-
-// said counts what a release's census found, in words.
-func (f *ReleaseFields) said() string {
-	if f == nil {
-		return "not censused"
-	}
-	if f.First {
-		s := fmt.Sprintf("first census, %s, %s", plural(f.Surfaces, "surface"), plural(f.Keys, "key"))
-		if f.Partial {
-			s += ", partial"
-		}
-		return s
-	}
-	// What came and what went, each behind its mark, as a diff says them.
-	signed := func(sign string, counts map[string]int, order ...string) string {
-		var out []string
-		for _, what := range order {
-			if n := counts[what]; n > 0 {
-				out = append(out, sign+plural(n, what))
-			}
-		}
-		return strings.Join(out, ", ")
-	}
-	var parts []string
-	if s := signed("+", map[string]int{"surface": f.NewSurfaces, "field": f.Added}, "surface", "field"); s != "" {
-		parts = append(parts, addedMark+" "+s)
-	}
-	if s := signed("-", map[string]int{"field": f.Removed, "surface": f.Unseen}, "field", "surface"); s != "" {
-		parts = append(parts, removedMark+" "+s)
-	}
-	if f.Withheld > 0 {
-		parts = append(parts, fmt.Sprintf("%d newly withheld", f.Withheld))
-	}
-	if len(parts) == 0 {
-		parts = append(parts, "no changes")
-	}
-	if f.Partial {
-		parts = append(parts, "census partial, nothing judged removed")
-	}
-	return strings.Join(parts, ", ")
-}
-
-// releaseLines are the night's releases, said, with strong for bold.
-func (d Drift) releaseLines(strong func(string) string) []string {
-	var out []string
-	for _, r := range d.Releases {
-		out = append(out, r.line(strong))
-	}
-	return listed(out)
-}
-
-// otherCompat are the compatibility changes but a release's failures, which its release
-// line says.
+// otherCompat are the compatibility changes no verdict says: a harness's newest build tonight
+// has its own line (Status), which names each check it fails, newly or not, and says it fixed
+// only where every earlier failure passed; a fix beside a failure it still has is said here.
+// A release's first failures are said on its line or among the older builds failing.
 func (d Drift) otherCompat() []CompatChange {
 	return slices.DeleteFunc(slices.Clone(d.Compat), func(c CompatChange) bool {
+		if i := slices.IndexFunc(d.Status, func(s Status) bool { return s.Harness == c.Harness && s.Version == c.Version }); i >= 0 {
+			return !(c.From == "fail" && c.To == "pass" && !d.Status[i].Fixed)
+		}
 		return c.From == "" && slices.ContainsFunc(d.Releases, func(r Release) bool { return r.Harness == c.Harness && r.Version == c.Version })
 	})
 }
