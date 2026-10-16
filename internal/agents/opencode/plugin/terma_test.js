@@ -874,25 +874,75 @@ test("an OpenCode 2 step whose start was missed still sends its spend", async ()
 })
 
 // An OpenCode 1 that called both the named export and the default's server for one
-// directory would report everything twice: the second is inert until the first is disposed.
+// directory would report everything twice: the newer instance reports, the older not.
 test("both of OpenCode 1's entry points for one directory register one set of hooks", async () => {
   received = []
   clearHooks()
   const plugin = await importPlugin(baseConfig())
   const input = { directory: dir, worktree: dir }
-  const first = await plugin.module.TermaPlugin(input)
-  const second = await plugin.server(input)
-  expect(Object.keys(first).length).toBeGreaterThan(0)
-  expect(second).toEqual({})
-  for (const hooks of [first, second]) await hooks.event?.({ event: { type: "session.created", properties: { info: { id: "ses_once", directory: dir } } } })
-  await first.dispose()
+  const older = await plugin.module.TermaPlugin(input)
+  const newer = await plugin.server(input)
+  for (const hooks of [older, newer]) await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_once", directory: dir } } } })
+  // Disposing the older leaves the newer reporting.
+  await older.dispose()
+  await newer.event({ event: { type: "session.idle", properties: { sessionID: "ses_once" } } })
+  await newer.dispose()
   expect((await hookCalls(1)).length).toBe(1)
   const records = received.filter((r) => r.path === "/v1/logs").flatMap((r) => r.body.resourceLogs[0].scopeLogs[0].logRecords)
-  expect(records.length).toBe(1)
-  // Disposed, the directory can start again, as a reloaded OpenCode starts it.
-  const again = await plugin.server(input)
-  expect(Object.keys(again).length).toBeGreaterThan(0)
-  await again.dispose()
+  expect(records.map((r) => r.attributes.find((a) => a.key === "event.name").value.stringValue).sort()).toEqual(["opencode.session.created", "opencode.session.idle"])
+})
+
+// An OpenCode 1 that rebuilds a directory's instance without disposing the old one (a
+// config reload) keeps reporting, through the new instance alone.
+test("a directory rebuilt without dispose reports through its new instance", async () => {
+  received = []
+  clearHooks()
+  const input = () => ({ directory: dir, worktree: dir })
+  const stale = await (await importPlugin(baseConfig())).server(input())
+  await stale.event({ event: { type: "session.created", properties: { info: { id: "ses_r1", directory: dir } } } })
+  const fresh = await (await importPlugin(baseConfig())).server(input())
+  for (const hooks of [stale, fresh]) await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_r2", directory: dir } } } })
+  await stale.dispose()
+  await fresh.dispose()
+  const sessions = (await hookCalls(2)).map((h) => h.payload.session_id).sort()
+  expect(sessions).toEqual(["ses_r1", "ses_r2"])
+  // Another directory's instance is its own.
+  const elsewhere = mkdtempSync(join(tmpdir(), "terma-other-dir-"))
+  const a = await (await importPlugin(baseConfig())).server({ directory: elsewhere, worktree: elsewhere })
+  const b = await (await importPlugin(baseConfig())).server(input())
+  for (const [hooks, id] of [[a, "ses_a"], [b, "ses_b"]]) await hooks.event({ event: { type: "session.created", properties: { info: { id, directory: dir } } } })
+  await a.dispose()
+  await b.dispose()
+  expect((await hookCalls(4)).map((h) => h.payload.session_id).sort()).toEqual(["ses_a", "ses_b", "ses_r1", "ses_r2"])
+})
+
+// A send nobody answers is given up on, and the sends queued behind it still go out.
+test("an export the endpoint never answers does not hold up the next", async () => {
+  let hung = 0
+  const arrived = []
+  const sink = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      const body = await req.json()
+      if (hung++ === 0) return new Promise(() => {}) // never answers
+      arrived.push(body)
+      return new Response("{}")
+    },
+  })
+  const timeout = AbortSignal.timeout
+  AbortSignal.timeout = () => timeout.call(AbortSignal, 200)
+  try {
+    const hooks = await load(baseConfig({ endpoint: `http://127.0.0.1:${sink.port}`, signals: ["logs"] }), dir)
+    // A full batch goes out at once, and hangs; the next queues behind it.
+    for (let i = 0; i < 64; i++) await hooks.event({ event: { type: "session.idle", properties: { sessionID: "ses_hung" } } })
+    await hooks.event({ event: { type: "session.idle", properties: { sessionID: "ses_next" } } })
+    await Promise.race([hooks.dispose(), new Promise((_, no) => setTimeout(() => no(new Error("the queue is stuck")), 3000))])
+  } finally {
+    AbortSignal.timeout = timeout
+    sink.stop(true)
+  }
+  expect(JSON.stringify(arrived)).toContain("ses_next")
+  expect(JSON.stringify(arrived)).not.toContain("ses_hung")
 })
 
 // OpenCode 1 from 1.18 calls setup as well as server, with a context that has no sessions,

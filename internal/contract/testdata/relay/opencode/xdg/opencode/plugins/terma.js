@@ -35,6 +35,8 @@ const MAX_TOOL_CONTENT = 16 * 1024
 const BATCH_SIZE = 64
 const BATCH_DELAY_MS = 3000
 const MAX_RETRIES = 5
+// A send gets this long to be answered; the relay is on this machine and answers at once.
+const SEND_TIMEOUT_MS = 10 * 1000
 // The headers helper is re-run this often, matching Claude Code's cadence.
 const HEADERS_TTL_MS = 29 * 60 * 1000
 
@@ -298,6 +300,7 @@ class Exporter {
           method: "POST",
           headers: { "content-type": "application/json", ...auth },
           body: payload,
+          signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
         })
         if (res.ok) return
         // A rejected credential will not fix itself by retrying; a 5xx or 429 might.
@@ -306,8 +309,11 @@ class Exporter {
           return
         }
         if (res.status < 500 && res.status !== 429) return
-      } catch {
-        // Network error: retry below.
+      } catch (err) {
+        // A send that never answered is dropped: sends queue behind one another, and the
+        // same request to a peer that hung is unlikely to fare better. Any other network
+        // error is retried below.
+        if (err?.name === "TimeoutError") return
       }
       await new Promise((r) => setTimeout(r, Math.min(30000, 1000 * 2 ** attempt)))
     }
@@ -556,9 +562,11 @@ const EDIT_TOOLS = ["edit", "write"]
 
 // --- OpenCode 1 ---------------------------------------------------------------------
 
-// RUNNING are the directories server runs for in this process, shared by every copy of the
-// module OpenCode loads.
-const RUNNING = (globalThis[Symbol.for("terma.opencode.server")] ??= new Set())
+// CURRENT is, for each directory, the server instance that reports for it in this process,
+// shared by every copy of the module OpenCode loads. The newest wins: an OpenCode 1 that
+// called both the named export and the default's server reports once, and one that
+// rebuilds a directory's instance without disposing the old one reports through the new.
+const CURRENT = (globalThis[Symbol.for("terma.opencode.server.current")] ??= new Map())
 
 // server is the OpenCode 1 plugin: hooks keyed by name, OpenCode's bus events through
 // `event`.
@@ -567,11 +575,10 @@ async function server({ directory, worktree }) {
   // No config, or per-repo mode in a repository bound to no Terma project: stay inert,
   // exporting nothing and firing no hooks.
   if (!CONFIG || !cfg.endpoint) return {}
-  // One OpenCode 1 that called both the named export and the default's server would
-  // report everything twice: the second call for a directory still running is inert.
   const key = `${worktree || ""}\0${directory || ""}`
-  if (RUNNING.has(key)) return {}
-  RUNNING.add(key)
+  const self = {}
+  CURRENT.set(key, self)
+  const current = () => CURRENT.get(key) === self
   const t = telemetry(cfg)
 
   let lastSession = "" // the session the most recent activity belonged to
@@ -600,7 +607,7 @@ async function server({ directory, worktree }) {
     })
   }
 
-  return {
+  const hooks = {
     event: async ({ event }) => {
       try {
         const p = event?.properties ?? {}
@@ -694,12 +701,17 @@ async function server({ directory, worktree }) {
     },
 
     dispose: async () => {
-      RUNNING.delete(key)
+      if (current()) CURRENT.delete(key)
       try {
         await t.flush()
       } catch {}
     },
   }
+  // An instance a newer one replaced reports nothing more; what it queued still goes out.
+  for (const [name, run] of Object.entries(hooks)) {
+    if (name !== "dispose") hooks[name] = async (...args) => (current() ? run(...args) : undefined)
+  }
+  return hooks
 }
 
 // --- OpenCode 2 ---------------------------------------------------------------------
