@@ -276,7 +276,10 @@ var censusOf = map[string][]string{"t3": {"claude", "codex"}, "claude-desktop": 
 func unclassified(met map[MetKey]bool, hs []HarnessDrift) []MetKey {
 	withheld := func(h HarnessDrift, key string) bool {
 		return slices.ContainsFunc(slices.Concat(h.Withheld, h.StillWithheld), func(c FieldChange) bool {
-			return c.Key == key || c.Surface == "resource" && "resource/"+c.Key == key
+			if c.Surface == "resource" {
+				return "resource/"+c.Key == key
+			}
+			return c.Key == key
 		})
 	}
 	var out []MetKey

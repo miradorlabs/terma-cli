@@ -128,9 +128,11 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 		{"", "state"}: true, {"", "overflowed"}: true, {"t3", "decision_type"}: true,
 		// Pi's census is missing tonight: Claude's withholding state does not hide Pi's.
 		{"pi", "state"}: true,
+		// A record's host.id is not the resource's, which the relay names resource/host.id.
+		{"codex", "host.id"}: true,
 	}
 	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
-	want := []MetKey{{"codex", "exposure"}, {"codex", "state"}, {"pi", "state"}, {"", "overflowed"}}
+	want := []MetKey{{"codex", "exposure"}, {"codex", "host.id"}, {"codex", "state"}, {"pi", "state"}, {"", "overflowed"}}
 	if !slices.Equal(d.Unclassified, want) {
 		t.Fatalf("unclassified %+v, want %+v", d.Unclassified, want)
 	}
@@ -141,7 +143,7 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 	if d.Quiet() {
 		t.Error("a night that met an unclassified key is quiet")
 	}
-	said := "Unclassified keys the checks met, withheld until classified: Codex CLI: `exposure`, `state`; Pi: `state`; other scenarios: `overflowed`."
+	said := "Unclassified keys the checks met, withheld until classified: Codex CLI: `exposure`, `host.id`, `state`; Pi: `state`; other scenarios: `overflowed`."
 	data, _ := json.Marshal(d.slack())
 	if !strings.Contains(string(data), said) {
 		t.Errorf("slack does not say %q:\n%s", said, data)
