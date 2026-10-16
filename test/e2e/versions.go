@@ -27,9 +27,12 @@ import (
 // ships only the current build, so the brew-installed binary is the
 // "installed" entry and the rest come from the distributions directly.
 //
-// TERMA_E2E_CLAUDE_VERSIONS / TERMA_E2E_CODEX_VERSIONS: "installed", "lastN",
-// or a comma list of versions; default "installed,last3". Downloads are cached
-// under test/e2e/versions/ (ignored by git).
+// TERMA_E2E_CLAUDE_VERSIONS / TERMA_E2E_CODEX_VERSIONS (and each harness's own):
+// "installed", "lastN", "checked", or a comma list of versions; default
+// "installed,last3". "checked" is the newest build the history at TERMA_E2E_CHECKED
+// has a result of on this platform and every release since, as the nightly runs them
+// (sinceChecked); it applies to harnesses that ship releases, not prereleases alone.
+// Downloads are cached under test/e2e/versions/ (ignored by git).
 
 // Binary is one harness build to test.
 type Binary struct {
@@ -91,14 +94,20 @@ func resolve(t *testing.T, harness, spec string, list func() ([]string, error), 
 			} else {
 				Note(harness+"/versions", "no installed "+harness+" on PATH")
 			}
-		case strings.HasPrefix(part, "last"):
-			n, err := strconv.Atoi(strings.TrimPrefix(part, "last"))
-			if err != nil || n <= 0 {
-				t.Fatalf("bad version spec %q", part)
-			}
+		case strings.HasPrefix(part, "last"), part == "checked":
 			versions, err := list()
 			if err != nil {
 				t.Fatalf("list %s versions: %v", harness, err)
+			}
+			n := fallbackLast
+			if part != "checked" {
+				if n, err = strconv.Atoi(strings.TrimPrefix(part, "last")); err != nil || n <= 0 {
+					t.Fatalf("bad version spec %q", part)
+				}
+			} else if since, why := checkedBuilds(harness, versions); why == "" {
+				versions, n = since, len(since)
+			} else {
+				Note(harness+"/versions", why+": testing the last "+strconv.Itoa(fallbackLast)+" releases")
 			}
 			if len(versions) > n {
 				versions = versions[len(versions)-n:]
@@ -345,4 +354,81 @@ func abs(p string) string {
 		return p
 	}
 	return a
+}
+
+// fallbackLast is how many releases "checked" tests where no history says what was checked.
+const fallbackLast = 3
+
+// maxSinceChecked bounds the releases "checked" tests after the newest checked build: a burst
+// of releases is tested whole up to it; beyond it, its newest are, and the older ones of the
+// burst are never tested, the next night starting from the newest.
+const maxSinceChecked = 5
+
+// checkedBuilds is the "checked" spec for harness among its releases, oldest first: the
+// builds sinceChecked picks by the history at TERMA_E2E_CHECKED, of this platform alone,
+// since another (the Linux machine job, which tests the newest release every night) says
+// nothing of what this one checked. why says why there are none, "" where there are.
+func checkedBuilds(harness string, releases []string) (builds []string, why string) {
+	return checkedBuildsOn(runtime.GOOS+"/"+runtime.GOARCH, harness, releases)
+}
+
+func checkedBuildsOn(platform, harness string, releases []string) (builds []string, why string) {
+	path := os.Getenv("TERMA_E2E_CHECKED")
+	if path == "" {
+		return nil, "no history of checked builds (TERMA_E2E_CHECKED)"
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "the history of checked builds is unreadable"
+	}
+	var history []CompatRow
+	if err := json.Unmarshal(data, &history); err != nil {
+		return nil, "the history of checked builds is unreadable"
+	}
+	var checked []string
+	for _, e := range history {
+		// A build whose every check was skipped was not checked.
+		if e.Harness == harness && e.Platform == platform && (e.Result == "pass" || e.Result == "fail") {
+			checked = append(checked, e.Version)
+		}
+	}
+	builds = sinceChecked(releases, checked, maxSinceChecked)
+	if len(builds) == 0 {
+		return nil, "the history has checked no " + harness + " release on " + platform
+	}
+	return builds, ""
+}
+
+// sinceChecked picks from releases, oldest first: the newest checked build, which is the
+// baseline what is new tonight is judged against and keeps terma tested on the build people
+// run, and every release after it, the newest max of them. A checked build no longer
+// released is no baseline; the releases after it still are. None where nothing was checked.
+func sinceChecked(releases, checked []string, max int) []string {
+	newest := ""
+	for _, v := range checked {
+		if isRelease(v) && (newest == "" || versionLess(newest, v)) {
+			newest = v
+		}
+	}
+	if newest == "" {
+		return nil
+	}
+	var after []string
+	for _, v := range releases {
+		if versionLess(newest, v) {
+			after = append(after, v)
+		}
+	}
+	sort.Slice(after, func(i, j int) bool { return versionLess(after[i], after[j]) })
+	if len(after) > max {
+		after = after[len(after)-max:]
+	}
+	var out []string
+	for _, v := range releases {
+		if v == newest {
+			out = append(out, v)
+			break
+		}
+	}
+	return append(out, after...)
 }

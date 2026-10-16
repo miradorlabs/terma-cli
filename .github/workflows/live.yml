@@ -26,10 +26,15 @@ jobs:
       contents: read
     env:
       INCLUDE_SUBSCRIPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.include_subscriptions || false }}
-      TERMA_E2E_CLAUDE_VERSIONS: last3
-      TERMA_E2E_CODEX_VERSIONS: last3
-      TERMA_E2E_OPENCODE_VERSIONS: last3
-      TERMA_E2E_GEMINI_VERSIONS: last3
+      # The newest build each harness was checked on here, on macOS, and every release since,
+      # the newest five of a burst (versions.go, sinceChecked): the build people run keeps
+      # being tested, and what is new is judged against it the same night. Without the
+      # published history, the last three releases. DeepSeek ships prereleases alone, which
+      # "checked" does not pick: its newest build, as before.
+      TERMA_E2E_CLAUDE_VERSIONS: checked
+      TERMA_E2E_CODEX_VERSIONS: checked
+      TERMA_E2E_OPENCODE_VERSIONS: checked
+      TERMA_E2E_GEMINI_VERSIONS: checked
       TERMA_E2E_DSH_VERSIONS: last3
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
@@ -79,6 +84,13 @@ jobs:
           node-version: 22
       - name: Install Pi and T3 Code (latest)
         run: npm install -g @earendil-works/pi-coding-agent t3
+      - name: Read which builds the published history checked
+        run: |
+          if git fetch -q --depth 1 origin compat-matrix && git show FETCH_HEAD:docs/compat/history.json > "$RUNNER_TEMP/history.json"; then
+            echo "TERMA_E2E_CHECKED=$RUNNER_TEMP/history.json" >> "$GITHUB_ENV"
+          else
+            echo "::notice::No published history: each harness's last three releases are tested."
+          fi
       - name: Build native test binaries
         run: |
           go build -o test/e2e/bin/terma ./cmd/terma
