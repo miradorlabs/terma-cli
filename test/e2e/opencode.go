@@ -44,6 +44,23 @@ func forEachOpenCode(t *testing.T, run func(t *testing.T, b Binary, newest bool)
 	}
 }
 
+// openCodeNewestOf is the newest OpenCode release of a major version, "" where there is none
+// or the registry cannot be read. OpenCode 2 is npm's @opencode/cli, not opencode-ai, which
+// OpenCodeBinaries reads.
+func openCodeNewestOf(major int) string {
+	vs, err := npmReleases("@opencode/cli")
+	if err != nil {
+		return ""
+	}
+	newest := ""
+	for _, v := range vs {
+		if strings.HasPrefix(v, fmt.Sprint(major)+".") && (newest == "" || versionLess(newest, v)) {
+			newest = v
+		}
+	}
+	return newest
+}
+
 // opencodePlatform is the npm package holding this machine's native binary.
 func opencodePlatform() string {
 	arch := map[string]string{"amd64": "x64", "arm64": "arm64"}[runtime.GOARCH]

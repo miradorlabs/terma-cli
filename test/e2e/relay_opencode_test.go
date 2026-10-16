@@ -81,6 +81,23 @@ func TestRelayOpenCode(t *testing.T) {
 // OpenCode: a session belongs to its project, and `opencode run --session <id> --dir
 // <other>` runs in the session's own project directory (1.18.33, --print-logs). It
 // also never exits there after finishing its turn, terma or not, so it is not driven.
+// OpenCode 2 runs plugins of a new shape, and terma's plugin is OpenCode 1's: the newest 2.x
+// is recorded as untested, and why, so the nightly says it is out rather than not see it.
+func TestRelayOpenCode2(t *testing.T) {
+	if !Enabled() {
+		t.Skip("live tests run only with TERMA_E2E=1")
+	}
+	v := openCodeNewestOf(2)
+	if v == "" {
+		t.Skip("no OpenCode 2 release found")
+	}
+	b := Binary{Harness: "opencode", Version: v}
+	t.Run(b.Label(), func(t *testing.T) {
+		ProvesAll(t, b, "relay.telemetry", "relay.content_allowed", "relay.content_withheld")
+		SkipBuild(t, "terma doesn't support OpenCode 2 yet: its plugin is OpenCode 1's")
+	})
+}
+
 func TestRelayOpenCodeNegative(t *testing.T) {
 	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.only_opted_in")
