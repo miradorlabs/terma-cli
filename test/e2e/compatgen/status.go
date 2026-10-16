@@ -27,18 +27,26 @@ type Status struct {
 	Release *Release `json:"release,omitempty"`
 	// OlderFailed are the older builds tested tonight that failed a check.
 	OlderFailed []string `json:"older_failed,omitempty"`
+	// Untested is a newer build than Version tonight's rows name whose every check was skipped.
+	Untested string `json:"untested,omitempty"`
+	// Regressed says a check Version passed before failed tonight; Fixed, that every check it
+	// failed before passed (CompatChange).
+	Regressed bool `json:"regressed,omitempty"`
+	Fixed     bool `json:"fixed,omitempty"`
 }
 
 // Passed reports a build that ran checks and failed none.
 func (s Status) Passed() bool { return s.Checks > 0 && len(s.Failed) == 0 }
 
-// statuses are the night's harnesses, by name: each one's newest build tonight's rows name,
-// with its checks, and its release where it is one.
-func statuses(rows []e2e.CompatRow, rs []Release) []Status {
+// statuses are the night's harnesses, failing first, then by name: each one's newest build
+// tonight's rows name that ran checks (a newer one whose checks were all skipped is named
+// beside it), with its checks, its release where it is one, and whether it changed from
+// before (compat).
+func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange) []Status {
 	type build struct{ harness, version string }
 	checks := map[build]map[FailedCheck]bool{}
 	failed := map[build][]FailedCheck{}
-	newest := map[string]string{}
+	newest, newestRun := map[string]string{}, map[string]string{}
 	for _, r := range rows {
 		b := build{r.Harness, r.Version}
 		if v, ok := newest[r.Harness]; !ok || versionLess(v, r.Version) {
@@ -46,6 +54,9 @@ func statuses(rows []e2e.CompatRow, rs []Release) []Status {
 		}
 		if r.Result == "not run" {
 			continue
+		}
+		if v, ok := newestRun[r.Harness]; !ok || versionLess(v, r.Version) {
+			newestRun[r.Harness] = r.Version
 		}
 		if checks[b] == nil {
 			checks[b] = map[FailedCheck]bool{}
@@ -57,9 +68,23 @@ func statuses(rows []e2e.CompatRow, rs []Release) []Status {
 		}
 	}
 	var out []Status
-	for harness, v := range newest {
+	for harness, latest := range newest {
+		v := latest
+		if run, ok := newestRun[harness]; ok {
+			v = run
+		}
 		b := build{harness, v}
 		s := Status{Harness: harness, Name: harnessName(harness), Version: v, Checks: len(checks[b]), Failed: failed[b]}
+		if latest != v {
+			s.Untested = latest
+		}
+		for _, c := range compat {
+			if c.Harness == harness && c.Version == v {
+				s.Regressed = s.Regressed || c.From == "pass" && c.To == "fail"
+				s.Fixed = s.Fixed || c.From == "fail" && c.To == "pass"
+			}
+		}
+		s.Fixed = s.Fixed && len(s.Failed) == 0
 		slices.SortFunc(s.Failed, func(x, y FailedCheck) int {
 			return cmp.Or(strings.Compare(x.Capability, y.Capability), strings.Compare(x.Platform, y.Platform))
 		})
@@ -74,20 +99,35 @@ func statuses(rows []e2e.CompatRow, rs []Release) []Status {
 		slices.SortFunc(s.OlderFailed, compareVersions)
 		out = append(out, s)
 	}
-	slices.SortFunc(out, func(a, b Status) int { return strings.Compare(a.Name, b.Name) })
+	// What is red first, so a long night never cuts it from the message.
+	rank := func(s Status) int {
+		switch {
+		case len(s.Failed) > 0:
+			return 0
+		case s.Checks == 0:
+			return 1
+		}
+		return 2
+	}
+	slices.SortFunc(out, func(a, b Status) int { return cmp.Or(rank(a)-rank(b), strings.Compare(a.Name, b.Name)) })
 	return out
 }
 
 // line says a harness's verdict: green where its newest build sends all the telemetry terma
 // expects, red where it does not, naming the checks it failed; strong makes text bold.
 func (s Status) line(strong func(string) string) string {
-	mark, verdict := "✅", ""
+	mark, verdict := "✅", fmt.Sprintf(": passes all %s", plural(s.Checks, "check"))
 	switch {
 	case s.Checks == 0:
 		mark, verdict = "⚪", ": no checks ran"
 	case len(s.Failed) > 0:
 		mark = "❌"
 		verdict = fmt.Sprintf(": fails %d of %s: %s", len(s.Failed), plural(s.Checks, "check"), strings.Join(failedNames(s.Failed), "; "))
+		if s.Regressed {
+			verdict += " · newly failing, passed before"
+		}
+	case s.Fixed:
+		verdict += " · fixed, failed before"
 	}
 	build := strong(s.Name + " " + s.Version)
 	if r := s.Release; r != nil {
@@ -101,6 +141,9 @@ func (s Status) line(strong func(string) string) string {
 		}
 	}
 	line := mark + " " + build + verdict
+	if s.Untested != "" {
+		line += " · " + s.Untested + " ran no checks"
+	}
 	if len(s.OlderFailed) > 0 {
 		line += " · older builds failing: " + strings.Join(s.OlderFailed, ", ")
 	}
@@ -141,7 +184,8 @@ func (d Drift) statusLines(strong func(string) string) []string {
 }
 
 // newFields names, per harness, the fields new tonight that the relay withholds until
-// someone classifies them: a note, never a failure.
+// someone classifies them: a note, never a failure. Each harness's keys are sorted, at most
+// maxListed of them.
 func (d Drift) newFields() string {
 	var parts []string
 	for _, h := range d.Harnesses {
@@ -151,6 +195,10 @@ func (d Drift) newFields() string {
 				keys = append(keys, k)
 			}
 		}
+		slices.Sort(keys)
+		if len(keys) > maxListed {
+			keys = append(keys[:maxListed], fmt.Sprintf("and %d more", len(keys)-maxListed))
+		}
 		if len(keys) > 0 {
 			parts = append(parts, h.Name+": "+strings.Join(keys, ", "))
 		}
@@ -159,4 +207,37 @@ func (d Drift) newFields() string {
 		return ""
 	}
 	return "New fields, withheld until classified: " + strings.Join(parts, "; ") + "."
+}
+
+// summary is the notification's text: whether every harness tested sends what terma expects,
+// how many do not and how many ran no checks, or that none was tested.
+func (d Drift) summary() string {
+	failing, untested := 0, 0
+	for _, s := range d.Status {
+		switch {
+		case len(s.Failed) > 0:
+			failing++
+		case s.Checks == 0:
+			untested++
+		}
+	}
+	var parts []string
+	switch {
+	case len(d.Status) == 0:
+		return "Harness drift: no harness was tested tonight"
+	case failing == 1:
+		parts = append(parts, "1 harness not sending what terma expects")
+	case failing > 1:
+		parts = append(parts, fmt.Sprintf("%d harnesses not sending what terma expects", failing))
+	}
+	switch {
+	case untested == 1:
+		parts = append(parts, "1 ran no checks")
+	case untested > 1:
+		parts = append(parts, fmt.Sprintf("%d ran no checks", untested))
+	}
+	if len(parts) == 0 {
+		return "Harness drift: every harness sends what terma expects"
+	}
+	return "Harness drift: " + strings.Join(parts, ", ")
 }

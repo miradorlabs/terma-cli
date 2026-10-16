@@ -135,8 +135,9 @@ type GoneSurface struct {
 	Source *SourceSays `json:"source,omitempty"`
 }
 
-// Quiet reports a night that took the census of every harness it should have and found
-// nothing worth a look: a release that passed its checks is news, not a change.
+// Quiet reports a night that took the census of every harness it should have, every harness
+// passing its checks, and found nothing else worth a look: no field, surface or capability
+// changed.
 func (d Drift) Quiet() bool {
 	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 || slices.ContainsFunc(d.Status, func(s Status) bool { return !s.Passed() }) {
 		return false

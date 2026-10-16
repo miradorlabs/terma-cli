@@ -161,7 +161,7 @@ func TestSlackDigest(t *testing.T) {
 	quiet := Drift{GeneratedAt: at, Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0"},
 		{Harness: "gemini", Name: "Gemini CLI", Version: "0.64.0", Previous: "0.63.0"}},
 		Status: []Status{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Checks: 4}, {Harness: "gemini", Name: "Gemini CLI", Version: "0.64.0", Checks: 4}}}
-	if s := slackDigestText(t, quiet); !quiet.Quiet() || !strings.Contains(s, "✅ *Codex CLI 0.162.0*\n✅ *Gemini CLI 0.64.0*") || !strings.Contains(s, "*To note*\nNo field changes.") ||
+	if s := slackDigestText(t, quiet); !quiet.Quiet() || !strings.Contains(s, "✅ *Codex CLI 0.162.0*: passes all 4 checks\n✅ *Gemini CLI 0.64.0*: passes all 4 checks") || !strings.Contains(s, "*To note*\nNo field changes.") ||
 		quiet.slack()["text"] != "Harness drift: every harness sends what terma expects" {
 		t.Errorf("quiet day: %s", s)
 	}

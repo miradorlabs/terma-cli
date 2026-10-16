@@ -81,17 +81,7 @@ type attachment struct {
 // then, under a divider, each harness's changes as attachments (slackChanges), as many whole
 // harnesses as one message holds.
 func (d Drift) slack() map[string]any {
-	// The notification's text: whether every harness tested sends what terma expects, never
-	// that it does when none was tested.
-	summary := "Harness drift: every harness sends what terma expects"
-	switch n := len(slices.DeleteFunc(slices.Clone(d.Status), Status.Passed)); {
-	case len(d.Status) == 0:
-		summary = "Harness drift: no harness was tested tonight"
-	case n == 1:
-		summary = "Harness drift: 1 harness not sending what terma expects"
-	case n > 1:
-		summary = fmt.Sprintf("Harness drift: %d harnesses not sending what terma expects", n)
-	}
+	summary := d.summary()
 	blocks := d.slackSummary()
 	var harnesses [][]attachment
 	for _, h := range d.Harnesses {
@@ -141,10 +131,22 @@ func (d Drift) slackSummary() []block {
 	for _, a := range d.alarms() {
 		blocks = append(blocks, slackSection(":warning: *"+a+"*"))
 	}
+	// The verdicts, as many sections as they need: red first, so none is cut, and a long night
+	// is split rather than clipped.
+	title := "*Does each harness send all the telemetry terma expects?*"
 	if len(d.Status) == 0 {
-		blocks = append(blocks, slackSection("*Does each harness send all the telemetry terma expects?*\n_No harness was tested tonight._"))
-	} else {
-		blocks = append(blocks, slackSection("*Does each harness send all the telemetry terma expects?*\n"+strings.Join(d.statusLines(func(s string) string { return "*" + s + "*" }), "\n")))
+		blocks = append(blocks, slackSection(title+"\n_No harness was tested tonight._"))
+	}
+	text := title
+	for _, l := range d.statusLines(func(s string) string { return "*" + s + "*" }) {
+		if len(slackText(text+"\n"+l)) > sectionLimit {
+			blocks = append(blocks, slackSection(text))
+			text = ""
+		}
+		text = strings.TrimPrefix(text+"\n"+l, "\n")
+	}
+	if len(d.Status) > 0 {
+		blocks = append(blocks, slackSection(text))
 	}
 	var notes []string
 	if d.Quiet() {

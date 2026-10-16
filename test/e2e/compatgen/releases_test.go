@@ -48,11 +48,11 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 		t.Errorf("claude %+v: one of two checks failed, no build before", claude)
 	}
 	bold := func(s string) string { return "*" + s + "*" }
-	ss := statuses(rows, rs)
+	ss := statuses(rows, rs, nil)
 	if len(ss) != 2 {
 		t.Fatalf("statuses %+v", ss)
 	}
-	if l := ss[1].line(bold); l != "✅ *Codex CLI 0.162.1* · new (was 0.162.0)" {
+	if l := ss[1].line(bold); l != "✅ *Codex CLI 0.162.1* · new (was 0.162.0): passes all 2 checks" {
 		t.Errorf("codex line %q", l)
 	}
 	if l := ss[0].line(bold); l != "❌ *Claude Code 2.1.297* · new: fails 1 of 2 checks: Prompts and tool content withheld when the project says so (macOS)" {
@@ -64,7 +64,7 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 	}
 	census := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", time.Now())}
 	if rs := releases(hist, Catalog{}, skipped, census, nil, censusRuns{}); len(rs) != 1 || rs[0].Checks != 0 || rs[0].Passed() ||
-		statuses(skipped, rs)[0].line(bold) != "⚪ *Codex CLI 0.163.0* · new (was 0.162.0): no checks ran" {
+		statuses(skipped, rs, nil)[0].line(bold) != "⚪ *Codex CLI 0.163.0* · new (was 0.162.0): no checks ran" {
 		t.Errorf("a censused build whose every check was skipped: %+v", rs)
 	}
 }
@@ -134,7 +134,7 @@ func TestTheDigestLeadsWithEachHarnessesVerdict(t *testing.T) {
 		Added:    []FieldChange{{Surface: "logs/tool_decision", Key: "permission_mode", Class: "unclassified"}},
 		Withheld: []FieldChange{{Surface: "logs/tool_decision", Key: "permission_mode"}}}}
 	s = slackDigestText(t, d)
-	if !strings.Contains(s, "✅ *Claude Code 2.1.297* · new (was 2.1.296)\n✅ *Codex CLI 0.162.1*") ||
+	if !strings.Contains(s, "✅ *Claude Code 2.1.297* · new (was 2.1.296): passes all 3 checks\n✅ *Codex CLI 0.162.1*: passes all 2 checks") ||
 		!strings.Contains(s, "*To note*\nNew fields, withheld until classified: Claude Code: `permission_mode`.") || strings.Contains(s, "❌") {
 		t.Errorf("a new field is not a note beside green verdicts:\n%s", s)
 	}
@@ -238,7 +238,7 @@ func TestSlackColoursWhatCameAndWent(t *testing.T) {
 	}
 	d.Status = []Status{{Harness: "pi", Name: "Pi", Version: "0.84.2", Checks: 1}}
 	items = slackItems(t, d)
-	verdicts, run, heading, codex := at("*Does each harness send all the telemetry terma expects?*\n✅ *Pi 0.84.2*"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
+	verdicts, run, heading, codex := at("*Does each harness send all the telemetry terma expects?*\n✅ *Pi 0.84.2*: passes all 1 check"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
 	if verdicts < 0 || run < 0 || !(verdicts < run && run < heading-1 && heading < codex) || items[heading-1].text != "" || items[len(items)-1].colour != removedColour {
 		t.Errorf("not summary, divider, then the harnesses: %+v", items)
 	}

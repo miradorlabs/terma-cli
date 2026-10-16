@@ -317,14 +317,17 @@ func (d Drift) markdown() string {
 	if len(d.Status) > 0 {
 		b.WriteString("\n")
 	}
-	b.WriteString("## To note\n\n")
+	var notes []string
 	if d.Quiet() {
-		b.WriteString("No changes: every field and capability as the catalog and history have them.\n\n")
+		notes = append(notes, "No changes: every field and capability as the catalog and history have them.")
 	}
 	for _, n := range []string{d.newFields(), d.stillWithheld()} {
 		if n != "" {
-			b.WriteString(n + "\n\n")
+			notes = append(notes, n)
 		}
+	}
+	if len(notes) > 0 {
+		b.WriteString("## To note\n\n" + strings.Join(notes, "\n\n") + "\n\n")
 	}
 	for _, h := range d.Harnesses {
 		if !h.changed() {
