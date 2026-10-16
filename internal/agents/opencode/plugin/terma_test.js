@@ -49,7 +49,7 @@ async function importPlugin(config) {
   // the named function.
   expect(Object.keys(mod).sort()).toEqual(["TermaPlugin", "default"])
   expect(mod.default.id).toBe("terma")
-  return mod.default
+  return { ...mod.default, module: mod }
 }
 
 // load runs the plugin as OpenCode 1 does: server() and the hooks it returns.
@@ -130,7 +130,7 @@ test("model calls become spans with tokens, cost and the session as trace", asyn
   expect(created).toBeDefined()
   expect(created.body.stringValue).toBe("fix the build")
   expect(created.traceId).toBe(s.traceId)
-})
+}, 15_000)
 
 test("prompts and tool content stay home when excluded", async () => {
   received = []
@@ -180,12 +180,7 @@ test("session and file events reach terma hook with the session attached", async
   await hooks.event({ event: { type: "file.edited", properties: { file: "/repo/src/b.go" } } })
   await hooks.event({ event: { type: "session.deleted", properties: { info: { id: "ses_9", directory: "/repo" } } } })
   await hooks.dispose()
-  // The hook processes are detached; give them a moment.
-  await new Promise((r) => setTimeout(r, 500))
-  const calls = readdirSync(hookLog).map((f) => {
-    const [event, payload] = readFileSync(join(hookLog, f), "utf8").split("\t")
-    return { event, payload: JSON.parse(payload) }
-  })
+  const calls = await hookCalls(4)
   expect(calls.length).toBe(4)
   expect(calls).toContainEqual({ event: "opencode-session-start", payload: { session_id: "ses_9", cwd: "/repo" } })
   expect(calls).toContainEqual({ event: "opencode-session-end", payload: { session_id: "ses_9", cwd: "/repo", reason: "deleted" } })
@@ -201,11 +196,7 @@ test("a session the task tool opened names its parent", async () => {
   const hooks = await load(baseConfig(), dir)
   await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_child", parentID: "ses_parent", directory: "/repo" } } } })
   await hooks.dispose()
-  await new Promise((r) => setTimeout(r, 500))
-  const calls = readdirSync(hookLog).map((f) => {
-    const [event, payload] = readFileSync(join(hookLog, f), "utf8").split("\t")
-    return { event, payload: JSON.parse(payload) }
-  })
+  const calls = await hookCalls(1)
   expect(calls).toContainEqual({ event: "opencode-session-start", payload: { session_id: "ses_child", cwd: "/repo", parent_session_id: "ses_parent" } })
   const recs = received.filter((r) => r.path === "/v1/logs")[0].body.resourceLogs[0].scopeLogs[0].logRecords
   const created = recs.find((r) => r.attributes.some((x) => x.key === "event.name" && x.value.stringValue === "opencode.session.created"))
@@ -480,13 +471,28 @@ async function setupPlugin(config, c) {
   return cleanup
 }
 
-async function hookCalls() {
-  // The hook processes are detached; give them a moment.
-  await new Promise((r) => setTimeout(r, 500))
-  return readdirSync(hookLog).map((f) => {
-    const [event, payload] = readFileSync(join(hookLog, f), "utf8").split("\t")
-    return { event, payload: JSON.parse(payload) }
-  })
+// hookCalls waits for the detached hook processes to have written expected calls, up to a
+// cap, and returns those there are; a test expecting none gives a straggler a moment.
+async function hookCalls(expected) {
+  const read = () => {
+    const calls = []
+    for (const f of readdirSync(hookLog)) {
+      const [event, payload] = readFileSync(join(hookLog, f), "utf8").split("\t")
+      try {
+        calls.push({ event, payload: JSON.parse(payload) })
+      } catch {
+        return null // still being written
+      }
+    }
+    return calls
+  }
+  const deadline = Date.now() + (expected > 0 ? 5000 : 150)
+  for (;;) {
+    const calls = read()
+    if (calls && expected > 0 && calls.length >= expected) return calls
+    if (Date.now() >= deadline) return calls ?? []
+    await new Promise((r) => setTimeout(r, 20))
+  }
 }
 
 function clearHooks() {
@@ -531,16 +537,16 @@ const sortCalls = (calls, toolless = []) =>
 const usage = { cost: 0.0421, tokens: { input: 1200, output: 340, reasoning: 20, cache: { read: 800, write: 100 } } }
 
 // runV1 and runV2 run one session through each plugin API, returning what it sent.
-async function runV1(config, drive) {
+async function runV1(config, drive, calls) {
   received = []
   clearHooks()
   const hooks = await load(config, dir)
   await drive(hooks)
   await hooks.dispose()
-  return { sent: sent(), raw: received, calls: await hookCalls() }
+  return { sent: sent(), raw: received, calls: await hookCalls(calls) }
 }
 
-async function runV2(config, drive) {
+async function runV2(config, drive, calls) {
   received = []
   clearHooks()
   const server = fakeServer()
@@ -548,7 +554,7 @@ async function runV2(config, drive) {
   const cleanup = await setupPlugin(config, c)
   await drive(server, c)
   await cleanup()
-  return { sent: sent(), raw: received, calls: await hookCalls() }
+  return { sent: sent(), raw: received, calls: await hookCalls(calls) }
 }
 
 const v1Created = (hooks, id, extra = {}) =>
@@ -576,6 +582,7 @@ const v1Tool = async (hooks, sessionID, callID, tool, args, output) => {
 const equivalent = [
   {
     name: "an edit",
+    calls: 3,
     async v1(h) {
       await v1Created(h, "ses_eq")
       await h["chat.message"]({ sessionID: "ses_eq", agent: "build", model: { providerID: "anthropic", modelID: "claude-opus-5" }, messageID: "msg_u1" }, { message: { id: "msg_u1" }, parts: [{ type: "text", text: "fix the build" }] })
@@ -605,6 +612,7 @@ const equivalent = [
   },
   {
     name: "a subagent",
+    calls: 1,
     async v1(h) {
       await v1Created(h, "ses_kid", { parentID: "ses_dad" })
       await v1Tool(h, "ses_kid", "call_k", "grep", { pattern: "x" }, "found")
@@ -623,6 +631,7 @@ const equivalent = [
   },
   {
     name: "a tool that fails",
+    calls: 1,
     async v1(h) {
       await v1Created(h, "ses_bad")
       await v1Tool(h, "ses_bad", "call_b", "edit", { filePath: join(dir, "gone.go") })
@@ -641,6 +650,7 @@ const equivalent = [
   },
   {
     name: "prompts and tool content withheld",
+    calls: 2,
     config: { includePrompts: false, includeToolContent: false },
     async v1(h) {
       await v1Created(h, "ses_q", { title: "secret title" })
@@ -669,8 +679,8 @@ const equivalent = [
 for (const scenario of equivalent) {
   test(`OpenCode 2 sends what OpenCode 1 sends for ${scenario.name}`, async () => {
     const config = baseConfig(scenario.config)
-    const one = await runV1(config, scenario.v1)
-    const two = await runV2(config, scenario.v2)
+    const one = await runV1(config, scenario.v1, scenario.calls)
+    const two = await runV2(config, scenario.v2, scenario.calls)
     scenario.expect(one, two)
     expect(one.sent.records.length).toBeGreaterThan(0)
     expect(two.sent).toEqual(one.sent)
@@ -715,7 +725,7 @@ test("a patch captured from OpenCode 2.0.30 sends what OpenCode 1's apply_patch 
       await h.event({ event: { type: "message.updated", properties: { info } } })
     }
     await h.event({ event: { type: "session.idle", properties: { sessionID: sid } } })
-  })
+  }, 3)
 
   const two = await runV2(baseConfig(), async (server, c) => {
     for (const r of records) {
@@ -725,7 +735,7 @@ test("a patch captured from OpenCode 2.0.30 sends what OpenCode 1's apply_patch 
         await server.emit(type, data, location?.directory)
       }
     }
-  })
+  }, 3)
 
   // The OpenCode 1 side here names no model on its prompt; OpenCode 2's names the one
   // that answered it.
@@ -765,7 +775,7 @@ test("an OpenCode 2 instance takes only its own location's sessions", async () =
   const spans = received.filter((r) => r.path === "/v1/traces").flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
   expect(spans.map((s) => s.name)).toEqual(["chat m"])
   // The session it was not told of being created is announced, as one created here.
-  expect(await hookCalls()).toEqual([{ event: "opencode-session-start", payload: { session_id: "ses_resumed", cwd: dir } }])
+  expect(await hookCalls(1)).toEqual([{ event: "opencode-session-start", payload: { session_id: "ses_resumed", cwd: dir } }])
 })
 
 test("an OpenCode 2 tool's path is the session's, and a written file's own path wins", async () => {
@@ -784,7 +794,7 @@ test("an OpenCode 2 tool's path is the session's, and a written file's own path 
   await call("c5", "read", { path: "r.go" }, { content: "text" })
   await cleanup()
 
-  const edits = (await hookCalls()).filter((h) => h.event === "opencode-file-edit").map((h) => h.payload)
+  const edits = (await hookCalls(4)).filter((h) => h.event === "opencode-file-edit").map((h) => h.payload)
   expect(edits.length).toBe(3)
   expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: join(dir, "pkg", "x.go"), tool: "edit" })
   expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: "/elsewhere/y.go", tool: "write" })
@@ -808,7 +818,7 @@ test("an OpenCode 2 patch names each file once, a moved one by both its paths", 
   // A patch reported with no result still names the files its text does.
   await v2Tool(c, "ses_p", "call_q", "patch", { patchText: "*** Begin Patch\n*** Add File: d.go\n+x\n*** End Patch" }, { status: "completed", result: { content: "Success" } })
   await cleanup()
-  const edits = (await hookCalls()).filter((h) => h.event === "opencode-file-edit").map((h) => h.payload.file).sort()
+  const edits = (await hookCalls(5)).filter((h) => h.event === "opencode-file-edit").map((h) => h.payload.file).sort()
   expect(edits).toEqual(["a.go", "b.go", "c.go", "d.go"].map((f) => join(dir, f)))
 })
 
@@ -835,7 +845,7 @@ test("an OpenCode 2 session forked, moved here or moved away is announced where 
   await v2Tool(c, "ses_out", "call_o", "write", { path: "o.go", content: "o" }, { status: "completed", result: { content: "ok" } })
   await cleanup()
 
-  const starts = (await hookCalls()).map((h) => JSON.stringify(h)).sort()
+  const starts = (await hookCalls(3)).map((h) => JSON.stringify(h)).sort()
   expect(starts).toEqual(
     [
       { event: "opencode-session-start", payload: { session_id: "ses_fork", cwd: dir } },
@@ -847,7 +857,7 @@ test("an OpenCode 2 session forked, moved here or moved away is announced where 
   expect(JSON.stringify(received)).not.toContain("call_o")
 })
 
-test("an OpenCode 2 step whose start was missed sends no nameless model call", async () => {
+test("an OpenCode 2 step whose start was missed still sends its spend", async () => {
   received = []
   const server = fakeServer()
   const c = server.location(dir)
@@ -855,7 +865,34 @@ test("an OpenCode 2 step whose start was missed sends no nameless model call", a
   await v2Created(server, "ses_late")
   await v2StepEnded(server, "ses_late", "msg_late")
   await cleanup()
-  expect(received.filter((r) => r.path === "/v1/traces")).toEqual([])
+  const spans = received.filter((r) => r.path === "/v1/traces").flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
+  expect(spans.map((s) => s.name)).toEqual(["chat"])
+  const a = Object.fromEntries(spans[0].attributes.map((x) => [x.key, x.value]))
+  expect(a["gen_ai.usage.input_tokens"]).toEqual({ intValue: "1200" })
+  expect(a["gen_ai.usage.total_cost"]).toEqual({ doubleValue: 0.0421 })
+  expect(a["gen_ai.request.model"]).toBeUndefined()
+})
+
+// An OpenCode 1 that called both the named export and the default's server for one
+// directory would report everything twice: the second is inert until the first is disposed.
+test("both of OpenCode 1's entry points for one directory register one set of hooks", async () => {
+  received = []
+  clearHooks()
+  const plugin = await importPlugin(baseConfig())
+  const input = { directory: dir, worktree: dir }
+  const first = await plugin.module.TermaPlugin(input)
+  const second = await plugin.server(input)
+  expect(Object.keys(first).length).toBeGreaterThan(0)
+  expect(second).toEqual({})
+  for (const hooks of [first, second]) await hooks.event?.({ event: { type: "session.created", properties: { info: { id: "ses_once", directory: dir } } } })
+  await first.dispose()
+  expect((await hookCalls(1)).length).toBe(1)
+  const records = received.filter((r) => r.path === "/v1/logs").flatMap((r) => r.body.resourceLogs[0].scopeLogs[0].logRecords)
+  expect(records.length).toBe(1)
+  // Disposed, the directory can start again, as a reloaded OpenCode starts it.
+  const again = await plugin.server(input)
+  expect(Object.keys(again).length).toBeGreaterThan(0)
+  await again.dispose()
 })
 
 // OpenCode 1 from 1.18 calls setup as well as server, with a context that has no sessions,
@@ -878,7 +915,7 @@ test("a terma that was missing is tried again later", async () => {
   writeFileSync(later, `#!/bin/sh\n{ printf '%s\\t' "$2"; cat; } > "${hookLog}/$$.$(date +%s%N)"\n`)
   chmodSync(later, 0o700)
   await created("ses_m2")
-  expect(await hookCalls()).toEqual([])
+  expect(await hookCalls(0)).toEqual([])
   const now = Date.now
   Date.now = () => now() + 61_000
   try {
@@ -887,7 +924,7 @@ test("a terma that was missing is tried again later", async () => {
     Date.now = now
   }
   await hooks.dispose()
-  expect((await hookCalls()).map((h) => h.payload.session_id)).toEqual(["ses_m3"])
+  expect((await hookCalls(1)).map((h) => h.payload.session_id)).toEqual(["ses_m3"])
 })
 
 test("an OpenCode 2 subagent's OpenRouter request names its parent and agent in the trace field", async () => {

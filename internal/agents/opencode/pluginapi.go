@@ -150,7 +150,7 @@ func (a Agent) RelayProblem() (string, string, bool) {
 	bare, missing := hookGone(cfg.HookCommand)
 	switch {
 	case !supported(version):
-		return tooOld(version) + " Update OpenCode, then run `terma setup` again.", "update OpenCode, then terma setup", true
+		return tooOld(version) + " Run `opencode upgrade`, then `terma setup` again.", "opencode upgrade, then terma setup", true
 	case missing != "":
 		return fmt.Sprintf("terma's OpenCode plugin (%s) runs terma at %s, which is not there now, so its commits go unattributed; run `terma setup` again to name this terma", plugin, missing),
 			"terma setup", true

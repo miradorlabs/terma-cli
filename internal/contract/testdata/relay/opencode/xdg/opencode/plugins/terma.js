@@ -464,7 +464,7 @@ function telemetry(cfg) {
       exporter.span({
         traceId: traceId(m.sessionID),
         spanId: spanId("message:" + m.id),
-        name: "chat " + (m.modelID ?? ""),
+        name: m.modelID ? "chat " + m.modelID : "chat",
         kind: 3,
         startTimeUnixNano: nanos(m.start ?? m.end),
         endTimeUnixNano: nanos(m.end),
@@ -556,6 +556,10 @@ const EDIT_TOOLS = ["edit", "write"]
 
 // --- OpenCode 1 ---------------------------------------------------------------------
 
+// RUNNING are the directories server runs for in this process, shared by every copy of the
+// module OpenCode loads.
+const RUNNING = (globalThis[Symbol.for("terma.opencode.server")] ??= new Set())
+
 // server is the OpenCode 1 plugin: hooks keyed by name, OpenCode's bus events through
 // `event`.
 async function server({ directory, worktree }) {
@@ -563,6 +567,11 @@ async function server({ directory, worktree }) {
   // No config, or per-repo mode in a repository bound to no Terma project: stay inert,
   // exporting nothing and firing no hooks.
   if (!CONFIG || !cfg.endpoint) return {}
+  // One OpenCode 1 that called both the named export and the default's server would
+  // report everything twice: the second call for a directory still running is inert.
+  const key = `${worktree || ""}\0${directory || ""}`
+  if (RUNNING.has(key)) return {}
+  RUNNING.add(key)
   const t = telemetry(cfg)
 
   let lastSession = "" // the session the most recent activity belonged to
@@ -685,6 +694,7 @@ async function server({ directory, worktree }) {
     },
 
     dispose: async () => {
+      RUNNING.delete(key)
       try {
         await t.flush()
       } catch {}
@@ -791,14 +801,13 @@ async function setup(ctx) {
     t.sessionIdle(sessionID)
   }
 
-  // stepEnded is the model call's span. A step whose start this instance missed names no
-  // model, and is left out rather than sent as a call to nothing. OpenCode 2's messages
-  // name no parent message, so the span names none.
+  // stepEnded is the model call's span. A step whose start this instance missed still
+  // sends its usage and cost, naming no model. OpenCode 2's messages name no parent
+  // message, so the span names none.
   function stepEnded(event, error) {
     const d = event.data
-    const step = steps.get(d.assistantMessageID)
+    const step = steps.get(d.assistantMessageID) ?? {}
     steps.delete(d.assistantMessageID)
-    if (!step) return
     t.modelCall({
       id: d.assistantMessageID,
       sessionID: d.sessionID,
