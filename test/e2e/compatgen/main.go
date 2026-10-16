@@ -58,8 +58,10 @@ func (e Entry) key() string {
 
 // config is what one compatgen run reads and writes.
 type config struct {
-	runs, fieldRuns   []string
-	censusRuns        []string
+	runs, fieldRuns []string
+	censusRuns      []string
+	// noteRuns are runs' notes.json: the unclassified keys their tripwire noted.
+	noteRuns          []string
 	history, md, json string
 	catalog, fieldsMD string
 	digest, link      string
@@ -69,10 +71,11 @@ type config struct {
 
 func main() {
 	var c config
-	var runs, fields, census runsFlag
+	var runs, fields, census, notes runsFlag
 	flag.Var(&runs, "run", "a run's compat.json (repeatable)")
 	flag.Var(&fields, "fields", "a run's fields.json (repeatable)")
 	flag.Var(&census, "census", "a run's census.json, the builds its census scenarios ran (repeatable)")
+	flag.Var(&notes, "notes", "a run's notes.json, the unclassified keys it noted (repeatable)")
 	flag.StringVar(&c.history, "history", "../../docs/compat/history.json", "the history, read and rewritten")
 	flag.StringVar(&c.md, "md", "../../docs/COMPATIBILITY.md", "the rendered matrix")
 	flag.StringVar(&c.json, "json", "../../docs/compat/compat.json", "the matrix for the website")
@@ -82,7 +85,7 @@ func main() {
 	flag.StringVar(&c.link, "link", "", "the run, linked from the digest")
 	flag.BoolVar(&c.source, "source", false, "link the digest's findings to the lines of a public harness source that name them (downloads it)")
 	flag.Parse()
-	c.runs, c.fieldRuns, c.censusRuns = runs, fields, census
+	c.runs, c.fieldRuns, c.censusRuns, c.noteRuns = runs, fields, census, notes
 	if err := run(c, time.Now().UTC()); err != nil {
 		fmt.Fprintln(os.Stderr, "compatgen:", err)
 		os.Exit(1)
@@ -131,6 +134,19 @@ func run(c config, now time.Time) error {
 		d := Drift{GeneratedAt: now, Link: c.link, Compat: compatDrift(hist, compatRows)}
 		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, ran, now)
 		d.Releases = releases(hist, catalog, compatRows, fieldRows, d.Harnesses, ran)
+		d.Status = statuses(compatRows, d.Releases, d.Compat, hist)
+		met := map[MetKey]bool{}
+		for _, p := range c.noteRuns {
+			var notes map[string][]string
+			if err := readJSON(p, &notes); err != nil {
+				return err
+			}
+			for _, n := range notes[e2e.UnclassifiedNotes] {
+				h, k := e2e.ParseUnclassifiedNote(n)
+				met[MetKey{Harness: h, Key: k}] = true
+			}
+		}
+		d.Unclassified = unclassified(met, d.Harnesses)
 		if c.source {
 			linkSources(&d, knownSurfaces(catalog, fieldRows))
 		}

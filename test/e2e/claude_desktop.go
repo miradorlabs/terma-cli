@@ -71,7 +71,7 @@ func forEachClaudeDesktop(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
 	for _, b := range ClaudeDesktopBinaries(t) {
-		t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 	}
 }
 

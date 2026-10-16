@@ -37,6 +37,9 @@ jobs:
       TERMA_E2E_GEMINI_VERSIONS: checked
       TERMA_E2E_DSH_VERSIONS: last3
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
+      # A field the relay has not classified is a note here, not a failure: the digest says
+      # what is new to classify, and a harness sending it still sends what terma expects.
+      TERMA_E2E_UNCLASSIFIED: note
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -123,7 +126,9 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: compat-macos
-          path: test/e2e/report/compat.json
+          path: |
+            test/e2e/report/compat.json
+            test/e2e/report/notes.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Upload this platform's field census
@@ -162,6 +167,8 @@ jobs:
           fi
       - name: Run the machine scenarios
         working-directory: test/e2e
+        env:
+          TERMA_E2E_UNCLASSIFIED: note
         # The agents' newest releases; the rows record the versions they turn out to be.
         run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest
       - name: Upload this platform's compatibility rows
@@ -169,7 +176,9 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: compat-linux
-          path: test/e2e/report/linux/compat.json
+          path: |
+            test/e2e/report/linux/compat.json
+            test/e2e/report/linux/notes.json
           if-no-files-found: ignore
           retention-days: 30
 
@@ -212,6 +221,7 @@ jobs:
           for f in $(find runs -name compat.json | sort); do args+=(-run "$f"); done
           for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
           for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
+          for f in $(find runs -name notes.json | sort); do args+=(-notes "$f"); done
           go run ./compatgen "${args[@]}" -digest report -source -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
           if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
