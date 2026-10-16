@@ -232,8 +232,7 @@ tested tonight that failed are named too. A scenario that cannot drive a build s
 through `SkipBuild`, saying why, and the reason goes beside its ⚪: T3 0.1.0, whose API the
 driver does not speak yet, is untested in the open, never failed. The history keeps the
 reason, and it replaces what an earlier run recorded of that build; the matrix's newest build
-verified is the newest that ran a check. A
-build tested for the first time, and newer than
+verified is the newest that ran a check. A build tested for the first time, and newer than
 any tested before (an older one, re-run or backported, is no news), is marked new, against the
 newest build known before it. Red comes first, and the list is split across Slack sections
 rather than cut. The notification says whether every harness sends what terma expects, or how
