@@ -26,7 +26,13 @@ func TestStatusEdges(t *testing.T) {
 		{Harness: "codex", Version: "0.163.0", Platform: "linux/amd64", Capability: "relay.telemetry", From: "pass", To: "fail"},
 		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", From: "fail", To: "pass"},
 	}
-	ss := statuses(rows, []Release{{Harness: "claude", Version: "2.1.301"}}, compat)
+	hist := map[string]Entry{}
+	for _, e := range []Entry{
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "fail"},
+	} {
+		hist[e.key()] = e
+	}
+	ss := statuses(rows, []Release{{Harness: "claude", Version: "2.1.301"}}, compat, hist)
 	var lines []string
 	for _, s := range ss {
 		lines = append(lines, s.line(bold))
@@ -74,5 +80,28 @@ func TestEveryVerdictReachesSlack(t *testing.T) {
 		if len(it.text) > sectionLimit || strings.HasSuffix(it.text, "\n…") {
 			t.Errorf("a section cut short (%d bytes)", len(it.text))
 		}
+	}
+}
+
+// A build is fixed only where every check it failed before passed tonight: one skipped tonight
+// may still fail.
+func TestFixedNeedsEveryEarlierFailureToPass(t *testing.T) {
+	hist := map[string]Entry{}
+	for _, e := range []Entry{
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "fail"},
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.content_withheld", Result: "fail"},
+	} {
+		hist[e.key()] = e
+	}
+	rows := []e2e.CompatRow{
+		check("pi", "1.3.0", "relay.telemetry", "darwin/arm64", "pass"),
+		check("pi", "1.3.0", "relay.content_withheld", "darwin/arm64", "not run"),
+	}
+	if s := statuses(rows, nil, nil, hist)[0]; s.Fixed {
+		t.Errorf("%+v: fixed, with a failure skipped tonight", s)
+	}
+	rows[1].Result = "pass"
+	if s := statuses(rows, nil, nil, hist)[0]; !s.Fixed {
+		t.Errorf("%+v: not fixed, every earlier failure passing", s)
 	}
 }

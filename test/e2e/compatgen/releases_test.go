@@ -48,7 +48,7 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 		t.Errorf("claude %+v: one of two checks failed, no build before", claude)
 	}
 	bold := func(s string) string { return "*" + s + "*" }
-	ss := statuses(rows, rs, nil)
+	ss := statuses(rows, rs, nil, nil)
 	if len(ss) != 2 {
 		t.Fatalf("statuses %+v", ss)
 	}
@@ -64,7 +64,7 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 	}
 	census := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", time.Now())}
 	if rs := releases(hist, Catalog{}, skipped, census, nil, censusRuns{}); len(rs) != 1 || rs[0].Checks != 0 || rs[0].Passed() ||
-		statuses(skipped, rs, nil)[0].line(bold) != "⚪ *Codex CLI 0.163.0* · new (was 0.162.0): no checks ran" {
+		statuses(skipped, rs, nil, nil)[0].line(bold) != "⚪ *Codex CLI 0.163.0* · new (was 0.162.0): no checks ran" {
 		t.Errorf("a censused build whose every check was skipped: %+v", rs)
 	}
 }

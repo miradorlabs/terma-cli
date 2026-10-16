@@ -31,8 +31,9 @@ type Status struct {
 	// skipped; UntestedNew says it is tested for the first time.
 	Untested    string `json:"untested,omitempty"`
 	UntestedNew bool   `json:"untested_new,omitempty"`
-	// Regressed says a check Version passed before failed tonight; Fixed, that every check it
-	// failed before passed (CompatChange).
+	// Regressed says a check Version passed before failed tonight (CompatChange); Fixed, that
+	// it failed checks before and every one of them passed tonight (the history), none left
+	// unchecked.
 	Regressed bool `json:"regressed,omitempty"`
 	Fixed     bool `json:"fixed,omitempty"`
 }
@@ -43,11 +44,12 @@ func (s Status) Passed() bool { return s.Checks > 0 && len(s.Failed) == 0 }
 // statuses are the night's harnesses, failing first, then by name: each one's newest build
 // tonight's rows name that ran checks (a newer one whose checks were all skipped is named
 // beside it), with its checks, its release where it is one, and whether it changed from
-// before (compat).
-func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange) []Status {
+// before: a regression from compat, a fix from the history before tonight (hist).
+func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange, hist map[string]Entry) []Status {
 	type build struct{ harness, version string }
 	checks := map[build]map[FailedCheck]bool{}
 	failed := map[build][]FailedCheck{}
+	passed := map[build]map[FailedCheck]bool{}
 	newest, newestRun := map[string]string{}, map[string]string{}
 	for _, r := range rows {
 		b := build{r.Harness, r.Version}
@@ -68,6 +70,12 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange) []Statu
 		if r.Result == "fail" && !slices.Contains(failed[b], c) {
 			failed[b] = append(failed[b], c)
 		}
+		if r.Result == "pass" {
+			if passed[b] == nil {
+				passed[b] = map[FailedCheck]bool{}
+			}
+			passed[b][c] = true
+		}
 	}
 	var out []Status
 	for harness, latest := range newest {
@@ -84,10 +92,17 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange) []Statu
 		for _, c := range compat {
 			if c.Harness == harness && c.Version == v {
 				s.Regressed = s.Regressed || c.From == "pass" && c.To == "fail"
-				s.Fixed = s.Fixed || c.From == "fail" && c.To == "pass"
 			}
 		}
-		s.Fixed = s.Fixed && len(s.Failed) == 0
+		// Fixed only where every check it failed before passed tonight: one skipped tonight
+		// may still fail.
+		var before []FailedCheck
+		for _, e := range hist {
+			if e.Harness == harness && e.Version == v && e.Result == "fail" {
+				before = append(before, FailedCheck{Capability: e.Capability, Platform: e.Platform})
+			}
+		}
+		s.Fixed = len(s.Failed) == 0 && len(before) > 0 && !slices.ContainsFunc(before, func(c FailedCheck) bool { return !passed[b][c] })
 		slices.SortFunc(s.Failed, func(x, y FailedCheck) int {
 			return cmp.Or(strings.Compare(x.Capability, y.Capability), strings.Compare(x.Platform, y.Platform))
 		})
