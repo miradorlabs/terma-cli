@@ -11,12 +11,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// opencodeIn sandboxes OpenCode's config directory (XDG_CONFIG_HOME) and terma's own.
+// opencodeIn sandboxes OpenCode's config directory (XDG_CONFIG_HOME) and terma's own, with
+// no OpenCode version known and a terma at a path that is there.
 func opencodeIn(t *testing.T) (exporter, string) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	return exporter{dir: filepath.Join(dir, "terma")}, filepath.Join(dir, "opencode", "plugins", "terma.js")
+	withVersion(t, "")
+	terma := fakeTerma(t)
+	return exporter{dir: filepath.Join(dir, "terma"), hook: []string{terma, "hook"}}, filepath.Join(dir, "opencode", "plugins", "terma.js")
 }
 
 func opencodeExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
@@ -34,21 +37,22 @@ func opencodeExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
 
 // The embedded plugin has exactly one config placeholder, or every connect installs an
 // inert plugin.
-func TestOpenCodeTemplateHasOneConfigLineAndOneExport(t *testing.T) {
+func TestOpenCodeTemplateHasOneConfigLineAndItsExports(t *testing.T) {
 	t.Parallel()
 	if n := strings.Count(opencodePluginSource, opencodeConfigPlaceholder); n != 1 {
 		t.Fatalf("placeholder appears %d times, want 1", n)
 	}
-	exports := 0
+	var exports []string
 	for line := range strings.SplitSeq(opencodePluginSource, "\n") {
 		if strings.HasPrefix(line, "export ") {
-			exports++
+			exports = append(exports, line)
 		}
 	}
-	// OpenCode 1's loader treats every export as a plugin and OpenCode 2's reads the
-	// default one: a stray helper export would make the plugin fail to load.
-	if exports != 1 {
-		t.Fatalf("plugin has %d exports, want exactly 1 (the plugin)", exports)
+	// OpenCode 2 reads the default export; OpenCode 1 before 1.3.17 calls every export as a
+	// plugin function, and from then the default's server: a stray helper export would make
+	// the plugin fail to load, or load twice.
+	if len(exports) != 2 || !strings.HasPrefix(exports[0], "export const TermaPlugin = ") || !strings.HasPrefix(exports[1], "export default {") {
+		t.Fatalf("plugin exports %q, want the named plugin function and the default", exports)
 	}
 	if !opencodeSetupExport.MatchString(opencodePluginSource) {
 		t.Fatal("the plugin's default export has no OpenCode 2 setup, or doctor no longer recognizes it")
@@ -88,7 +92,7 @@ func TestOpenCodeConnectWritesPluginAndHelper(t *testing.T) {
 	if cfg.ResourceAttributes[semconv.MiradorProjectIDKey] != "proj_123" || cfg.ResourceAttributes[harness.AttrEnduserID] != "dev@example.com" {
 		t.Errorf("resource attributes = %v", cfg.ResourceAttributes)
 	}
-	if !reflect.DeepEqual(cfg.HookCommand, []string{"terma", "hook"}) {
+	if !reflect.DeepEqual(cfg.HookCommand, h.hook) {
 		t.Errorf("hook command = %v", cfg.HookCommand)
 	}
 	// No secret in the file, so it is readable like any other plugin.

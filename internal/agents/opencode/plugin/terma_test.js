@@ -45,8 +45,9 @@ async function importPlugin(config) {
   const path = join(mkdtempSync(join(dir, "module-")), "plugin.js")
   writeFileSync(path, spliced)
   const mod = await import(path)
-  // OpenCode 2 reads the default export alone; OpenCode 1 treats every export as a plugin.
-  expect(Object.keys(mod)).toEqual(["default"])
+  // OpenCode 2 reads the default export; OpenCode 1 the default's server, or before 1.3.17
+  // the named function.
+  expect(Object.keys(mod).sort()).toEqual(["TermaPlugin", "default"])
   expect(mod.default.id).toBe("terma")
   return mod.default
 }
@@ -493,14 +494,21 @@ function clearHooks() {
 }
 
 // What a session sent, with the parts that differ between two runs of it taken out:
-// clock times, and the tool arguments, which are each OpenCode's own tool's.
+// clock times; the version of OpenCode; the tool arguments, which are each OpenCode's own
+// tool's; the parent message, which OpenCode 2 does not name; and 1.x's apply_patch,
+// which OpenCode 2 calls patch.
 function sent() {
+  const differ = ["gen_ai.tool.call.arguments", "opencode.version", "opencode.parent_message.id"]
+  const rename = (v) => (v?.stringValue === "apply_patch" ? { stringValue: "patch" } : v)
   const strip = (attributes) =>
-    attributes.filter((a) => a.key !== "gen_ai.tool.call.arguments").sort((a, b) => a.key.localeCompare(b.key))
+    attributes
+      .filter((a) => !differ.includes(a.key))
+      .map((a) => ({ key: a.key, value: rename(a.value) }))
+      .sort((a, b) => a.key.localeCompare(b.key))
   const spans = received
     .filter((r) => r.path === "/v1/traces")
     .flatMap((r) => r.body.resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)))
-    .map(({ startTimeUnixNano, endTimeUnixNano, ...s }) => ({ ...s, attributes: strip(s.attributes) }))
+    .map(({ startTimeUnixNano, endTimeUnixNano, ...s }) => ({ ...s, name: s.name.replace("apply_patch", "patch"), attributes: strip(s.attributes) }))
     .sort((a, b) => a.spanId.localeCompare(b.spanId))
   const name = (r) => r.attributes.find((a) => a.key === "event.name").value.stringValue
   const records = received
@@ -512,69 +520,227 @@ function sent() {
   return { spans, records, resources: [...new Set(resources)] }
 }
 
-const sortCalls = (calls) => calls.map((c) => JSON.stringify(c)).sort()
+// The hook calls a session made, in order-free form. A file OpenCode 1 learned of from
+// file.edited names no tool; OpenCode 2 learns of each from its tool.
+const sortCalls = (calls, toolless = []) =>
+  calls
+    .map((c) => (toolless.includes(c.payload.tool) ? { ...c, payload: { ...c.payload, tool: undefined } } : c))
+    .map((c) => JSON.stringify(c))
+    .sort()
 
 const usage = { cost: 0.0421, tokens: { input: 1200, output: 340, reasoning: 20, cache: { read: 800, write: 100 } } }
 
-test("an OpenCode 2 session sends what the same OpenCode 1 session sends", async () => {
-  const file = join(dir, "src", "a.go")
-
-  // OpenCode 1.
+// runV1 and runV2 run one session through each plugin API, returning what it sent.
+async function runV1(config, drive) {
   received = []
   clearHooks()
-  const v1 = await load(baseConfig(), dir)
-  await v1.event({ event: { type: "session.created", properties: { info: { id: "ses_eq", projectID: "global", directory: dir, version: "2.0.30" } } } })
-  await v1["chat.message"]({ sessionID: "ses_eq", agent: "build", model: { providerID: "anthropic", modelID: "claude-opus-5" }, messageID: "msg_u1" }, { message: { id: "msg_u1" }, parts: [{ type: "text", text: "fix the build" }] })
-  await v1["tool.execute.before"]({ tool: "edit", sessionID: "ses_eq", callID: "call_1" }, { args: { filePath: file } })
-  await v1["tool.execute.after"]({ tool: "edit", sessionID: "ses_eq", callID: "call_1", args: { filePath: file } }, { output: "Edited src/a.go", metadata: {} })
-  await v1.event({ event: { type: "message.part.updated", properties: { part: { type: "text", messageID: "msg_a1", sessionID: "ses_eq", text: "I fixed it." } } } })
-  await v1.event({ event: { type: "message.updated", properties: { info: { ...assistant, ...usage, sessionID: "ses_eq", parentID: "msg_u1" } } } })
-  await v1.event({ event: { type: "session.idle", properties: { sessionID: "ses_eq" } } })
-  await v1.event({ event: { type: "session.deleted", properties: { info: { id: "ses_eq", directory: dir } } } })
-  await v1.dispose()
-  const one = sent()
-  const oneCalls = await hookCalls()
+  const hooks = await load(config, dir)
+  await drive(hooks)
+  await hooks.dispose()
+  return { sent: sent(), raw: received, calls: await hookCalls() }
+}
 
-  // OpenCode 2.
+async function runV2(config, drive) {
   received = []
   clearHooks()
   const server = fakeServer()
   const c = server.location(dir)
-  const cleanup = await setupPlugin(baseConfig(), c)
-  await server.emit("session.created", { sessionID: "ses_eq", projectID: "global", location: { directory: dir }, subpath: "", slug: "s", version: "2.0.30" }, dir)
-  await c.hooks["session.prompt"]({ sessionID: "ses_eq", messageID: "msg_u1", prompt: { text: "fix the build", files: [] }, delivery: "steer" })
-  await server.emit("session.execution.started", { sessionID: "ses_eq" })
-  await server.emit("session.step.started", { sessionID: "ses_eq", assistantMessageID: "msg_a1", agent: "build", model: { id: "claude-opus-5", providerID: "anthropic" }, started: Date.now() }, dir)
-  await c.hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_eq", agent: "build", messageID: "msg_a1", id: "call_1", input: { path: "src/a.go", oldString: "a", newString: "b" } })
-  await c.hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_eq", agent: "build", messageID: "msg_a1", id: "call_1", input: { path: "src/a.go", oldString: "a", newString: "b" }, status: "completed", result: { content: [{ type: "text", text: "Edited src/a.go" }] } })
-  await server.emit("session.text.ended", { sessionID: "ses_eq", assistantMessageID: "msg_a1", ordinal: 0, text: "I fixed it." }, dir)
-  await server.emit("session.step.ended", { sessionID: "ses_eq", assistantMessageID: "msg_a1", finish: "stop", ...usage, files: ["src/a.go"] }, dir)
-  await server.emit("session.usage.updated", { sessionID: "ses_eq", ...usage })
-  await server.emit("session.execution.succeeded", { sessionID: "ses_eq" })
-  await server.emit("session.deleted", { sessionID: "ses_eq" })
+  const cleanup = await setupPlugin(config, c)
+  await drive(server, c)
   await cleanup()
-  const two = sent()
-  const twoCalls = await hookCalls()
+  return { sent: sent(), raw: received, calls: await hookCalls() }
+}
 
-  expect(one.spans.length).toBe(2)
-  expect(one.records.map((r) => r.attributes.find((a) => a.key === "event.name").value.stringValue)).toEqual([
-    "opencode.session.created",
-    "opencode.session.deleted",
-    "opencode.session.idle",
-    "opencode.user_prompt",
-  ])
-  expect(two).toEqual(one)
-  expect(oneCalls.length).toBe(3)
-  expect(sortCalls(twoCalls)).toEqual(sortCalls(oneCalls))
-  expect(twoCalls).toContainEqual({ event: "opencode-file-edit", payload: { session_id: "ses_eq", cwd: dir, file, tool: "edit" } })
+const v1Created = (hooks, id, extra = {}) =>
+  hooks.event({ event: { type: "session.created", properties: { info: { id, projectID: "global", directory: dir, version: "1.19.2", ...extra } } } })
+const v2Created = (server, id, extra = {}) =>
+  server.emit("session.created", { sessionID: id, projectID: "global", location: { directory: dir }, subpath: "", slug: "s", version: "2.0.30", ...extra }, dir)
+const v2Step = (server, sessionID, messageID, model = { id: "claude-opus-5", providerID: "anthropic" }) =>
+  server.emit("session.step.started", { sessionID, assistantMessageID: messageID, agent: "build", model, started: Date.now() }, dir)
+const v2StepEnded = (server, sessionID, messageID) =>
+  server.emit("session.step.ended", { sessionID, assistantMessageID: messageID, finish: "stop", ...usage, files: [] }, dir)
+const v1Message = (hooks, sessionID, id, extra = {}) =>
+  hooks.event({ event: { type: "message.updated", properties: { info: { ...assistant, ...usage, id, sessionID, parentID: "msg_u1", ...extra } } } })
+const v2Tool = async (c, sessionID, id, tool, input, outcome) => {
+  const call = { tool, sessionID, agent: "build", messageID: "msg_a1", id, input }
+  await c.hooks["tool.execute.before"](call)
+  await c.hooks["tool.execute.after"]({ ...call, ...outcome })
+}
+const v1Tool = async (hooks, sessionID, callID, tool, args, output) => {
+  await hooks["tool.execute.before"]({ tool, sessionID, callID }, { args })
+  if (output) await hooks["tool.execute.after"]({ tool, sessionID, callID, args }, { output, metadata: {} })
+}
 
-  // The arguments are OpenCode 2's own.
-  const tool = received
-    .filter((r) => r.path === "/v1/traces")
-    .flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
-    .find((s) => s.name === "execute_tool edit")
-  const args = tool.attributes.find((a) => a.key === "gen_ai.tool.call.arguments").value.stringValue
-  expect(JSON.parse(args)).toEqual({ path: "src/a.go", oldString: "a", newString: "b" })
+// The same session, as OpenCode 1 and OpenCode 2 each report it. A tool that fails is one
+// OpenCode 1 reports no end of (1.19.0 calls no tool.execute.after for it).
+const equivalent = [
+  {
+    name: "an edit",
+    async v1(h) {
+      await v1Created(h, "ses_eq")
+      await h["chat.message"]({ sessionID: "ses_eq", agent: "build", model: { providerID: "anthropic", modelID: "claude-opus-5" }, messageID: "msg_u1" }, { message: { id: "msg_u1" }, parts: [{ type: "text", text: "fix the build" }] })
+      await v1Tool(h, "ses_eq", "call_1", "edit", { filePath: join(dir, "src", "a.go") }, "Edited src/a.go")
+      await h.event({ event: { type: "message.part.updated", properties: { part: { type: "text", messageID: "msg_a1", sessionID: "ses_eq", text: "I fixed it." } } } })
+      await v1Message(h, "ses_eq", "msg_a1")
+      await h.event({ event: { type: "session.idle", properties: { sessionID: "ses_eq" } } })
+      await h.event({ event: { type: "session.deleted", properties: { info: { id: "ses_eq", directory: dir } } } })
+    },
+    async v2(server, c) {
+      await v2Created(server, "ses_eq")
+      await c.hooks["session.prompt"]({ sessionID: "ses_eq", messageID: "msg_u1", prompt: { text: "fix the build", files: [] }, delivery: "steer" })
+      await server.emit("session.execution.started", { sessionID: "ses_eq" })
+      await v2Step(server, "ses_eq", "msg_a1")
+      await v2Tool(c, "ses_eq", "call_1", "edit", { path: "src/a.go", oldString: "a", newString: "b" }, { status: "completed", result: { content: [{ type: "text", text: "Edited src/a.go" }] } })
+      await server.emit("session.text.ended", { sessionID: "ses_eq", assistantMessageID: "msg_a1", ordinal: 0, text: "I fixed it." }, dir)
+      await v2StepEnded(server, "ses_eq", "msg_a1")
+      await server.emit("session.usage.updated", { sessionID: "ses_eq", ...usage })
+      await server.emit("session.execution.succeeded", { sessionID: "ses_eq" })
+      await server.emit("session.deleted", { sessionID: "ses_eq" })
+    },
+    expect(one) {
+      expect(one.sent.spans.length).toBe(2)
+      expect(one.calls.length).toBe(3)
+      expect(one.calls).toContainEqual({ event: "opencode-file-edit", payload: { session_id: "ses_eq", cwd: dir, file: join(dir, "src", "a.go"), tool: "edit" } })
+    },
+  },
+  {
+    name: "a subagent",
+    async v1(h) {
+      await v1Created(h, "ses_kid", { parentID: "ses_dad" })
+      await v1Tool(h, "ses_kid", "call_k", "grep", { pattern: "x" }, "found")
+      await v1Message(h, "ses_kid", "msg_k")
+    },
+    async v2(server, c) {
+      await v2Created(server, "ses_kid", { parentID: "ses_dad" })
+      await v2Step(server, "ses_kid", "msg_k")
+      await v2Tool(c, "ses_kid", "call_k", "grep", { pattern: "x" }, { status: "completed", result: { content: "found" } })
+      await v2StepEnded(server, "ses_kid", "msg_k")
+    },
+    expect(one) {
+      for (const span of one.sent.spans) expect(span.attributes).toContainEqual({ key: "opencode.parent_session.id", value: { stringValue: "ses_dad" } })
+      expect(one.calls).toEqual([{ event: "opencode-session-start", payload: { session_id: "ses_kid", cwd: dir, parent_session_id: "ses_dad" } }])
+    },
+  },
+  {
+    name: "a tool that fails",
+    async v1(h) {
+      await v1Created(h, "ses_bad")
+      await v1Tool(h, "ses_bad", "call_b", "edit", { filePath: join(dir, "gone.go") })
+      await v1Message(h, "ses_bad", "msg_b")
+    },
+    async v2(server, c) {
+      await v2Created(server, "ses_bad")
+      await v2Step(server, "ses_bad", "msg_b")
+      await v2Tool(c, "ses_bad", "call_b", "edit", { path: "gone.go", oldString: "a", newString: "b" }, { status: "error", error: { message: "file does not exist" } })
+      await v2StepEnded(server, "ses_bad", "msg_b")
+    },
+    expect(one) {
+      expect(one.sent.spans.map((s) => s.name)).toEqual(["chat claude-opus-5"])
+      expect(one.calls.map((c) => c.event)).toEqual(["opencode-session-start"])
+    },
+  },
+  {
+    name: "prompts and tool content withheld",
+    config: { includePrompts: false, includeToolContent: false },
+    async v1(h) {
+      await v1Created(h, "ses_q", { title: "secret title" })
+      await h["chat.message"]({ sessionID: "ses_q", agent: "build", model: { providerID: "anthropic", modelID: "claude-opus-5" }, messageID: "msg_u1" }, { message: { id: "msg_u1" }, parts: [{ type: "text", text: "delete everything" }] })
+      await v1Tool(h, "ses_q", "call_q", "write", { filePath: join(dir, "x.go") }, "secret output")
+      await h.event({ event: { type: "message.part.updated", properties: { part: { type: "text", messageID: "msg_q", sessionID: "ses_q", text: "done" } } } })
+      await v1Message(h, "ses_q", "msg_q")
+    },
+    async v2(server, c) {
+      await v2Created(server, "ses_q", { title: "secret title" })
+      await c.hooks["session.prompt"]({ sessionID: "ses_q", messageID: "msg_u1", prompt: { text: "delete everything", files: [] }, delivery: "steer" })
+      await v2Step(server, "ses_q", "msg_q")
+      await v2Tool(c, "ses_q", "call_q", "write", { path: "x.go", content: "z" }, { status: "completed", result: { content: "secret output" } })
+      await server.emit("session.text.ended", { sessionID: "ses_q", assistantMessageID: "msg_q", ordinal: 0, text: "done" }, dir)
+      await v2StepEnded(server, "ses_q", "msg_q")
+    },
+    expect(one, two) {
+      for (const run of [one, two]) {
+        const everything = JSON.stringify(run.raw)
+        for (const secret of ["delete everything", "secret output", "secret title", '"done"', "x.go\\\""]) expect(everything).not.toContain(secret)
+      }
+    },
+  },
+]
+
+for (const scenario of equivalent) {
+  test(`OpenCode 2 sends what OpenCode 1 sends for ${scenario.name}`, async () => {
+    const config = baseConfig(scenario.config)
+    const one = await runV1(config, scenario.v1)
+    const two = await runV2(config, scenario.v2)
+    scenario.expect(one, two)
+    expect(one.sent.records.length).toBeGreaterThan(0)
+    expect(two.sent).toEqual(one.sent)
+    expect(sortCalls(two.calls)).toEqual(sortCalls(one.calls))
+  })
+}
+
+// A session captured from OpenCode 2.0.30 itself (a fake OpenAI-compatible model named
+// gpt-5, which OpenCode gives its patch tool): its hooks and events in the order the
+// plugin met them, the checkout's path written {{DIR}}.
+function fixture(name) {
+  return readFileSync(join(import.meta.dir, "testdata", name), "utf8")
+    .replaceAll("{{DIR}}", dir)
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+}
+
+test("a patch captured from OpenCode 2.0.30 sends what OpenCode 1's apply_patch does", async () => {
+  const records = fixture("opencode-2.0.30-patch.jsonl")
+  const created = records.find((r) => r.event?.type === "session.created").event.data
+  const prompt = records.find((r) => r.name === "session.prompt").input
+  const after = records.find((r) => r.name === "tool.execute.after").input
+  const steps = records.filter((r) => r.event?.type === "session.step.started").map((r) => r.event.data)
+  const ends = records.filter((r) => r.event?.type === "session.step.ended").map((r) => r.event.data)
+  const text = records.find((r) => r.event?.type === "session.text.ended").event.data
+  const sid = created.sessionID
+  const files = after.result.output.applied.map((a) => a.target)
+  expect(files).toEqual([join(dir, "pkg", "new.go"), join(dir, "pkg", "a.go")])
+
+  // OpenCode 1: apply_patch names no file, and file.edited names each it wrote.
+  const one = await runV1(baseConfig(), async (h) => {
+    await h.event({ event: { type: "session.created", properties: { info: { id: sid, projectID: created.projectID, directory: dir, version: "1.19.2" } } } })
+    await h["chat.message"]({ sessionID: sid, messageID: prompt.messageID }, { message: { id: prompt.messageID }, parts: [{ type: "text", text: prompt.prompt.text }] })
+    await v1Tool(h, sid, after.id, "apply_patch", after.input, after.result.content.map((c) => c.text).join("\n"))
+    for (const file of files) await h.event({ event: { type: "file.edited", properties: { file } } })
+    for (const [i, s] of steps.entries()) {
+      if (s.assistantMessageID === text.assistantMessageID) {
+        await h.event({ event: { type: "message.part.updated", properties: { part: { type: "text", messageID: s.assistantMessageID, sessionID: sid, text: text.text } } } })
+      }
+      const info = { id: s.assistantMessageID, sessionID: sid, role: "assistant", modelID: s.model.id, providerID: s.model.providerID, mode: s.agent, cost: ends[i].cost, tokens: ends[i].tokens, finish: ends[i].finish, time: { created: s.started, completed: s.started + 1 } }
+      await h.event({ event: { type: "message.updated", properties: { info } } })
+    }
+    await h.event({ event: { type: "session.idle", properties: { sessionID: sid } } })
+  })
+
+  const two = await runV2(baseConfig(), async (server, c) => {
+    for (const r of records) {
+      if (r.kind === "hook") await c.hooks[r.name](r.input)
+      else {
+        const { type, data, location } = r.event
+        await server.emit(type, data, location?.directory)
+      }
+    }
+  })
+
+  // The OpenCode 1 side here names no model on its prompt; OpenCode 2's names the one
+  // that answered it.
+  const promptModel = ["gen_ai.request.model", "gen_ai.provider.name", "opencode.agent"]
+  const isPrompt = (r) => r.attributes.some((a) => a.value.stringValue === "opencode.user_prompt")
+  const noModel = (run) => ({
+    ...run.sent,
+    records: run.sent.records.map((r) => (isPrompt(r) ? { ...r, attributes: r.attributes.filter((a) => !promptModel.includes(a.key)) } : r)),
+  })
+  expect(noModel(two)).toEqual(noModel(one))
+  expect(two.sent.spans.map((s) => s.name).sort()).toEqual(["chat gpt-5", "chat gpt-5", "execute_tool patch"])
+  expect(sortCalls(two.calls, ["patch"])).toEqual(sortCalls(one.calls))
+  const edits = two.calls.filter((c) => c.event === "opencode-file-edit").map((c) => c.payload)
+  expect(edits).toEqual(expect.arrayContaining(files.map((file) => ({ session_id: sid, cwd: dir, file, tool: "patch" }))))
+  expect(edits.length).toBe(2)
 })
 
 test("an OpenCode 2 instance takes only its own location's sessions", async () => {
@@ -598,7 +764,8 @@ test("an OpenCode 2 instance takes only its own location's sessions", async () =
   expect(JSON.stringify(received)).not.toContain("ses_there")
   const spans = received.filter((r) => r.path === "/v1/traces").flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
   expect(spans.map((s) => s.name)).toEqual(["chat m"])
-  expect(await hookCalls()).toEqual([])
+  // The session it was not told of being created is announced, as one created here.
+  expect(await hookCalls()).toEqual([{ event: "opencode-session-start", payload: { session_id: "ses_resumed", cwd: dir } }])
 })
 
 test("an OpenCode 2 tool's path is the session's, and a written file's own path wins", async () => {
@@ -622,10 +789,105 @@ test("an OpenCode 2 tool's path is the session's, and a written file's own path 
   expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: join(dir, "pkg", "x.go"), tool: "edit" })
   expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: "/elsewhere/y.go", tool: "write" })
   expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: "/abs/z.go", tool: "write" })
-  // The failed call still has its span, its error as the output.
+  // The failed call has no span, as under OpenCode 1.
   const spans = received.filter((r) => r.path === "/v1/traces").flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
-  const failed = spans.find((s) => s.attributes.some((a) => a.key === "gen_ai.tool.call.id" && a.value.stringValue === "c4"))
-  expect(failed.attributes.find((a) => a.key === "gen_ai.tool.call.result").value).toEqual({ stringValue: "no such file" })
+  expect(spans.some((s) => s.attributes.some((a) => a.key === "gen_ai.tool.call.id" && a.value.stringValue === "c4"))).toBe(false)
+})
+
+test("an OpenCode 2 patch names each file once, a moved one by both its paths", async () => {
+  clearHooks()
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig(), c)
+  await v2Created(server, "ses_p")
+  const patchText = ["*** Begin Patch", "*** Update File: a.go", "*** Move to: b.go", "@@", "-x", "+y", "*** Delete File: c.go", "*** End Patch"].join("\n")
+  await v2Tool(c, "ses_p", "call_p", "patch", { patchText }, {
+    status: "completed",
+    result: { output: { applied: [{ type: "update", resource: "b.go", target: join(dir, "b.go") }, { type: "delete", resource: "c.go", target: join(dir, "c.go") }] }, content: "Success" },
+  })
+  // A patch reported with no result still names the files its text does.
+  await v2Tool(c, "ses_p", "call_q", "patch", { patchText: "*** Begin Patch\n*** Add File: d.go\n+x\n*** End Patch" }, { status: "completed", result: { content: "Success" } })
+  await cleanup()
+  const edits = (await hookCalls()).filter((h) => h.event === "opencode-file-edit").map((h) => h.payload.file).sort()
+  expect(edits).toEqual(["a.go", "b.go", "c.go", "d.go"].map((f) => join(dir, f)))
+})
+
+test("an OpenCode 2 session forked, moved here or moved away is announced where it works", async () => {
+  received = []
+  clearHooks()
+  const server = fakeServer()
+  const c = server.location(dir)
+  const other = mkdtempSync(join(tmpdir(), "terma-moved-"))
+  const cleanup = await setupPlugin(baseConfig(), c)
+  // A fork: OpenCode 2.0.30 creates none, and the fork is no subagent.
+  await server.emit("session.forked", { sessionID: "ses_fork", parentID: "ses_src", boundary: {} }, dir)
+  await v2Tool(c, "ses_fork", "call_f", "grep", { pattern: "x" }, { status: "completed", result: { content: "x" } })
+  // Moved here, into a subdirectory: announced there, once.
+  await server.emit("session.moved", { sessionID: "ses_in", projectID: "global", location: { directory: dir }, subpath: "pkg" }, dir)
+  await v2Step(server, "ses_in", "msg_in")
+  // Created here, then moved away: this location takes nothing of it after.
+  await v2Created(server, "ses_out")
+  await server.emit("session.moved", { sessionID: "ses_out", projectID: "global", location: { directory: other } }, other)
+  await server.emit("session.step.started", { sessionID: "ses_out", assistantMessageID: "msg_out", agent: "build", model: { id: "m", providerID: "p" }, started: Date.now() }, other)
+  await server.emit("session.step.ended", { sessionID: "ses_out", assistantMessageID: "msg_out", finish: "stop", ...usage }, other)
+  await server.emit("session.deleted", { sessionID: "ses_out" })
+  // Its hooks, should another location's run reach this one, are refused.
+  await v2Tool(c, "ses_out", "call_o", "write", { path: "o.go", content: "o" }, { status: "completed", result: { content: "ok" } })
+  await cleanup()
+
+  const starts = (await hookCalls()).map((h) => JSON.stringify(h)).sort()
+  expect(starts).toEqual(
+    [
+      { event: "opencode-session-start", payload: { session_id: "ses_fork", cwd: dir } },
+      { event: "opencode-session-start", payload: { session_id: "ses_in", cwd: join(dir, "pkg") } },
+      { event: "opencode-session-start", payload: { session_id: "ses_out", cwd: dir } },
+    ].map((h) => JSON.stringify(h)).sort(),
+  )
+  expect(JSON.stringify(received)).not.toContain("msg_out")
+  expect(JSON.stringify(received)).not.toContain("call_o")
+})
+
+test("an OpenCode 2 step whose start was missed sends no nameless model call", async () => {
+  received = []
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig(), c)
+  await v2Created(server, "ses_late")
+  await v2StepEnded(server, "ses_late", "msg_late")
+  await cleanup()
+  expect(received.filter((r) => r.path === "/v1/traces")).toEqual([])
+})
+
+// OpenCode 1 from 1.18 calls setup as well as server, with a context that has no sessions,
+// tools or events: setup must do nothing there, or it would report beside server.
+test("OpenCode 1's own setup context leaves the plugin to server", async () => {
+  const plugin = await importPlugin(baseConfig())
+  const ctx = { agent: {}, aisdk: {}, catalog: {}, command: {}, integration: {}, options: {}, plugin: {}, reference: {}, skill: {} }
+  expect(await plugin.setup(ctx)).toBeUndefined()
+})
+
+// A terma that was not there is tried again a minute on, by when an update may have put it
+// back.
+test("a terma that was missing is tried again later", async () => {
+  clearHooks()
+  const later = join(mkdtempSync(join(dir, "later-")), "terma")
+  const hooks = await load(baseConfig({ hookCommand: [later, "hook"] }), dir)
+  const created = (id) => hooks.event({ event: { type: "session.created", properties: { info: { id, directory: dir } } } })
+  await created("ses_m1")
+  await new Promise((r) => setTimeout(r, 300))
+  writeFileSync(later, `#!/bin/sh\n{ printf '%s\\t' "$2"; cat; } > "${hookLog}/$$.$(date +%s%N)"\n`)
+  chmodSync(later, 0o700)
+  await created("ses_m2")
+  expect(await hookCalls()).toEqual([])
+  const now = Date.now
+  Date.now = () => now() + 61_000
+  try {
+    await created("ses_m3")
+  } finally {
+    Date.now = now
+  }
+  await hooks.dispose()
+  expect((await hookCalls()).map((h) => h.payload.session_id)).toEqual(["ses_m3"])
 })
 
 test("an OpenCode 2 subagent's OpenRouter request names its parent and agent in the trace field", async () => {

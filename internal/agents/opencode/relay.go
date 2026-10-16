@@ -11,6 +11,9 @@ import (
 // hook` by the path setup names: OpenCode 2 runs it in a background server, whose PATH is
 // whatever the client that started it had.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
+	if version := installedVersion(); !supported(version) {
+		return agents.RelayResult{Pending: true, Notes: []string{tooOld(version) + " Terma left OpenCode's plugins as they were; update OpenCode, then run `terma setup` again."}}, nil
+	}
 	return relayexport.Native(exporter{dir: a.ConfigDir, hook: cfg.HookCommand}, cfg)
 }
 

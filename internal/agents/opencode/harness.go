@@ -86,9 +86,10 @@ func (c exporter) Local(root string) (harness.Harness, bool) {
 	return exporter{root: root, dir: c.dir}, true
 }
 
-// Detect runs `opencode --version`; a missing binary is not-found, not an error.
+// Detect runs `opencode --version`, once per binary (detect); a missing binary is
+// not-found, not an error.
 func (exporter) Detect(ctx context.Context) harness.Detection {
-	return harness.DetectBinary(ctx, "opencode", harness.SemverRE)
+	return detect(ctx)
 }
 
 // opencodeConfigDir is $XDG_CONFIG_HOME/opencode, else ~/.config/opencode, on every platform.
@@ -297,7 +298,8 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 }
 
 // RefreshPlugin re-splices an installed plugin's configuration into this build's source,
-// leaving an absent or inert plugin, and the file mode, alone.
+// leaving an absent or inert plugin, and the file mode, alone. A hook command that no longer
+// runs terma by a path that is there is pointed at this terma.
 func (exporter) RefreshPlugin() (string, bool, error) {
 	path, err := (exporter{}).ConfigPath()
 	if err != nil {
@@ -318,6 +320,11 @@ func (exporter) RefreshPlugin() (string, bool, error) {
 	if !ok {
 		return path, false, nil
 	}
+	// An OpenCode older than the plugin runs under keeps the plugin it can load.
+	if !supported(installedVersion()) {
+		return path, false, nil
+	}
+	cfg.HookCommand = repairHookCommand(cfg.HookCommand)
 	src, err := renderPlugin(*cfg)
 	if err != nil || bytes.Equal(src, data) {
 		return path, false, err

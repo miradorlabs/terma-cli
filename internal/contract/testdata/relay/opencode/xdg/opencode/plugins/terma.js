@@ -317,18 +317,21 @@ class Exporter {
 
 // --- attribution hooks --------------------------------------------------------------
 
+// A terma that was not there is not tried again for this long: the telemetry export does
+// not depend on it, and a spawn error per event would be noise. It is tried again after,
+// since an update or a reinstall puts it back while OpenCode runs on.
+const MISSING_RETRY_MS = 60 * 1000
+
 // hookRunner hands session and file events to `terma hook <event>`, fire and forget.
-// A terma binary that is not on PATH is noticed once and then left alone: the
-// telemetry export does not depend on it, and a spawn error per event would be noise.
 function hookRunner(cfg) {
   const argv = Array.isArray(cfg.hookCommand) && cfg.hookCommand.length > 0 ? cfg.hookCommand : ["terma", "hook"]
-  let missing = false
+  let missingUntil = 0
   return function run(event, payload) {
-    if (missing) return
+    if (Date.now() < missingUntil) return
     try {
       const child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
       child.on("error", (err) => {
-        if (err && err.code === "ENOENT") missing = true
+        if (err && err.code === "ENOENT") missingUntil = Date.now() + MISSING_RETRY_MS
       })
       child.stdin.on("error", () => {})
       child.stdin.end(JSON.stringify(payload))
@@ -385,7 +388,13 @@ function telemetry(cfg) {
       return seenMessages.has(messageID)
     },
 
-    sessionCreated({ id, parentID, title, projectID, directory, version }) {
+    sessionCreated(info) {
+      this.sessionRecorded(info)
+      this.sessionStarted(info.id, info.directory, info.parentID)
+    },
+
+    // sessionRecorded is session.created's record, and the parent it names.
+    sessionRecorded({ id, parentID, title, projectID, directory, version }) {
       if (id && parentID) {
         parents.set(id, parentID)
         if (parents.size > 256) parents.delete(parents.keys().next().value)
@@ -397,6 +406,10 @@ function telemetry(cfg) {
         // Set when the task tool opened this session for a subagent.
         "opencode.parent_session.id": parentID,
       })
+    },
+
+    // sessionStarted announces a session to terma, in the directory it works in.
+    sessionStarted(id, directory, parentID) {
       hook("opencode-session-start", { session_id: id, cwd: directory, parent_session_id: parentID })
     },
 
@@ -478,6 +491,12 @@ function telemetry(cfg) {
     // toolStarted's session, when the call was seen starting.
     toolSession(callID) {
       return tools.get(callID)?.sessionID
+    },
+
+    // toolAbandoned forgets a call that ended without a result: OpenCode 1 never reports
+    // one, so neither does its span.
+    toolAbandoned(callID) {
+      tools.delete(callID)
     },
 
     // toolFinished is one tool call's span. output is its text result; filePath, the file
@@ -678,35 +697,75 @@ async function server({ directory, worktree }) {
 // OpenRouter's provider id: the context hook below runs for its requests alone.
 const OPENROUTER = "openrouter"
 
+// A patch call's file headers: the files it adds, updates, deletes and moves to.
+const PATCH_FILE = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/
+
 // setup is the OpenCode 2 plugin. One shared OpenCode server runs every session on the
-// machine and calls setup once per location (a directory OpenCode was opened in); hooks
-// reach the location's own instance, but every instance hears every event, so events are
-// taken only for this location's sessions. The returned cleanup flushes.
+// machine and calls setup once per location (a directory OpenCode was opened in). Every
+// instance hears every event, so events are taken only for this location's sessions.
+// Hooks reach the instance of the session's own location alone (2.0.30 runs a tool's
+// hooks once with two locations open), and a session an event placed elsewhere is
+// refused there too. The returned cleanup flushes.
 async function setup(ctx) {
-  const location = ctx?.location ?? {}
-  const here = location.directory || ""
+  // OpenCode 1 from 1.18 calls setup too, with a context that has none of these: there the
+  // plugin is server's alone.
+  const location = ctx?.location
+  if (!location?.directory || typeof ctx.event?.subscribe !== "function" || typeof ctx.session?.hook !== "function" || typeof ctx.tool?.hook !== "function") {
+    return undefined
+  }
+  const here = location.directory
   // The checkout's root, which the OpenCode 1 plugin was handed as its worktree.
   const root = location.project?.directory || here
   const cfg = effectiveConfig(root)
   if (!CONFIG || !cfg.endpoint) return undefined
   const t = telemetry(cfg)
 
+  // Bounded, oldest out first; a session in use is moved to the back.
+  const LIMIT = 1024
+  const keep = (map, key, value) => {
+    map.delete(key)
+    map.set(key, value)
+    if (map.size > LIMIT) map.delete(map.keys().next().value)
+  }
   // This location's sessions, by id -> the directory each runs in. session.deleted names
-  // only the session, and tool paths may be relative to it. Bounded.
+  // only the session, and tool paths may be relative to it.
   const own = new Map()
+  const elsewhere = new Map() // sessions an event placed in another location
+  const announced = new Map() // sessions terma has been told of, by session-start
+
   function claim(sessionID, directory) {
     if (!sessionID) return false
-    if (!own.has(sessionID) || directory) own.set(sessionID, directory || own.get(sessionID) || here)
-    if (own.size > 1024) own.delete(own.keys().next().value)
+    if (directory) elsewhere.delete(sessionID)
+    else if (elsewhere.has(sessionID)) return false
+    keep(own, sessionID, directory || own.get(sessionID) || here)
     return true
   }
-  // mine reports whether an event belongs to this location: a session claimed already, or
-  // one the event places here.
+  function release(sessionID) {
+    own.delete(sessionID)
+    announced.delete(sessionID)
+    keep(elsewhere, sessionID, true)
+  }
+  // mine reports whether an event belongs to this location: one that places its session
+  // here, or names a session claimed here already.
   function mine(event) {
     const sessionID = event?.data?.sessionID
     if (!sessionID) return false
-    if (own.has(sessionID)) return true
-    return event.location?.directory === here && claim(sessionID)
+    const at = event.location?.directory
+    if (at && at !== here) {
+      if (own.has(sessionID)) release(sessionID)
+      else keep(elsewhere, sessionID, true)
+      return false
+    }
+    if (at || own.has(sessionID)) return claim(sessionID)
+    return false
+  }
+  // announce tells terma of a session it has not heard of: one forked, or resumed after
+  // the server restarted, which OpenCode does not create again. A fork is not a subagent,
+  // so it names no parent.
+  function announce(sessionID, parentID) {
+    if (announced.has(sessionID)) return
+    keep(announced, sessionID, true)
+    t.sessionStarted(sessionID, own.get(sessionID) ?? here, parentID)
   }
 
   // A model call is a step: its start names the model and agent, its end the usage.
@@ -714,11 +773,7 @@ async function setup(ctx) {
   // A prompt's record names the model that answers it, which the first step names, so it
   // waits for that step, or for the turn to end without one.
   const prompts = new Map() // sessionID -> { text, messageID, time }
-  const userMessages = new Map() // sessionID -> the latest prompt's message id
-  const idled = new Set() // sessions whose turn has ended and been recorded
-  const bound = (map) => {
-    if (map.size > 1024) map.delete(map.keys().next().value)
-  }
+  const idled = new Map() // sessions whose turn has ended and been recorded
 
   function promptAnswered(sessionID, agent, model) {
     const p = prompts.get(sessionID)
@@ -732,22 +787,24 @@ async function setup(ctx) {
   function turnEnded(sessionID) {
     promptAnswered(sessionID)
     if (idled.has(sessionID)) return
-    idled.add(sessionID)
-    bound(idled)
+    keep(idled, sessionID, true)
     t.sessionIdle(sessionID)
   }
 
+  // stepEnded is the model call's span. A step whose start this instance missed names no
+  // model, and is left out rather than sent as a call to nothing. OpenCode 2's messages
+  // name no parent message, so the span names none.
   function stepEnded(event, error) {
     const d = event.data
-    const step = steps.get(d.assistantMessageID) ?? {}
+    const step = steps.get(d.assistantMessageID)
     steps.delete(d.assistantMessageID)
+    if (!step) return
     t.modelCall({
       id: d.assistantMessageID,
       sessionID: d.sessionID,
       providerID: step.model?.providerID,
       modelID: step.model?.id,
       agent: step.agent,
-      parentID: userMessages.get(d.sessionID),
       tokens: d.tokens,
       cost: d.cost,
       finish: d.finish,
@@ -762,16 +819,37 @@ async function setup(ctx) {
     switch (event?.type) {
       case "session.created": {
         const at = d.location?.directory || event.location?.directory
-        if (at !== here) return
-        const directory = d.subpath ? join(at, d.subpath) : at
-        claim(d.sessionID, directory)
-        t.sessionCreated({ id: d.sessionID, parentID: d.parentID, title: d.title, projectID: d.projectID, directory, version: d.version })
+        if (at !== here) {
+          if (d.sessionID) keep(elsewhere, d.sessionID, true)
+          return
+        }
+        claim(d.sessionID, d.subpath ? join(at, d.subpath) : at)
+        t.sessionRecorded({ id: d.sessionID, parentID: d.parentID, title: d.title, projectID: d.projectID, directory: own.get(d.sessionID), version: d.version })
+        announce(d.sessionID, d.parentID)
         return
       }
+      case "session.moved": {
+        // A session moved here is announced where it now works; one moved away is
+        // another location's from now on.
+        const at = d.location?.directory
+        if (!d.sessionID || !at) return
+        if (at !== here) {
+          if (own.has(d.sessionID)) release(d.sessionID)
+          return
+        }
+        announced.delete(d.sessionID)
+        claim(d.sessionID, d.subpath ? join(at, d.subpath) : at)
+        announce(d.sessionID)
+        return
+      }
+      case "session.forked":
+        if (mine(event)) announce(d.sessionID)
+        return
       case "session.deleted":
         if (!mine(event)) return
         t.sessionDeleted(d.sessionID, own.get(d.sessionID))
         own.delete(d.sessionID)
+        announced.delete(d.sessionID)
         return
       case "session.execution.started":
         if (mine(event)) idled.delete(d.sessionID)
@@ -789,8 +867,10 @@ async function setup(ctx) {
         return
       case "session.step.started":
         if (!mine(event)) return
-        steps.set(d.assistantMessageID, { agent: d.agent, model: d.model, start: d.started ?? event.created })
-        bound(steps)
+        // The stream carries session.created ahead of a session's first step, so a
+        // session not announced by now was not created here.
+        announce(d.sessionID)
+        keep(steps, d.assistantMessageID, { agent: d.agent, model: d.model, start: d.started ?? event.created })
         promptAnswered(d.sessionID, d.agent, d.model)
         return
       case "session.text.ended":
@@ -807,7 +887,6 @@ async function setup(ctx) {
 
   // The text a tool call returned, as the OpenCode 1 hook's output string.
   function toolOutput(call) {
-    if (call.status === "error") return call.error?.message
     const content = call.result?.content
     if (typeof content === "string") return content
     if (Array.isArray(content)) {
@@ -816,19 +895,41 @@ async function setup(ctx) {
     return typeof call.result?.output === "string" ? call.result.output : undefined
   }
 
-  // The file a call named, absolute: the edit tools take a path that may be relative to
-  // the session's directory, and report the file they wrote.
+  // inSession makes a tool's path absolute: relative ones are the session's directory's.
+  function inSession(sessionID, path) {
+    return isAbsolute(path) ? path : resolve(own.get(sessionID) || here, path)
+  }
+
+  // The file an edit or write call named, absolute: the call takes a path, and a write
+  // reports the file it wrote.
   function toolFile(call) {
     const target = call.result?.output?.target
     if (typeof target === "string" && isAbsolute(target)) return target
     const path = call.input?.path
     if (typeof path !== "string" || path === "") return undefined
-    return isAbsolute(path) ? path : resolve(own.get(call.sessionID) || here, path)
+    return inSession(call.sessionID, path)
+  }
+
+  // The files a patch call changed, each once: those it reports applying, and those its
+  // text names, which include a moved file's old path.
+  function patchFiles(call) {
+    const files = new Set()
+    for (const a of Array.isArray(call.result?.output?.applied) ? call.result.output.applied : []) {
+      if (typeof a?.target === "string" && isAbsolute(a.target)) files.add(resolve(a.target))
+    }
+    const text = call.input?.patchText
+    if (typeof text === "string") {
+      for (const line of text.split("\n")) {
+        const m = PATCH_FILE.exec(line.trim())
+        if (m && m[1].trim()) files.add(inSession(call.sessionID, m[1].trim()))
+      }
+    }
+    return [...files]
   }
 
   const register = async (domain, name, callback, options) => {
     try {
-      await domain?.hook?.(name, callback, options)
+      await domain.hook(name, callback, options)
     } catch {
       // A hook this OpenCode does not offer: the rest still report.
     }
@@ -838,19 +939,14 @@ async function setup(ctx) {
     try {
       if (!claim(input?.sessionID)) return
       idled.delete(input.sessionID)
-      prompts.set(input.sessionID, { text: input.prompt?.text ?? "", messageID: input.messageID, time: Date.now() })
-      bound(prompts)
-      if (input.messageID) {
-        userMessages.set(input.sessionID, input.messageID)
-        bound(userMessages)
-      }
+      keep(prompts, input.sessionID, { text: input.prompt?.text ?? "", messageID: input.messageID, time: Date.now() })
     } catch {}
   })
 
   // OpenCode 2's provider options are the request's own: a configured trace is in them.
   await register(ctx.session, "context", (input) => {
     try {
-      if (input?.model?.providerID !== OPENROUTER || !input.options) return
+      if (input?.model?.providerID !== OPENROUTER || !input.options || !claim(input.sessionID)) return
       const trace = t.openRouterTrace(input.sessionID, input.agent, input.options.trace)
       if (trace) input.options.trace = trace
     } catch {}
@@ -859,6 +955,7 @@ async function setup(ctx) {
   await register(ctx.tool, "execute.before", (call) => {
     try {
       if (!call?.id || !claim(call.sessionID)) return
+      announce(call.sessionID)
       t.toolStarted(call.id, call.sessionID)
     } catch {}
   })
@@ -866,7 +963,13 @@ async function setup(ctx) {
   await register(ctx.tool, "execute.after", (call) => {
     try {
       if (!call?.id || !claim(call.sessionID)) return
-      const file = toolFile(call)
+      // OpenCode 1 reports no call that failed, so neither span nor edit is sent for one.
+      if (call.status !== "completed") {
+        t.toolAbandoned(call.id)
+        return
+      }
+      announce(call.sessionID)
+      const edited = call.tool === "patch" ? patchFiles(call) : EDIT_TOOLS.includes(call.tool) ? [toolFile(call)].filter(Boolean) : []
       t.toolFinished({
         callID: call.id,
         sessionID: call.sessionID,
@@ -874,11 +977,9 @@ async function setup(ctx) {
         args: call.input ?? {},
         title: call.result?.metadata?.title,
         output: toolOutput(call),
-        filePath: file,
+        filePath: call.tool === "patch" ? undefined : edited[0],
       })
-      if (call.status === "completed" && EDIT_TOOLS.includes(call.tool) && file) {
-        t.fileEdited(call.sessionID, root, file, call.tool)
-      }
+      for (const file of edited) t.fileEdited(call.sessionID, root, file, call.tool)
     } catch {}
   })
 
@@ -910,5 +1011,8 @@ async function setup(ctx) {
   }
 }
 
-// One module for both: OpenCode 2 runs setup, OpenCode 1 (from 1.18.29) runs server.
+// One module for every OpenCode: OpenCode 2 runs the default export's setup; OpenCode 1
+// from 1.3.17 runs its server and ignores the named export, and from 1.2.11 to then runs
+// the named export alone. Each registers the hooks once.
+export const TermaPlugin = (input) => server(input)
 export default { id: "terma", setup, server }
