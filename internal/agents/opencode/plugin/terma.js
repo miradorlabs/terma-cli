@@ -12,6 +12,9 @@
 // the subagent. Nothing else is read or changed. Commit attribution is not done here:
 // session start/end and file edits are handed to `terma hook`, where the logic lives.
 //
+// It is one plugin for both of OpenCode's plugin APIs: OpenCode 1 calls `server`, OpenCode
+// 2 calls `setup`, and either sends the same thing for the same session.
+//
 // Dependency-free on purpose. OpenCode loads directory plugins without installing
 // anything for them, so this file uses only what Bun ships: fetch, node:crypto,
 // node:fs and node:child_process.
@@ -311,6 +314,7 @@ class Exporter {
   }
 }
 
+
 // --- attribution hooks --------------------------------------------------------------
 
 // hookRunner hands session and file events to `terma hook <event>`, fire and forget.
@@ -335,35 +339,28 @@ function hookRunner(cfg) {
   }
 }
 
-// --- the plugin ---------------------------------------------------------------------
+// --- what both plugin APIs send -----------------------------------------------------
 
-export const TermaPlugin = async ({ directory, worktree }) => {
-  const cfg = effectiveConfig(worktree || directory)
-  // No config, or per-repo mode in a repository bound to no Terma project: stay inert,
-  // exporting nothing and firing no hooks.
-  if (!CONFIG || !cfg.endpoint) return {}
+// telemetry is everything the plugin sends, in OpenCode's terms but in neither API's
+// shapes: the OpenCode 1 hooks and the OpenCode 2 setup below each translate their own
+// events into these calls, so one session yields the same spans, records and hook calls
+// under either.
+function telemetry(cfg) {
   const exporter = new Exporter(cfg)
   const hook = hookRunner(cfg)
 
-  // Per-process bookkeeping, bounded so a long session cannot grow it without limit.
+  // Bookkeeping, bounded so a long-lived OpenCode cannot grow it without limit.
   const seenMessages = new Set() // assistant messages already exported
   const texts = new Map() // messageID -> latest assistant text (only when prompts are on)
   const tools = new Map() // callID -> { sessionID, start }
-  let lastSession = "" // the session the most recent activity belonged to
   const remember = (set, key) => {
     set.add(key)
     if (set.size > 4096) set.delete(set.values().next().value)
   }
 
-  function sessionOf(id) {
-    if (id) lastSession = id
-    return lastSession
-  }
-
   // Sessions the task tool opened for a subagent, by id -> parent id. A child's spans
   // carry the parent too, so the link survives a traces-only policy, which drops the
-  // session.created record that is the only other place it is written. Bounded: a
-  // long-lived OpenCode opens subagent sessions for as long as it runs.
+  // session.created record that is the only other place it is written.
   const parents = new Map()
   function parentOf(sessionID) {
     return sessionID ? parents.get(sessionID) : undefined
@@ -380,44 +377,198 @@ export const TermaPlugin = async ({ directory, worktree }) => {
     })
   }
 
+  return {
+    parentOf,
+
+    // exported reports whether a model call's span is already sent.
+    exported(messageID) {
+      return seenMessages.has(messageID)
+    },
+
+    sessionCreated({ id, parentID, title, projectID, directory, version }) {
+      if (id && parentID) {
+        parents.set(id, parentID)
+        if (parents.size > 256) parents.delete(parents.keys().next().value)
+      }
+      record(id, "opencode.session.created", cfg.includePrompts ? title : "", {
+        "opencode.project.id": projectID,
+        "opencode.session.directory": directory,
+        "opencode.version": version,
+        // Set when the task tool opened this session for a subagent.
+        "opencode.parent_session.id": parentID,
+      })
+      hook("opencode-session-start", { session_id: id, cwd: directory, parent_session_id: parentID })
+    },
+
+    sessionDeleted(id, directory) {
+      record(id, "opencode.session.deleted", "")
+      hook("opencode-session-end", { session_id: id, cwd: directory, reason: "deleted" })
+    },
+
+    sessionIdle(id) {
+      record(id, "opencode.session.idle", "")
+    },
+
+    sessionError(id, message, type) {
+      record(id, "opencode.session.error", truncate(message, 4096), { "error.type": type }, 17)
+    },
+
+    assistantText(messageID, text) {
+      if (!cfg.includePrompts || !messageID) return
+      texts.set(messageID, text)
+      if (texts.size > 256) texts.delete(texts.keys().next().value)
+    },
+
+    // modelCall is one completed model call: the assistant message it produced. error,
+    // when set, is { message, type }.
+    modelCall(m) {
+      if (seenMessages.has(m.id)) return
+      remember(seenMessages, m.id)
+      const tokens = m.tokens ?? {}
+      const cache = tokens.cache ?? {}
+      const attributes = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": m.providerID,
+        "gen_ai.system": m.providerID,
+        "gen_ai.request.model": m.modelID,
+        "gen_ai.usage.input_tokens": tokens.input,
+        "gen_ai.usage.output_tokens": tokens.output,
+        "gen_ai.usage.cache_read.input_tokens": cache.read,
+        "gen_ai.usage.cache_write.input_tokens": cache.write,
+        "gen_ai.usage.total_cost": m.cost,
+        "gen_ai.response.finish_reasons": m.finish,
+        "opencode.usage.reasoning_tokens": tokens.reasoning,
+        "opencode.agent": m.agent,
+        "opencode.message.id": m.id,
+        "opencode.parent_message.id": m.parentID,
+        "opencode.parent_session.id": parentOf(m.sessionID),
+        "session.id": m.sessionID,
+      }
+      if (cfg.includePrompts) attributes["gen_ai.completion"] = truncate(texts.get(m.id), MAX_TEXT)
+      texts.delete(m.id)
+      const status = m.error ? { code: 2, message: truncate(m.error.message, 1024) } : { code: 1 }
+      if (m.error) attributes["error.type"] = m.error.type
+      exporter.span({
+        traceId: traceId(m.sessionID),
+        spanId: spanId("message:" + m.id),
+        name: "chat " + (m.modelID ?? ""),
+        kind: 3,
+        startTimeUnixNano: nanos(m.start ?? m.end),
+        endTimeUnixNano: nanos(m.end),
+        attributes: attrs(attributes),
+        status,
+      })
+    },
+
+    userPrompt(sessionID, text, { messageID, agent, modelID, providerID }, time) {
+      record(sessionID, "opencode.user_prompt", cfg.includePrompts ? truncate(text, MAX_TEXT) : "", {
+        "opencode.message.id": messageID,
+        "opencode.agent": agent,
+        "gen_ai.request.model": modelID,
+        "gen_ai.provider.name": providerID,
+        "opencode.prompt.length": text.length,
+      }, 9, time)
+    },
+
+    toolStarted(callID, sessionID) {
+      tools.set(callID, { sessionID, start: Date.now() })
+      if (tools.size > 1024) tools.delete(tools.keys().next().value)
+    },
+
+    // toolStarted's session, when the call was seen starting.
+    toolSession(callID) {
+      return tools.get(callID)?.sessionID
+    },
+
+    // toolFinished is one tool call's span. output is its text result; filePath, the file
+    // it named, absolute.
+    toolFinished({ callID, sessionID, tool, args, title, output, filePath }) {
+      const started = tools.get(callID)
+      tools.delete(callID)
+      const end = Date.now()
+      const start = started?.start ?? end
+      const attributes = {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": tool,
+        "gen_ai.tool.call.id": callID,
+        "opencode.tool.title": truncate(title, 512),
+        "opencode.tool.output_bytes": typeof output === "string" ? output.length : 0,
+        "opencode.parent_session.id": parentOf(sessionID),
+        "session.id": sessionID,
+      }
+      if (cfg.includeToolContent) {
+        attributes["gen_ai.tool.call.arguments"] = truncate(JSON.stringify(args), MAX_TOOL_CONTENT)
+        attributes["gen_ai.tool.call.result"] = truncate(output, MAX_TOOL_CONTENT)
+        if (typeof filePath === "string") attributes["opencode.tool.file_path"] = filePath
+      }
+      exporter.span({
+        traceId: traceId(sessionID),
+        spanId: spanId("tool:" + callID),
+        name: "execute_tool " + (tool ?? ""),
+        kind: 1,
+        startTimeUnixNano: nanos(start),
+        endTimeUnixNano: nanos(end),
+        attributes: attrs(attributes),
+        status: { code: 1 },
+      })
+    },
+
+    fileEdited(sessionID, cwd, file, tool) {
+      hook("opencode-file-edit", { session_id: sessionID, cwd, file, tool })
+    },
+
+    // openRouterTrace is the `trace` object a subagent's OpenRouter request carries:
+    // OpenRouter's trace export reports it as trace.metadata.*, and nothing else the
+    // request sends names the parent. Keys the developer configured are kept.
+    openRouterTrace(sessionID, agent, ...configured) {
+      const parent = parentOf(sessionID)
+      if (!parent) return undefined
+      return Object.assign({}, ...configured, { parent_session_id: parent, agent })
+    },
+
+    flush() {
+      return exporter.flush()
+    },
+  }
+}
+
+// The edit tools: their file is the one the call names.
+const EDIT_TOOLS = ["edit", "write"]
+
+// --- OpenCode 1 ---------------------------------------------------------------------
+
+// server is the OpenCode 1 plugin: hooks keyed by name, OpenCode's bus events through
+// `event`.
+async function server({ directory, worktree }) {
+  const cfg = effectiveConfig(worktree || directory)
+  // No config, or per-repo mode in a repository bound to no Terma project: stay inert,
+  // exporting nothing and firing no hooks.
+  if (!CONFIG || !cfg.endpoint) return {}
+  const t = telemetry(cfg)
+
+  let lastSession = "" // the session the most recent activity belonged to
+  function sessionOf(id) {
+    if (id) lastSession = id
+    return lastSession
+  }
+
   function modelCall(info) {
     if (!info || info.role !== "assistant" || !info.time || !info.time.completed) return
-    if (seenMessages.has(info.id)) return
-    remember(seenMessages, info.id)
-    const sid = sessionOf(info.sessionID)
-    const tokens = info.tokens ?? {}
-    const cache = tokens.cache ?? {}
-    const attributes = {
-      "gen_ai.operation.name": "chat",
-      "gen_ai.provider.name": info.providerID,
-      "gen_ai.system": info.providerID,
-      "gen_ai.request.model": info.modelID,
-      "gen_ai.usage.input_tokens": tokens.input,
-      "gen_ai.usage.output_tokens": tokens.output,
-      "gen_ai.usage.cache_read.input_tokens": cache.read,
-      "gen_ai.usage.cache_write.input_tokens": cache.write,
-      "gen_ai.usage.total_cost": info.cost,
-      "gen_ai.response.finish_reasons": info.finish,
-      "opencode.usage.reasoning_tokens": tokens.reasoning,
-      "opencode.agent": info.mode,
-      "opencode.message.id": info.id,
-      "opencode.parent_message.id": info.parentID,
-      "opencode.parent_session.id": parentOf(sid),
-      "session.id": sid,
-    }
-    if (cfg.includePrompts) attributes["gen_ai.completion"] = truncate(texts.get(info.id), MAX_TEXT)
-    texts.delete(info.id)
-    const status = info.error ? { code: 2, message: truncate(info.error.data?.message ?? info.error.name ?? "error", 1024) } : { code: 1 }
-    if (info.error) attributes["error.type"] = info.error.name
-    exporter.span({
-      traceId: traceId(sid),
-      spanId: spanId("message:" + info.id),
-      name: "chat " + (info.modelID ?? ""),
-      kind: 3,
-      startTimeUnixNano: nanos(info.time.created ?? info.time.completed),
-      endTimeUnixNano: nanos(info.time.completed),
-      attributes: attrs(attributes),
-      status,
+    if (t.exported(info.id)) return
+    const error = info.error ? { message: info.error.data?.message ?? info.error.name ?? "error", type: info.error.name } : undefined
+    t.modelCall({
+      id: info.id,
+      sessionID: sessionOf(info.sessionID),
+      providerID: info.providerID,
+      modelID: info.modelID,
+      agent: info.mode,
+      parentID: info.parentID,
+      tokens: info.tokens,
+      cost: info.cost,
+      finish: info.finish,
+      error,
+      start: info.time.created,
+      end: info.time.completed,
     })
   }
 
@@ -429,48 +580,31 @@ export const TermaPlugin = async ({ directory, worktree }) => {
           case "session.created": {
             const info = p.info ?? {}
             sessionOf(info.id)
-            if (info.id && info.parentID) {
-              parents.set(info.id, info.parentID)
-              if (parents.size > 256) parents.delete(parents.keys().next().value)
-            }
-            record(info.id, "opencode.session.created", cfg.includePrompts ? info.title : "", {
-              "opencode.project.id": info.projectID,
-              "opencode.session.directory": info.directory,
-              "opencode.version": info.version,
-              // Set when the task tool opened this session for a subagent.
-              "opencode.parent_session.id": info.parentID,
-            })
-            hook("opencode-session-start", { session_id: info.id, cwd: info.directory, parent_session_id: info.parentID })
+            t.sessionCreated({ id: info.id, parentID: info.parentID, title: info.title, projectID: info.projectID, directory: info.directory, version: info.version })
             break
           }
           case "session.deleted": {
             const info = p.info ?? {}
-            record(info.id, "opencode.session.deleted", "")
-            hook("opencode-session-end", { session_id: info.id, cwd: info.directory, reason: "deleted" })
+            t.sessionDeleted(info.id, info.directory)
             break
           }
           case "session.idle":
-            record(sessionOf(p.sessionID), "opencode.session.idle", "")
+            t.sessionIdle(sessionOf(p.sessionID))
             break
           case "session.error": {
             const err = p.error ?? {}
-            record(sessionOf(p.sessionID), "opencode.session.error", truncate(err.data?.message ?? err.name ?? "error", 4096), {
-              "error.type": err.name,
-            }, 17)
+            t.sessionError(sessionOf(p.sessionID), err.data?.message ?? err.name ?? "error", err.name)
             break
           }
           case "file.edited":
-            if (p.file) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file })
+            if (p.file) t.fileEdited(lastSession, worktree || directory, p.file)
             break
           case "message.updated":
             modelCall(p.info)
             break
           case "message.part.updated": {
             const part = p.part
-            if (cfg.includePrompts && part && part.type === "text" && part.messageID) {
-              texts.set(part.messageID, part.text)
-              if (texts.size > 256) texts.delete(texts.keys().next().value)
-            }
+            if (part && part.type === "text") t.assistantText(part.messageID, part.text)
             break
           }
         }
@@ -479,19 +613,12 @@ export const TermaPlugin = async ({ directory, worktree }) => {
       }
     },
 
-    // OpenRouter's trace export carries the request body's `trace` object as
-    // trace.metadata.*, and nothing else a subagent's request sends names its parent. The
-    // SDK spreads these options over the provider's extraBody, so its trace keys are kept.
+    // The SDK spreads these options over the provider's extraBody, so its trace keys are kept.
     "chat.params": async (input, output) => {
       try {
-        const parent = parentOf(input?.sessionID)
-        if (!parent || input?.model?.api?.npm !== "@openrouter/ai-sdk-provider" || !output?.options) return
-        output.options.trace = {
-          ...input.provider?.options?.extraBody?.trace,
-          ...output.options.trace,
-          parent_session_id: parent,
-          agent: input.agent,
-        }
+        if (input?.model?.api?.npm !== "@openrouter/ai-sdk-provider" || !output?.options) return
+        const trace = t.openRouterTrace(input?.sessionID, input.agent, input.provider?.options?.extraBody?.trace, output.options.trace)
+        if (trace) output.options.trace = trace
       } catch {}
     },
 
@@ -500,12 +627,11 @@ export const TermaPlugin = async ({ directory, worktree }) => {
         const sid = sessionOf(input?.sessionID)
         const parts = Array.isArray(output?.parts) ? output.parts : []
         const text = parts.filter((x) => x && x.type === "text").map((x) => x.text ?? "").join("\n")
-        record(sid, "opencode.user_prompt", cfg.includePrompts ? truncate(text, MAX_TEXT) : "", {
-          "opencode.message.id": input?.messageID ?? output?.message?.id,
-          "opencode.agent": input?.agent,
-          "gen_ai.request.model": input?.model?.modelID,
-          "gen_ai.provider.name": input?.model?.providerID,
-          "opencode.prompt.length": text.length,
+        t.userPrompt(sid, text, {
+          messageID: input?.messageID ?? output?.message?.id,
+          agent: input?.agent,
+          modelID: input?.model?.modelID,
+          providerID: input?.model?.providerID,
         })
       } catch {}
     },
@@ -513,56 +639,276 @@ export const TermaPlugin = async ({ directory, worktree }) => {
     "tool.execute.before": async (input) => {
       try {
         if (!input?.callID) return
-        tools.set(input.callID, { sessionID: sessionOf(input.sessionID), start: Date.now() })
-        if (tools.size > 1024) tools.delete(tools.keys().next().value)
+        t.toolStarted(input.callID, sessionOf(input.sessionID))
       } catch {}
     },
 
     "tool.execute.after": async (input, output) => {
       try {
         if (!input?.callID) return
-        const started = tools.get(input.callID)
-        tools.delete(input.callID)
-        const sid = sessionOf(input.sessionID || started?.sessionID)
-        const end = Date.now()
-        const start = started?.start ?? end
+        const sid = sessionOf(input.sessionID || t.toolSession(input.callID))
         const args = input.args ?? {}
-        const attributes = {
-          "gen_ai.operation.name": "execute_tool",
-          "gen_ai.tool.name": input.tool,
-          "gen_ai.tool.call.id": input.callID,
-          "opencode.tool.title": truncate(output?.title, 512),
-          "opencode.tool.output_bytes": typeof output?.output === "string" ? output.output.length : 0,
-          "opencode.parent_session.id": parentOf(sid),
-          "session.id": sid,
-        }
-        if (cfg.includeToolContent) {
-          attributes["gen_ai.tool.call.arguments"] = truncate(JSON.stringify(args), MAX_TOOL_CONTENT)
-          attributes["gen_ai.tool.call.result"] = truncate(output?.output, MAX_TOOL_CONTENT)
-          if (typeof args.filePath === "string") attributes["opencode.tool.file_path"] = args.filePath
-        }
-        exporter.span({
-          traceId: traceId(sid),
-          spanId: spanId("tool:" + input.callID),
-          name: "execute_tool " + (input.tool ?? ""),
-          kind: 1,
-          startTimeUnixNano: nanos(start),
-          endTimeUnixNano: nanos(end),
-          attributes: attrs(attributes),
-          status: { code: 1 },
+        t.toolFinished({
+          callID: input.callID,
+          sessionID: sid,
+          tool: input.tool,
+          args,
+          title: output?.title,
+          output: output?.output,
+          filePath: args.filePath,
         })
         // The edit tools name their file in the arguments, which is the reliable route
         // to attribution: unlike file.edited, this event knows its session.
-        if ((input.tool === "edit" || input.tool === "write") && typeof args.filePath === "string") {
-          hook("opencode-file-edit", { session_id: sid, cwd: worktree || directory, file: args.filePath, tool: input.tool })
+        if (EDIT_TOOLS.includes(input.tool) && typeof args.filePath === "string") {
+          t.fileEdited(sid, worktree || directory, args.filePath, input.tool)
         }
       } catch {}
     },
 
     dispose: async () => {
       try {
-        await exporter.flush()
+        await t.flush()
       } catch {}
     },
   }
 }
+
+// --- OpenCode 2 ---------------------------------------------------------------------
+
+// OpenRouter's provider id: the context hook below runs for its requests alone.
+const OPENROUTER = "openrouter"
+
+// setup is the OpenCode 2 plugin. One shared OpenCode server runs every session on the
+// machine and calls setup once per location (a directory OpenCode was opened in); hooks
+// reach the location's own instance, but every instance hears every event, so events are
+// taken only for this location's sessions. The returned cleanup flushes.
+async function setup(ctx) {
+  const location = ctx?.location ?? {}
+  const here = location.directory || ""
+  // The checkout's root, which the OpenCode 1 plugin was handed as its worktree.
+  const root = location.project?.directory || here
+  const cfg = effectiveConfig(root)
+  if (!CONFIG || !cfg.endpoint) return undefined
+  const t = telemetry(cfg)
+
+  // This location's sessions, by id -> the directory each runs in. session.deleted names
+  // only the session, and tool paths may be relative to it. Bounded.
+  const own = new Map()
+  function claim(sessionID, directory) {
+    if (!sessionID) return false
+    if (!own.has(sessionID) || directory) own.set(sessionID, directory || own.get(sessionID) || here)
+    if (own.size > 1024) own.delete(own.keys().next().value)
+    return true
+  }
+  // mine reports whether an event belongs to this location: a session claimed already, or
+  // one the event places here.
+  function mine(event) {
+    const sessionID = event?.data?.sessionID
+    if (!sessionID) return false
+    if (own.has(sessionID)) return true
+    return event.location?.directory === here && claim(sessionID)
+  }
+
+  // A model call is a step: its start names the model and agent, its end the usage.
+  const steps = new Map() // assistantMessageID -> { agent, model, start }
+  // A prompt's record names the model that answers it, which the first step names, so it
+  // waits for that step, or for the turn to end without one.
+  const prompts = new Map() // sessionID -> { text, messageID, time }
+  const userMessages = new Map() // sessionID -> the latest prompt's message id
+  const idled = new Set() // sessions whose turn has ended and been recorded
+  const bound = (map) => {
+    if (map.size > 1024) map.delete(map.keys().next().value)
+  }
+
+  function promptAnswered(sessionID, agent, model) {
+    const p = prompts.get(sessionID)
+    if (!p) return
+    prompts.delete(sessionID)
+    t.userPrompt(sessionID, p.text, { messageID: p.messageID, agent, modelID: model?.id, providerID: model?.providerID }, p.time)
+  }
+
+  // turnEnded is OpenCode 1's session.idle: OpenCode 2 ends a turn with an execution's
+  // outcome, and may also say idle; the turn is recorded once.
+  function turnEnded(sessionID) {
+    promptAnswered(sessionID)
+    if (idled.has(sessionID)) return
+    idled.add(sessionID)
+    bound(idled)
+    t.sessionIdle(sessionID)
+  }
+
+  function stepEnded(event, error) {
+    const d = event.data
+    const step = steps.get(d.assistantMessageID) ?? {}
+    steps.delete(d.assistantMessageID)
+    t.modelCall({
+      id: d.assistantMessageID,
+      sessionID: d.sessionID,
+      providerID: step.model?.providerID,
+      modelID: step.model?.id,
+      agent: step.agent,
+      parentID: userMessages.get(d.sessionID),
+      tokens: d.tokens,
+      cost: d.cost,
+      finish: d.finish,
+      error,
+      start: step.start,
+      end: event.created ?? Date.now(),
+    })
+  }
+
+  function onEvent(event) {
+    const d = event?.data ?? {}
+    switch (event?.type) {
+      case "session.created": {
+        const at = d.location?.directory || event.location?.directory
+        if (at !== here) return
+        const directory = d.subpath ? join(at, d.subpath) : at
+        claim(d.sessionID, directory)
+        t.sessionCreated({ id: d.sessionID, parentID: d.parentID, title: d.title, projectID: d.projectID, directory, version: d.version })
+        return
+      }
+      case "session.deleted":
+        if (!mine(event)) return
+        t.sessionDeleted(d.sessionID, own.get(d.sessionID))
+        own.delete(d.sessionID)
+        return
+      case "session.execution.started":
+        if (mine(event)) idled.delete(d.sessionID)
+        return
+      case "session.execution.failed":
+        if (!mine(event)) return
+        promptAnswered(d.sessionID)
+        t.sessionError(d.sessionID, d.error?.message ?? d.error?.type ?? "error", d.error?.type)
+        turnEnded(d.sessionID)
+        return
+      case "session.execution.succeeded":
+      case "session.execution.interrupted":
+      case "session.idle":
+        if (mine(event)) turnEnded(d.sessionID)
+        return
+      case "session.step.started":
+        if (!mine(event)) return
+        steps.set(d.assistantMessageID, { agent: d.agent, model: d.model, start: d.started ?? event.created })
+        bound(steps)
+        promptAnswered(d.sessionID, d.agent, d.model)
+        return
+      case "session.text.ended":
+        if (mine(event)) t.assistantText(d.assistantMessageID, d.text)
+        return
+      case "session.step.ended":
+        if (mine(event)) stepEnded(event)
+        return
+      case "session.step.failed":
+        if (mine(event)) stepEnded(event, { message: d.error?.message ?? d.error?.type ?? "error", type: d.error?.type })
+        return
+    }
+  }
+
+  // The text a tool call returned, as the OpenCode 1 hook's output string.
+  function toolOutput(call) {
+    if (call.status === "error") return call.error?.message
+    const content = call.result?.content
+    if (typeof content === "string") return content
+    if (Array.isArray(content)) {
+      return content.filter((c) => c && c.type === "text").map((c) => c.text ?? "").join("\n")
+    }
+    return typeof call.result?.output === "string" ? call.result.output : undefined
+  }
+
+  // The file a call named, absolute: the edit tools take a path that may be relative to
+  // the session's directory, and report the file they wrote.
+  function toolFile(call) {
+    const target = call.result?.output?.target
+    if (typeof target === "string" && isAbsolute(target)) return target
+    const path = call.input?.path
+    if (typeof path !== "string" || path === "") return undefined
+    return isAbsolute(path) ? path : resolve(own.get(call.sessionID) || here, path)
+  }
+
+  const register = async (domain, name, callback, options) => {
+    try {
+      await domain?.hook?.(name, callback, options)
+    } catch {
+      // A hook this OpenCode does not offer: the rest still report.
+    }
+  }
+
+  await register(ctx.session, "prompt", (input) => {
+    try {
+      if (!claim(input?.sessionID)) return
+      idled.delete(input.sessionID)
+      prompts.set(input.sessionID, { text: input.prompt?.text ?? "", messageID: input.messageID, time: Date.now() })
+      bound(prompts)
+      if (input.messageID) {
+        userMessages.set(input.sessionID, input.messageID)
+        bound(userMessages)
+      }
+    } catch {}
+  })
+
+  // OpenCode 2's provider options are the request's own: a configured trace is in them.
+  await register(ctx.session, "context", (input) => {
+    try {
+      if (input?.model?.providerID !== OPENROUTER || !input.options) return
+      const trace = t.openRouterTrace(input.sessionID, input.agent, input.options.trace)
+      if (trace) input.options.trace = trace
+    } catch {}
+  }, { providerID: OPENROUTER })
+
+  await register(ctx.tool, "execute.before", (call) => {
+    try {
+      if (!call?.id || !claim(call.sessionID)) return
+      t.toolStarted(call.id, call.sessionID)
+    } catch {}
+  })
+
+  await register(ctx.tool, "execute.after", (call) => {
+    try {
+      if (!call?.id || !claim(call.sessionID)) return
+      const file = toolFile(call)
+      t.toolFinished({
+        callID: call.id,
+        sessionID: call.sessionID,
+        tool: call.tool,
+        args: call.input ?? {},
+        title: call.result?.metadata?.title,
+        output: toolOutput(call),
+        filePath: file,
+      })
+      if (call.status === "completed" && EDIT_TOOLS.includes(call.tool) && file) {
+        t.fileEdited(call.sessionID, root, file, call.tool)
+      }
+    } catch {}
+  })
+
+  // Events arrive on a stream that can drop; it is reopened until cleanup.
+  const stop = new AbortController()
+  ;(async () => {
+    while (!stop.signal.aborted) {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: stop.signal })) {
+          try {
+            onEvent(event)
+          } catch {}
+        }
+      } catch {}
+      if (stop.signal.aborted) break
+      await new Promise((r) => {
+        const timer = setTimeout(r, 1000)
+        if (typeof timer.unref === "function") timer.unref()
+      })
+    }
+  })()
+
+  return async () => {
+    stop.abort()
+    try {
+      for (const sessionID of [...prompts.keys()]) promptAnswered(sessionID)
+      await t.flush()
+    } catch {}
+  }
+}
+
+// One module for both: OpenCode 2 runs setup, OpenCode 1 (from 1.18.29) runs server.
+export default { id: "terma", setup, server }

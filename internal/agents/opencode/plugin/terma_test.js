@@ -1,6 +1,6 @@
 // Runs the plugin the way OpenCode would — CONFIG spliced in, hooks called with the
 // events OpenCode emits — against a local OTLP receiver, and checks what arrives.
-// `bun test internal/harness/opencode`.
+// `bun test internal/agents/opencode/plugin`.
 import { test, expect, beforeAll, afterAll } from "bun:test"
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -35,7 +35,7 @@ beforeAll(() => {
 })
 afterAll(() => server?.stop(true))
 
-async function load(config, worktree) {
+async function importPlugin(config) {
   const src = readFileSync(join(import.meta.dir, "terma.js"), "utf8")
   const line = `const CONFIG = ${JSON.stringify(config)}`
   const spliced = src.replace(/^const CONFIG = null \/\* terma:config \*\/$/m, line)
@@ -45,10 +45,15 @@ async function load(config, worktree) {
   const path = join(mkdtempSync(join(dir, "module-")), "plugin.js")
   writeFileSync(path, spliced)
   const mod = await import(path)
-  const exportsList = Object.keys(mod)
-  // OpenCode's legacy loader treats every export as a plugin function.
-  expect(exportsList).toEqual(["TermaPlugin"])
-  return mod.TermaPlugin({ directory: worktree, worktree })
+  // OpenCode 2 reads the default export alone; OpenCode 1 treats every export as a plugin.
+  expect(Object.keys(mod)).toEqual(["default"])
+  expect(mod.default.id).toBe("terma")
+  return mod.default
+}
+
+// load runs the plugin as OpenCode 1 does: server() and the hooks it returns.
+async function load(config, worktree) {
+  return (await importPlugin(config)).server({ directory: worktree, worktree })
 }
 
 function baseConfig(overrides = {}) {
@@ -254,8 +259,9 @@ test("a null CONFIG makes the plugin inert", async () => {
   const path = join(mkdtempSync(join(dir, "module-")), "raw.js")
   writeFileSync(path, src)
   const mod = await import(path)
-  const hooks = await mod.TermaPlugin({ directory: dir, worktree: dir })
+  const hooks = await mod.default.server({ directory: dir, worktree: dir })
   expect(Object.keys(hooks)).toEqual([])
+  expect(await mod.default.setup(fakeContext(dir).ctx)).toBeUndefined()
 })
 
 // Per-repo routing: one global plugin, each session pointed at whatever project its
@@ -386,4 +392,301 @@ test("per-repo mode ignores an unsupported TOML binding", async () => {
   const hooks = await load(perRepoConfig(), wt)
   expect(Object.keys(hooks)).toEqual([])
   expect(received.length).toBe(0)
+})
+
+// --- OpenCode 2 ---------------------------------------------------------------------
+
+// fakeContext is the slice of OpenCode 2's plugin context the plugin uses, shaped as
+// @opencode/plugin's types declare it: hooks registered by name, and one event stream the
+// whole server shares, which emit feeds to every subscriber.
+function fakeContext(directory, project = directory) {
+  const hooks = {}
+  const options = {}
+  const subscribers = new Set()
+  const domain = (name) => ({
+    hook: async (hook, callback, opts) => {
+      hooks[`${name}.${hook}`] = callback
+      options[`${name}.${hook}`] = opts
+      return { dispose: async () => {} }
+    },
+  })
+  const ctx = {
+    app: { name: "cli", version: "2.0.30", channel: "latest" },
+    location: { directory, project: { id: "global", directory: project, canonical: project } },
+    options: {},
+    session: domain("session"),
+    tool: domain("tool"),
+    event: {
+      subscribe({ signal } = {}) {
+        const queue = []
+        let wake = null
+        const sub = {
+          push(event) {
+            queue.push(event)
+            wake?.()
+          },
+        }
+        subscribers.add(sub)
+        return {
+          async *[Symbol.asyncIterator]() {
+            try {
+              while (!signal?.aborted) {
+                if (queue.length === 0) {
+                  await new Promise((r) => {
+                    wake = r
+                    signal?.addEventListener("abort", r, { once: true })
+                  })
+                  wake = null
+                  continue
+                }
+                yield queue.shift()
+              }
+            } finally {
+              subscribers.delete(sub)
+            }
+          },
+        }
+      },
+    },
+  }
+  return { ctx, hooks, options, subscribers }
+}
+
+// server is OpenCode 2's shared server: every location's plugin instance hears every event.
+function fakeServer() {
+  const contexts = []
+  let seq = 0
+  return {
+    location(directory, project) {
+      const c = fakeContext(directory, project)
+      contexts.push(c)
+      return c
+    },
+    async emit(type, data, directory) {
+      const event = { id: `evt_${++seq}`, created: Date.now(), type, data }
+      if (directory) event.location = { directory }
+      for (const c of contexts) for (const s of c.subscribers) s.push(event)
+      await new Promise((r) => setTimeout(r, 5))
+    },
+  }
+}
+
+async function setupPlugin(config, c) {
+  const plugin = await importPlugin(config)
+  const cleanup = await plugin.setup(c.ctx)
+  // Let the event loop open its subscription.
+  await new Promise((r) => setTimeout(r, 5))
+  return cleanup
+}
+
+async function hookCalls() {
+  // The hook processes are detached; give them a moment.
+  await new Promise((r) => setTimeout(r, 500))
+  return readdirSync(hookLog).map((f) => {
+    const [event, payload] = readFileSync(join(hookLog, f), "utf8").split("\t")
+    return { event, payload: JSON.parse(payload) }
+  })
+}
+
+function clearHooks() {
+  for (const f of readdirSync(hookLog)) rmSync(join(hookLog, f))
+}
+
+// What a session sent, with the parts that differ between two runs of it taken out:
+// clock times, and the tool arguments, which are each OpenCode's own tool's.
+function sent() {
+  const strip = (attributes) =>
+    attributes.filter((a) => a.key !== "gen_ai.tool.call.arguments").sort((a, b) => a.key.localeCompare(b.key))
+  const spans = received
+    .filter((r) => r.path === "/v1/traces")
+    .flatMap((r) => r.body.resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)))
+    .map(({ startTimeUnixNano, endTimeUnixNano, ...s }) => ({ ...s, attributes: strip(s.attributes) }))
+    .sort((a, b) => a.spanId.localeCompare(b.spanId))
+  const name = (r) => r.attributes.find((a) => a.key === "event.name").value.stringValue
+  const records = received
+    .filter((r) => r.path === "/v1/logs")
+    .flatMap((r) => r.body.resourceLogs.flatMap((rl) => rl.scopeLogs.flatMap((sl) => sl.logRecords)))
+    .map(({ timeUnixNano, ...r }) => ({ ...r, attributes: strip(r.attributes) }))
+    .sort((a, b) => name(a).localeCompare(name(b)))
+  const resources = received.map((r) => JSON.stringify((r.body.resourceSpans ?? r.body.resourceLogs)[0].resource))
+  return { spans, records, resources: [...new Set(resources)] }
+}
+
+const sortCalls = (calls) => calls.map((c) => JSON.stringify(c)).sort()
+
+const usage = { cost: 0.0421, tokens: { input: 1200, output: 340, reasoning: 20, cache: { read: 800, write: 100 } } }
+
+test("an OpenCode 2 session sends what the same OpenCode 1 session sends", async () => {
+  const file = join(dir, "src", "a.go")
+
+  // OpenCode 1.
+  received = []
+  clearHooks()
+  const v1 = await load(baseConfig(), dir)
+  await v1.event({ event: { type: "session.created", properties: { info: { id: "ses_eq", projectID: "global", directory: dir, version: "2.0.30" } } } })
+  await v1["chat.message"]({ sessionID: "ses_eq", agent: "build", model: { providerID: "anthropic", modelID: "claude-opus-5" }, messageID: "msg_u1" }, { message: { id: "msg_u1" }, parts: [{ type: "text", text: "fix the build" }] })
+  await v1["tool.execute.before"]({ tool: "edit", sessionID: "ses_eq", callID: "call_1" }, { args: { filePath: file } })
+  await v1["tool.execute.after"]({ tool: "edit", sessionID: "ses_eq", callID: "call_1", args: { filePath: file } }, { output: "Edited src/a.go", metadata: {} })
+  await v1.event({ event: { type: "message.part.updated", properties: { part: { type: "text", messageID: "msg_a1", sessionID: "ses_eq", text: "I fixed it." } } } })
+  await v1.event({ event: { type: "message.updated", properties: { info: { ...assistant, ...usage, sessionID: "ses_eq", parentID: "msg_u1" } } } })
+  await v1.event({ event: { type: "session.idle", properties: { sessionID: "ses_eq" } } })
+  await v1.event({ event: { type: "session.deleted", properties: { info: { id: "ses_eq", directory: dir } } } })
+  await v1.dispose()
+  const one = sent()
+  const oneCalls = await hookCalls()
+
+  // OpenCode 2.
+  received = []
+  clearHooks()
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig(), c)
+  await server.emit("session.created", { sessionID: "ses_eq", projectID: "global", location: { directory: dir }, subpath: "", slug: "s", version: "2.0.30" }, dir)
+  await c.hooks["session.prompt"]({ sessionID: "ses_eq", messageID: "msg_u1", prompt: { text: "fix the build", files: [] }, delivery: "steer" })
+  await server.emit("session.execution.started", { sessionID: "ses_eq" })
+  await server.emit("session.step.started", { sessionID: "ses_eq", assistantMessageID: "msg_a1", agent: "build", model: { id: "claude-opus-5", providerID: "anthropic" }, started: Date.now() }, dir)
+  await c.hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_eq", agent: "build", messageID: "msg_a1", id: "call_1", input: { path: "src/a.go", oldString: "a", newString: "b" } })
+  await c.hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_eq", agent: "build", messageID: "msg_a1", id: "call_1", input: { path: "src/a.go", oldString: "a", newString: "b" }, status: "completed", result: { content: [{ type: "text", text: "Edited src/a.go" }] } })
+  await server.emit("session.text.ended", { sessionID: "ses_eq", assistantMessageID: "msg_a1", ordinal: 0, text: "I fixed it." }, dir)
+  await server.emit("session.step.ended", { sessionID: "ses_eq", assistantMessageID: "msg_a1", finish: "stop", ...usage, files: ["src/a.go"] }, dir)
+  await server.emit("session.usage.updated", { sessionID: "ses_eq", ...usage })
+  await server.emit("session.execution.succeeded", { sessionID: "ses_eq" })
+  await server.emit("session.deleted", { sessionID: "ses_eq" })
+  await cleanup()
+  const two = sent()
+  const twoCalls = await hookCalls()
+
+  expect(one.spans.length).toBe(2)
+  expect(one.records.map((r) => r.attributes.find((a) => a.key === "event.name").value.stringValue)).toEqual([
+    "opencode.session.created",
+    "opencode.session.deleted",
+    "opencode.session.idle",
+    "opencode.user_prompt",
+  ])
+  expect(two).toEqual(one)
+  expect(oneCalls.length).toBe(3)
+  expect(sortCalls(twoCalls)).toEqual(sortCalls(oneCalls))
+  expect(twoCalls).toContainEqual({ event: "opencode-file-edit", payload: { session_id: "ses_eq", cwd: dir, file, tool: "edit" } })
+
+  // The arguments are OpenCode 2's own.
+  const tool = received
+    .filter((r) => r.path === "/v1/traces")
+    .flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
+    .find((s) => s.name === "execute_tool edit")
+  const args = tool.attributes.find((a) => a.key === "gen_ai.tool.call.arguments").value.stringValue
+  expect(JSON.parse(args)).toEqual({ path: "src/a.go", oldString: "a", newString: "b" })
+})
+
+test("an OpenCode 2 instance takes only its own location's sessions", async () => {
+  received = []
+  clearHooks()
+  const server = fakeServer()
+  const here = server.location(dir)
+  const other = mkdtempSync(join(tmpdir(), "terma-other-"))
+  server.location(other) // the other location's instance: no plugin loaded there
+  const cleanup = await setupPlugin(baseConfig(), here)
+  await server.emit("session.created", { sessionID: "ses_there", projectID: "global", location: { directory: other }, version: "2.0.30" }, other)
+  await server.emit("session.step.started", { sessionID: "ses_there", assistantMessageID: "msg_x", agent: "build", model: { id: "m", providerID: "p" }, started: Date.now() }, other)
+  await server.emit("session.step.ended", { sessionID: "ses_there", assistantMessageID: "msg_x", finish: "stop", ...usage }, other)
+  await server.emit("session.execution.succeeded", { sessionID: "ses_there" })
+  await server.emit("session.deleted", { sessionID: "ses_there" })
+  // A session placed here only by an event that carries its location is still this one's.
+  await server.emit("session.step.started", { sessionID: "ses_resumed", assistantMessageID: "msg_y", agent: "build", model: { id: "m", providerID: "p" }, started: Date.now() }, dir)
+  await server.emit("session.step.ended", { sessionID: "ses_resumed", assistantMessageID: "msg_y", finish: "stop", ...usage }, dir)
+  await cleanup()
+
+  expect(JSON.stringify(received)).not.toContain("ses_there")
+  const spans = received.filter((r) => r.path === "/v1/traces").flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
+  expect(spans.map((s) => s.name)).toEqual(["chat m"])
+  expect(await hookCalls()).toEqual([])
+})
+
+test("an OpenCode 2 tool's path is the session's, and a written file's own path wins", async () => {
+  received = []
+  clearHooks()
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig(), c)
+  await server.emit("session.created", { sessionID: "ses_sub", projectID: "global", location: { directory: dir }, subpath: "pkg", version: "2.0.30" }, dir)
+  const call = (id, tool, input, result, status = "completed") =>
+    c.hooks["tool.execute.after"]({ tool, sessionID: "ses_sub", agent: "build", messageID: "msg_1", id, input, status, ...(status === "completed" ? { result } : { error: { message: "no such file" } }) })
+  await call("c1", "edit", { path: "x.go", oldString: "a", newString: "b" }, { content: "ok" })
+  await call("c2", "write", { path: "y.go", content: "z" }, { output: { operation: "write", target: "/elsewhere/y.go", resource: "y.go" }, content: [{ type: "text", text: "Created" }] })
+  await call("c3", "write", { path: "/abs/z.go", content: "z" }, { content: "ok" })
+  await call("c4", "edit", { path: "gone.go", oldString: "a", newString: "b" }, undefined, "error")
+  await call("c5", "read", { path: "r.go" }, { content: "text" })
+  await cleanup()
+
+  const edits = (await hookCalls()).filter((h) => h.event === "opencode-file-edit").map((h) => h.payload)
+  expect(edits.length).toBe(3)
+  expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: join(dir, "pkg", "x.go"), tool: "edit" })
+  expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: "/elsewhere/y.go", tool: "write" })
+  expect(edits).toContainEqual({ session_id: "ses_sub", cwd: dir, file: "/abs/z.go", tool: "write" })
+  // The failed call still has its span, its error as the output.
+  const spans = received.filter((r) => r.path === "/v1/traces").flatMap((r) => r.body.resourceSpans[0].scopeSpans[0].spans)
+  const failed = spans.find((s) => s.attributes.some((a) => a.key === "gen_ai.tool.call.id" && a.value.stringValue === "c4"))
+  expect(failed.attributes.find((a) => a.key === "gen_ai.tool.call.result").value).toEqual({ stringValue: "no such file" })
+})
+
+test("an OpenCode 2 subagent's OpenRouter request names its parent and agent in the trace field", async () => {
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig(), c)
+  expect(c.options["session.context"]).toEqual({ providerID: "openrouter" })
+  await server.emit("session.created", { sessionID: "ses_child4", parentID: "ses_parent4", projectID: "global", location: { directory: dir }, version: "2.0.30" }, dir)
+  const context = async (sessionID, providerID, options) => {
+    const input = { sessionID, agent: "explore", model: { id: "m", providerID }, system: [], messages: [], options, tools: {} }
+    await c.hooks["session.context"](input)
+    return input.options
+  }
+  expect(await context("ses_child4", "openrouter", { usage: { include: true } })).toEqual({ usage: { include: true }, trace: { parent_session_id: "ses_parent4", agent: "explore" } })
+  expect(await context("ses_child4", "openrouter", { trace: { environment: "staging" } })).toEqual({ trace: { environment: "staging", parent_session_id: "ses_parent4", agent: "explore" } })
+  expect(await context("ses_root4", "openrouter", { usage: { include: true } })).toEqual({ usage: { include: true } })
+  expect(await context("ses_child4", "anthropic", { usage: { include: true } })).toEqual({ usage: { include: true } })
+  await cleanup()
+})
+
+test("an OpenCode 2 failure is the model call's status and the session's error", async () => {
+  received = []
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig(), c)
+  await server.emit("session.step.started", { sessionID: "ses_err", assistantMessageID: "msg_e", agent: "build", model: { id: "m", providerID: "p" }, started: Date.now() }, dir)
+  await server.emit("session.step.failed", { sessionID: "ses_err", assistantMessageID: "msg_e", error: { type: "provider.auth", message: "bad key" } }, dir)
+  await server.emit("session.execution.failed", { sessionID: "ses_err", error: { type: "provider.auth", message: "bad key" } })
+  await cleanup()
+
+  const span = received.find((r) => r.path === "/v1/traces").body.resourceSpans[0].scopeSpans[0].spans[0]
+  expect(span.status).toEqual({ code: 2, message: "bad key" })
+  expect(span.attributes.find((a) => a.key === "error.type").value).toEqual({ stringValue: "provider.auth" })
+  const recs = received.find((r) => r.path === "/v1/logs").body.resourceLogs[0].scopeLogs[0].logRecords
+  const names = recs.map((r) => r.attributes.find((a) => a.key === "event.name").value.stringValue)
+  expect(names).toEqual(["opencode.session.error", "opencode.session.idle"])
+  expect(recs[0].body.stringValue).toBe("bad key")
+  expect(recs[0].severityNumber).toBe(17)
+})
+
+test("OpenCode 2 prompts and tool content stay home when excluded", async () => {
+  received = []
+  const server = fakeServer()
+  const c = server.location(dir)
+  const cleanup = await setupPlugin(baseConfig({ includePrompts: false, includeToolContent: false }), c)
+  await c.hooks["session.prompt"]({ sessionID: "ses_q", messageID: "msg_q", prompt: { text: "delete everything", files: [] }, delivery: "steer" })
+  await server.emit("session.step.started", { sessionID: "ses_q", assistantMessageID: "msg_qa", agent: "build", model: { id: "gpt-5", providerID: "openai" }, started: Date.now() }, dir)
+  await c.hooks["tool.execute.after"]({ tool: "shell", sessionID: "ses_q", agent: "build", messageID: "msg_qa", id: "call_q", input: { command: "rm -rf /" }, status: "completed", result: { content: "secret output" } })
+  await server.emit("session.text.ended", { sessionID: "ses_q", assistantMessageID: "msg_qa", ordinal: 0, text: "done" }, dir)
+  await server.emit("session.step.ended", { sessionID: "ses_q", assistantMessageID: "msg_qa", finish: "stop", ...usage }, dir)
+  await cleanup()
+
+  const everything = JSON.stringify(received)
+  expect(everything).not.toContain("delete everything")
+  expect(everything).not.toContain("rm -rf")
+  expect(everything).not.toContain("secret output")
+  expect(everything).not.toContain('"done"')
+  const recs = received.find((r) => r.path === "/v1/logs").body.resourceLogs[0].scopeLogs[0].logRecords
+  const prompt = recs.find((r) => r.attributes.some((x) => x.value.stringValue === "opencode.user_prompt"))
+  const a = Object.fromEntries(prompt.attributes.map((x) => [x.key, x.value]))
+  expect(a["opencode.prompt.length"]).toEqual({ intValue: "17" })
+  // The prompt names the model the step that answered it ran.
+  expect(a["gen_ai.request.model"]).toEqual({ stringValue: "gpt-5" })
 })

@@ -23,10 +23,11 @@ import (
 // reads only OTEL_* process env, so terma's plugin turns its events into OTLP/JSON and
 // runs terma's helper script for its key. With root set it is the repository's committed
 // policy file instead, which names no destination or key. dir is terma's config directory,
-// which holds the helper scripts.
+// which holds the helper scripts; hook, when set, is how the plugin runs `terma hook`.
 type exporter struct {
 	root string
 	dir  string
+	hook []string
 }
 
 //go:embed plugin/terma.js
@@ -140,7 +141,10 @@ func (c exporter) config(e harness.Exporter) opencodeConfig {
 			}
 		}
 	}
-	cfg.HookCommand = []string{"terma", "hook"}
+	cfg.HookCommand = c.hook
+	if len(cfg.HookCommand) == 0 {
+		cfg.HookCommand = []string{"terma", "hook"}
+	}
 	return cfg
 }
 
