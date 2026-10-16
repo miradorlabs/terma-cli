@@ -26,7 +26,7 @@ func TestStatusEdges(t *testing.T) {
 		{Harness: "codex", Version: "0.163.0", Platform: "linux/amd64", Capability: "relay.telemetry", From: "pass", To: "fail"},
 		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", From: "fail", To: "pass"},
 	}
-	ss := statuses(rows, nil, compat)
+	ss := statuses(rows, []Release{{Harness: "claude", Version: "2.1.301"}}, compat)
 	var lines []string
 	for _, s := range ss {
 		lines = append(lines, s.line(bold))
@@ -34,19 +34,19 @@ func TestStatusEdges(t *testing.T) {
 	want := []string{
 		"❌ Codex CLI 0.163.0: fails 1 of 2 checks: Telemetry reaches the project through the local relay (Linux) · newly failing, passed before",
 		"⚪ T3 Code 0.1.0: no checks ran",
-		"✅ Claude Code 2.1.300: passes all 1 check · 2.1.301 ran no checks",
-		"✅ Pi 1.3.0: passes all 1 check · fixed, failed before",
+		"✅ Claude Code 2.1.300: passes its 1 check · 2.1.301 (new) ran no checks",
+		"✅ Pi 1.3.0: passes its 1 check · fixed, failed before",
 	}
 	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("lines:\n%s\nwant:\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
-	if got := (Drift{Status: ss}).summary(); got != "Harness drift: 1 harness not sending what terma expects, 1 ran no checks" {
+	if got := (Drift{Status: ss}).summary(); got != "Harness drift: 1 harness not sending what terma expects, 1 harness ran no checks" {
 		t.Errorf("summary %q", got)
 	}
 	if got := (Drift{Status: ss[2:]}).summary(); got != "Harness drift: every harness sends what terma expects" {
 		t.Errorf("summary %q", got)
 	}
-	if got := (Drift{Status: ss[1:2]}).summary(); got != "Harness drift: 1 ran no checks" {
+	if got := (Drift{Status: ss[1:]}).summary(); got != "Harness drift: 1 harness ran no checks; the rest send what terma expects" {
 		t.Errorf("summary %q", got)
 	}
 }

@@ -238,7 +238,7 @@ func TestSlackColoursWhatCameAndWent(t *testing.T) {
 	}
 	d.Status = []Status{{Harness: "pi", Name: "Pi", Version: "0.84.2", Checks: 1}}
 	items = slackItems(t, d)
-	verdicts, run, heading, codex := at("*Does each harness send all the telemetry terma expects?*\n✅ *Pi 0.84.2*: passes all 1 check"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
+	verdicts, run, heading, codex := at("*Does each harness send all the telemetry terma expects?*\n✅ *Pi 0.84.2*: passes its 1 check"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
 	if verdicts < 0 || run < 0 || !(verdicts < run && run < heading-1 && heading < codex) || items[heading-1].text != "" || items[len(items)-1].colour != removedColour {
 		t.Errorf("not summary, divider, then the harnesses: %+v", items)
 	}

@@ -27,8 +27,10 @@ type Status struct {
 	Release *Release `json:"release,omitempty"`
 	// OlderFailed are the older builds tested tonight that failed a check.
 	OlderFailed []string `json:"older_failed,omitempty"`
-	// Untested is a newer build than Version tonight's rows name whose every check was skipped.
-	Untested string `json:"untested,omitempty"`
+	// Untested is a newer build than Version tonight's rows name whose every check was
+	// skipped; UntestedNew says it is tested for the first time.
+	Untested    string `json:"untested,omitempty"`
+	UntestedNew bool   `json:"untested_new,omitempty"`
 	// Regressed says a check Version passed before failed tonight; Fixed, that every check it
 	// failed before passed (CompatChange).
 	Regressed bool `json:"regressed,omitempty"`
@@ -77,6 +79,7 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange) []Statu
 		s := Status{Harness: harness, Name: harnessName(harness), Version: v, Checks: len(checks[b]), Failed: failed[b]}
 		if latest != v {
 			s.Untested = latest
+			s.UntestedNew = slices.ContainsFunc(rs, func(r Release) bool { return r.Harness == harness && r.Version == latest })
 		}
 		for _, c := range compat {
 			if c.Harness == harness && c.Version == v {
@@ -116,7 +119,10 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange) []Statu
 // line says a harness's verdict: green where its newest build sends all the telemetry terma
 // expects, red where it does not, naming the checks it failed; strong makes text bold.
 func (s Status) line(strong func(string) string) string {
-	mark, verdict := "✅", fmt.Sprintf(": passes all %s", plural(s.Checks, "check"))
+	mark, verdict := "✅", fmt.Sprintf(": passes all %d checks", s.Checks)
+	if s.Checks == 1 {
+		verdict = ": passes its 1 check"
+	}
 	switch {
 	case s.Checks == 0:
 		mark, verdict = "⚪", ": no checks ran"
@@ -141,7 +147,10 @@ func (s Status) line(strong func(string) string) string {
 		}
 	}
 	line := mark + " " + build + verdict
-	if s.Untested != "" {
+	switch {
+	case s.Untested != "" && s.UntestedNew:
+		line += " · " + s.Untested + " (new) ran no checks"
+	case s.Untested != "":
 		line += " · " + s.Untested + " ran no checks"
 	}
 	if len(s.OlderFailed) > 0 {
@@ -221,23 +230,21 @@ func (d Drift) summary() string {
 			untested++
 		}
 	}
-	var parts []string
+	harnesses := func(n int) string {
+		if n == 1 {
+			return "1 harness"
+		}
+		return fmt.Sprintf("%d harnesses", n)
+	}
 	switch {
 	case len(d.Status) == 0:
 		return "Harness drift: no harness was tested tonight"
-	case failing == 1:
-		parts = append(parts, "1 harness not sending what terma expects")
-	case failing > 1:
-		parts = append(parts, fmt.Sprintf("%d harnesses not sending what terma expects", failing))
+	case failing > 0 && untested > 0:
+		return "Harness drift: " + harnesses(failing) + " not sending what terma expects, " + harnesses(untested) + " ran no checks"
+	case failing > 0:
+		return "Harness drift: " + harnesses(failing) + " not sending what terma expects"
+	case untested > 0:
+		return "Harness drift: " + harnesses(untested) + " ran no checks; the rest send what terma expects"
 	}
-	switch {
-	case untested == 1:
-		parts = append(parts, "1 ran no checks")
-	case untested > 1:
-		parts = append(parts, fmt.Sprintf("%d ran no checks", untested))
-	}
-	if len(parts) == 0 {
-		return "Harness drift: every harness sends what terma expects"
-	}
-	return "Harness drift: " + strings.Join(parts, ", ")
+	return "Harness drift: every harness sends what terma expects"
 }
