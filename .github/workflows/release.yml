@@ -72,7 +72,7 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    uses: shadybin/shadybin/.github/workflows/certify.yml@327560b825854318c9daf2b3677962cd073ccc63 # main
+    uses: shadybin/shadybin/.github/workflows/certify.yml@7b883fdc66a7beb429d67bc45529ff5d8f0f9d1f # main
     with:
       tag: ${{ github.ref_name }}
     secrets:
