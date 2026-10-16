@@ -242,7 +242,8 @@ type MetKey struct {
 
 // unclassified are the keys met that the census does not say withheld, new tonight
 // (newFields) or before (stillWithheld): the census of the harness that met one, or any
-// harness's where none says which. They are by harness then key, those no harness says
+// harness's where none says which or the harness has none (T3 Code and the desktop apps run
+// Claude Code's and Codex's, and meet their keys). They are by harness then key, those no harness says
 // last. The relay counts a resource's key as "resource/<key>", the census as the key on the
 // surface "resource".
 func unclassified(met map[MetKey]bool, hs []HarnessDrift) []MetKey {
@@ -253,7 +254,8 @@ func unclassified(met map[MetKey]bool, hs []HarnessDrift) []MetKey {
 	}
 	var out []MetKey
 	for m := range met {
-		if !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return (m.Harness == "" || h.Harness == m.Harness) && withheld(h, m.Key) }) {
+		anyCensus := m.Harness == "" || !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return h.Harness == m.Harness })
+		if !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return (anyCensus || h.Harness == m.Harness) && withheld(h, m.Key) }) {
 			out = append(out, m)
 		}
 	}

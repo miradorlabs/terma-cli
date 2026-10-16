@@ -54,7 +54,8 @@ func TestUnclassifiedNotesNameTheHarness(t *testing.T) {
 	if h := harnessOf(t); h != "" {
 		t.Errorf("harness %q above the scenario, want none", h)
 	}
-	for _, n := range []string{UnclassifiedNote("codex", "state"), UnclassifiedNote("", "resource/host.id")} {
+	for _, n := range []string{UnclassifiedNote("codex", "state"), UnclassifiedNote("claude-desktop", "state"), UnclassifiedNote("", "resource/host.id"),
+		UnclassifiedNote("", "(and more: unclassified_overflow)")} {
 		h, k := ParseUnclassifiedNote(n)
 		if UnclassifiedNote(h, k) != n {
 			t.Errorf("%q parses to %q, %q", n, h, k)

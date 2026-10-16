@@ -122,8 +122,9 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 		{"codex", "exposure"}: true,
 		// Claude's census has state withheld, Codex's does not: Codex's is news.
 		{"codex", "state"}: true,
-		// A scenario that proves no harness: any census that has it withheld says it.
-		{"", "state"}: true, {"", "overflowed"}: true,
+		// A scenario that proves no harness, or one with no census of its own (T3 Code runs
+		// Codex): any census that has it withheld says it.
+		{"", "state"}: true, {"", "overflowed"}: true, {"t3", "decision_type"}: true,
 	}
 	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
 	want := []MetKey{{"codex", "exposure"}, {"codex", "state"}, {"", "overflowed"}}

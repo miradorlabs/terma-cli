@@ -36,12 +36,14 @@ func UnclassifiedNote(harness, key string) string {
 	return harness + ": " + key
 }
 
-// ParseUnclassifiedNote is UnclassifiedNote's harness and key.
+// ParseUnclassifiedNote is UnclassifiedNote's harness and key. A harness is an id, lowercase
+// letters, digits and dashes: the relay's overflow, "(and more: …)", names none.
 func ParseUnclassifiedNote(note string) (harness, key string) {
-	if h, k, ok := strings.Cut(note, ": "); ok {
-		return h, k
+	h, k, ok := strings.Cut(note, ": ")
+	if !ok || h == "" || strings.ContainsFunc(h, func(r rune) bool { return !('a' <= r && r <= 'z' || '0' <= r && r <= '9' || r == '-') }) {
+		return "", note
 	}
-	return "", note
+	return h, k
 }
 
 var (
