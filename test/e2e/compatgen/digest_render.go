@@ -282,22 +282,6 @@ func (d Drift) alarms() []string {
 	return out
 }
 
-// unchanged names the harness builds with nothing new, as one line; a release by its build
-// alone, which its release line says more of.
-func (d Drift) unchanged() string {
-	var builds []string
-	for _, h := range d.Harnesses {
-		switch {
-		case h.changed():
-		case slices.ContainsFunc(d.Releases, func(r Release) bool { return r.Harness == h.Harness && r.Version == h.Version }):
-			builds = append(builds, h.Name+" "+h.Version)
-		default:
-			builds = append(builds, h.Name+" "+h.build("new build, "))
-		}
-	}
-	return strings.Join(builds, ", ")
-}
-
 // stillWithheld is the reminder of what the relay has been withholding, unclassified, before.
 func (d Drift) stillWithheld() string {
 	var parts []string
@@ -323,24 +307,24 @@ func (d Drift) markdown() string {
 	for _, a := range d.alarms() {
 		b.WriteString("**" + a + "**\n\n")
 	}
-	b.WriteString("## New releases\n\n")
-	if len(d.Releases) == 0 {
-		b.WriteString("None tonight.\n\n")
+	b.WriteString("## Does each harness send all the telemetry terma expects?\n\n")
+	if len(d.Status) == 0 {
+		b.WriteString("No harness was tested tonight.\n\n")
 	}
-	for _, l := range d.releaseLines(func(s string) string { return "**" + s + "**" }) {
+	for _, l := range d.statusLines(func(s string) string { return "**" + s + "**" }) {
 		b.WriteString("- " + l + "\n")
 	}
-	if len(d.Releases) > 0 {
+	if len(d.Status) > 0 {
 		b.WriteString("\n")
 	}
+	b.WriteString("## To note\n\n")
 	if d.Quiet() {
 		b.WriteString("No changes: every field and capability as the catalog and history have them.\n\n")
 	}
-	if u := d.unchanged(); u != "" {
-		fmt.Fprintf(&b, "Unchanged: %s.\n\n", u)
-	}
-	if s := d.stillWithheld(); s != "" {
-		b.WriteString(s + "\n\n")
+	for _, n := range []string{d.newFields(), d.stillWithheld()} {
+		if n != "" {
+			b.WriteString(n + "\n\n")
+		}
 	}
 	for _, h := range d.Harnesses {
 		if !h.changed() {

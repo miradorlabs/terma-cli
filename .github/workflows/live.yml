@@ -32,6 +32,9 @@ jobs:
       TERMA_E2E_GEMINI_VERSIONS: last3
       TERMA_E2E_DSH_VERSIONS: last3
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
+      # A field the relay has not classified is a note here, not a failure: the digest says
+      # what is new to classify, and a harness sending it still sends what terma expects.
+      TERMA_E2E_UNCLASSIFIED: note
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -150,6 +153,8 @@ jobs:
           fi
       - name: Run the machine scenarios
         working-directory: test/e2e
+        env:
+          TERMA_E2E_UNCLASSIFIED: note
         # The agents' newest releases; the rows record the versions they turn out to be.
         run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest
       - name: Upload this platform's compatibility rows

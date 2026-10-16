@@ -48,10 +48,14 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 		t.Errorf("claude %+v: one of two checks failed, no build before", claude)
 	}
 	bold := func(s string) string { return "*" + s + "*" }
-	if l := codex.line(bold); !strings.HasPrefix(l, "✅ *Codex CLI 0.162.1 (was 0.162.0)*: passes all 2 checks · fields: not censused") {
+	ss := statuses(rows, rs)
+	if len(ss) != 2 {
+		t.Fatalf("statuses %+v", ss)
+	}
+	if l := ss[1].line(bold); l != "✅ *Codex CLI 0.162.1* · new (was 0.162.0)" {
 		t.Errorf("codex line %q", l)
 	}
-	if l := claude.line(bold); !strings.Contains(l, "❌ *Claude Code 2.1.297 (first build seen)*: fails 1 of 2 checks: Prompts and tool content withheld when the project says so (macOS)") {
+	if l := ss[0].line(bold); l != "❌ *Claude Code 2.1.297* · new: fails 1 of 2 checks: Prompts and tool content withheld when the project says so (macOS)" {
 		t.Errorf("claude line %q", l)
 	}
 	skipped := []e2e.CompatRow{check("codex", "0.163.0", "relay.desktop", "darwin/arm64", "not run")}
@@ -60,7 +64,7 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 	}
 	census := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", time.Now())}
 	if rs := releases(hist, Catalog{}, skipped, census, nil, censusRuns{}); len(rs) != 1 || rs[0].Checks != 0 || rs[0].Passed() ||
-		!strings.Contains(rs[0].line(bold), "⚪ *Codex CLI 0.163.0 (was 0.162.0)*: no checks ran") {
+		statuses(skipped, rs)[0].line(bold) != "⚪ *Codex CLI 0.163.0* · new (was 0.162.0): no checks ran" {
 		t.Errorf("a censused build whose every check was skipped: %+v", rs)
 	}
 }
@@ -90,52 +94,55 @@ func TestAReleaseSaysWhatItsCensusFound(t *testing.T) {
 	if f == nil || f.Added != 1 || f.NewSurfaces != 1 || f.Removed != 1 || f.Unseen != 1 {
 		t.Fatalf("fields %+v: 1 new field, 1 new surface, 1 removed, 1 surface gone", f)
 	}
-	if got := f.said(); got != "🟢 +1 surface, +1 field, 🔴 -1 field, -1 surface" {
-		t.Errorf("said %q", got)
-	}
 }
 
-// Every digest says whether there were releases; a release that failed is said once, on its
-// line, not again among the compatibility changes, and makes no quiet night.
-func TestTheDigestLeadsWithTheReleases(t *testing.T) {
+// Every digest leads with each harness's verdict: does its newest build send all the
+// telemetry terma expects. A build that failed is said once, on its line, not again among the
+// compatibility changes; a harness that only sent a new field is green, the field a note.
+func TestTheDigestLeadsWithEachHarnessesVerdict(t *testing.T) {
 	d := Drift{GeneratedAt: time.Date(2026, 10, 12, 4, 0, 0, 0, time.UTC)}
-	if !strings.Contains(d.markdown(), "None tonight") || !strings.Contains(slackDigestText(t, d), "*New releases:* none tonight") {
-		t.Errorf("no releases is not said:\n%s", d.markdown())
+	if !strings.Contains(d.markdown(), "No harness was tested tonight") || !strings.Contains(slackDigestText(t, d), "No harness was tested tonight") {
+		t.Errorf("a night that tested nothing does not say so:\n%s", d.markdown())
 	}
-	d.Harnesses = []HarnessDrift{{Harness: "gemini", Name: "Gemini CLI", Version: "0.63.0", Previous: "0.62.0"}}
-	if u := d.unchanged(); u != "Gemini CLI 0.63.0 (new build, was 0.62.0)" {
-		t.Errorf("unchanged %q: a new build no release line says is said new here", u)
+	d.Status = []Status{
+		{Harness: "claude", Name: "Claude Code", Version: "2.1.297", Checks: 3, Failed: []FailedCheck{{Capability: "relay.telemetry", Platform: "linux/amd64"}},
+			Release: &Release{Harness: "claude", Name: "Claude Code", Version: "2.1.297", Previous: "2.1.296"}},
+		{Harness: "codex", Name: "Codex CLI", Version: "0.162.1", Checks: 2, OlderFailed: []string{"0.162.0"}},
 	}
-	d.Releases = []Release{{Harness: "gemini", Name: "Gemini CLI", Version: "0.63.0", Previous: "0.62.0", Checks: 1}}
-	if u := d.unchanged(); u != "Gemini CLI 0.63.0" {
-		t.Errorf("unchanged %q: a release is said again", u)
-	}
-	d.Harnesses = nil
-	d.Releases = []Release{{Harness: "claude", Name: "Claude Code", Version: "2.1.297", Previous: "2.1.296", Checks: 3,
-		Failed: []FailedCheck{{Capability: "relay.telemetry", Platform: "linux/amd64"}}}}
 	d.Compat = []CompatChange{
 		{Harness: "claude", Version: "2.1.297", Platform: "linux/amd64", Capability: "relay.telemetry", To: "fail"},
 		{Harness: "codex", Version: "0.162.0", Platform: "linux/amd64", Capability: "relay.telemetry", From: "pass", To: "fail"},
 	}
 	if d.Quiet() {
-		t.Error("a night whose release failed is quiet")
+		t.Error("a night a harness failed is quiet")
 	}
 	md := d.markdown()
-	if strings.Count(md, "Claude Code 2.1.297") != 1 || !strings.Contains(md, "Codex CLI 0.162.0") {
-		t.Errorf("a release's failure is said twice, or another change not at all:\n%s", md)
+	if strings.Count(md, "Claude Code 2.1.297") != 1 || !strings.Contains(md, "Codex CLI 0.162.0") || !strings.Contains(md, "older builds failing: 0.162.0") {
+		t.Errorf("a failure is said twice, or an older build's not at all:\n%s", md)
 	}
-	if s := slackDigestText(t, d); strings.Index(s, "New releases") > strings.Index(s, "Compatibility changes") {
-		t.Errorf("the releases do not lead:\n%s", s)
+	s := slackDigestText(t, d)
+	if !strings.HasPrefix(s, "Harness drift — 2026-10-12\n*Does each harness send all the telemetry terma expects?*\n❌ *Claude Code 2.1.297* · new (was 2.1.296): fails 1 of 3 checks") ||
+		strings.Index(s, "Does each harness") > strings.Index(s, "Compatibility changes") {
+		t.Errorf("the verdicts do not lead:\n%s", s)
 	}
-	if d.Compat = nil; d.Quiet() {
-		t.Error("a night whose release failed, its history saying nothing of it, is quiet")
+	if got := d.slack()["text"]; got != "Harness drift: 1 harness not sending what terma expects" {
+		t.Errorf("summary %q", got)
 	}
-	if d.Releases[0].Checks = 0; d.Quiet() {
-		t.Error("a night whose release ran no checks is quiet")
+	// Only a new field: every harness green, the field noted, and no harness said failing.
+	d.Status[0].Failed, d.Status[1].OlderFailed, d.Compat = nil, nil, nil
+	d.Harnesses = []HarnessDrift{{Harness: "claude", Name: "Claude Code", Version: "2.1.297", Previous: "2.1.296",
+		Added:    []FieldChange{{Surface: "logs/tool_decision", Key: "permission_mode", Class: "unclassified"}},
+		Withheld: []FieldChange{{Surface: "logs/tool_decision", Key: "permission_mode"}}}}
+	s = slackDigestText(t, d)
+	if !strings.Contains(s, "✅ *Claude Code 2.1.297* · new (was 2.1.296)\n✅ *Codex CLI 0.162.1*") ||
+		!strings.Contains(s, "*To note*\nNew fields, withheld until classified: Claude Code: `permission_mode`.") || strings.Contains(s, "❌") {
+		t.Errorf("a new field is not a note beside green verdicts:\n%s", s)
 	}
-	d.Releases[0].Checks, d.Releases[0].Failed = 3, nil
-	if !d.Quiet() {
-		t.Error("a release that passed every check makes the night not quiet")
+	if got := d.slack()["text"]; got != "Harness drift: every harness sends what terma expects" {
+		t.Errorf("summary %q", got)
+	}
+	if d.Status[1].Checks = 0; d.Quiet() {
+		t.Error("a night a harness ran no checks is quiet")
 	}
 }
 
@@ -229,8 +236,10 @@ func TestSlackColoursWhatCameAndWent(t *testing.T) {
 	at := func(prefix string) int {
 		return slices.IndexFunc(items, func(it slackItem) bool { return strings.HasPrefix(it.text, prefix) })
 	}
-	unchanged, run, heading, codex := at("_Unchanged:_ Pi 0.84.2"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
-	if unchanged < 0 || run < 0 || !(unchanged < run && run < heading-1 && heading < codex) || items[heading-1].text != "" || items[len(items)-1].colour != removedColour {
+	d.Status = []Status{{Harness: "pi", Name: "Pi", Version: "0.84.2", Checks: 1}}
+	items = slackItems(t, d)
+	verdicts, run, heading, codex := at("*Does each harness send all the telemetry terma expects?*\n✅ *Pi 0.84.2*"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
+	if verdicts < 0 || run < 0 || !(verdicts < run && run < heading-1 && heading < codex) || items[heading-1].text != "" || items[len(items)-1].colour != removedColour {
 		t.Errorf("not summary, divider, then the harnesses: %+v", items)
 	}
 	if md := d.markdown(); !strings.Contains(md, "- 🟢 `+region`") || !strings.Contains(md, "- 🔴 `-gone`") || !strings.Contains(md, "- `state`") {
@@ -287,14 +296,12 @@ func TestTwoReleasesInANight(t *testing.T) {
 
 // Failures on two platforms with one short name say which each is.
 func TestTwoLinuxFailuresSayTheirArchitecture(t *testing.T) {
-	r := Release{Name: "Codex CLI", Version: "0.163.0", Checks: 2, Failed: []FailedCheck{
-		{Capability: "relay.telemetry", Platform: "linux/amd64"}, {Capability: "relay.telemetry", Platform: "linux/arm64"}}}
-	if l := r.line(func(s string) string { return s }); !strings.Contains(l, "(linux/amd64); Telemetry reaches the project through the local relay (linux/arm64)") {
-		t.Errorf("line %q", l)
+	failed := []FailedCheck{{Capability: "relay.telemetry", Platform: "linux/amd64"}, {Capability: "relay.telemetry", Platform: "linux/arm64"}}
+	if got := strings.Join(failedNames(failed), "; "); !strings.Contains(got, "(linux/amd64); Telemetry reaches the project through the local relay (linux/arm64)") {
+		t.Errorf("names %q", got)
 	}
-	r.Failed = r.Failed[:1]
-	if l := r.line(func(s string) string { return s }); !strings.Contains(l, "(Linux)") {
-		t.Errorf("one Linux failure: %q", l)
+	if got := strings.Join(failedNames(failed[:1]), "; "); !strings.Contains(got, "(Linux)") {
+		t.Errorf("one Linux failure: %q", got)
 	}
 }
 
@@ -313,7 +320,8 @@ func TestAReleaseLinksItsSourceWithoutACensus(t *testing.T) {
 	if d.Releases[1].Compare != "" || d.Releases[2].Compare != "" {
 		t.Errorf("a first build, or a harness with no public source, linked a comparison: %+v", d.Releases)
 	}
-	if l := d.Releases[0].line(func(s string) string { return s }); !strings.Contains(renderLinks(l, false), "(was 0.162.1, [diff](https://github.com/openai/codex/compare/rust-v0.162.1...rust-v0.163.0))") {
+	st := Status{Name: "Codex CLI", Version: "0.163.0", Checks: 1, Release: &d.Releases[0]}
+	if l := st.line(func(s string) string { return s }); !strings.Contains(renderLinks(l, false), "· new (was 0.162.1, [diff](https://github.com/openai/codex/compare/rust-v0.162.1...rust-v0.163.0))") {
 		t.Errorf("line %q", renderLinks(l, false))
 	}
 }

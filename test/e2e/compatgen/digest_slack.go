@@ -81,9 +81,16 @@ type attachment struct {
 // then, under a divider, each harness's changes as attachments (slackChanges), as many whole
 // harnesses as one message holds.
 func (d Drift) slack() map[string]any {
-	summary := "Harness drift: no changes"
-	if !d.Quiet() {
-		summary = "Harness drift: changes to look at"
+	// The notification's text: whether every harness tested sends what terma expects, never
+	// that it does when none was tested.
+	summary := "Harness drift: every harness sends what terma expects"
+	switch n := len(slices.DeleteFunc(slices.Clone(d.Status), Status.Passed)); {
+	case len(d.Status) == 0:
+		summary = "Harness drift: no harness was tested tonight"
+	case n == 1:
+		summary = "Harness drift: 1 harness not sending what terma expects"
+	case n > 1:
+		summary = fmt.Sprintf("Harness drift: %d harnesses not sending what terma expects", n)
 	}
 	blocks := d.slackSummary()
 	var harnesses [][]attachment
@@ -126,25 +133,30 @@ func (d Drift) slack() map[string]any {
 	return payload
 }
 
-// slackSummary is the digest's summary as blocks: a header, the alarms, the new releases, the
-// builds unchanged, what is still withheld, compatibility, and a link to the run.
+// slackSummary is the digest's summary as blocks: a header, the alarms, each harness's
+// verdict, then what is to note: new fields, what is still withheld, compatibility, and a
+// link to the run.
 func (d Drift) slackSummary() []block {
 	blocks := []block{{"type": "header", "text": block{"type": "plain_text", "text": "Harness drift — " + d.GeneratedAt.Format("2006-01-02")}}}
 	for _, a := range d.alarms() {
 		blocks = append(blocks, slackSection(":warning: *"+a+"*"))
 	}
-	if len(d.Releases) == 0 {
-		blocks = append(blocks, slackSection("*New releases:* none tonight"))
+	if len(d.Status) == 0 {
+		blocks = append(blocks, slackSection("*Does each harness send all the telemetry terma expects?*\n_No harness was tested tonight._"))
 	} else {
-		blocks = append(blocks, slackSection("*New releases*\n• "+strings.Join(d.releaseLines(func(s string) string { return "*" + s + "*" }), "\n• ")))
+		blocks = append(blocks, slackSection("*Does each harness send all the telemetry terma expects?*\n"+strings.Join(d.statusLines(func(s string) string { return "*" + s + "*" }), "\n")))
 	}
+	var notes []string
 	if d.Quiet() {
-		blocks = append(blocks, slackSection("No changes. Censused: "+d.unchanged()+"."))
-	} else if u := d.unchanged(); u != "" {
-		blocks = append(blocks, slackSection("_Unchanged:_ "+u))
+		notes = append(notes, "No field changes.")
 	}
-	if s := d.stillWithheld(); s != "" {
-		blocks = append(blocks, slackSection(s))
+	for _, n := range []string{d.newFields(), d.stillWithheld()} {
+		if n != "" {
+			notes = append(notes, n)
+		}
+	}
+	if len(notes) > 0 {
+		blocks = append(blocks, slackSection("*To note*\n"+strings.Join(notes, "\n")))
 	}
 	if len(d.SourceErrors) > 0 {
 		blocks = append(blocks, slackSection("_Source links left out: "+strings.Join(d.SourceErrors, "; ")+"._"))
