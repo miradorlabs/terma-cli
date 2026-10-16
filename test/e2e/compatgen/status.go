@@ -234,12 +234,16 @@ func (d Drift) newFields() string {
 	return "New fields, withheld until classified: " + strings.Join(parts, "; ") + "."
 }
 
-// unclassified are the keys met that no harness's census found new tonight (newFields says
-// those), sorted.
+// unclassified are the keys met that no harness's census says withheld, new tonight
+// (newFields) or before (stillWithheld), sorted. The relay counts a resource's key as
+// "resource/<key>", the census as the key on the surface "resource".
 func unclassified(met map[string]bool, hs []HarnessDrift) []string {
 	for _, h := range hs {
-		for _, c := range h.Withheld {
+		for _, c := range slices.Concat(h.Withheld, h.StillWithheld) {
 			delete(met, c.Key)
+			if c.Surface == "resource" {
+				delete(met, "resource/"+c.Key)
+			}
 		}
 	}
 	return slices.Sorted(maps.Keys(met))
@@ -252,6 +256,10 @@ func (d Drift) metUnclassified() string {
 	}
 	var keys []string
 	for _, k := range d.Unclassified {
+		if strings.HasPrefix(k, "(") { // the relay's overflow, more than it names
+			keys = append(keys, k)
+			continue
+		}
 		keys = append(keys, "`"+k+"`")
 	}
 	if len(keys) > maxListed {

@@ -111,10 +111,17 @@ func TestFixedNeedsEveryEarlierFailureToPass(t *testing.T) {
 // A key a tripwire met that no census found new, the Linux machines' say, is to note; one the
 // census found new is said once, with the census's.
 func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
-	hs := []HarnessDrift{{Harness: "codex", Name: "Codex", Withheld: []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}}}}
-	d := Drift{Harnesses: hs, Unclassified: unclassified(map[string]bool{"tool_mode": true, "exposure": true}, hs)}
+	hs := []HarnessDrift{{Harness: "codex", Name: "Codex",
+		Withheld:      []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}},
+		StillWithheld: []FieldChange{{Surface: "log:codex.decision", Key: "decision_type"}, {Surface: "resource", Key: "host.id"}}}}
+	met := map[string]bool{"tool_mode": true, "decision_type": true, "resource/host.id": true, "exposure": true}
+	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
 	if !slices.Equal(d.Unclassified, []string{"exposure"}) {
-		t.Fatalf("unclassified %q, want only the key no census found", d.Unclassified)
+		t.Fatalf("unclassified %q, want only the key no census says withheld, new or before", d.Unclassified)
+	}
+	// A night that met only keys the census says withheld is quiet.
+	if q := (Drift{Harnesses: []HarnessDrift{{Harness: "claude"}}, Unclassified: unclassified(map[string]bool{"decision_type": true}, hs)}); !q.Quiet() {
+		t.Errorf("%+v: a night meeting only keys withheld before is not quiet", q.Unclassified)
 	}
 	if d.Quiet() {
 		t.Error("a night that met an unclassified key is quiet")
