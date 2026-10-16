@@ -34,17 +34,15 @@ func TestUnclassifiedIsANoteInTheNightly(t *testing.T) {
 	}
 }
 
-// A key is noted with the harness the scenario that met it proves, found up its parents.
+// A key is noted with the harness of the scenario that met it, found up its parents.
 func TestUnclassifiedNotesNameTheHarness(t *testing.T) {
-	compatMu.Lock()
-	provesHarness[t.Name()+"/v1.0.0"] = "codex"
-	compatMu.Unlock()
 	t.Cleanup(func() {
 		compatMu.Lock()
-		delete(provesHarness, t.Name()+"/v1.0.0")
+		delete(scenarios, t.Name()+"/v1.0.0")
 		compatMu.Unlock()
 	})
 	t.Run("v1.0.0", func(t *testing.T) {
+		scenarioOf(t, "codex")
 		t.Run("withheld", func(t *testing.T) {
 			if h := harnessOf(t); h != "codex" {
 				t.Errorf("harness %q, want codex", h)

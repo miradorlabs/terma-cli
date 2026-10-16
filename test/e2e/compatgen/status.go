@@ -27,6 +27,9 @@ type Status struct {
 	Release *Release `json:"release,omitempty"`
 	// OlderFailed are the older builds tested tonight that failed a check.
 	OlderFailed []string `json:"older_failed,omitempty"`
+	// AlsoNew are the harness's other releases tonight, older than Version, that failed
+	// nothing (OlderFailed names those that did): several tested the first time in one night.
+	AlsoNew []string `json:"also_new,omitempty"`
 	// Untested is a newer build than Version tonight's rows name whose every check was
 	// skipped; UntestedNew says it is tested for the first time.
 	Untested    string `json:"untested,omitempty"`
@@ -115,6 +118,12 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange, hist ma
 			}
 		}
 		slices.SortFunc(s.OlderFailed, compareVersions)
+		for _, r := range rs {
+			if r.Harness == harness && r.Version != v && r.Version != s.Untested && !slices.Contains(s.OlderFailed, r.Version) {
+				s.AlsoNew = append(s.AlsoNew, r.Version)
+			}
+		}
+		slices.SortFunc(s.AlsoNew, compareVersions)
 		out = append(out, s)
 	}
 	// What is red first, so a long night never cuts it from the message.
@@ -170,6 +179,9 @@ func (s Status) line(strong func(string) string) string {
 	}
 	if len(s.OlderFailed) > 0 {
 		line += " · older builds failing: " + strings.Join(s.OlderFailed, ", ")
+	}
+	if len(s.AlsoNew) > 0 {
+		line += " · also new tonight, failing nothing: " + strings.Join(s.AlsoNew, ", ")
 	}
 	return line
 }

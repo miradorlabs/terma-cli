@@ -29,7 +29,7 @@ func forEachPi(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("pi is not installed")
 	}
 	b := Binary{Harness: "pi", Version: numberOf(Version(path)), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 }
 
 // piAgentDir is the sandbox's Pi configuration directory (PI_CODING_AGENT_DIR's

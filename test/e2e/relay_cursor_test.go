@@ -23,6 +23,7 @@ import (
 // (cursor_test.go).
 func TestRelayCursorHooks(t *testing.T) {
 	track(t)
+	scenarioOf(t, "cursor")
 	cursorHooksUnavailable(t)
 	sb := New(t, Isolated)
 	sb.UseRelay(RelayOptions{Start: true})

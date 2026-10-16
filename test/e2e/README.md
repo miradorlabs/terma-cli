@@ -237,8 +237,8 @@ A field the relay has not classified is never a failure there: the nightly runs 
 tripwire for one (`failUnclassified`) with `TERMA_E2E_UNCLASSIFIED=note`, so the field is
 withheld, as always, and noted, and the harness stays green. Each run writes what it noted to
 `report/notes.json`, which both platforms upload, so a key only the Linux machines met is
-still said under what is to note. A key is noted with the harness its scenario proves
-(`Proves`), and weighed against that harness's census alone: one harness withholding `state`
+still said under what is to note. A key is noted with the harness of the scenario that met it
+(each `forEach…` helper's build says it, and `Proves`), and weighed against that harness's census alone: one harness withholding `state`
 does not hide another meeting it. Pull-request CI leaves it unset, so a pinned build bumped
 past a new field fails until the field is classified.
 

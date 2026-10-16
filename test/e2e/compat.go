@@ -67,17 +67,24 @@ type CompatRow struct {
 }
 
 var (
-	compatMu      sync.Mutex
-	compatRows    []CompatRow
-	provesHarness = map[string]string{} // test → the harness it proves (Proves)
+	compatMu   sync.Mutex
+	compatRows []CompatRow
+	scenarios  = map[string]string{} // test → the harness it is a scenario of (scenarioOf)
 )
 
-// harnessOf is the harness t, or a scenario t runs in, proves, "" where none does.
+// scenarioOf says t is a scenario of harness: each forEach helper's build, and Proves.
+func scenarioOf(t *testing.T, harness string) {
+	compatMu.Lock()
+	defer compatMu.Unlock()
+	scenarios[t.Name()] = harness
+}
+
+// harnessOf is the harness t, or a scenario t runs in, is a scenario of, "" where none is.
 func harnessOf(t *testing.T) string {
 	compatMu.Lock()
 	defer compatMu.Unlock()
 	for name := t.Name(); ; {
-		if h, ok := provesHarness[name]; ok {
+		if h, ok := scenarios[name]; ok {
 			return h
 		}
 		i := strings.LastIndexByte(name, '/')
@@ -100,9 +107,7 @@ func Proves(t *testing.T, harness, version, capability string) {
 	if !known {
 		t.Fatalf("Proves: unknown capability %q: add it to Capabilities", capability)
 	}
-	compatMu.Lock()
-	provesHarness[t.Name()] = harness
-	compatMu.Unlock()
+	scenarioOf(t, harness)
 	t.Cleanup(func() {
 		result := "pass"
 		switch {

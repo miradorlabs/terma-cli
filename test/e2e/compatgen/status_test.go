@@ -176,3 +176,20 @@ func TestAFixBesideAFailureIsSaid(t *testing.T) {
 		t.Errorf("other compatibility changes %+v, want none beside a fixed verdict", got)
 	}
 }
+
+// A night that tests several releases of a harness for the first time says each: the newest on
+// the verdict, an older one that failed among the older builds failing, the rest beside it.
+func TestEveryReleaseOfTheNightIsSaid(t *testing.T) {
+	rows := []e2e.CompatRow{
+		check("pi", "1.3.0", "relay.telemetry", "darwin/arm64", "pass"),
+		check("pi", "1.3.1", "relay.telemetry", "darwin/arm64", "fail"),
+		check("pi", "1.3.2", "relay.telemetry", "darwin/arm64", "pass"),
+	}
+	rs := []Release{{Harness: "pi", Version: "1.3.0"}, {Harness: "pi", Version: "1.3.1"}, {Harness: "pi", Version: "1.3.2"}}
+	line := statuses(rows, rs, nil, nil)[0].line(func(s string) string { return s })
+	for _, want := range []string{"Pi 1.3.2 · new", "older builds failing: 1.3.1", "also new tonight, failing nothing: 1.3.0"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("%q does not say %q", line, want)
+		}
+	}
+}
