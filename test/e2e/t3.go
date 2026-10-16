@@ -27,7 +27,8 @@ import (
 // user-level exporters and the repository's hooks work as they do anywhere, and the
 // relay needs nothing T3-specific; these scenarios prove it. T3 is driven the way its
 // front end drives it: commands POSTed to /api/orchestration/dispatch with a session
-// token, state read from /api/orchestration/snapshot.
+// token, state read from /api/orchestration/snapshot. T3 0.1.0 replaced that API; a build
+// that no longer serves it is skipped as one the driver cannot drive (SkipBuild), not failed.
 
 func forEachT3(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
@@ -119,7 +120,26 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 		t.Fatalf("t3 auth session issue: %v\n%s", err, x.out.String())
 	}
 	x.token = strings.TrimSpace(string(tok))
+	// 0.1.0 answers the old snapshot route with its web app, and the dispatch with a 404:
+	// that answer alone says the driver cannot drive the build. Any other (an error, a
+	// refusal, a server that never came up) goes on, and fails the scenario as it should.
+	if x.servesWebApp("/api/orchestration/snapshot") {
+		SkipBuild(t, "the test driver can't drive this version yet (it no longer serves /api/orchestration)")
+	}
 	return x
+}
+
+// servesWebApp says whether T3 answers a GET of path with its web app's HTML, as a build
+// that no longer serves path as an API route does.
+func (x *T3) servesWebApp(path string) bool {
+	req, _ := http.NewRequest(http.MethodGet, x.url+path, nil)
+	req.Header.Set("Authorization", "Bearer "+x.token)
+	resp, err := t3Client.Do(req)
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode/100 == 2 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html")
 }
 
 // t3Client bounds every request: a server that accepts and never answers must fail the
