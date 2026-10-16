@@ -32,6 +32,9 @@ type Drift struct {
 	Status    []Status       `json:"status,omitempty"`
 	Releases  []Release      `json:"releases,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
+	// Unclassified are the keys the night's tripwires met unclassified that no census found
+	// new: one a scenario without a census met, the Linux machines' among them.
+	Unclassified []string `json:"unclassified,omitempty"`
 	// SourceErrors are the builds whose source could not be read, their findings unlinked.
 	SourceErrors []string       `json:"source_errors,omitempty"`
 	Compat       []CompatChange `json:"compat"`
@@ -139,7 +142,7 @@ type GoneSurface struct {
 // passing its checks, and found nothing else worth a look: no field, surface or capability
 // changed.
 func (d Drift) Quiet() bool {
-	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 || slices.ContainsFunc(d.Status, func(s Status) bool { return !s.Passed() }) {
+	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 || len(d.Unclassified) > 0 || slices.ContainsFunc(d.Status, func(s Status) bool { return !s.Passed() }) {
 		return false
 	}
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)

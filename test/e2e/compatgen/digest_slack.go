@@ -152,7 +152,7 @@ func (d Drift) slackSummary() []block {
 	if d.Quiet() {
 		notes = append(notes, "No field changes.")
 	}
-	for _, n := range []string{d.newFields(), d.stillWithheld()} {
+	for _, n := range []string{d.newFields(), d.metUnclassified(), d.stillWithheld()} {
 		if n != "" {
 			notes = append(notes, n)
 		}

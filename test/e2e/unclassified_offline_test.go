@@ -13,21 +13,21 @@ func TestUnclassifiedIsANoteInTheNightly(t *testing.T) {
 	// after the scenarios, whose own notes the report must keep.
 	const key = "terma_e2e_self_test_key"
 	reportMu.Lock()
-	before, had := reportNotes["relay/unclassified"]
+	before, had := reportNotes[UnclassifiedNotes]
 	before = slices.Clone(before)
 	reportMu.Unlock()
 	t.Cleanup(func() {
 		reportMu.Lock()
 		defer reportMu.Unlock()
 		if had {
-			reportNotes["relay/unclassified"] = before
+			reportNotes[UnclassifiedNotes] = before
 		} else {
-			delete(reportNotes, "relay/unclassified")
+			delete(reportNotes, UnclassifiedNotes)
 		}
 	})
 	failUnclassified(t, map[string]int{"unclassified." + key: 2, "forwarded.logs": 3})
 	reportMu.Lock()
-	notes := slices.Clone(reportNotes["relay/unclassified"])
+	notes := slices.Clone(reportNotes[UnclassifiedNotes])
 	reportMu.Unlock()
 	if !slices.Contains(notes, key) {
 		t.Errorf("notes %q: the unclassified key is not noted", notes)

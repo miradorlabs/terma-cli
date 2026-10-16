@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -231,6 +232,32 @@ func (d Drift) newFields() string {
 		return ""
 	}
 	return "New fields, withheld until classified: " + strings.Join(parts, "; ") + "."
+}
+
+// unclassified are the keys met that no harness's census found new tonight (newFields says
+// those), sorted.
+func unclassified(met map[string]bool, hs []HarnessDrift) []string {
+	for _, h := range hs {
+		for _, c := range h.Withheld {
+			delete(met, c.Key)
+		}
+	}
+	return slices.Sorted(maps.Keys(met))
+}
+
+// metUnclassified says the keys the tripwires met that no census found, or "".
+func (d Drift) metUnclassified() string {
+	if len(d.Unclassified) == 0 {
+		return ""
+	}
+	var keys []string
+	for _, k := range d.Unclassified {
+		keys = append(keys, "`"+k+"`")
+	}
+	if len(keys) > maxListed {
+		keys = append(keys[:maxListed], fmt.Sprintf("and %d more", len(keys)-maxListed))
+	}
+	return "Unclassified keys the checks met, withheld until classified: " + strings.Join(keys, ", ") + "."
 }
 
 // summary is the notification's text: whether every harness tested sends what terma expects,

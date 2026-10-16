@@ -76,7 +76,8 @@ machines: machine-image
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
 FIELD_RUNS ?= $(wildcard report/fields.json)
 CENSUS_RUNS ?= $(wildcard report/census.json)
-COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f)) $(foreach c,$(CENSUS_RUNS),-census $(c))
+NOTE_RUNS ?= $(wildcard report/notes.json report/linux/notes.json)
+COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f)) $(foreach c,$(CENSUS_RUNS),-census $(c)) $(foreach n,$(NOTE_RUNS),-notes $(n))
 .PHONY: compat drift
 compat:
 	$(COMPATGEN)

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -103,5 +105,25 @@ func TestFixedNeedsEveryEarlierFailureToPass(t *testing.T) {
 	rows[1].Result = "pass"
 	if s := statuses(rows, nil, nil, hist)[0]; !s.Fixed {
 		t.Errorf("%+v: not fixed, every earlier failure passing", s)
+	}
+}
+
+// A key a tripwire met that no census found new, the Linux machines' say, is to note; one the
+// census found new is said once, with the census's.
+func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
+	hs := []HarnessDrift{{Harness: "codex", Name: "Codex", Withheld: []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}}}}
+	d := Drift{Harnesses: hs, Unclassified: unclassified(map[string]bool{"tool_mode": true, "exposure": true}, hs)}
+	if !slices.Equal(d.Unclassified, []string{"exposure"}) {
+		t.Fatalf("unclassified %q, want only the key no census found", d.Unclassified)
+	}
+	if d.Quiet() {
+		t.Error("a night that met an unclassified key is quiet")
+	}
+	data, _ := json.Marshal(d.slack())
+	if !strings.Contains(string(data), "Unclassified keys the checks met, withheld until classified: `exposure`") {
+		t.Errorf("slack does not say the key:\n%s", data)
+	}
+	if md := d.markdown(); !strings.Contains(md, "`exposure`") {
+		t.Errorf("drift.md does not say the key:\n%s", md)
 	}
 }

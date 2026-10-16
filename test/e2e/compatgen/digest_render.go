@@ -321,7 +321,7 @@ func (d Drift) markdown() string {
 	if d.Quiet() {
 		notes = append(notes, "No changes: every field and capability as the catalog and history have them.")
 	}
-	for _, n := range []string{d.newFields(), d.stillWithheld()} {
+	for _, n := range []string{d.newFields(), d.metUnclassified(), d.stillWithheld()} {
 		if n != "" {
 			notes = append(notes, n)
 		}
