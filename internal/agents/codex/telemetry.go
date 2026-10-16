@@ -40,6 +40,16 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		MetricSafeKeys: map[string][]string{
 			"codex.shell_snapshot.command": {"state"},
 			"codex.shell_snapshot.wait_ms": {"state"},
+			// 0.163's sandbox integrity checks (exec-server/src/sandbox_integrity): its backend
+			// (seatbelt, bubblewrap or windows_mxc), checker ("contents") and dependency, each a
+			// &'static str the module's own doc calls bounded tags.
+			"codex.sandbox_integrity.check":          {"backend", "checker", "dependency"},
+			"codex.sandbox_integrity.duration_ms":    {"backend"},
+			"codex.sandbox_integrity.preparation_ms": {"backend"},
+			// 0.163's tool registrations (core/src/tools/router.rs): a ToolExposure (direct,
+			// direct_model_only, deferred, deferred_model_only, code_mode_only, hidden) and a
+			// ToolMode (direct, code_mode, code_mode_only).
+			"codex.tools.registered": {"exposure", "tool_mode"},
 		},
 		// The backend keys a Codex seat on the workspace and the login; the email is withheld.
 		Principal: shape.Principal{Scope: "user.account_id", Email: "user.email"},

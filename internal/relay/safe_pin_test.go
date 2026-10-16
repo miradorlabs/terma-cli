@@ -52,7 +52,7 @@ var pinnedSafeKeys = []string{
 	"opencode.version", "operation", "organization.id",
 	"originator", "os", "os.type", "os.version", "os_arch", "os_platform", "os_release",
 	"os_version", "outcome", "output_format", "output_token_count", "output_tokens",
-	"output_truncated", "parent.source", "phase", "phases", "plugin.name", "plugin.scope",
+	"output_truncated", "parent.source", "permission_mode", "phase", "phases", "plugin.name", "plugin.scope",
 	"plugin_id_hash", "process.command", "process.executable.name", "process.executable.path",
 	"process.owner", "process.pid", "process.runtime.description", "process.runtime.name",
 	"process.runtime.version", "product_sku", "programming_language", "prompt.id",

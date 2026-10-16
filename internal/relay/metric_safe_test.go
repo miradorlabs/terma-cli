@@ -12,8 +12,12 @@ import (
 
 // The keys an agent makes safe on one metric alone, as composed, pinned like the safe keys.
 var pinnedMetricSafeKeys = map[string][]string{
-	"codex.shell_snapshot.command": {"state"},
-	"codex.shell_snapshot.wait_ms": {"state"},
+	"codex.shell_snapshot.command":           {"state"},
+	"codex.shell_snapshot.wait_ms":           {"state"},
+	"codex.sandbox_integrity.check":          {"backend", "checker", "dependency"},
+	"codex.sandbox_integrity.duration_ms":    {"backend"},
+	"codex.sandbox_integrity.preparation_ms": {"backend"},
+	"codex.tools.registered":                 {"exposure", "tool_mode"},
 }
 
 func TestComposedMetricSafeKeysArePinned(t *testing.T) {
