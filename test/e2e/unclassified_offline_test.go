@@ -29,7 +29,35 @@ func TestUnclassifiedIsANoteInTheNightly(t *testing.T) {
 	reportMu.Lock()
 	notes := slices.Clone(reportNotes[UnclassifiedNotes])
 	reportMu.Unlock()
-	if !slices.Contains(notes, key) {
+	if !slices.Contains(notes, UnclassifiedNote("", key)) {
 		t.Errorf("notes %q: the unclassified key is not noted", notes)
+	}
+}
+
+// A key is noted with the harness the scenario that met it proves, found up its parents.
+func TestUnclassifiedNotesNameTheHarness(t *testing.T) {
+	compatMu.Lock()
+	provesHarness[t.Name()+"/v1.0.0"] = "codex"
+	compatMu.Unlock()
+	t.Cleanup(func() {
+		compatMu.Lock()
+		delete(provesHarness, t.Name()+"/v1.0.0")
+		compatMu.Unlock()
+	})
+	t.Run("v1.0.0", func(t *testing.T) {
+		t.Run("withheld", func(t *testing.T) {
+			if h := harnessOf(t); h != "codex" {
+				t.Errorf("harness %q, want codex", h)
+			}
+		})
+	})
+	if h := harnessOf(t); h != "" {
+		t.Errorf("harness %q above the scenario, want none", h)
+	}
+	for _, n := range []string{UnclassifiedNote("codex", "state"), UnclassifiedNote("", "resource/host.id")} {
+		h, k := ParseUnclassifiedNote(n)
+		if UnclassifiedNote(h, k) != n {
+			t.Errorf("%q parses to %q, %q", n, h, k)
+		}
 	}
 }

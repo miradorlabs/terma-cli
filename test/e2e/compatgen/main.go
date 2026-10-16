@@ -135,14 +135,15 @@ func run(c config, now time.Time) error {
 		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, ran, now)
 		d.Releases = releases(hist, catalog, compatRows, fieldRows, d.Harnesses, ran)
 		d.Status = statuses(compatRows, d.Releases, d.Compat, hist)
-		met := map[string]bool{}
+		met := map[MetKey]bool{}
 		for _, p := range c.noteRuns {
 			var notes map[string][]string
 			if err := readJSON(p, &notes); err != nil {
 				return err
 			}
-			for _, k := range notes[e2e.UnclassifiedNotes] {
-				met[k] = true
+			for _, n := range notes[e2e.UnclassifiedNotes] {
+				h, k := e2e.ParseUnclassifiedNote(n)
+				met[MetKey{Harness: h, Key: k}] = true
 			}
 		}
 		d.Unclassified = unclassified(met, d.Harnesses)

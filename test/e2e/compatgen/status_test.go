@@ -108,29 +108,41 @@ func TestFixedNeedsEveryEarlierFailureToPass(t *testing.T) {
 	}
 }
 
-// A key a tripwire met that no census found new, the Linux machines' say, is to note; one the
-// census found new is said once, with the census's.
+// A key a tripwire met that the census of the harness that met it does not say withheld, the
+// Linux machines' say, is to note; one that census found, new or before, is said with it.
 func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
-	hs := []HarnessDrift{{Harness: "codex", Name: "Codex",
-		Withheld:      []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}},
-		StillWithheld: []FieldChange{{Surface: "log:codex.decision", Key: "decision_type"}, {Surface: "resource", Key: "host.id"}}}}
-	met := map[string]bool{"tool_mode": true, "decision_type": true, "resource/host.id": true, "exposure": true}
-	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
-	if !slices.Equal(d.Unclassified, []string{"exposure"}) {
-		t.Fatalf("unclassified %q, want only the key no census says withheld, new or before", d.Unclassified)
+	hs := []HarnessDrift{
+		{Harness: "codex", Name: "Codex",
+			Withheld:      []FieldChange{{Surface: "metric:codex.tools.registered", Key: "tool_mode"}},
+			StillWithheld: []FieldChange{{Surface: "log:codex.decision", Key: "decision_type"}, {Surface: "resource", Key: "host.id"}}},
+		{Harness: "claude", Name: "Claude Code", StillWithheld: []FieldChange{{Surface: "log:claude_code.tool_decision", Key: "state"}}},
 	}
-	// A night that met only keys the census says withheld is quiet.
-	if q := (Drift{Harnesses: []HarnessDrift{{Harness: "claude"}}, Unclassified: unclassified(map[string]bool{"decision_type": true}, hs)}); !q.Quiet() {
+	met := map[MetKey]bool{
+		{"codex", "tool_mode"}: true, {"codex", "decision_type"}: true, {"codex", "resource/host.id"}: true,
+		{"codex", "exposure"}: true,
+		// Claude's census has state withheld, Codex's does not: Codex's is news.
+		{"codex", "state"}: true,
+		// A scenario that proves no harness: any census that has it withheld says it.
+		{"", "state"}: true, {"", "overflowed"}: true,
+	}
+	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
+	want := []MetKey{{"codex", "exposure"}, {"codex", "state"}, {"", "overflowed"}}
+	if !slices.Equal(d.Unclassified, want) {
+		t.Fatalf("unclassified %+v, want %+v", d.Unclassified, want)
+	}
+	// A night that met only keys their harness's census says withheld is quiet.
+	if q := (Drift{Harnesses: []HarnessDrift{{Harness: "pi"}}, Unclassified: unclassified(map[MetKey]bool{{"codex", "decision_type"}: true}, hs)}); !q.Quiet() {
 		t.Errorf("%+v: a night meeting only keys withheld before is not quiet", q.Unclassified)
 	}
 	if d.Quiet() {
 		t.Error("a night that met an unclassified key is quiet")
 	}
+	said := "Unclassified keys the checks met, withheld until classified: Codex CLI: `exposure`, `state`; other scenarios: `overflowed`."
 	data, _ := json.Marshal(d.slack())
-	if !strings.Contains(string(data), "Unclassified keys the checks met, withheld until classified: `exposure`") {
-		t.Errorf("slack does not say the key:\n%s", data)
+	if !strings.Contains(string(data), said) {
+		t.Errorf("slack does not say %q:\n%s", said, data)
 	}
-	if md := d.markdown(); !strings.Contains(md, "`exposure`") {
-		t.Errorf("drift.md does not say the key:\n%s", md)
+	if md := d.markdown(); !strings.Contains(md, said) {
+		t.Errorf("drift.md does not say %q:\n%s", said, md)
 	}
 }

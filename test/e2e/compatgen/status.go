@@ -3,7 +3,6 @@ package main
 import (
 	"cmp"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
@@ -234,38 +233,69 @@ func (d Drift) newFields() string {
 	return "New fields, withheld until classified: " + strings.Join(parts, "; ") + "."
 }
 
-// unclassified are the keys met that no harness's census says withheld, new tonight
-// (newFields) or before (stillWithheld), sorted. The relay counts a resource's key as
-// "resource/<key>", the census as the key on the surface "resource".
-func unclassified(met map[string]bool, hs []HarnessDrift) []string {
-	for _, h := range hs {
-		for _, c := range slices.Concat(h.Withheld, h.StillWithheld) {
-			delete(met, c.Key)
-			if c.Surface == "resource" {
-				delete(met, "resource/"+c.Key)
-			}
-		}
-	}
-	return slices.Sorted(maps.Keys(met))
+// MetKey is a key a tripwire met unclassified, and the harness whose scenario met it, ""
+// where the scenario proves none.
+type MetKey struct {
+	Harness string `json:"harness,omitempty"`
+	Key     string `json:"key"`
 }
 
-// metUnclassified says the keys the tripwires met that no census found, or "".
+// unclassified are the keys met that the census does not say withheld, new tonight
+// (newFields) or before (stillWithheld): the census of the harness that met one, or any
+// harness's where none says which. They are by harness then key, those no harness says
+// last. The relay counts a resource's key as "resource/<key>", the census as the key on the
+// surface "resource".
+func unclassified(met map[MetKey]bool, hs []HarnessDrift) []MetKey {
+	withheld := func(h HarnessDrift, key string) bool {
+		return slices.ContainsFunc(slices.Concat(h.Withheld, h.StillWithheld), func(c FieldChange) bool {
+			return c.Key == key || c.Surface == "resource" && "resource/"+c.Key == key
+		})
+	}
+	var out []MetKey
+	for m := range met {
+		if !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return (m.Harness == "" || h.Harness == m.Harness) && withheld(h, m.Key) }) {
+			out = append(out, m)
+		}
+	}
+	unsaid := func(m MetKey) int {
+		if m.Harness == "" {
+			return 1
+		}
+		return 0
+	}
+	slices.SortFunc(out, func(a, b MetKey) int {
+		return cmp.Or(unsaid(a)-unsaid(b), strings.Compare(a.Harness, b.Harness), strings.Compare(a.Key, b.Key))
+	})
+	return out
+}
+
+// metUnclassified says the keys the tripwires met that no census says withheld, by harness,
+// or "".
 func (d Drift) metUnclassified() string {
 	if len(d.Unclassified) == 0 {
 		return ""
 	}
-	var keys []string
-	for _, k := range d.Unclassified {
-		if strings.HasPrefix(k, "(") { // the relay's overflow, more than it names
+	var parts []string
+	for i := 0; i < len(d.Unclassified); {
+		h := d.Unclassified[i].Harness
+		var keys []string
+		for ; i < len(d.Unclassified) && d.Unclassified[i].Harness == h; i++ {
+			k := d.Unclassified[i].Key
+			if !strings.HasPrefix(k, "(") { // the relay's overflow, more than it names
+				k = "`" + k + "`"
+			}
 			keys = append(keys, k)
-			continue
 		}
-		keys = append(keys, "`"+k+"`")
+		if len(keys) > maxListed {
+			keys = append(keys[:maxListed], fmt.Sprintf("and %d more", len(keys)-maxListed))
+		}
+		name := "other scenarios"
+		if h != "" {
+			name = harnessName(h)
+		}
+		parts = append(parts, name+": "+strings.Join(keys, ", "))
 	}
-	if len(keys) > maxListed {
-		keys = append(keys[:maxListed], fmt.Sprintf("and %d more", len(keys)-maxListed))
-	}
-	return "Unclassified keys the checks met, withheld until classified: " + strings.Join(keys, ", ") + "."
+	return "Unclassified keys the checks met, withheld until classified: " + strings.Join(parts, "; ") + "."
 }
 
 // summary is the notification's text: whether every harness tested sends what terma expects,

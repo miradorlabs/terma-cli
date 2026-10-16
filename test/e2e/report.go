@@ -27,6 +27,23 @@ type reportEntry struct {
 // whichever platform met them.
 const UnclassifiedNotes = "relay/unclassified"
 
+// UnclassifiedNote is the note of key, met in a scenario of harness, "" where none says
+// which: "harness: key", so the digest weighs it against that harness's census alone.
+func UnclassifiedNote(harness, key string) string {
+	if harness == "" {
+		return key
+	}
+	return harness + ": " + key
+}
+
+// ParseUnclassifiedNote is UnclassifiedNote's harness and key.
+func ParseUnclassifiedNote(note string) (harness, key string) {
+	if h, k, ok := strings.Cut(note, ": "); ok {
+		return h, k
+	}
+	return "", note
+}
+
 var (
 	reportMu    sync.Mutex
 	reportRows  []reportEntry

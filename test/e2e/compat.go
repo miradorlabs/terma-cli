@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -66,9 +67,26 @@ type CompatRow struct {
 }
 
 var (
-	compatMu   sync.Mutex
-	compatRows []CompatRow
+	compatMu      sync.Mutex
+	compatRows    []CompatRow
+	provesHarness = map[string]string{} // test → the harness it proves (Proves)
 )
+
+// harnessOf is the harness t, or a scenario t runs in, proves, "" where none does.
+func harnessOf(t *testing.T) string {
+	compatMu.Lock()
+	defer compatMu.Unlock()
+	for name := t.Name(); ; {
+		if h, ok := provesHarness[name]; ok {
+			return h
+		}
+		i := strings.LastIndexByte(name, '/')
+		if i < 0 {
+			return ""
+		}
+		name = name[:i]
+	}
+}
 
 // Proves records that t proves capability for harness at version: a pass when t
 // passes, a failure when it fails, "not run" when it is skipped. Call it where the
@@ -82,6 +100,9 @@ func Proves(t *testing.T, harness, version, capability string) {
 	if !known {
 		t.Fatalf("Proves: unknown capability %q: add it to Capabilities", capability)
 	}
+	compatMu.Lock()
+	provesHarness[t.Name()] = harness
+	compatMu.Unlock()
 	t.Cleanup(func() {
 		result := "pass"
 		switch {
