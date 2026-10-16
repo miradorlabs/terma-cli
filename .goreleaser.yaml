@@ -41,21 +41,9 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
-    # Every entry's owner, group and time is pinned, so the archives are byte for byte the
-    # same wherever they are built: shadybin rebuilds a release from its tag and certifies
-    # it only if the archives match the published ones.
-    builds_info:
-      owner: root
-      group: root
-      mtime: "{{ .CommitDate }}"
     files:
-      - src: README.md
-        info: &pinned
-          owner: root
-          group: root
-          mtime: "{{ .CommitDate }}"
-      - src: LICENSE*
-        info: *pinned
+      - README.md
+      - LICENSE*
 
 checksum:
   name_template: "checksums.txt"
