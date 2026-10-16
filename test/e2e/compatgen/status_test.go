@@ -199,3 +199,15 @@ func TestEveryReleaseOfTheNightIsSaid(t *testing.T) {
 		}
 	}
 }
+
+// A release only a census saw has a verdict: no checks ran, never left unsaid.
+func TestACensusOnlyReleaseHasAVerdict(t *testing.T) {
+	ss := statuses(nil, []Release{{Harness: "pi", Version: "1.3.0"}}, nil, nil)
+	if len(ss) != 1 || ss[0].Version != "1.3.0" || ss[0].Checks != 0 {
+		t.Fatalf("statuses %+v, want Pi 1.3.0 with no checks", ss)
+	}
+	ss = statuses([]e2e.CompatRow{check("pi", "1.2.0", "relay.telemetry", "darwin/arm64", "pass")}, []Release{{Harness: "pi", Version: "1.3.0"}}, nil, nil)
+	if len(ss) != 1 || ss[0].Version != "1.2.0" || ss[0].Untested != "1.3.0" || !ss[0].UntestedNew {
+		t.Errorf("statuses %+v, want Pi 1.2.0 passing with 1.3.0 new and untested beside it", ss)
+	}
+}

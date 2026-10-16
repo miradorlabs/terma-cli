@@ -82,6 +82,12 @@ func statuses(rows []e2e.CompatRow, rs []Release, compat []CompatChange, hist ma
 			passed[b][c] = true
 		}
 	}
+	// A release only a census saw (no check of it ran) has a verdict too: no checks ran.
+	for _, r := range rs {
+		if v, ok := newest[r.Harness]; !ok || versionLess(v, r.Version) {
+			newest[r.Harness] = r.Version
+		}
+	}
 	var out []Status
 	for harness, latest := range newest {
 		v := latest
