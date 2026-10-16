@@ -122,12 +122,15 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 		{"codex", "exposure"}: true,
 		// Claude's census has state withheld, Codex's does not: Codex's is news.
 		{"codex", "state"}: true,
-		// A scenario that proves no harness, or one with no census of its own (T3 Code runs
-		// Codex): any census that has it withheld says it.
+		// A scenario that proves no harness: any census that has it withheld says it. One of a
+		// harness with no census of its own, the census of the harness it runs (T3 Code runs
+		// Codex).
 		{"", "state"}: true, {"", "overflowed"}: true, {"t3", "decision_type"}: true,
+		// Pi's census is missing tonight: Claude's withholding state does not hide Pi's.
+		{"pi", "state"}: true,
 	}
 	d := Drift{Harnesses: hs, Unclassified: unclassified(met, hs)}
-	want := []MetKey{{"codex", "exposure"}, {"codex", "state"}, {"", "overflowed"}}
+	want := []MetKey{{"codex", "exposure"}, {"codex", "state"}, {"pi", "state"}, {"", "overflowed"}}
 	if !slices.Equal(d.Unclassified, want) {
 		t.Fatalf("unclassified %+v, want %+v", d.Unclassified, want)
 	}
@@ -138,7 +141,7 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 	if d.Quiet() {
 		t.Error("a night that met an unclassified key is quiet")
 	}
-	said := "Unclassified keys the checks met, withheld until classified: Codex CLI: `exposure`, `state`; other scenarios: `overflowed`."
+	said := "Unclassified keys the checks met, withheld until classified: Codex CLI: `exposure`, `state`; Pi: `state`; other scenarios: `overflowed`."
 	data, _ := json.Marshal(d.slack())
 	if !strings.Contains(string(data), said) {
 		t.Errorf("slack does not say %q:\n%s", said, data)

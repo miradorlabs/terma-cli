@@ -239,7 +239,8 @@ withheld, as always, and noted, and the harness stays green. Each run writes wha
 `report/notes.json`, which both platforms upload, so a key only the Linux machines met is
 still said under what is to note. A key is noted with the harness of the scenario that met it
 (each `forEach…` helper's build says it, and `Proves`), and weighed against that harness's census alone: one harness withholding `state`
-does not hide another meeting it. Pull-request CI leaves it unset, so a pinned build bumped
+does not hide another meeting it, even on a night the other's census is missing. T3 Code and
+the desktop apps, which take no census, are weighed against the census of the agents they run. Pull-request CI leaves it unset, so a pinned build bumped
 past a new field fails until the field is classified.
 
 What is to note follows, never red: the fields new tonight that the relay withholds until

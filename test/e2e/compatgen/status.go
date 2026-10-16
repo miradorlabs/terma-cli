@@ -262,12 +262,17 @@ type MetKey struct {
 	Key     string `json:"key"`
 }
 
+// censusOf names the harnesses whose agents a harness with no census of its own runs, and
+// whose census therefore says what it meets: T3 Code runs Claude Code and Codex, each
+// desktop app its own.
+var censusOf = map[string][]string{"t3": {"claude", "codex"}, "claude-desktop": {"claude"}, "codex-desktop": {"codex"}}
+
 // unclassified are the keys met that the census does not say withheld, new tonight
-// (newFields) or before (stillWithheld): the census of the harness that met one, or any
-// harness's where none says which or the harness has none (T3 Code and the desktop apps run
-// Claude Code's and Codex's, and meet their keys). They are by harness then key, those no harness says
-// last. The relay counts a resource's key as "resource/<key>", the census as the key on the
-// surface "resource".
+// (newFields) or before (stillWithheld): the census of the harness that met one and of the
+// harnesses it runs (censusOf), or any harness's where no scenario says which. One harness's
+// census never hides another's key, even on a night the other's census is missing. They are
+// by harness then key, those no harness says last. The relay counts a resource's key as
+// "resource/<key>", the census as the key on the surface "resource".
 func unclassified(met map[MetKey]bool, hs []HarnessDrift) []MetKey {
 	withheld := func(h HarnessDrift, key string) bool {
 		return slices.ContainsFunc(slices.Concat(h.Withheld, h.StillWithheld), func(c FieldChange) bool {
@@ -276,8 +281,10 @@ func unclassified(met map[MetKey]bool, hs []HarnessDrift) []MetKey {
 	}
 	var out []MetKey
 	for m := range met {
-		anyCensus := m.Harness == "" || !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return h.Harness == m.Harness })
-		if !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return (anyCensus || h.Harness == m.Harness) && withheld(h, m.Key) }) {
+		says := func(h HarnessDrift) bool {
+			return m.Harness == "" || h.Harness == m.Harness || slices.Contains(censusOf[m.Harness], h.Harness)
+		}
+		if !slices.ContainsFunc(hs, func(h HarnessDrift) bool { return says(h) && withheld(h, m.Key) }) {
 			out = append(out, m)
 		}
 	}
