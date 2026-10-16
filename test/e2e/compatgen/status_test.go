@@ -49,6 +49,9 @@ func TestStatusEdges(t *testing.T) {
 	if got := (Drift{Status: ss[1:]}).summary(); got != "Harness drift: 1 harness ran no checks; the rest send what terma expects" {
 		t.Errorf("summary %q", got)
 	}
+	if got := (Drift{Status: ss[1:2]}).summary(); got != "Harness drift: no harness ran its checks tonight" {
+		t.Errorf("summary %q: no harness is left to send anything", got)
+	}
 }
 
 // However many harnesses fail (sixteen, four checks each, pass one section), every verdict reaches Slack: the list is split across sections,

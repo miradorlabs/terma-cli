@@ -239,6 +239,8 @@ func (d Drift) summary() string {
 	switch {
 	case len(d.Status) == 0:
 		return "Harness drift: no harness was tested tonight"
+	case untested == len(d.Status):
+		return "Harness drift: no harness ran its checks tonight"
 	case failing > 0 && untested > 0:
 		return "Harness drift: " + harnesses(failing) + " not sending what terma expects, " + harnesses(untested) + " ran no checks"
 	case failing > 0:
