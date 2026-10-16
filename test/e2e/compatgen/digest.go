@@ -27,9 +27,14 @@ type Drift struct {
 	// Missing names the harnesses this night has no census of that it should have: those the
 	// catalog took a census of within missingWithin, and those whose census scenarios ran.
 	Missing []string `json:"missing,omitempty"`
-	// Releases are the builds tested tonight for the first time.
+	// Status is each harness's verdict: does its newest build tested tonight send all the
+	// telemetry terma expects. Releases are the builds tested tonight for the first time.
+	Status    []Status       `json:"status,omitempty"`
 	Releases  []Release      `json:"releases,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
+	// Unclassified are the keys the night's tripwires met unclassified that no census found
+	// new: one a scenario without a census met, the Linux machines' among them.
+	Unclassified []string `json:"unclassified,omitempty"`
 	// SourceErrors are the builds whose source could not be read, their findings unlinked.
 	SourceErrors []string       `json:"source_errors,omitempty"`
 	Compat       []CompatChange `json:"compat"`
@@ -133,10 +138,11 @@ type GoneSurface struct {
 	Source *SourceSays `json:"source,omitempty"`
 }
 
-// Quiet reports a night that took the census of every harness it should have and found
-// nothing worth a look: a release that passed its checks is news, not a change.
+// Quiet reports a night that took the census of every harness it should have, every harness
+// passing its checks, and found nothing else worth a look: no field, surface or capability
+// changed.
 func (d Drift) Quiet() bool {
-	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 || slices.ContainsFunc(d.Releases, func(r Release) bool { return !r.Passed() }) {
+	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 || len(d.Unclassified) > 0 || slices.ContainsFunc(d.Status, func(s Status) bool { return !s.Passed() }) {
 		return false
 	}
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)

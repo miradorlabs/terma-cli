@@ -170,8 +170,8 @@ func TestTheBuildJudgedAgainstIsNamed(t *testing.T) {
 	}
 	h.Removed, h.Previous, h.Compare = nil, "0.162.0", "https://c"
 	h.Version = "0.162.1"
-	if got := (Drift{Harnesses: []HarnessDrift{h}}).unchanged(); got != "Codex CLI 0.162.1 (new build, was 0.162.0; judged against 0.161.0, censused whole, \x00https://c\x01diff\x02)" {
-		t.Errorf("unchanged %q", got)
+	if got := h.build("new build, "); got != "0.162.1 (new build, was 0.162.0; judged against 0.161.0, censused whole, \x00https://c\x01diff\x02)" {
+		t.Errorf("build %q", got)
 	}
 }
 

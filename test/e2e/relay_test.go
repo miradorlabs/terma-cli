@@ -108,7 +108,10 @@ func agentRecords(e telemetryEvidence) int {
 
 // failUnclassified fails a scenario whose withheld content met an attribute key the
 // relay has not classified (internal/relay/allow.go): the relay dropped it, as it must,
-// and someone has to decide whether it is safe metadata to let through or content.
+// and someone has to decide whether it is safe metadata to let through or content. With
+// TERMA_E2E_UNCLASSIFIED=note, as the nightly runs, it notes them instead: a harness that
+// sends a new field still sends all the telemetry terma expects, and the field census and
+// its digest say what is to classify.
 func failUnclassified(t *testing.T, c map[string]int) {
 	t.Helper()
 	var keys []string
@@ -120,10 +123,19 @@ func failUnclassified(t *testing.T, c map[string]int) {
 	if c["unclassified_overflow"] > 0 {
 		keys = append(keys, "(and more: unclassified_overflow)")
 	}
-	if len(keys) > 0 {
-		sort.Strings(keys)
-		t.Errorf("withheld content met %d unclassified key(s) — classify each in internal/relay/allow.go as safe, or as content in content.go: %s", len(keys), strings.Join(keys, ", "))
+	if len(keys) == 0 {
+		return
 	}
+	sort.Strings(keys)
+	msg := fmt.Sprintf("withheld content met %d unclassified key(s) — classify each in internal/relay/allow.go as safe, or as content in content.go: %s", len(keys), strings.Join(keys, ", "))
+	if os.Getenv("TERMA_E2E_UNCLASSIFIED") == "note" {
+		t.Log(msg)
+		for _, k := range keys {
+			Note(UnclassifiedNotes, k)
+		}
+		return
+	}
+	t.Error(msg)
 }
 
 func noteRelayStats(name string, c map[string]int) {

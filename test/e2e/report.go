@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,11 @@ type reportEntry struct {
 	Status string // pass | fail | not run
 	Note   string
 }
+
+// UnclassifiedNotes are the keys the nightly's tripwire met unclassified, noted, not failed
+// (TERMA_E2E_UNCLASSIFIED=note): report/notes.json carries them to the digest, which says them
+// whichever platform met them.
+const UnclassifiedNotes = "relay/unclassified"
 
 var (
 	reportMu    sync.Mutex
@@ -62,7 +68,7 @@ func AddSpend(usd float64) {
 	spendUSD += usd
 }
 
-// WriteReport renders report/latest.md.
+// WriteReport renders report/latest.md, and writes the notes, by surface, to report/notes.json.
 func WriteReport(dir string) error {
 	reportMu.Lock()
 	defer reportMu.Unlock()
@@ -103,5 +109,12 @@ func WriteReport(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "latest.md"), []byte(b.String()), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "latest.md"), []byte(b.String()), 0o644); err != nil {
+		return err
+	}
+	notes, err := json.MarshalIndent(reportNotes, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "notes.json"), append(notes, '\n'), 0o644)
 }
