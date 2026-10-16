@@ -366,13 +366,22 @@ func TestRelayWorkloadsCodex(t *testing.T) {
 
 // --- OpenCode ----------------------------------------------------------------------
 
-// openAIToolProvider asks OpenCode's bash tool to run cmd on the first call, then
+// openAIToolProvider asks the agent's bash tool to run cmd on the first call, then
 // replies.
 func openAIToolProvider(calls *atomic.Int32, cmd string) http.Handler {
 	if cmd == "" {
 		return openAIToolCallProvider(calls, "", nil)
 	}
 	return openAIToolCallProvider(calls, "bash", map[string]any{"command": cmd, "description": "workload"})
+}
+
+// openCodeToolProvider is openAIToolProvider for OpenCode b, whose shell tool OpenCode 2
+// names shell and takes the command alone.
+func openCodeToolProvider(b Binary, calls *atomic.Int32, cmd string) http.Handler {
+	if cmd != "" && opencode2(b) {
+		return openAIToolCallProvider(calls, "shell", map[string]any{"command": cmd})
+	}
+	return openAIToolProvider(calls, cmd)
 }
 
 // openAIToolCallProvider asks for one call of tool with args on the first request
@@ -407,9 +416,9 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 				runBoth(t, b, func(t *testing.T) *Sandbox {
 					sb := New(t, Isolated)
 					var calls atomic.Int32
-					provider = httptest.NewServer(openAIToolProvider(&calls, w.cmd))
+					provider = httptest.NewServer(openCodeToolProvider(b, &calls, w.cmd))
 					t.Cleanup(provider.Close)
-					sb.UseOpenCodeProvider(provider.URL)
+					sb.UseOpenCodeProvider(b, provider.URL)
 					return sb
 				}, func(t *testing.T, sb *Sandbox) {
 					sb.directOpenCode()
