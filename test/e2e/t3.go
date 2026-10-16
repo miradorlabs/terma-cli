@@ -79,8 +79,7 @@ type T3 struct {
 	cmd   *exec.Cmd
 	out   bytes.Buffer
 	once  sync.Once
-	v2    bool  // 0.1.0's API: /api/projects, the WebSocket, /api/orchestration/shell
-	rpcID int64 // the last Effect RPC request's id
+	v2    bool // 0.1.0's API: /api/projects, the WebSocket, /api/orchestration/shell
 }
 
 // StartT3 serves T3 for the sandbox, with its state under the sandbox and env added to
@@ -128,9 +127,9 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 	}
 	x.token = strings.TrimSpace(string(tok))
 	// 0.1.0 answers the old snapshot route with its web app, and serves its own shell
-	// snapshot instead. A build that does the first and not the second speaks neither
-	// API. Any other answer (an error, a refusal, a server that never came up) goes on
-	// with the old API, and fails the scenario as it should.
+	// snapshot instead. A build that answers the shell route with its web app or a 404
+	// too speaks neither API. Any other answer (an error, a refusal, a server that never
+	// came up) fails the scenario, here or in the old API, as it should.
 	if x.servesWebApp("/api/orchestration/snapshot") {
 		if !x.servesShell() {
 			SkipBuild(t, "the test driver can't drive this version (it serves neither /api/orchestration/snapshot nor /api/orchestration/shell)")
@@ -166,17 +165,39 @@ func (x *T3) servesWebApp(path string) bool {
 	return resp.StatusCode/100 == 2 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html")
 }
 
-// servesShell says whether T3 answers 0.1.0's shell snapshot route with JSON.
+// servesShell says whether T3 serves 0.1.0's shell snapshot route: true where it answers
+// with JSON, false where it answers with its web app or a 404, as a build without the
+// route does. Anything else fails the scenario, once a server error or a dropped
+// connection has had a few seconds to clear: a build that cannot answer is broken, not
+// one the driver cannot drive.
 func (x *T3) servesShell() bool {
-	req, _ := http.NewRequest(http.MethodGet, x.url+"/api/orchestration/shell", nil)
-	req.Header.Set("Authorization", "Bearer "+x.token)
-	req.Header.Set(t3ProtocolHeader, t3Protocol)
-	resp, err := t3Client.Do(req)
-	if err != nil {
-		return false
+	x.t.Helper()
+	var last string
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
+		req, _ := http.NewRequest(http.MethodGet, x.url+"/api/orchestration/shell", nil)
+		req.Header.Set("Authorization", "Bearer "+x.token)
+		req.Header.Set(t3ProtocolHeader, t3Protocol)
+		resp, err := t3Client.Do(req)
+		if err != nil {
+			last = err.Error()
+			continue
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2000))
+		_ = resp.Body.Close()
+		kind := resp.Header.Get("Content-Type")
+		switch {
+		case resp.StatusCode/100 == 2 && strings.HasPrefix(kind, "application/json"):
+			return true
+		case resp.StatusCode/100 == 2 && strings.HasPrefix(kind, "text/html"), resp.StatusCode == http.StatusNotFound:
+			return false
+		case resp.StatusCode/100 == 5:
+			last = resp.Status + " " + string(body)
+			continue
+		}
+		x.t.Fatalf("t3 GET /api/orchestration/shell: %s (%s) %s\n%s", resp.Status, kind, body, tail(x.out.String(), 2000))
 	}
-	_ = resp.Body.Close()
-	return resp.StatusCode/100 == 2 && strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json")
+	x.t.Fatalf("t3 GET /api/orchestration/shell: %s\n%s", last, tail(x.out.String(), 2000))
+	return false
 }
 
 // t3Client bounds every request: a server that accepts and never answers must fail the
@@ -335,28 +356,41 @@ func (x *T3) turnV2(project, thread string, agent map[string]any, prompt string)
 		"workspaceStrategy": map[string]any{"type": "root"},
 		"initialMessage":    map[string]any{"messageId": uuid.NewString(), "text": prompt, "attachments": []any{}}})
 	x.t.Logf("T3: %v thread %s started", agent["instanceId"], thread)
+	seen := "no such thread in T3's shell snapshot"
 	deadline := time.Now().Add(3 * time.Minute)
 	for time.Now().Before(deadline) {
-		if th, ok := x.shellThread(thread); ok && th.LatestRunID != nil && th.ActiveRunID == nil {
-			if th.Status != "completed" {
-				x.t.Fatalf("T3's %v thread %s: run %s: %s (%s)\n%s", agent["instanceId"], thread, th.Status, th.LastError, th.LastErrorClass, tail(x.out.String(), 3000))
+		if th, ok := x.shellThread(thread); ok {
+			if th.LatestRunID != nil && th.ActiveRunID == nil {
+				if th.Status != "completed" {
+					x.t.Fatalf("T3's %v thread %s: run %s: %s (%s)\n%s", agent["instanceId"], thread, th.Status, th.LastError, th.LastErrorClass, tail(x.out.String(), 3000))
+				}
+				x.t.Logf("T3: %v thread %s completed", agent["instanceId"], thread)
+				return
 			}
-			x.t.Logf("T3: %v thread %s completed", agent["instanceId"], thread)
-			return
+			seen = fmt.Sprintf("status %s, latest run %s, active run %s", th.Status, deref(th.LatestRunID), deref(th.ActiveRunID))
 		}
 		time.Sleep(time.Second)
 	}
-	x.t.Fatalf("T3's %v thread %s never settled\n%s", agent["instanceId"], thread, tail(x.out.String(), 3000))
+	x.t.Fatalf("T3's %v thread %s never settled (last seen: %s)\n%s", agent["instanceId"], thread, seen, tail(x.out.String(), 3000))
+}
+
+// deref is *s, or "none" where s is nil.
+func deref(s *string) string {
+	if s == nil {
+		return "none"
+	}
+	return *s
 }
 
 // t3ShellThread is what turnV2 reads of a thread in 0.1.0's shell snapshot.
 type t3ShellThread struct {
-	ID             string  `json:"id"`
-	Status         string  `json:"status"`
-	LatestRunID    *string `json:"latestRunId"`
-	ActiveRunID    *string `json:"activeRunId"`
-	LastError      string  `json:"lastError"`
-	LastErrorClass string  `json:"lastErrorClass"`
+	ID          string  `json:"id"`
+	Status      string  `json:"status"`
+	LatestRunID *string `json:"latestRunId"`
+	ActiveRunID *string `json:"activeRunId"`
+	// Raw, as T3 sends them: what fails the scenario is shown, never what it could not decode.
+	LastError      json.RawMessage `json:"lastError"`
+	LastErrorClass json.RawMessage `json:"lastErrorClass"`
 }
 
 // shellThread is thread in T3's shell snapshot, false while the snapshot has no such thread.
@@ -380,7 +414,8 @@ func (x *T3) shellThread(thread string) (t3ShellThread, bool) {
 // rpc makes one Effect RPC call over 0.1.0's WebSocket and returns its result: one
 // connection per call, authenticated by the session token on the upgrade, its request
 // a JSON message and its answer the Exit that names the request. A failed call fails
-// the scenario with its cause.
+// the scenario with its cause. The client pings in Effect RPC and the server only
+// answers, so a call this short has nothing to answer but its Exit.
 func (x *T3) rpc(tag string, payload any) json.RawMessage {
 	x.t.Helper()
 	cfg, err := websocket.NewConfig(strings.Replace(x.url, "http", "ws", 1)+"/ws?orchestrationProtocol="+t3Protocol, x.url)
@@ -388,23 +423,25 @@ func (x *T3) rpc(tag string, payload any) json.RawMessage {
 		x.t.Fatal(err)
 	}
 	cfg.Header.Set("Authorization", "Bearer "+x.token)
-	cfg.Dialer = &net.Dialer{Timeout: t3Client.Timeout}
-	ws, err := websocket.DialConfig(cfg)
+	// The upgrade is bounded as every request is, not only the connect.
+	ctx, cancel := context.WithTimeout(context.Background(), t3Client.Timeout)
+	defer cancel()
+	ws, err := cfg.DialContext(ctx)
 	if err != nil {
 		x.t.Fatalf("t3 %s: %v\n%s", tag, err, tail(x.out.String(), 2000))
 	}
 	defer func() { _ = ws.Close() }()
 	_ = ws.SetDeadline(time.Now().Add(t3Client.Timeout))
-	x.rpcID++
-	id := fmt.Sprint(x.rpcID)
+	const id = "1" // the connection's only request
 	req := map[string]any{"_tag": "Request", "id": id, "tag": tag, "payload": payload, "headers": []any{}}
 	if err := websocket.JSON.Send(ws, req); err != nil {
 		x.t.Fatalf("t3 %s: %v", tag, err)
 	}
 	for {
 		var msg struct {
-			Tag       string `json:"_tag"`
-			RequestID string `json:"requestId"`
+			Tag       string          `json:"_tag"`
+			RequestID string          `json:"requestId"`
+			Defect    json.RawMessage `json:"defect"`
 			Exit      struct {
 				Tag   string          `json:"_tag"`
 				Value json.RawMessage `json:"value"`
@@ -415,15 +452,13 @@ func (x *T3) rpc(tag string, payload any) json.RawMessage {
 			x.t.Fatalf("t3 %s: no answer: %v\n%s", tag, err, tail(x.out.String(), 2000))
 		}
 		switch {
-		case msg.Tag == "Ping":
-			_ = websocket.JSON.Send(ws, map[string]any{"_tag": "Pong"})
 		case msg.Tag == "Exit" && msg.RequestID == id:
 			if msg.Exit.Tag != "Success" {
 				x.t.Fatalf("t3 %s: %s %s", tag, msg.Exit.Tag, tail(string(msg.Exit.Cause), 2000))
 			}
 			return msg.Exit.Value
 		case msg.Tag == "Defect":
-			x.t.Fatalf("t3 %s: defect: %+v", tag, msg)
+			x.t.Fatalf("t3 %s: defect: %s\n%s", tag, tail(string(msg.Defect), 2000), tail(x.out.String(), 2000))
 		}
 	}
 }
