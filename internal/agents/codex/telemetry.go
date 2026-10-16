@@ -40,9 +40,12 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		MetricSafeKeys: map[string][]string{
 			"codex.shell_snapshot.command": {"state"},
 			"codex.shell_snapshot.wait_ms": {"state"},
-			// 0.163's sandbox integrity checks (exec-server/src/sandbox_integrity): its backend
-			// (seatbelt, bubblewrap or windows_mxc), checker ("contents") and dependency, each a
-			// &'static str the module's own doc calls bounded tags.
+			// 0.163's sandbox integrity checks (exec-server/src/sandbox_integrity, whose AGENTS.md
+			// says never to emit paths, environment values or error text): its backend (seatbelt,
+			// bubblewrap or windows_mxc), checker ("contents") and dependency (codex, seatbelt,
+			// sandbox_launcher, bundled_bwrap_candidate, system_bwrap_candidate, glob_scanner,
+			// or preparation), each a &'static str. Codex's guardian_v2 metrics carry a backend
+			// too, of other values: it stays unclassified there.
 			"codex.sandbox_integrity.check":          {"backend", "checker", "dependency"},
 			"codex.sandbox_integrity.duration_ms":    {"backend"},
 			"codex.sandbox_integrity.preparation_ms": {"backend"},
