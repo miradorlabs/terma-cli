@@ -45,10 +45,13 @@ func TestOpenCodeTemplateHasOneConfigLineAndOneExport(t *testing.T) {
 			exports++
 		}
 	}
-	// OpenCode's loader treats every export as a plugin function; a stray helper export
-	// would make the plugin fail to load.
+	// OpenCode 1's loader treats every export as a plugin and OpenCode 2's reads the
+	// default one: a stray helper export would make the plugin fail to load.
 	if exports != 1 {
-		t.Fatalf("plugin has %d exports, want exactly 1 (the plugin function)", exports)
+		t.Fatalf("plugin has %d exports, want exactly 1 (the plugin)", exports)
+	}
+	if !opencodeSetupExport.MatchString(opencodePluginSource) {
+		t.Fatal("the plugin's default export has no OpenCode 2 setup, or doctor no longer recognizes it")
 	}
 	if _, ok := readPluginConfig([]byte(opencodePluginSource)); ok {
 		t.Fatal("the raw template must read as unconfigured")
