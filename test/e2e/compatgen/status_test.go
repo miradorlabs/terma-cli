@@ -147,3 +147,32 @@ func TestUnclassifiedKeysTheChecksMetAreToNote(t *testing.T) {
 		t.Errorf("drift.md does not say %q:\n%s", said, md)
 	}
 }
+
+// A build that fixed one check and still fails another is not fixed: its line names the
+// failure, and the fix is said among the compatibility changes, not lost.
+func TestAFixBesideAFailureIsSaid(t *testing.T) {
+	hist := map[string]Entry{}
+	e := Entry{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "fail"}
+	hist[e.key()] = e
+	rows := []e2e.CompatRow{
+		check("pi", "1.3.0", "relay.telemetry", "darwin/arm64", "pass"),
+		check("pi", "1.3.0", "relay.content_withheld", "darwin/arm64", "fail"),
+	}
+	compat := []CompatChange{
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.telemetry", From: "fail", To: "pass"},
+		{Harness: "pi", Version: "1.3.0", Platform: "darwin/arm64", Capability: "relay.content_withheld", From: "pass", To: "fail"},
+	}
+	d := Drift{Compat: compat, Status: statuses(rows, nil, compat, hist)}
+	if d.Status[0].Fixed {
+		t.Fatalf("%+v: fixed, still failing a check", d.Status[0])
+	}
+	if got := d.otherCompat(); len(got) != 1 || got[0].Capability != "relay.telemetry" {
+		t.Errorf("other compatibility changes %+v, want only the fix the verdict does not say", got)
+	}
+	// Fixed outright, the verdict says it.
+	rows[1].Result = "pass"
+	d = Drift{Compat: compat[:1], Status: statuses(rows, nil, compat[:1], hist)}
+	if got := d.otherCompat(); len(got) != 0 {
+		t.Errorf("other compatibility changes %+v, want none beside a fixed verdict", got)
+	}
+}
