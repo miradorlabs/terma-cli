@@ -30,28 +30,54 @@ func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier stri
 	return &Credential{AccessToken: "mir_cli_test", ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
-// browser drives the login flow the way the approval page does.
+// browser drives the login flow the way earlier versions of the approval page do: a GET
+// with the code and state in the query.
 func browser(t *testing.T, authURL string, code string, overrideState string) {
 	t.Helper()
-	parsed, err := url.Parse(authURL)
-	if err != nil {
-		t.Fatalf("parse authorize url: %v", err)
-	}
-	q := parsed.Query()
-
-	state := q.Get("state")
+	port, state := portFrom(t, authURL)
 	if overrideState != "" {
 		state = overrideState
 	}
-	port := q.Get("port")
 
-	callback := "http://127.0.0.1:" + port + "/callback?code=" + url.QueryEscape(code) + "&state=" + url.QueryEscape(state)
+	callback := fmt.Sprintf("http://127.0.0.1:%d/callback?code=%s&state=%s", port, url.QueryEscape(code), url.QueryEscape(state))
 	resp, err := http.Get(callback)
 	if err != nil {
 		t.Fatalf("callback request: %v", err)
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, resp.Body)
+}
+
+// postBrowser drives the login flow the way the approval page does: a form POST, so the code
+// is in the body and never in a URL. It returns the listener's status.
+func postBrowser(t *testing.T, authURL string, code string, overrideState string) int {
+	t.Helper()
+	port, state := portFrom(t, authURL)
+	if overrideState != "" {
+		state = overrideState
+	}
+	form := url.Values{"code": {code}, "state": {state}}
+	resp, err := http.PostForm(fmt.Sprintf("http://127.0.0.1:%d/callback", port), form)
+	if err != nil {
+		t.Fatalf("callback request: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode
+}
+
+// startLogin runs Login in the background and returns the URL it asks the browser to open.
+func startLogin(t *testing.T, exchanger TokenExchanger, timeout time.Duration) (authURL string, done <-chan error) {
+	t.Helper()
+	capture := &urlCapture{ch: make(chan string, 1)}
+	errs := make(chan error, 1)
+	go func() {
+		_, err := Login(context.Background(), exchanger, LoginOptions{
+			AppURL: "https://app.example.test", NoBrowser: true, Out: capture, Timeout: timeout,
+		})
+		errs <- err
+	}()
+	return <-capture.ch, errs
 }
 
 type urlCapture struct {
@@ -326,5 +352,131 @@ func TestLogin_HostileCallbacksAloneNeverAuthenticate(t *testing.T) {
 	}
 	if exchanger.code != "" {
 		t.Error("a code with the wrong state must never reach the token endpoint")
+	}
+}
+
+// TestLogin_AcceptsAPostedCallback takes the code from a form POST, as the approval page sends it.
+func TestLogin_AcceptsAPostedCallback(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLogin(t, exchanger, 0)
+
+	if status := postBrowser(t, authURL, "mir_cod_posted", ""); status != http.StatusOK {
+		t.Errorf("posted callback status = %d, want 200", status)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if exchanger.code != "mir_cod_posted" {
+		t.Errorf("code = %q, want the posted one", exchanger.code)
+	}
+	if want, _ := portFrom(t, authURL); exchanger.port != want {
+		t.Errorf("exchanged port = %d, advertised %d", exchanger.port, want)
+	}
+}
+
+// TestLogin_PostReadsOnlyItsBody proves a POST is answered from its form body: a code and state
+// in its query are not read.
+func TestLogin_PostReadsOnlyItsBody(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLogin(t, exchanger, 0)
+	port, state := portFrom(t, authURL)
+
+	target := fmt.Sprintf("http://127.0.0.1:%d/callback?code=mir_cod_query&state=%s", port, url.QueryEscape(state))
+	resp, err := http.PostForm(target, url.Values{})
+	if err != nil {
+		t.Fatalf("callback request: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("a POST with its state only in the query should be refused, got %d", resp.StatusCode)
+	}
+
+	postBrowser(t, authURL, "mir_cod_real", "")
+	if err := <-done; err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if exchanger.code != "mir_cod_real" {
+		t.Errorf("code = %q, want the one in the posted body", exchanger.code)
+	}
+}
+
+// TestLogin_RejectsAPostedCallbackFromAForeignHost holds a POST to the same Host check as a GET.
+func TestLogin_RejectsAPostedCallbackFromAForeignHost(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLogin(t, exchanger, 0)
+	port, state := portFrom(t, authURL)
+
+	form := url.Values{"code": {"mir_cod_rebind"}, "state": {state}}
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:%d/callback", port), strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Host = "evil.example.com:" + strconv.Itoa(port)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("callback request: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("foreign Host should be rejected, got %d", resp.StatusCode)
+	}
+
+	postBrowser(t, authURL, "mir_cod_real", "")
+	if err := <-done; err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if exchanger.code != "mir_cod_real" {
+		t.Errorf("code = %q, want the legitimate one", exchanger.code)
+	}
+}
+
+// TestLogin_RefusedCallbacksDoNotCancelThePendingLogin: a posted callback with the wrong state,
+// an oversized body or another method is refused, and the login still completes.
+func TestLogin_RefusedCallbacksDoNotCancelThePendingLogin(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLogin(t, exchanger, 0)
+	port, state := portFrom(t, authURL)
+	callback := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
+
+	if status := postBrowser(t, authURL, "mir_cod_attacker", "not-the-state-we-issued"); status != http.StatusBadRequest {
+		t.Errorf("wrong state: status = %d, want 400", status)
+	}
+
+	big := url.Values{"code": {strings.Repeat("a", maxCallbackBody)}, "state": {state}}
+	resp, err := http.PostForm(callback, big)
+	if err != nil {
+		t.Fatalf("oversized callback: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("oversized body: status = %d, want 400", resp.StatusCode)
+	}
+
+	for _, method := range []string{http.MethodPut, http.MethodHead, http.MethodDelete} {
+		req, err := http.NewRequest(method, callback+"?code=mir_cod_other&state="+url.QueryEscape(state), nil)
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s callback: %v", method, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("%s: status = %d, want 405", method, resp.StatusCode)
+		}
+	}
+
+	postBrowser(t, authURL, "mir_cod_real", "")
+	if err := <-done; err != nil {
+		t.Fatalf("Login should survive refused callbacks: %v", err)
+	}
+	if exchanger.code != "mir_cod_real" {
+		t.Errorf("code = %q, want the legitimate one", exchanger.code)
 	}
 }
