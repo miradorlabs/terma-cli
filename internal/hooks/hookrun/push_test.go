@@ -2,6 +2,8 @@ package hookrun
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -451,5 +454,134 @@ func TestAPushRecordIsKeptForTheRefsNotReported(t *testing.T) {
 	}
 	if left, _ := os.ReadDir(filepath.Join(p.stateDir, PushesDir)); len(left) > 0 {
 		t.Errorf("left %v", left)
+	}
+}
+
+// unpark parks recs in p's git directory, as a pre-push in an agent's sandbox does, then runs
+// the next hook outside it, and returns the pushes that hook handed to AwaitPush.
+func (p *pushRepo) unpark(t *testing.T, recs ...pushRecord) []string {
+	t.Helper()
+	for _, rec := range recs {
+		line, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookruntest.Store(t, p.root).Park(parkedPushes, append(line, '\n')); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var awaited []string
+	env := Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Spool: p.sp, Team: p.team, Policy: hookruntest.Admitting(p.root),
+		AwaitPush: func(path string) { awaited = append(awaited, path) }}
+	if _, err := env.Repo(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(p.root, ".git", project.GitStoreDir, parkedPushes+"*")); len(left) > 0 {
+		t.Errorf("left parked: %v", left)
+	}
+	return awaited
+}
+
+// parked is a record of main's push to backup as pre-push parks it.
+func (p *pushRepo) parked() pushRecord {
+	head, before := p.sha("HEAD"), p.sha("backup/main")
+	return pushRecord{ID: rand.Text(), Time: time.Now().Add(-time.Minute), Root: p.root, GitDir: filepath.Join(p.root, ".git"),
+		Remote: "backup", Excluded: []string{before},
+		Refs: []PushRef{{LocalRef: "refs/heads/main", LocalSHA: head, RemoteRef: "refs/heads/main", RemoteSHA: before,
+			Tracking: "refs/remotes/backup/main", TrackingBefore: before}},
+		Event: spool.Event{Name: semconv.TermaPushEvent, Repository: config.Repository{Origin: p.origin()},
+			Attrs: map[string]any{AttrProjectID: p.team}}}
+}
+
+// origin is p's repository as admission names it.
+func (p *pushRepo) origin() string { return "github.com/acme/" + filepath.Base(p.root) }
+
+// The git directory is the sandbox's to write, so a parked record is held to what pre-push
+// writes there; any other is dropped, and the hook goes on.
+func TestAParkedPushIsHeldToWhatPrePushWrites(t *testing.T) {
+	p := newPushRepo(t)
+	p.git("commit", "-q", "--allow-empty", "-m", "more")
+	outside := t.TempDir()
+	settings := filepath.Join(outside, "settings.json")
+	const kept = `{"kept":true}`
+	if err := os.WriteFile(settings, []byte(kept), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	escape, err := filepath.Rel(filepath.Join(p.stateDir, PushesDir), filepath.Join(outside, "settings"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*pushRecord)
+	}{
+		{"an id that leaves the pushes directory", func(r *pushRecord) { r.ID = escape }},
+		{"an absolute id", func(r *pushRecord) { r.ID = filepath.Join(outside, "settings") }},
+		{"an id outside rand.Text's alphabet", func(r *pushRecord) { r.ID = strings.ToLower(r.ID) }},
+		{"a short id", func(r *pushRecord) { r.ID = r.ID[:8] }},
+		{"no id", func(r *pushRecord) { r.ID = "" }},
+		{"a time to come", func(r *pushRecord) { r.Time = time.Now().Add(time.Hour) }},
+		{"no refs", func(r *pushRecord) { r.Refs = nil }},
+		{"a commit that is no commit id", func(r *pushRecord) { r.Refs[0].LocalSHA = "--all" }},
+		{"an old commit that is no commit id", func(r *pushRecord) { r.Refs[0].RemoteSHA = "HEAD~1" }},
+		{"a deleted branch", func(r *pushRecord) { r.Refs[0].LocalSHA = zero }},
+		{"a ref that is no branch", func(r *pushRecord) { r.Refs[0].RemoteRef = "refs/tags/v1" }},
+		{"a tracking ref outside refs/remotes", func(r *pushRecord) { r.Refs[0].Tracking = "../../settings" }},
+		{"a tracking ref that leaves refs/remotes", func(r *pushRecord) { r.Refs[0].Tracking = "refs/remotes/../../../" }},
+		{"a tracking commit that is no commit id", func(r *pushRecord) { r.Refs[0].TrackingBefore = "main" }},
+		{"an excluded commit that is no commit id", func(r *pushRecord) { r.Excluded = []string{"--all"} }},
+		{"another event", func(r *pushRecord) { r.Event.Name = semconv.TermaCommitEvent }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := p.parked()
+			tc.edit(&rec)
+			if awaited := p.unpark(t, rec); len(awaited) > 0 {
+				t.Errorf("recorded %v", awaited)
+			}
+			if entries, _ := os.ReadDir(filepath.Join(p.stateDir, PushesDir)); len(entries) > 0 {
+				t.Errorf("recorded %v", entries)
+			}
+		})
+	}
+	if data, err := os.ReadFile(settings); err != nil || string(data) != kept {
+		t.Errorf("a file outside the state directory became %q (%v)", data, err)
+	}
+	// A dropped record leaves the rest of the parking to be recorded.
+	if awaited := p.unpark(t, p.parked(), pushRecord{ID: escape}, p.parked()); len(awaited) != 2 {
+		t.Errorf("awaited %v, want the two pushes", awaited)
+	}
+}
+
+// A parked push is the repository's it was parked in, its event stamped as any hook there
+// stamps one, whatever the record says of either.
+func TestAParkedPushIsItsRepositorysOwn(t *testing.T) {
+	p := newPushRepo(t)
+	p.git("commit", "-q", "--allow-empty", "-m", "more")
+	head := p.sha("HEAD")
+	elsewhere := hookruntest.InitRepo(t)
+	rec := p.parked()
+	rec.Root, rec.GitDir = elsewhere, filepath.Join(elsewhere, ".git")
+	rec.Event.Repository = config.Repository{Origin: "github.com/acme/elsewhere"}
+	rec.Event.Attrs[AttrProjectID] = "project-b"
+	awaited := p.unpark(t, rec)
+	if len(awaited) != 1 {
+		t.Fatalf("awaited %v", awaited)
+	}
+	got, err := readPush(awaited[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Root != p.root || got.GitDir != filepath.Join(p.root, ".git") {
+		t.Errorf("recorded for %s (%s), want %s", got.Root, got.GitDir, p.root)
+	}
+	env := Env{StateDir: p.stateDir, Spool: p.sp, Team: p.team, Policy: hookruntest.Admitting(p.root)}
+	AwaitPush(context.Background(), env, awaited[0])
+	events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent)
+	if len(events) != 1 {
+		t.Fatalf("events %+v", events)
+	}
+	if ev := events[0]; ev.Attrs[AttrProjectID] != p.team || ev.Repository.Origin != p.origin() || ev.Global ||
+		!slices.Equal(strs(ev.Attrs[semconv.TermaPushCommitsKey]), []string{head}) {
+		t.Errorf("parked push: %+v", ev)
 	}
 }

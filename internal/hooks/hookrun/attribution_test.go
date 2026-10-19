@@ -3,6 +3,7 @@ package hookrun
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
@@ -149,6 +151,54 @@ func sandboxedCommit(t *testing.T, workspace bool) {
 	}
 	if flushes != 1 {
 		t.Errorf("%d flushes after unparking, want 1", flushes)
+	}
+}
+
+// The git directory is the sandbox's to write, so a parked event is stamped for the
+// repository it was parked in, as any hook there stamps one: whatever project and repository
+// the line names. A Global already set stays, since it only withholds the event.
+func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
+	t.Parallel()
+	root, stateDir, sp := hookruntest.Project(t)
+	origin := "github.com/acme/" + filepath.Base(root)
+	now := time.Now().UTC()
+	parked := []spool.Event{
+		{Name: semconv.TermaCommitEvent, Time: now, Repository: config.Repository{Origin: "github.com/acme/elsewhere"},
+			Attrs: map[string]any{AttrProjectID: "project-b"}},
+		{Name: semconv.TermaCommitEvent, Time: now},
+		{Name: semconv.TermaCommitEvent, Time: now, Global: true, Attrs: map[string]any{AttrProjectID: hookruntest.Team}},
+	}
+	unpark := func(team string) []spool.Event {
+		t.Helper()
+		for _, ev := range parked {
+			line, err := json.Marshal(ev)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := hookruntest.Store(t, root).Park(parkedEvents, append(line, '\n')); err != nil {
+				t.Fatal(err)
+			}
+		}
+		env := Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Team: team}
+		if _, err := env.Repo(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		return hookruntest.Spooled(t, sp)
+	}
+	got := unpark(hookruntest.Team)
+	if len(got) != len(parked) {
+		t.Fatalf("spooled %d events, want %d", len(got), len(parked))
+	}
+	for i, ev := range got {
+		if ev.Attrs[AttrProjectID] != hookruntest.Team || ev.Repository.Origin != origin || ev.Global != parked[i].Global {
+			t.Errorf("event %d spooled as %+v", i, ev)
+		}
+	}
+	// With no team to route to, a project the line names is not taken either.
+	for i, ev := range unpark("") {
+		if id, ok := ev.Attrs[AttrProjectID]; ok {
+			t.Errorf("event %d kept project %v", i, id)
+		}
 	}
 }
 
