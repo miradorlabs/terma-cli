@@ -7,7 +7,8 @@ before:
     # verify, not tidy: a tagged release must build from the committed go.mod/go.sum,
     # never silently re-resolve dependencies at release time.
     - go mod verify
-    - go test ./...
+    # The tests run in the release workflow's verify job, which holds no secret, rather
+    # than here, where every command sees the signing key.
 
 builds:
   - id: terma
