@@ -1,6 +1,8 @@
 package boundary
 
 import (
+	"bytes"
+	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -53,16 +55,33 @@ func TestTheReleaseTagLeavesOutThePolicyStub(t *testing.T) {
 	root := repoRoot(t)
 	// go test caches by what this process reads, not the go command it runs: read what the
 	// release test builds from here, as listPackages does, or a change is answered from the cache.
-	list := exec.Command("go", "list", "-deps", "-test", "-tags", releaseTag,
-		"-f", `{{if and (not .Standard) (ne .Name "main")}}{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .TestGoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{end}}`, "./internal/config/")
+	list := exec.Command("go", "list", "-deps", "-test", "-tags", releaseTag, "-json", "./internal/config/")
 	list.Dir = root
 	listed, err := list.Output()
 	if err != nil {
 		t.Fatalf("go list: %v", err)
 	}
-	files := append(strings.Fields(string(listed)), filepath.Join(root, "go.mod"), filepath.Join(root, "go.sum"))
+	files := []string{filepath.Join(root, "go.mod"), filepath.Join(root, "go.sum")}
+	dec := json.NewDecoder(bytes.NewReader(listed))
+	for dec.More() {
+		var p struct {
+			Dir, Name            string
+			Standard             bool
+			GoFiles, TestGoFiles []string
+		}
+		if err := dec.Decode(&p); err != nil {
+			t.Fatal(err)
+		}
+		// The generated test main lives in the build cache, outside the module.
+		if p.Standard || p.Name == "main" {
+			continue
+		}
+		for _, name := range slices.Concat(p.GoFiles, p.TestGoFiles) {
+			files = append(files, filepath.Join(p.Dir, name))
+		}
+	}
 	if !slices.Contains(files, filepath.Join(root, "internal", "config", "policystub_release_test.go")) {
-		t.Fatalf("go list -tags %s does not build the release test:\n%s", releaseTag, listed)
+		t.Fatalf("go list -tags %s does not build the release test: %q", releaseTag, files)
 	}
 	for _, f := range files {
 		if _, err := os.ReadFile(f); err != nil {
@@ -84,7 +103,11 @@ func TestOnlyConfigReadsThePolicyStub(t *testing.T) {
 	root := repoRoot(t)
 	fset := token.NewFileSet()
 	for _, p := range listPackages(t) {
-		for _, name := range p.GoFiles {
+		// Files another platform or build tag compiles too: the gate itself is a build tag.
+		for _, name := range slices.Concat(p.GoFiles, p.IgnoredGoFiles) {
+			if strings.HasSuffix(name, "_test.go") {
+				continue
+			}
 			path := filepath.Join(p.Dir, name)
 			f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
 			if err != nil {
