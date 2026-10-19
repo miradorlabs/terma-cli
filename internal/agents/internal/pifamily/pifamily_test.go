@@ -37,6 +37,14 @@ func TestWrite(t *testing.T) {
 	if !strings.Contains(template, configMarker) {
 		t.Fatal("the raw template must stay inert, with its configuration line")
 	}
+	// A refresh leaves the inert template inert.
+	raw := filepath.Join(t.TempDir(), "raw.ts")
+	if err := os.WriteFile(raw, []byte(template), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if changed, err := Refresh(raw); err != nil || changed {
+		t.Fatalf("refresh of the raw template: changed=%v err=%v", changed, err)
+	}
 }
 
 // An export carries the session's content and the relay's token, so it goes straight to
@@ -86,11 +94,13 @@ await on.session_shutdown({}, ctx)
 				t.Fatal(err)
 			}
 			cmd := exec.Command(rt[0], append(rt[1:], script, plugin, relay.URL, proxy.URL)...)
-			cmd.Env = withProxy(proxy.URL)
+			// NODE_USE_ENV_PROXY puts node:http's own default agent behind the proxy too.
+			cmd.Env = append(withProxy(proxy.URL), "NODE_USE_ENV_PROXY=1")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("%s: %v\n%s", rt[0], err, out)
 			}
-			if got := proxied(); !slices.Equal(got, []string{"/probe "}) {
+			// One request, the probe: under NODE_USE_ENV_PROXY a Node may tunnel it with CONNECT.
+			if got := proxied(); len(got) != 1 || strings.Contains(got[0], "Bearer") {
 				t.Errorf("the proxy saw %q, want only the probe", got)
 			}
 			if got := received(); !slices.Equal(got, []string{"/v1/logs Bearer tok"}) {

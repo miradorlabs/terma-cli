@@ -187,11 +187,10 @@ function attrs(obj) {
 
 // --- exporter -----------------------------------------------------------------------
 
-// directTo is the fetch option that keeps exports to the local relay off any HTTP proxy
-// the environment names: Bun's fetch sends even 127.0.0.1 through HTTP_PROXY, and an
-// export carries the session's content and the relay's token. Naming the relay as its own
-// proxy connects straight to it on every Bun release (`proxy: false` came only in Bun
-// 1.4.3, after the one OpenCode ships). Any other endpoint keeps the environment's proxy.
+// directTo is the fetch option that sends exports straight to the local relay, never
+// through an HTTP proxy, though Bun's fetch sends even 127.0.0.1 through HTTP_PROXY.
+// Naming the relay as its own proxy connects to it directly on every Bun release
+// (`proxy: false` came only in Bun 1.4.3). Any other endpoint keeps the environment's proxy.
 function directTo(base) {
   try {
     const url = new URL(base)

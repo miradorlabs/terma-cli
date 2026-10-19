@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -158,6 +160,64 @@ func TestUnconfigureRelayUndoesConfigure(t *testing.T) {
 			}
 			if again, err := e.UnconfigureRelay(t.Context(), token); err != nil || len(again.Paths) > 0 {
 				t.Fatalf("a second unconfigure changed %v, %v", again.Paths, err)
+			}
+		})
+	}
+}
+
+// A refresh rewrites a relay exporter's own file in this build's template, keeping its
+// configuration and its mode, and writes none that is not there.
+func TestRefreshRewritesRelayExporterFiles(t *testing.T) {
+	paths := map[string]string{
+		"opencode": "xdg/opencode/plugins/terma.js", "pi": "pi/extensions/terma.ts",
+		"omp": "omp/agent/extensions/terma-relay.ts", "dsh": "dsh/plugins/terma-relay.mjs",
+		"hermes": "hermes/plugins/terma/__init__.py",
+	}
+	for name, rel := range paths {
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("PATH", "") // Hermes's activation is left to the developer.
+			for key, dir := range map[string]string{
+				"XDG_CONFIG_HOME": "xdg", "PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes", "DSH_HOME": "dsh",
+			} {
+				t.Setenv(key, filepath.Join(home, dir))
+			}
+			reg := Agents(filepath.Join(home, "terma"))
+			e, _ := reg.Find[agents.RelayExporter](name)
+			r, ok := reg.Find[agents.MachineRefresher](name)
+			if !ok {
+				t.Fatalf("%s's relay exporter file is not refreshed", name)
+			}
+			path := filepath.Join(home, rel)
+			if _, changed, err := r.RefreshMachine(); err != nil || changed {
+				t.Fatalf("a refresh with nothing written: changed=%v err=%v", changed, err)
+			}
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("a refresh wrote %s: %v", rel, err)
+			}
+			if _, err := e.ConfigureRelay(t.Context(), agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "relay-token", HookCommand: []string{"terma", "hook"}}); err != nil {
+				t.Fatal(err)
+			}
+			want, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// What an earlier build wrote differs from this one's template.
+			if err := os.WriteFile(path, append(slices.Clone(want), '\n'), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if got, changed, err := r.RefreshMachine(); err != nil || !changed || got != path {
+				t.Fatalf("refresh: path=%q changed=%v err=%v", got, changed, err)
+			}
+			if got, _ := os.ReadFile(path); string(got) != string(want) {
+				t.Errorf("refreshed %s:\n%s\nwant:\n%s", rel, got, want)
+			}
+			if info, _ := os.Stat(path); runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+				t.Errorf("refreshed %s is %v: it holds the relay's token", rel, info.Mode().Perm())
+			}
+			if _, changed, err := r.RefreshMachine(); err != nil || changed {
+				t.Fatalf("a second refresh: changed=%v err=%v", changed, err)
 			}
 		})
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -50,6 +51,37 @@ func RemoveOwn(path string) (agents.RelayResult, error) {
 		return agents.RelayResult{}, err
 	}
 	return agents.RelayResult{Paths: []string{path}}, nil
+}
+
+// Refresh rewrites terma's own exporter file at path, whose configuration is the text
+// between prefix and suffix on one line, as render renders that configuration now, keeping
+// the file's mode. A missing file, one without that line, or a configuration render does
+// not take (the inert template's) is left alone.
+func Refresh(path, prefix, suffix string, render func(configuration string) (string, bool)) (bool, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	for line := range strings.SplitSeq(string(data), "\n") {
+		raw, isPrefixed := strings.CutPrefix(line, prefix)
+		raw, isSuffixed := strings.CutSuffix(raw, suffix)
+		if !isPrefixed || !isSuffixed {
+			continue
+		}
+		text, ok := render(raw)
+		if !ok || text == string(data) {
+			return false, nil
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return false, err
+		}
+		return true, config.WriteFileAtomic(path, []byte(text), info.Mode().Perm())
+	}
+	return false, nil
 }
 
 // NativePointed reports whether h's exporter sends to the relay at addr.

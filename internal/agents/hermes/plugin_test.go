@@ -49,6 +49,41 @@ func TestRenderHermesPluginIsValidPython(t *testing.T) {
 	}
 }
 
+// A refresh rewrites terma's plugin to this build's template with its configuration, and
+// leaves the inert template inert.
+func TestRefreshHermesPlugin(t *testing.T) {
+	t.Setenv("HERMES_HOME", t.TempDir())
+	dir, err := pluginDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "__init__.py")
+	want, err := renderPlugin(pluginConfig{Endpoint: "http://127.0.0.1:43180", Headers: map[string]string{"Authorization": `Bearer t0k"en`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		file, want string
+		changed    bool
+	}{
+		"earlier": {file: want + "\n", want: want, changed: true},
+		"inert":   {file: hermesPluginTemplate, want: hermesPluginTemplate},
+	} {
+		if err := os.WriteFile(path, []byte(tc.file), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, changed, err := (Agent{}).RefreshMachine(); err != nil || changed != tc.changed {
+			t.Fatalf("%s: changed=%v err=%v", name, changed, err)
+		}
+		if got, _ := os.ReadFile(path); string(got) != tc.want {
+			t.Errorf("%s: refreshed to\n%s", name, got)
+		}
+	}
+}
+
 // An export carries the session's content and the relay's token, so it goes straight to
 // the local relay whatever proxy the environment names.
 func TestHermesPluginBypassesProxies(t *testing.T) {

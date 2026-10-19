@@ -23,7 +23,7 @@ const CONFIG = {"version":1,"endpoint":"http://127.0.0.1:43180","headers":{"Auth
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
-import { request } from "node:http"
+import { Agent, request } from "node:http"
 
 export const name = "terma"
 
@@ -73,18 +73,21 @@ let spans = []
 let logs = []
 let timer
 
-// post sends with node:http and an agent of its own rather than fetch, whose route is
-// whatever dispatcher the host installed (dsh's follows the environment's HTTP proxy
-// settings): an export to the local relay carries the session's content and the relay's
-// token, so it goes straight to the relay whatever the host's proxy policy.
+// relayAgent keeps the connection to the relay alive between exports, closing it once idle
+// well before the relay would.
+const relayAgent = new Agent({ keepAlive: true, timeout: 5000 })
+
+// post sends straight to the local relay with node:http through relayAgent rather than
+// fetch, whose route is whatever dispatcher the host installed: no HTTP proxy policy of
+// the host's, or NODE_USE_ENV_PROXY, applies to it.
 function post(path, body) {
   const data = JSON.stringify(body)
   return new Promise((resolve) => {
     try {
       const headers = { "content-type": "application/json", "content-length": String(Buffer.byteLength(data)), ...CONFIG.headers }
-      const req = request(CONFIG.endpoint.replace(/\/+$/, "") + path, { method: "POST", headers, agent: false, timeout: 10000 }, (res) => res.resume())
+      const req = request(CONFIG.endpoint.replace(/\/+$/, "") + path, { method: "POST", headers, agent: relayAgent, timeout: 10000 }, (res) => res.resume())
       req.on("timeout", () => req.destroy())
-      req.on("error", () => {}) // A telemetry failure must never surface in the agent.
+      req.on("error", resolve) // A telemetry failure must never surface in the agent.
       req.on("close", resolve)
       req.end(data)
     } catch {

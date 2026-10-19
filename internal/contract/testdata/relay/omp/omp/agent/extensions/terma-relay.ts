@@ -29,7 +29,7 @@ const CONFIG: TermaConfig | null = {"version":1,"agent":"omp","lifecycle":false,
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
-import { request } from "node:http"
+import { Agent, request } from "node:http"
 
 type TermaConfig = {
   version: 1
@@ -101,25 +101,29 @@ async function post(path: string, body: unknown) {
   }
 }
 
-// send posts to the local relay directly, never through an HTTP proxy the environment
-// names: an export carries the session's content and the relay's token, and both hosts
-// would send even 127.0.0.1 through HTTP_PROXY — Bun's fetch reads it itself, and Pi puts
+// send posts straight to the local relay, never through an HTTP proxy, though both hosts
+// would send even 127.0.0.1 through HTTP_PROXY: Bun's fetch reads it itself, and Pi puts
 // Node's fetch behind a proxy dispatcher. On Bun, fetch names the relay as its own proxy,
-// which connects straight to it on every release (`proxy: false` came only in Bun 1.4.3);
-// on Node, node:http with an agent of its own, which no fetch dispatcher reaches.
+// which connects to it directly on every release (`proxy: false` came only in Bun 1.4.3);
+// on Node, node:http through relayAgent, which no fetch dispatcher or NODE_USE_ENV_PROXY
+// reaches.
 function send(url: string, headers: Record<string, string>, body: string): Promise<unknown> {
   if ("Bun" in globalThis) {
     const init = { method: "POST", headers, body, signal: AbortSignal.timeout(10000), proxy: new URL(url).origin }
     return fetch(url, init as RequestInit)
   }
   return new Promise((resolve) => {
-    const req = request(url, { method: "POST", headers: { ...headers, "content-length": String(Buffer.byteLength(body)) }, agent: false, timeout: 10000 }, (res) => res.resume())
+    const req = request(url, { method: "POST", headers: { ...headers, "content-length": String(Buffer.byteLength(body)) }, agent: relayAgent, timeout: 10000 }, (res) => res.resume())
     req.on("timeout", () => req.destroy())
-    req.on("error", () => {})
+    req.on("error", resolve)
     req.on("close", resolve)
     req.end(body)
   })
 }
+
+// relayAgent keeps the connection to the relay alive between exports, closing it once idle
+// well before the relay would.
+const relayAgent = new Agent({ keepAlive: true, timeout: 5000 })
 
 async function flush() {
   if (timer) clearTimeout(timer)

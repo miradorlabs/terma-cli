@@ -82,8 +82,8 @@ _spans = []
 _logs = []
 _wake = threading.Event()
 
-# An opener with no proxies: an export to the local relay carries the session's content and
-# the relay's token, so it never goes through a proxy the environment or the system names.
+# An opener with no proxies: exports go straight to the local relay, never through a proxy
+# the environment or the system names.
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 

@@ -49,6 +49,13 @@ func TestWritePluginInsertsItselfOnce(t *testing.T) {
 	if !strings.Contains(dshPluginTemplate, dshConfigMarker) {
 		t.Fatal("the raw template must stay inert, with its configuration line")
 	}
+	// A refresh leaves the inert template inert.
+	if err := os.WriteFile(path, []byte(dshPluginTemplate), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, changed, err := (Agent{}).RefreshMachine(); err != nil || changed {
+		t.Fatalf("refresh of the raw template: changed=%v err=%v", changed, err)
+	}
 }
 
 // Removing the plugin takes out only terma's insert, and the patch with it when nothing else was there.
@@ -121,11 +128,13 @@ on["session/event"]({ id: "s1" }, { type: "turn/end", data: {} })
 		t.Fatal(err)
 	}
 	cmd := exec.Command(node, script, plugin, relay.URL, proxy.URL)
-	cmd.Env = withProxy(proxy.URL)
+	// NODE_USE_ENV_PROXY puts node:http's own default agent behind the proxy too.
+	cmd.Env = append(withProxy(proxy.URL), "NODE_USE_ENV_PROXY=1")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("node: %v\n%s", err, out)
 	}
-	if got := proxied(); !slices.Equal(got, []string{"/probe "}) {
+	// One request, the probe: under NODE_USE_ENV_PROXY a Node may tunnel it with CONNECT.
+	if got := proxied(); len(got) != 1 || strings.Contains(got[0], "Bearer") {
 		t.Errorf("the proxy saw %q, want only the probe", got)
 	}
 	if got := received(); !slices.Equal(got, []string{"/v1/logs Bearer tok"}) {
