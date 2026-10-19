@@ -188,6 +188,12 @@ func TestRefreshLeavesOtherExportsAlone(t *testing.T) {
 				t.Fatal(err)
 			}
 		},
+		"an unreadable record": func(t *testing.T, c exporter, path string) {
+			earlierRelayInstall(t, c)
+			if err := os.WriteFile(harness.JournalPath(c.dir, c.Name(), path), []byte("{"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		},
 		"no record": func(t *testing.T, _ exporter, path string) {
 			body := `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_EXPORTER_OTLP_ENDPOINT":"` + relayEndpoint +
 				`","OTEL_EXPORTER_OTLP_HEADERS":"Authorization=Bearer ` + relayToken + `"}}`

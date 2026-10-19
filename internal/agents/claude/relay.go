@@ -18,7 +18,7 @@ import (
 // OTEL_* entries Claude Code releases before 2.1.128 passed to every tool they ran. Not on
 // Windows, where the helper is a sh script Claude Code cannot start directly, and a failing
 // helper stops the export altogether: there the token stays in the env block.
-var relayHelper = runtime.GOOS != "windows"
+const relayHelper = runtime.GOOS != "windows"
 
 // relayHelperPath is the relay's headers helper under terma's config directory dir, named
 // apart from the per-team helpers (<agent>-otel-<team>).
@@ -51,7 +51,7 @@ func (c exporter) moveRelayToken() (bool, error) {
 	}
 	path, err := c.ConfigPath()
 	if err != nil {
-		return false, err
+		return false, nil // RefreshStatusLine reports it
 	}
 	j, err := harness.LoadJournal(c.dir, c.Name(), path)
 	if err != nil || j == nil {
