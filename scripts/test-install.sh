@@ -8,19 +8,26 @@
 # Covers the paths a user takes: pinned version piped through bash (the documented
 # `curl | bash`), latest under plain sh, a version without the v prefix, the default
 # destination (~/.local/bin, never sudo), the PATH line appended for zsh, bash and fish
-# (and when it is not), and the two
-# refusals — a checksum that does not match, and cleartext to a host that is not this
-# machine. Nothing here touches the real PATH: every install goes to a temp dir, under
-# a temp HOME.
+# (and when it is not), and the refusals — a release its key did not sign or signed for
+# another tag, a checksums.txt changed after it was signed, no signature, a checksum that
+# does not match, and cleartext to a host that is not this machine. Nothing here touches
+# the real PATH: every install goes to a temp dir, under a temp HOME.
+#
+# The mirror is signed with a key made for this run (scripts/releasesign, so Go is
+# needed) and installed with a copy of install.sh that pins that key in place of the
+# release key; install.sh itself, with the release key, is shown to refuse it.
 set -euo pipefail
 
 DIST="${1:?usage: test-install.sh <dist-dir> <tag>}"
 TAG="${2:?usage: test-install.sh <dist-dir> <tag>}"
 PORT="${TERMA_TEST_PORT:-18765}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-INSTALLER="$ROOT/install.sh"
+RELEASED="$ROOT/install.sh"
 
 work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+# Built before HOME moves, so Go keeps its own caches and toolchain.
+(cd "$ROOT" && go build -o "$work/releasesign" ./scripts/releasesign)
 # `make test-install` exports TERMA_ENV=dev. Keep the release binary's version
 # check in that environment too, with no machine profile influencing its output.
 export TERMA_ENV=dev TERMA_CONFIG_DIR="$work/config"
@@ -30,11 +37,30 @@ export HOME="$work/home"
 unset ZDOTDIR XDG_CONFIG_HOME TERMA_INSTALL_DIR TERMA_NO_MODIFY_PATH
 mkdir -p "$HOME"
 mirror="$work/mirror/miradorlabs/terma-cli/releases"
-mkdir -p "$mirror/download/$TAG" "$mirror/latest"
+mkdir -p "$mirror/download/$TAG"
 cp "$DIST"/*.tar.gz "$DIST"/checksums.txt "$mirror/download/$TAG/"
-ln -s "../download/$TAG" "$mirror/latest/download"
+sums="$mirror/download/$TAG/checksums.txt"
 
-(cd "$work/mirror" && exec python3 -m http.server "$PORT" --bind 127.0.0.1 >"$work/http.log" 2>&1) &
+# python3's file server, plus GitHub's redirect from releases/latest to the latest tag.
+cat >"$work/serve.py" <<'EOF'
+import functools, http.server, sys
+
+root, port, tag = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+
+class Mirror(http.server.SimpleHTTPRequestHandler):
+    def send_head(self):
+        path = self.path.split('?', 1)[0].rstrip('/')
+        if path.endswith('/releases/latest'):
+            self.send_response(302)
+            self.send_header('Location', path[:-len('latest')] + 'tag/' + tag)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return None
+        return super().send_head()
+
+http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(Mirror, directory=root)).serve_forever()
+EOF
+python3 -I "$work/serve.py" "$work/mirror" "$PORT" "$TAG" >"$work/http.log" 2>&1 &
 server=$!
 disown # no "Terminated" notice from the shell when cleanup kills it
 trap 'kill $server 2>/dev/null || true; rm -rf "$work"' EXIT
@@ -43,6 +69,16 @@ for _ in $(seq 1 50); do curl -fs -o /dev/null "http://127.0.0.1:$PORT/" && brea
 BASE="http://127.0.0.1:$PORT/miradorlabs/terma-cli/releases"
 want="terma ${TAG#v} (dev)"
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# This run's release key, and the installer that pins it in place of the release key.
+pub="$("$work/releasesign" keygen "$work/release.key" | sed -n 's/^public key: //p')"
+# sign <tag> signs the mirror's checksums.txt for tag, as a release is signed.
+sign() { TERMA_SIGNING_KEY="$(cat "$work/release.key")" "$work/releasesign" sign "$1" "$sums" "$sums.sig"; }
+sign "$TAG"
+spki="$(python3 -I -c 'import base64, sys; print(base64.b64encode(bytes.fromhex("302a300506032b6570032100" + sys.argv[1])).decode())' "$pub")"
+INSTALLER="$work/install.sh"
+sed "s|^RELEASE_KEYS=.*|RELEASE_KEYS='$spki'|" "$RELEASED" >"$INSTALLER"
+[ "$(diff "$RELEASED" "$INSTALLER" | grep -c '^>')" = 1 ] || fail "pinning this run's key changed more than RELEASE_KEYS"
 
 echo "== pinned version, piped through bash"
 TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$work/bin1" bash <"$INSTALLER"
@@ -86,7 +122,7 @@ fresh_home() { mktemp -d "$work/home.XXXXXX"; }
 # own error about an unset variable or a file it cannot write.
 clean() {
   local stray
-  stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ is (already )?on PATH in )' <<<"$1" || true)"
+  stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ is (already )?on PATH in |Warning: .+ signature is not checked: that needs OpenSSL 3, )' <<<"$1" || true)"
   [ -z "$stray" ] || fail "stray output: $stray"
 }
 # reloads <shell> <home> <output> runs the `source …` of the installer's Next: line in
@@ -268,21 +304,92 @@ mkdir -p "$work/sub"
 (cd "$work/sub" && install_as /bin/zsh "$home" TERMA_INSTALL_DIR=../rel/bin >/dev/null)
 grep -qxF "export PATH=\"$work/rel/bin:\$PATH\"" "$home/.zshrc" || fail ".zshrc: $(cat "$home/.zshrc")"
 
-echo "== refuses a checksum that does not match"
-sums="$mirror/download/$TAG/checksums.txt"
+# refused <installer> <message> [VAR=value...]: installs the pinned release with that
+# installer to a directory of its own, and fails unless it refuses, saying message, and
+# installs nothing.
+refused() {
+  local dest out
+  dest="$(mktemp -d "$work/refused.XXXXXX")"
+  if out="$(env TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$dest" "${@:3}" sh "$1" 2>&1)"; then
+    fail "installed, where it should have said \"$2\": $out"
+  fi
+  grep -qF "$2" <<<"$out" || fail "refused, but without \"$2\": $out"
+  [ ! -e "$dest/terma" ] || fail "installed terma while refusing: $out"
+}
 cp "$sums" "$work/checksums.good"
-sed 's/^[0-9a-f]\{4\}/dead/' "$work/checksums.good" >"$sums"
-if TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$work/bin4" sh "$INSTALLER" 2>"$work/err4"; then
-  fail "tampered checksums.txt was accepted"
+cp "$sums.sig" "$work/checksums.sig.good"
+restore() { cp "$work/checksums.good" "$sums"; cp "$work/checksums.sig.good" "$sums.sig"; }
+unsigned="is not signed by a key this installer trusts"
+
+# The signature is checked where an OpenSSL 3 is on PATH: the Linux runner's own, or on
+# a Mac Homebrew's, linked or not.
+ssl=''
+for o in "$(command -v openssl || true)" /opt/homebrew/opt/openssl@3/bin/openssl /usr/local/opt/openssl@3/bin/openssl; do
+  case "$([ -x "$o" ] && "$o" version)" in "OpenSSL "[3-9]*) ssl="$(dirname "$o")"; break ;; esac
+done
+if [ -z "$ssl" ]; then
+  [ -z "${CI:-}" ] || fail "no OpenSSL 3 here to check signatures with"
+  echo "== no OpenSSL 3 here: skipping the signature checks"
+else
+  echo "== with OpenSSL 3, the signature is checked, and nothing said when it holds"
+  out="$(PATH="$ssl:$PATH" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$work/bin6" sh "$INSTALLER" 2>&1)"
+  [ "$("$work/bin6/terma" version)" = "$want" ] || fail "signed install: $out"
+  ! grep -q 'signature' <<<"$out" || fail "a signed install said: $out"
+
+  echo "== install.sh, with the release key, refuses a release that key did not sign"
+  refused "$RELEASED" "$unsigned" PATH="$ssl:$PATH"
+
+  echo "== refuses a signature made for another tag"
+  sign v9.9.9
+  refused "$INSTALLER" "$unsigned" PATH="$ssl:$PATH"
+  restore
+
+  echo "== refuses a checksums.txt changed after it was signed"
+  sed 's/^[0-9a-f]\{4\}/dead/' "$work/checksums.good" >"$sums"
+  refused "$INSTALLER" "$unsigned" PATH="$ssl:$PATH"
+  restore
 fi
-grep -q "checksum mismatch" "$work/err4" || fail "wrong error for tampered checksum: $(cat "$work/err4")"
-[ ! -e "$work/bin4/terma" ] || fail "binary installed despite checksum mismatch"
-cp "$work/checksums.good" "$sums"
+
+echo "== without OpenSSL 3, says the signature is not checked, and checks the digest alone"
+mkdir -p "$work/nossl"
+printf '#!/bin/sh\nexit 1\n' >"$work/nossl/openssl" # first on PATH, as LibreSSL or OpenSSL 1.1 can be
+chmod +x "$work/nossl/openssl"
+out="$(PATH="$work/nossl:$PATH" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$work/bin7" sh "$INSTALLER" 2>&1)"
+[ "$("$work/bin7/terma" version)" = "$want" ] || fail "install without OpenSSL 3: $out"
+grep -qE "^Warning: $TAG's signature is not checked: that needs OpenSSL 3, and there is none on PATH here\. terma_[A-Za-z]+_[a-z0-9_]+\.tar\.gz is checked against checksums\.txt alone\.$" <<<"$out" \
+  || fail "no warning without OpenSSL 3: $out"
+
+echo "== refuses a release with no signature, with OpenSSL 3 or without"
+rm "$sums.sig"
+refused "$INSTALLER" "download failed: $BASE/download/$TAG/checksums.txt.sig"
+refused "$INSTALLER" "download failed: $BASE/download/$TAG/checksums.txt.sig" PATH="$work/nossl:$PATH"
+restore
+
+echo "== refuses a checksum that does not match, signed or not"
+sed 's/^[0-9a-f]\{4\}/dead/' "$work/checksums.good" >"$sums"
+sign "$TAG"
+refused "$INSTALLER" "checksum mismatch"
+refused "$INSTALLER" "checksum mismatch" PATH="$work/nossl:$PATH"
+restore
+
+echo "== refuses a version that is not a release tag"
+refused "$INSTALLER" "not a release: v1.0.0/../x" TERMA_VERSION=1.0.0/../x
+
+echo "== cleartext only to 127.0.0.1, localhost or [::1], with at most a port"
+# loopback <url> runs install.sh's loopback_http on url.
+# shellcheck disable=SC1090 # the installer, sourced for its functions
+loopback() { (TERMA_INSTALL_FUNCTIONS_ONLY=1 . "$RELEASED" && loopback_http "$1"); }
+for url in http://127.0.0.1 http://127.0.0.1/r "http://127.0.0.1:$PORT/r" http://localhost:80/r 'http://[::1]/r' 'http://[::1]:8080/r'; do
+  loopback "$url" || fail "$url is loopback"
+done
+for url in https://127.0.0.1/r http://127.0.0.1.example/r http://127.0.0.1:/r 'http://127.0.0.1:80?x/r' \
+  "http://localhost:1@127.0.0.1:$PORT/r" http://127.0.0.1:80@example.invalid/r 'http://[::1]@example.invalid/r' \
+  http://example.invalid/r; do
+  if loopback "$url"; then fail "$url is not loopback"; fi
+done
+refused "$INSTALLER" "download failed" TERMA_RELEASE_BASE="http://localhost:1@127.0.0.1:$PORT/miradorlabs/terma-cli/releases"
 
 echo "== refuses cleartext to a host that is not loopback"
-if TERMA_RELEASE_BASE="http://example.invalid/releases" TERMA_INSTALL_DIR="$work/bin5" sh "$INSTALLER" 2>"$work/err5"; then
-  fail "cleartext base was accepted"
-fi
-grep -q "download failed" "$work/err5" || fail "wrong error for cleartext: $(cat "$work/err5")"
+refused "$INSTALLER" "download failed" TERMA_RELEASE_BASE="http://example.invalid/releases"
 
 echo "ok: install.sh ($(grep -c GET "$work/http.log") requests served)"

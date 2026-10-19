@@ -275,9 +275,10 @@ jobs:
           if-no-files-found: error
 
   # `curl -fsSL https://terma.ai/install.sh | bash`, against those archives served
-  # over loopback: pinned and latest, piped through bash and under sh, the PATH line
-  # it appends per shell, plus the two refusals (checksum mismatch, cleartext).
-  # scripts/test-install.sh.
+  # over loopback and signed with a key made for the run: pinned and latest, piped
+  # through bash and under sh, the PATH line it appends per shell, plus the refusals
+  # (an unsigned or wrongly signed release, checksum mismatch, cleartext).
+  # scripts/test-install.sh, which signs with scripts/releasesign.
   install-script:
     needs: release-dry-run
     runs-on: ubuntu-latest
@@ -287,6 +288,10 @@ jobs:
         with:
           name: release-dry-run
           path: dist
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: shellcheck
         run: |
           shellcheck -s sh install.sh

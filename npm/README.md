@@ -2,7 +2,8 @@
 
 npm shim for the [terma CLI](https://github.com/miradorlabs/terma-cli). Installing the
 package downloads the matching release binary from GitHub Releases, verifies it against
-the release's `checksums.txt`, and exposes it as `terma`.
+the release's `checksums.txt` and that file's signature by a release key built into the
+package (the keys `terma update` checks), and exposes it as `terma`.
 
 ```bash
 npm install -g @miradorlabs/terma   # or: npx @miradorlabs/terma setup

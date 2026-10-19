@@ -14,7 +14,8 @@ they produce so agent spend can be traced to shipped code. It supports **Claude 
 Install terma one of these ways, then run `terma setup` once.
 
 **Installer script** (macOS and Linux). Installs to `~/.local/bin`, without sudo, and
-verifies `checksums.txt`. terma keeps it up to date by itself (see [Updates](#updates)).
+verifies `checksums.txt` and, with OpenSSL 3, its signature. terma keeps it up to date by
+itself (see [Updates](#updates)).
 When `~/.local/bin` is not on your PATH, the installer adds it in your shell's startup
 files, so new terminals find `terma`, and prints the `source` command that puts it on
 PATH in the terminal you installed from: run that first.
@@ -185,11 +186,13 @@ its `checksums.txt` and `checksums.txt.sig` and run `go run ./scripts/releasesig
 <tag> checksums.txt checksums.txt.sig` from a clone. A key is rotated by releases signed
 with both the old key and the new for as long as builds without the new key are still
 updating; a build that only knows a retired key cannot update, and is reinstalled with the
-installer script. The installer script and the npm package do not check
-the signature: on a first install, the script, the key it would check against and the
-archives would all come from the same place, so the check would add nothing; what covers
-them is the build provenance GitHub attaches to every release asset (`gh attestation
-verify <file> --owner miradorlabs`).
+installer script. A first install checks the same signature with the same keys: the npm
+package always, and the installer script wherever OpenSSL 3 is installed. Neither OpenSSL
+1.1 nor the LibreSSL macOS ships can check an ed25519 signature, so without OpenSSL 3 the
+script says the signature was not checked and verifies the archive against
+`checksums.txt` alone. The script itself is a release asset (`https://terma.ai/install.sh`
+serves the latest release's), and what covers it is the build provenance GitHub attaches
+to every release asset (`gh attestation verify <file> --owner miradorlabs`).
 
 **A bad release.** terma never installs an older version over a newer one, so a release
 is rolled back by rolling forward: delete the bad release, or mark it a pre-release, so
