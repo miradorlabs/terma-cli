@@ -93,9 +93,10 @@ func LastMove(dir string) (Move, bool) {
 	return m, true
 }
 
-// Repointed records that `terma setup` has pointed every agent at where the relay moved.
-func Repointed(dir string) {
-	if m, ok := LastMove(dir); ok && !m.Repointed {
+// Repointed records that `terma setup` has pointed every agent at to, where the relay moved
+// last; a later move is left as it is.
+func Repointed(dir, to string) {
+	if m, ok := LastMove(dir); ok && m.To == to && !m.Repointed {
 		m.Repointed = true
 		writeMove(dir, m)
 	}

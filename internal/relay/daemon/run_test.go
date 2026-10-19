@@ -226,7 +226,11 @@ func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
 	if !ok || m.From != from || m.To != to || m.Repointed || !m.Recent(time.Now()) || m.Recent(time.Now().Add(MoveNotice)) {
 		t.Errorf("LastMove = %+v, %v", m, ok)
 	}
-	Repointed(dir)
+	Repointed(dir, from)
+	if m, _ := LastMove(dir); m.Repointed {
+		t.Error("setup's re-pointing at another address is recorded for this move")
+	}
+	Repointed(dir, to)
 	if m, _ := LastMove(dir); !m.Repointed {
 		t.Error("setup's re-pointing is not recorded")
 	}

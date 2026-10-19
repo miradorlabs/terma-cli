@@ -71,7 +71,7 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 		}
 	}
 	if m, ok := daemon.LastMove(dir); ok && m.To == now {
-		daemon.Repointed(dir)
+		daemon.Repointed(dir, now)
 		if m.Recent(time.Now()) {
 			r.warn("Relay", m.Describe())
 		}

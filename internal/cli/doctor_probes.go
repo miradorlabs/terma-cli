@@ -96,7 +96,8 @@ func (app *App) serverKeyCredential(cfg *config.Config) (doctor.Credential, erro
 func (app *App) relayFacts() doctor.Relay {
 	dir := claim.Dir(app.stateDir)
 	r := doctor.Relay{Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
-	// What answers on the relay's address is not proof it is the relay.
+	// What answers on the relay's address is not proof it is the relay. A relay listening but
+	// not yet recorded reads as not serving for the milliseconds until it is.
 	_, serving := daemon.Serving(dir)
 	r.Squatted = !serving && daemon.Squatted(r.Addr)
 	if m, ok := daemon.LastMove(dir); ok {

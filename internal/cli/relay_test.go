@@ -138,7 +138,7 @@ func TestARelayMovesOffASquattedPort(t *testing.T) {
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex", "gemini"}); c.Status != doctor.Fail || c.Fix != "terma setup" || !strings.Contains(c.Detail, "Gemini") {
 		t.Errorf("moved relay, Gemini selected: %+v", c)
 	}
-	daemon.Repointed(dir)
+	daemon.Repointed(dir, moved)
 	facts = testApp.relayFacts()
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex", "gemini"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "moved to "+moved) {
 		t.Errorf("moved relay, setup since: %+v", c)
