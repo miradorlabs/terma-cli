@@ -57,19 +57,27 @@ func TestExtensionBypassesProxies(t *testing.T) {
 	if s := os.Getenv("TERMA_EXPORTER_RUNTIMES"); s != "" {
 		names, required = strings.Split(s, ","), true
 	}
+	// A runtime runs the extension if it runs TypeScript: Bun always, Node by default from
+	// 22.18 and 23.6, earlier with the flag that turns type stripping on.
+	probe := filepath.Join(t.TempDir(), "probe.ts")
+	if err := os.WriteFile(probe, []byte("const ok: boolean = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	var runtimes [][]string
 	for _, name := range names {
-		rt := []string{name}
-		if name == "node" {
-			rt = append(rt, "--experimental-strip-types")
-		}
+		name = strings.TrimSpace(name)
 		path, err := exec.LookPath(name)
+		var rt []string
 		if err == nil {
-			rt[0] = path
-			err = exec.Command(path, append(rt[1:], "-e", "")...).Run()
+			for _, flags := range [][]string{nil, {"--experimental-strip-types"}} {
+				if err = exec.Command(path, append(flags, probe)...).Run(); err == nil {
+					rt = append([]string{path}, flags...)
+					break
+				}
+			}
 		}
 		switch {
-		case err == nil:
+		case rt != nil:
 			runtimes = append(runtimes, rt)
 		case required:
 			t.Fatalf("%s cannot run the extension: %v", name, err)
