@@ -143,11 +143,12 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 	}
 }
 
-// callbackParams reads the state and the code the approval page sent back: from the form
-// body of a POST, which keeps the code out of the address bar and the browser's history, or
-// from the query of a GET, as earlier versions of the page send them. Either way the caller
-// checks the state, so a page that posts here without it is ignored, as a GET is. ok is false
-// once a response has been written.
+// callbackParams reads the state and the code the approval page sends back: from the form
+// body of a POST (application/x-www-form-urlencoded, as a plain HTML form sends it), which
+// keeps the code out of the address bar and the browser's history, or from the query of a
+// GET, as the page has sent them so far. Either way the caller checks the state, so a page
+// that posts here without it is ignored, as a GET is. ok is false once a response has been
+// written.
 func callbackParams(w http.ResponseWriter, r *http.Request) (state, code string, ok bool) {
 	switch r.Method {
 	case http.MethodPost:

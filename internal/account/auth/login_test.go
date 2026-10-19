@@ -30,8 +30,8 @@ func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier stri
 	return &Credential{AccessToken: "mir_cli_test", ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
-// browser drives the login flow the way earlier versions of the approval page do: a GET
-// with the code and state in the query.
+// browser drives the login flow the way the approval page has so far: a GET with the code
+// and state in the query.
 func browser(t *testing.T, authURL string, code string, overrideState string) {
 	t.Helper()
 	port, state := portFrom(t, authURL)
@@ -48,8 +48,8 @@ func browser(t *testing.T, authURL string, code string, overrideState string) {
 	_, _ = io.Copy(io.Discard, resp.Body)
 }
 
-// postBrowser drives the login flow the way the approval page does: a form POST, so the code
-// is in the body and never in a URL. It returns the listener's status.
+// postBrowser drives the login flow with a form POST, the code in the body and never in a
+// URL, as the approval page is to send it. It returns the listener's status.
 func postBrowser(t *testing.T, authURL string, code string, overrideState string) int {
 	t.Helper()
 	port, state := portFrom(t, authURL)
@@ -67,13 +67,13 @@ func postBrowser(t *testing.T, authURL string, code string, overrideState string
 }
 
 // startLogin runs Login in the background and returns the URL it asks the browser to open.
-func startLogin(t *testing.T, exchanger TokenExchanger, timeout time.Duration) (authURL string, done <-chan error) {
+func startLogin(t *testing.T, exchanger TokenExchanger) (authURL string, done <-chan error) {
 	t.Helper()
 	capture := &urlCapture{ch: make(chan string, 1)}
 	errs := make(chan error, 1)
 	go func() {
 		_, err := Login(context.Background(), exchanger, LoginOptions{
-			AppURL: "https://app.example.test", NoBrowser: true, Out: capture, Timeout: timeout,
+			AppURL: "https://app.example.test", NoBrowser: true, Out: capture,
 		})
 		errs <- err
 	}()
@@ -359,7 +359,7 @@ func TestLogin_HostileCallbacksAloneNeverAuthenticate(t *testing.T) {
 func TestLogin_AcceptsAPostedCallback(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger, 0)
+	authURL, done := startLogin(t, exchanger)
 
 	if status := postBrowser(t, authURL, "mir_cod_posted", ""); status != http.StatusOK {
 		t.Errorf("posted callback status = %d, want 200", status)
@@ -380,20 +380,38 @@ func TestLogin_AcceptsAPostedCallback(t *testing.T) {
 func TestLogin_PostReadsOnlyItsBody(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger, 0)
+	authURL, done := startLogin(t, exchanger)
 	port, state := portFrom(t, authURL)
 
-	target := fmt.Sprintf("http://127.0.0.1:%d/callback?code=mir_cod_query&state=%s", port, url.QueryEscape(state))
-	resp, err := http.PostForm(target, url.Values{})
+	base := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
+	for _, tc := range []struct {
+		name  string
+		query string
+		body  url.Values
+	}{
+		{"code and state in the query", "?code=mir_cod_query&state=" + url.QueryEscape(state), url.Values{}},
+		{"state in the body, code in the query", "?code=mir_cod_query", url.Values{"state": {state}}},
+	} {
+		resp, err := http.PostForm(base+tc.query, tc.body)
+		if err != nil {
+			t.Fatalf("%s: callback request: %v", tc.name, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: a POST must be read from its body only, got %d", tc.name, resp.StatusCode)
+		}
+	}
+
+	// The body wins outright: a query beside it, even one naming another code, is not read.
+	resp, err := http.PostForm(base+"?code=mir_cod_query&state=not-the-state-we-issued",
+		url.Values{"code": {"mir_cod_real"}, "state": {state}})
 	if err != nil {
 		t.Fatalf("callback request: %v", err)
 	}
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("a POST with its state only in the query should be refused, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("a POST whose body is right should be accepted whatever its query says, got %d", resp.StatusCode)
 	}
-
-	postBrowser(t, authURL, "mir_cod_real", "")
 	if err := <-done; err != nil {
 		t.Fatalf("Login: %v", err)
 	}
@@ -406,7 +424,7 @@ func TestLogin_PostReadsOnlyItsBody(t *testing.T) {
 func TestLogin_RejectsAPostedCallbackFromAForeignHost(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger, 0)
+	authURL, done := startLogin(t, exchanger)
 	port, state := portFrom(t, authURL)
 
 	form := url.Values{"code": {"mir_cod_rebind"}, "state": {state}}
@@ -439,7 +457,7 @@ func TestLogin_RejectsAPostedCallbackFromAForeignHost(t *testing.T) {
 func TestLogin_RefusedCallbacksDoNotCancelThePendingLogin(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger, 0)
+	authURL, done := startLogin(t, exchanger)
 	port, state := portFrom(t, authURL)
 	callback := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
@@ -469,6 +487,9 @@ func TestLogin_RefusedCallbacksDoNotCancelThePendingLogin(t *testing.T) {
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusMethodNotAllowed {
 			t.Errorf("%s: status = %d, want 405", method, resp.StatusCode)
+		}
+		if allow := resp.Header.Get("Allow"); allow != "GET, POST" {
+			t.Errorf("%s: Allow = %q, want \"GET, POST\"", method, allow)
 		}
 	}
 
