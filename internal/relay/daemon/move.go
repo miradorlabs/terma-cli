@@ -107,6 +107,8 @@ func move(stateDir, from string) (net.Listener, string, error) {
 	}
 	to := ln.Addr().String()
 	if err := config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(to+"\n"), 0o600); err != nil {
+		// No move, so the token the agents hold stays the relay's.
+		_ = config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(old+"\n"), 0o600)
 		_ = ln.Close()
 		return nil, "", err
 	}

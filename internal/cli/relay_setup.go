@@ -39,15 +39,16 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			token, err := app.ensureRelayToken()
-			if err != nil {
-				return err
-			}
 			// Only an address asked for is recorded: writing back the one read would undo a
-			// relay's move made meanwhile.
+			// relay's move made meanwhile. The address before the token: a relay that moves
+			// writes its new token first.
 			if addr == "" {
 				addr = daemon.Addr(dir)
 			} else if err := daemon.RecordAddr(dir, addr); err != nil {
+				return err
+			}
+			token, err := app.ensureRelayToken()
+			if err != nil {
 				return err
 			}
 			out := cmd.OutOrStdout()
