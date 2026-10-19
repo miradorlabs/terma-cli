@@ -16,13 +16,14 @@
 // attribution. dsh computes no cost; the platform prices the tokens.
 //
 // It sets no environment: dsh passes its own to every tool, and a tool must never inherit
-// terma's endpoint or token. Dependency-free: only Node's fetch, node:crypto and
-// node:child_process.
+// terma's endpoint or token. Dependency-free: only node:crypto, node:child_process and
+// node:http.
 
 const CONFIG = null /* terma:config */
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
+import { request } from "node:http"
 
 export const name = "terma"
 
@@ -72,17 +73,24 @@ let spans = []
 let logs = []
 let timer
 
-async function post(path, body) {
-  try {
-    await fetch(CONFIG.endpoint.replace(/\/+$/, "") + path, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...CONFIG.headers },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10000),
-    })
-  } catch {
-    // A telemetry failure must never surface in the agent.
-  }
+// post sends with node:http and an agent of its own rather than fetch, whose route is
+// whatever dispatcher the host installed (dsh's follows the environment's HTTP proxy
+// settings): an export to the local relay carries the session's content and the relay's
+// token, so it goes straight to the relay whatever the host's proxy policy.
+function post(path, body) {
+  const data = JSON.stringify(body)
+  return new Promise((resolve) => {
+    try {
+      const headers = { "content-type": "application/json", "content-length": String(Buffer.byteLength(data)), ...CONFIG.headers }
+      const req = request(CONFIG.endpoint.replace(/\/+$/, "") + path, { method: "POST", headers, agent: false, timeout: 10000 }, (res) => res.resume())
+      req.on("timeout", () => req.destroy())
+      req.on("error", () => {}) // A telemetry failure must never surface in the agent.
+      req.on("close", resolve)
+      req.end(data)
+    } catch {
+      resolve()
+    }
+  })
 }
 
 async function flush() {

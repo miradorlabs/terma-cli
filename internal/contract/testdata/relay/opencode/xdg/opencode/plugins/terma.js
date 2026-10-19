@@ -187,10 +187,30 @@ function attrs(obj) {
 
 // --- exporter -----------------------------------------------------------------------
 
+// directTo is the fetch option that keeps exports to the local relay off any HTTP proxy
+// the environment names: Bun's fetch sends even 127.0.0.1 through HTTP_PROXY, and an
+// export carries the session's content and the relay's token. Naming the relay as its own
+// proxy connects straight to it on every Bun release (`proxy: false` came only in Bun
+// 1.4.3, after the one OpenCode ships). Any other endpoint keeps the environment's proxy.
+function directTo(base) {
+  try {
+    const url = new URL(base)
+    if (url.protocol === "http:" && isLoopback(url.hostname)) return { proxy: url.origin }
+  } catch {
+    // No endpoint: nothing is sent.
+  }
+  return {}
+}
+
+function isLoopback(host) {
+  return host === "localhost" || host === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
+}
+
 class Exporter {
   constructor(cfg) {
     this.cfg = cfg
     this.base = String(cfg.endpoint ?? "").replace(/\/+$/, "")
+    this.direct = directTo(this.base)
     this.traces = cfg.signals.includes("traces")
     this.logs = cfg.signals.includes("logs")
     this.spans = []
@@ -295,6 +315,7 @@ class Exporter {
           method: "POST",
           headers: { "content-type": "application/json", ...auth },
           body: payload,
+          ...this.direct,
         })
         if (res.ok) return
         // A rejected credential will not fix itself by retrying; a 5xx or 429 might.

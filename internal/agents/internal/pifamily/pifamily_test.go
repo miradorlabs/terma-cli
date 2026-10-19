@@ -1,9 +1,15 @@
 package pifamily
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -31,4 +37,96 @@ func TestWrite(t *testing.T) {
 	if !strings.Contains(template, configMarker) {
 		t.Fatal("the raw template must stay inert, with its configuration line")
 	}
+}
+
+// An export carries the session's content and the relay's token, so it goes straight to
+// the local relay whatever proxy the host would route it through: on Bun, the environment's
+// HTTP_PROXY, which its fetch reads itself; on Node, the proxy Pi puts its fetch behind,
+// which the driver stands in for. Each runtime found runs the extension.
+func TestExtensionBypassesProxies(t *testing.T) {
+	t.Parallel()
+	var runtimes [][]string
+	if bun, err := exec.LookPath("bun"); err == nil {
+		runtimes = append(runtimes, []string{bun})
+	}
+	if node, err := exec.LookPath("node"); err == nil && exec.Command(node, "--experimental-strip-types", "-e", "").Run() == nil {
+		runtimes = append(runtimes, []string{node, "--experimental-strip-types"})
+	}
+	if len(runtimes) == 0 {
+		t.Skip("neither bun nor a node that runs TypeScript")
+	}
+	const driver = `const [plugin, relay, proxy] = process.argv.slice(2)
+if (!("Bun" in globalThis)) {
+  // Pi's own fetch, behind its proxy dispatcher.
+  const direct = globalThis.fetch
+  globalThis.fetch = (url, init) => direct(proxy + new URL(url).pathname, init)
+}
+// A plain fetch first: it goes to the proxy, which is live for 127.0.0.1.
+await fetch(relay + "/probe", { method: "POST", body: "{}" }).catch(() => {})
+const { default: extension } = await import(plugin)
+const on = {}
+extension({ on: (name, fn) => { on[name] = fn } })
+const ctx = { sessionManager: { getSessionId: () => "s1" }, cwd: process.cwd() }
+on.before_agent_start({ prompt: "hi" }, ctx)
+await on.session_shutdown({}, ctx)
+`
+	for _, rt := range runtimes {
+		t.Run(filepath.Base(rt[0]), func(t *testing.T) {
+			t.Parallel()
+			proxy, proxied := recorder(t)
+			relay, received := recorder(t)
+			dir := t.TempDir()
+			plugin, err := Write(filepath.Join(dir, "terma.ts"), Config{Agent: "pi", Endpoint: relay.URL,
+				Headers: map[string]string{"Authorization": "Bearer tok"}, HookCommand: []string{rt[0], "-e", "process.stdin.resume()"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			script := filepath.Join(dir, "driver.mjs")
+			if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command(rt[0], append(rt[1:], script, plugin, relay.URL, proxy.URL)...)
+			cmd.Env = withProxy(proxy.URL)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("%s: %v\n%s", rt[0], err, out)
+			}
+			if got := proxied(); !slices.Equal(got, []string{"/probe "}) {
+				t.Errorf("the proxy saw %q, want only the probe", got)
+			}
+			if got := received(); !slices.Equal(got, []string{"/v1/logs Bearer tok"}) {
+				t.Errorf("the relay saw %q, want the export", got)
+			}
+		})
+	}
+}
+
+// recorder answers every request with an empty JSON object and reports each one's path
+// and Authorization, in order.
+func recorder(t *testing.T) (*httptest.Server, func() []string) {
+	var mu sync.Mutex
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		mu.Lock()
+		seen = append(seen, r.URL.Path+" "+r.Header.Get("Authorization"))
+		mu.Unlock()
+		_, _ = w.Write([]byte("{}"))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(seen)
+	}
+}
+
+// withProxy is this process's environment with proxy as its only HTTP proxy.
+func withProxy(proxy string) []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); !strings.HasSuffix(strings.ToLower(name), "_proxy") {
+			env = append(env, kv)
+		}
+	}
+	return append(env, "HTTP_PROXY="+proxy, "http_proxy="+proxy)
 }

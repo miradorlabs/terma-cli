@@ -1,9 +1,15 @@
 package dsh
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -75,4 +81,85 @@ func TestRemovePluginTakesOutItsInsert(t *testing.T) {
 			t.Fatalf("plugin survived: %v", err)
 		}
 	}
+}
+
+// An export carries the session's content and the relay's token, so it goes straight to
+// the local relay whatever proxy dsh's own fetch would route it through; the driver stands
+// in for that fetch.
+func TestPluginBypassesProxies(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("no node")
+	}
+	proxy, proxied := recorder(t)
+	relay, received := recorder(t)
+	text, err := renderPlugin(pluginConfig{Endpoint: relay.URL, Headers: map[string]string{"Authorization": "Bearer tok"},
+		HookCommand: []string{node, "-e", "process.stdin.resume()"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	plugin := filepath.Join(dir, "terma-relay.mjs")
+	if err := os.WriteFile(plugin, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const driver = `const [plugin, relay, proxy] = process.argv.slice(2)
+// dsh's own fetch, behind the dispatcher it installs.
+const direct = globalThis.fetch
+globalThis.fetch = (url, init) => direct(proxy + new URL(url).pathname, init)
+// A plain fetch first: it goes to the proxy.
+await fetch(relay + "/probe", { method: "POST", body: "{}" }).catch(() => {})
+const { apply } = await import(plugin)
+const on = {}
+apply({ on: (name, fn) => { on[name] = fn } })
+on["session/event"]({ id: "s1" }, { type: "user/message", data: { content: "hi" } })
+on["session/event"]({ id: "s1" }, { type: "turn/end", data: {} })
+`
+	script := filepath.Join(dir, "driver.mjs")
+	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(node, script, plugin, relay.URL, proxy.URL)
+	cmd.Env = withProxy(proxy.URL)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	if got := proxied(); !slices.Equal(got, []string{"/probe "}) {
+		t.Errorf("the proxy saw %q, want only the probe", got)
+	}
+	if got := received(); !slices.Equal(got, []string{"/v1/logs Bearer tok"}) {
+		t.Errorf("the relay saw %q, want the export", got)
+	}
+}
+
+// recorder answers every request with an empty JSON object and reports each one's path
+// and Authorization, in order.
+func recorder(t *testing.T) (*httptest.Server, func() []string) {
+	var mu sync.Mutex
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		mu.Lock()
+		seen = append(seen, r.URL.Path+" "+r.Header.Get("Authorization"))
+		mu.Unlock()
+		_, _ = w.Write([]byte("{}"))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(seen)
+	}
+}
+
+// withProxy is this process's environment with proxy as its only HTTP proxy.
+func withProxy(proxy string) []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); !strings.HasSuffix(strings.ToLower(name), "_proxy") {
+			env = append(env, kv)
+		}
+	}
+	return append(env, "HTTP_PROXY="+proxy, "http_proxy="+proxy)
 }

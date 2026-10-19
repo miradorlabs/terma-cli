@@ -35,7 +35,8 @@ beforeAll(() => {
 })
 afterAll(() => server?.stop(true))
 
-async function load(config, worktree) {
+// splice writes the plugin with config in place of its placeholder and returns its path.
+function splice(config) {
   const src = readFileSync(join(import.meta.dir, "terma.js"), "utf8")
   const line = `const CONFIG = ${JSON.stringify(config)}`
   const spliced = src.replace(/^const CONFIG = null \/\* terma:config \*\/$/m, line)
@@ -44,7 +45,11 @@ async function load(config, worktree) {
   // module a fresh directory so later imports see files created after the first.
   const path = join(mkdtempSync(join(dir, "module-")), "plugin.js")
   writeFileSync(path, spliced)
-  const mod = await import(path)
+  return path
+}
+
+async function load(config, worktree) {
+  const mod = await import(splice(config))
   const exportsList = Object.keys(mod)
   // OpenCode's legacy loader treats every export as a plugin function.
   expect(exportsList).toEqual(["TermaPlugin"])
@@ -124,6 +129,51 @@ test("model calls become spans with tokens, cost and the session as trace", asyn
   expect(created).toBeDefined()
   expect(created.body.stringValue).toBe("fix the build")
   expect(created.traceId).toBe(s.traceId)
+})
+
+// An export carries the session's content and the relay's token, so an HTTP proxy the
+// environment names must never see one to the local relay. The plugin runs in a Bun of
+// its own, with the proxy in its environment from the start, as OpenCode would.
+test("exports to the local relay bypass an HTTP proxy in the environment", async () => {
+  received = []
+  const proxied = []
+  const proxy = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch(req) {
+      proxied.push(req.url)
+      return new Response("{}", { status: 200 })
+    },
+  })
+  const endpoint = `http://127.0.0.1:${server.port}`
+  const script = join(mkdtempSync(join(dir, "proxied-")), "run.js")
+  writeFileSync(
+    script,
+    `// A plain fetch first: the proxy is live for 127.0.0.1 in this process.
+await fetch(${JSON.stringify(endpoint + "/probe")}, { method: "POST", body: "{}" }).catch(() => {})
+const { TermaPlugin } = await import(${JSON.stringify(splice(baseConfig()))})
+const hooks = await TermaPlugin({ directory: ${JSON.stringify(dir)}, worktree: ${JSON.stringify(dir)} })
+await hooks.event({ event: { type: "message.updated", properties: { info: ${JSON.stringify(assistant)} } } })
+await hooks.dispose()
+`,
+  )
+  const env = { ...process.env }
+  for (const k of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"]) {
+    delete env[k]
+    delete env[k.toLowerCase()]
+  }
+  env.HTTP_PROXY = env.http_proxy = `http://127.0.0.1:${proxy.port}`
+  try {
+    const child = Bun.spawn([process.execPath, script], { env, stdout: "inherit", stderr: "inherit" })
+    expect(await child.exited).toBe(0)
+  } finally {
+    proxy.stop(true)
+  }
+
+  expect(proxied).toEqual([endpoint + "/probe"])
+  const traces = received.filter((r) => r.path === "/v1/traces")
+  expect(traces.length).toBe(1)
+  expect(traces[0].headers["authorization"]).toBe("Bearer ter_srv_test")
 })
 
 test("prompts and tool content stay home when excluded", async () => {
