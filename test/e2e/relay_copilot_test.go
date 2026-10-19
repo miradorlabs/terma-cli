@@ -131,12 +131,14 @@ func TestRelayCopilotToolsGetNoExporter(t *testing.T) {
 }
 
 // A file Copilot writes is attributed: its PostToolUse hook lands it in the session's
-// manifest, and the commit of it is stamped with Copilot's session.
+// manifest, and the commit of it is stamped with Copilot's session. The prompt names the
+// edit tool: a file a shell command writes is not attributed (README, Copilot), and
+// which tool a model picks unprompted depends on the model the token is given.
 func TestCopilotAttribution(t *testing.T) {
 	forEachCopilot(t, func(t *testing.T, b Binary) {
 		track(t)
 		sb := copilotSandbox(t, b)
-		sid, out := sb.CopilotRun(sb.Repo, "Create a file named hello.txt containing exactly hello, then reply with exactly: done.")
+		sid, out := sb.CopilotRun(sb.Repo, "Using your file editing tool, not a shell command, create a file named hello.txt containing exactly hello, then reply with exactly: done.")
 		if sid == "" {
 			t.Fatalf("Copilot reported no session:\n%s", tail(out, 2000))
 		}

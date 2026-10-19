@@ -48,6 +48,10 @@ jobs:
 
       - run: go vet ./...
 
+      # The shell launcher tests parse their fish block with a real fish where one is installed.
+      - name: Install fish
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fish
+
       # The version lives in .golangci-lint-version, which `make lint` reads too.
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -185,7 +189,10 @@ jobs:
       # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
+      # Every shard's token may bill Copilot requests; none needs it in .git/config.
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
