@@ -408,3 +408,32 @@ func TestARelayMakesWayWhenItsAddressChanges(t *testing.T) {
 	case <-time.After(2500 * time.Millisecond):
 	}
 }
+
+// A relay that cannot record itself does not run: unrecorded, it would never be Serving.
+func TestARelayThatCannotRecordItselfDoesNotRun(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, time.Hour, nil)
+	c.Listening = func(net.Addr, time.Duration) {
+		// The record's place is taken once the relay has cleared any old one.
+		if err := os.Mkdir(filepath.Join(dir, RunFile), 0o700); err != nil {
+			t.Error(err)
+		}
+	}
+	if _, err := Run(t.Context(), c); err == nil || !strings.Contains(err.Error(), "record itself") {
+		t.Fatalf("Run = %v, want a failure to record itself", err)
+	}
+}
+
+// Current reads the relay's address and token together.
+func TestCurrentIsTheRelaysAddressAndToken(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	addr := freeAddr(t)
+	if err := RecordAddr(dir, addr); err != nil {
+		t.Fatal(err)
+	}
+	if got, token, err := Current(stateDir); err != nil || got != addr || token != "tok" {
+		t.Fatalf("Current = %s, %q, %v", got, token, err)
+	}
+}

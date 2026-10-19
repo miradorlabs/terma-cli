@@ -80,6 +80,42 @@ func Running(dir string) bool {
 	return flock.IsBusy(err)
 }
 
+// RunInfo is what the running relay records about itself.
+type RunInfo struct {
+	PID int `json:"pid"`
+	// Addr is the address it listens on, as the relay's directory records it (Serving).
+	Addr string `json:"addr,omitempty"`
+	// Environment is the backend environment it delivers to.
+	Environment string `json:"environment"`
+	// Launch is what started the relay: the service manager, a hook, or a developer.
+	Launch Launch `json:"launch"`
+	// Service is Launch == LaunchService, still written for a terma from before Launch,
+	// and read from one: its record has no launch.
+	Service bool `json:"service"`
+	// Version is the terma it runs.
+	Version string `json:"version,omitempty"`
+}
+
+// RunningRelay is what the relay holding dir's lock recorded about itself; false when none
+// runs, or it is a terma from before the record.
+func RunningRelay(dir string) (RunInfo, bool) {
+	if !Running(dir) {
+		return RunInfo{}, false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, RunFile))
+	if err != nil {
+		return RunInfo{}, false
+	}
+	var info RunInfo
+	if json.Unmarshal(data, &info) != nil || info.PID <= 0 {
+		return RunInfo{}, false
+	}
+	if info.Launch == "" && info.Service {
+		info.Launch = LaunchService
+	}
+	return info, true
+}
+
 // Serving is the address this state directory's relay listens on, and whether it is the
 // relay's address (Addr): the relay holds the lock and recorded that it listens there. A
 // port answering is no such proof, since any account on the machine may listen on a

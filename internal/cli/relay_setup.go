@@ -42,17 +42,21 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 				return err
 			}
 			// Only an address asked for is recorded: writing back the one read would undo a
-			// relay's move made meanwhile. The address before the token: a relay that moves
-			// writes its new token first.
-			if addr == "" {
-				addr = daemon.Addr(dir)
-			} else if err := daemon.RecordAddr(dir, addr); err != nil {
+			// relay's move made meanwhile.
+			if addr != "" {
+				if err := daemon.RecordAddr(dir, addr); err != nil {
+					return err
+				}
+			}
+			if _, err := app.ensureRelayToken(); err != nil {
 				return err
 			}
-			token, err := app.ensureRelayToken()
+			// One pair, never a moving relay's new token with its old address.
+			current, token, err := daemon.Current(app.stateDir)
 			if err != nil {
 				return err
 			}
+			addr = current
 			out := cmd.OutOrStdout()
 			err = app.withExporters(cmd.Context(), func() error {
 				return app.pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {

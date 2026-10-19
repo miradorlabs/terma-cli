@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -191,9 +192,17 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	}
 	// Recorded before anything slower: a hook that started this relay waits for the record
 	// (Serving) before the agent goes on.
+	// Without it the relay is never Serving, so it does not run unrecorded.
 	runPath := filepath.Join(dir, RunFile)
-	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Addr: addr, Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
-		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
+	data, err := json.Marshal(RunInfo{PID: os.Getpid(), Addr: addr, Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version})
+	if err == nil {
+		err = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
+	}
+	if err != nil {
+		_ = ln.Close()
+		err = fmt.Errorf("relay: record itself: %w", err)
+		c.Log.Printf("relay pid %d: %v", os.Getpid(), err)
+		return res, err
 	}
 	// Gone before the lock is, so the next relay's records are never removed.
 	defer func() { _ = os.Remove(runPath) }()
@@ -331,42 +340,6 @@ func (r stopReason) exit(err error) string {
 func setUp(stateDir string) bool {
 	_, err := Token(stateDir)
 	return err == nil
-}
-
-// RunInfo is what the running relay records about itself.
-type RunInfo struct {
-	PID int `json:"pid"`
-	// Addr is the address it listens on, as the relay's directory records it (Serving).
-	Addr string `json:"addr,omitempty"`
-	// Environment is the backend environment it delivers to.
-	Environment string `json:"environment"`
-	// Launch is what started the relay: the service manager, a hook, or a developer.
-	Launch Launch `json:"launch"`
-	// Service is Launch == LaunchService, still written for a terma from before Launch,
-	// and read from one: its record has no launch.
-	Service bool `json:"service"`
-	// Version is the terma it runs.
-	Version string `json:"version,omitempty"`
-}
-
-// RunningRelay is what the relay holding dir's lock recorded about itself; false when none
-// runs, or it is a terma from before the record.
-func RunningRelay(dir string) (RunInfo, bool) {
-	if !Running(dir) {
-		return RunInfo{}, false
-	}
-	data, err := os.ReadFile(filepath.Join(dir, RunFile))
-	if err != nil {
-		return RunInfo{}, false
-	}
-	var info RunInfo
-	if json.Unmarshal(data, &info) != nil || info.PID <= 0 {
-		return RunInfo{}, false
-	}
-	if info.Launch == "" && info.Service {
-		info.Launch = LaunchService
-	}
-	return info, true
 }
 
 // watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce

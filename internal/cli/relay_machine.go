@@ -40,9 +40,11 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 		if dir, err = daemon.Dir(app.stateDir); err != nil {
 			return err
 		}
-		// The address before the token: a relay that moves writes its new token first.
-		addr = daemon.Addr(dir)
-		if token, err = app.ensureRelayToken(); err != nil {
+		if _, err = app.ensureRelayToken(); err != nil {
+			return err
+		}
+		// One pair, never a moving relay's new token with its old address.
+		if addr, token, err = daemon.Current(app.stateDir); err != nil {
 			return err
 		}
 		return app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
@@ -63,8 +65,8 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 		}
 	})
 	// A move gives the relay a new address and token; either changed, every agent follows.
-	now := daemon.Addr(dir)
-	if latest, err := daemon.Token(app.stateDir); err == nil && (now != addr || latest != token) {
+	now, latest, err := daemon.Current(app.stateDir)
+	if err == nil && (now != addr || latest != token) {
 		if err := app.withExporters(ctx, func() error {
 			return app.pointAgentsAtRelay(ctx, targets, now, latest, func(string, string) {}, r.then)
 		}); err != nil {

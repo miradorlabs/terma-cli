@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand/v2"
 	"net"
 	"os"
@@ -74,6 +75,24 @@ func RecordAddr(dir, addr string) error {
 		defer unlock()
 	}
 	return config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600)
+}
+
+// Current is the relay's address and token as one pair: read under the lock a move holds
+// while it writes its new token and then its new address, never the new token with the old
+// address.
+func Current(stateDir string) (addr, token string, err error) {
+	dir := claim.Dir(stateDir)
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	switch {
+	case err == nil:
+		defer unlock()
+	case !errors.Is(err, fs.ErrNotExist):
+		return "", "", err
+	}
+	token, err = Token(stateDir)
+	return Addr(dir), token, err
 }
 
 // move listens on a free port of the host of from, where the relay of stateDir could not,
