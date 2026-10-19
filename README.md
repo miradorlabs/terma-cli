@@ -357,10 +357,10 @@ though anyone who can guess the path can recompute it.
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
 rewrites a service an earlier terma wrote. `terma doctor` shows whether it runs and
-delivers; `terma teardown` stops it and removes its service. A relay that finds its port
-held by another process listens on a free one instead and points the agents there; agents
-already running keep sending to the old port until restarted, and `terma setup` and
-`terma doctor` say so for a day after the move.
+delivers; `terma teardown` stops it and removes its service. A relay that cannot listen on
+its port, which another process may hold, listens on a free one instead and points the
+agents whose settings name the old port there; `terma setup` points the rest. Agents already
+running keep sending to the old port until restarted: `terma setup` and `terma doctor` say so.
 
 ## Hooks and commit attribution
 

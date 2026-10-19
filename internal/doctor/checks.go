@@ -210,8 +210,21 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if len(wrong) > 0 {
 		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma setup"}
 	}
-	if relay.Moved != "" {
-		return Check{Status: Warn, Detail: relay.Moved, Fix: "restart those agents"}
+	if m := relay.Move; m != nil {
+		// An exporter the relay cannot read was not pointed at it when it moved.
+		var unseen []string
+		for _, e := range reg.With[agents.RelayExporter]() {
+			if _, known := e.RelayPointed(addr); mine(e) && !known && !m.Repointed {
+				unseen = append(unseen, e.DisplayName())
+			}
+		}
+		if len(unseen) > 0 {
+			return Check{Status: Fail, Detail: m.Detail + "; " + strings.Join(unseen, " and ") + ": every session sends there until setup points it at the relay",
+				Fix: "terma setup"}
+		}
+		if m.Recent {
+			return Check{Status: Warn, Detail: m.Detail, Fix: "restart those agents"}
+		}
 	}
 	if !running && relay.LastFailure != "" {
 		return Check{Status: Warn, Detail: "the local relay last failed to start: " + relay.LastFailure, Fix: "terma setup"}

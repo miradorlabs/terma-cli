@@ -97,9 +97,10 @@ func (app *App) relayFacts() doctor.Relay {
 	dir := claim.Dir(app.stateDir)
 	r := doctor.Relay{Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
 	// What answers on the relay's address is not proof it is the relay.
-	r.Squatted = !daemon.Serving(dir) && daemon.Squatted(r.Addr)
-	if m, ok := daemon.RecentMove(dir, time.Now()); ok {
-		r.Moved = m.Describe()
+	_, serving := daemon.Serving(dir)
+	r.Squatted = !serving && daemon.Squatted(r.Addr)
+	if m, ok := daemon.LastMove(dir); ok {
+		r.Move = &doctor.RelayMove{Detail: m.Describe(), From: m.From, Recent: m.Recent(time.Now()), Repointed: m.Repointed}
 	}
 	if data, err := os.ReadFile(filepath.Join(dir, daemon.ErrorFile)); err == nil && !r.Running {
 		r.LastFailure = strings.TrimSpace(string(data))

@@ -52,9 +52,9 @@ type Config struct {
 	// restarts on it.
 	Updater   *Updater
 	Listening func(addr net.Addr, hold time.Duration)
-	// Moved, when set, runs beside the engine once the relay found the address setup recorded
-	// held by another process and listens on to instead (Move): the agents' exporters still
-	// name from.
+	// Moved, when set, runs beside the engine once the relay could not listen on the address
+	// setup recorded, which another process may hold, and listens on to instead (Move): the
+	// agents' exporters still name from.
 	Moved func(from, to string)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
@@ -143,6 +143,9 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		return res, nil
 	}
 	defer unlock()
+	// A record there while this relay holds the lock is a dead relay's: Stop must not take
+	// its pid for this relay's.
+	_ = os.Remove(filepath.Join(dir, RunFile))
 	token, err := Token(c.StateDir)
 	if err != nil {
 		return res, err
@@ -154,10 +157,10 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	ln, err := listen(dir, addr)
 	// Only the address setup recorded moves: one --addr names is meant.
 	moved := ""
-	if err != nil && c.Addr == "" && inUse(err, addr) {
+	if err != nil && c.Addr == "" {
 		if ml, merr := move(dir, addr); merr == nil {
+			c.Log.Printf("relay pid %d: %v, so the relay listens on %s instead", os.Getpid(), err, ml.Addr())
 			ln, err, moved, addr = ml, nil, addr, ml.Addr().String()
-			c.Log.Printf("relay pid %d: another process holds %s, so the relay listens on %s instead", os.Getpid(), moved, addr)
 		}
 	}
 	if err != nil {
@@ -179,13 +182,15 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
-	claim.Prune(c.StateDir, time.Now())
+	// Recorded before anything slower: a hook that started this relay waits for the record
+	// (Serving) before the agent goes on.
 	runPath := filepath.Join(dir, RunFile)
 	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Addr: addr, Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
 	}
 	// Gone before the lock is, so the next relay's records are never removed.
 	defer func() { _ = os.Remove(runPath) }()
+	claim.Prune(c.StateDir, time.Now())
 
 	// The engine outlives a stop signal until the server has shut down, so its final sweep
 	// sees, and its exit count includes, everything the last exports held.

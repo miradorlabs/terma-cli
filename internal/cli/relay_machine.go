@@ -63,22 +63,26 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 			r.ok("Relay", what)
 		}
 	})
-	// A relay that found its address held moved off it (daemon.RecentMove): every agent follows.
-	if now := daemon.Addr(dir); now != addr {
+	// A relay that could not listen on its address moved (daemon.LastMove): every agent follows.
+	now := daemon.Addr(dir)
+	if now != addr {
 		if err := app.pointAgentsAtRelay(ctx, targets, now, token, func(string, string) {}, r.then); err != nil {
 			return err
 		}
 	}
-	if m, ok := daemon.RecentMove(dir, time.Now()); ok {
-		r.warn("Relay", m.Describe())
+	if m, ok := daemon.LastMove(dir); ok && m.To == now {
+		daemon.Repointed(dir)
+		if m.Recent(time.Now()) {
+			r.warn("Relay", m.Describe())
+		}
 	}
 	return nil
 }
 
-// relayMoved points the agents that export to from, an address another process held, at
-// to, where the relay listens now (daemon.Config.Moved). Only an exporter seen naming from
+// relayMoved points the agents that export to from, an address the relay could not listen
+// on, at to, where it listens now (daemon.Config.Moved). Only an exporter seen naming from
 // is rewritten: the relay's environment may place an agent's settings elsewhere than the
-// developer's does. `terma setup` points the rest, and doctor says so (daemon.RecentMove).
+// developer's does. `terma setup` points the rest, and doctor says so until it has.
 func (app *App) relayMoved(ctx context.Context, from, to string, logf func(string, ...any)) {
 	token, err := daemon.Token(app.stateDir)
 	if err != nil {

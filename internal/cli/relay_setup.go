@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -76,6 +78,14 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 }
 
 func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
+	// One writer at a time: setup and a relay that moved may both point the agents at once.
+	// A lock that cannot be had costs the writes their exclusivity, never the writes.
+	lockCtx, cancel := context.WithTimeout(ctx, exportersLockWait)
+	unlock, err := flock.Lock(lockCtx, filepath.Join(claim.Dir(app.stateDir), daemon.ExportersLockFile))
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
 	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand()}
 	for _, name := range selected {
 		integration, ok := app.agents.Find[agents.RelayExporter](name)
@@ -103,6 +113,9 @@ func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr,
 	}
 	return nil
 }
+
+// exportersLockWait bounds the wait for daemon.ExportersLockFile.
+const exportersLockWait = 10 * time.Second
 
 // ensureRelayToken is the relay's token: the one there is, else the one teardown kept for
 // this sign-in, which agents still running present, else a new one.

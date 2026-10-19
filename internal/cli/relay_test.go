@@ -2,9 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -131,9 +133,63 @@ func TestARelayMovesOffASquattedPort(t *testing.T) {
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "moved to "+moved) {
 		t.Errorf("moved relay: %+v", c)
 	}
-	facts.Moved, facts.LastFailure = "", "listen on "+addr+": address already in use"
+	// An agent whose exporter no settings file shows is not re-pointed by the relay: doctor
+	// sends the developer to setup until setup has pointed it.
+	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex", "gemini"}); c.Status != doctor.Fail || c.Fix != "terma setup" || !strings.Contains(c.Detail, "Gemini") {
+		t.Errorf("moved relay, Gemini selected: %+v", c)
+	}
+	daemon.Repointed(dir)
+	facts = testApp.relayFacts()
+	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex", "gemini"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "moved to "+moved) {
+		t.Errorf("moved relay, setup since: %+v", c)
+	}
+	facts.Move.Recent = false
+	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex", "gemini"}); strings.Contains(c.Detail, "moved to") {
+		t.Errorf("a move past its notice, setup since: %+v", c)
+	}
+	facts.Move, facts.LastFailure = nil, "listen on "+addr+": address already in use"
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "last failed to start") {
 		t.Errorf("failed relay: %+v", c)
+	}
+}
+
+// Setup points every agent it sets up at where the relay moved, those whose exporter the
+// relay cannot read included, records that it has, and says agents started before the move
+// still send to the old address.
+func TestSetupFollowsTheRelaysMove(t *testing.T) {
+	dir := relaySandbox(t)
+	t.Setenv("GEMINI_CLI_HOME", t.TempDir())
+	from, to := freeAddr(t), freeAddr(t)
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", from, "--harness", "codex,gemini"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(dir, daemon.AddrFile), []byte(to+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	moved := fmt.Sprintf(`{"from":%q,"to":%q,"at":%q}`, from, to, time.Now().UTC().Format(time.RFC3339))
+	if err := os.WriteFile(filepath.Join(dir, daemon.MovedFile), []byte(moved), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var warned []string
+	err := testApp.connectMachineRelay(t.Context(), []string{"codex", "gemini"}, "", relayReport{
+		ok: func(string, string) {}, warn: func(_, what string) { warned = append(warned, what) }, then: func(string) {}, detail: io.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codex, _ := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
+	gemini, _ := os.ReadFile(filepath.Join(os.Getenv("GEMINI_CLI_HOME"), ".gemini", "settings.json"))
+	for name, data := range map[string][]byte{"Codex": codex, "Gemini": gemini} {
+		if !strings.Contains(string(data), "http://"+to) || strings.Contains(string(data), "http://"+from) {
+			t.Errorf("%s does not export to where the relay moved:\n%s", name, data)
+		}
+	}
+	if m, ok := daemon.LastMove(dir); !ok || !m.Repointed {
+		t.Errorf("setup did not record that it pointed the agents at the moved relay: %+v", m)
+	}
+	if !slices.ContainsFunc(warned, func(w string) bool {
+		return strings.Contains(w, "moved to "+to) && strings.Contains(w, "still send to "+from)
+	}) {
+		t.Errorf("setup did not tell of the move: %q", warned)
 	}
 }
 

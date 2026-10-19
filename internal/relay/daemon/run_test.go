@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -195,7 +197,7 @@ func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(from+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if Serving(dir) {
+	if _, ok := Serving(dir); ok {
 		t.Fatal("another process listening on the relay's address counts as the relay")
 	}
 	c := runConfig(stateDir, time.Hour, nil)
@@ -214,14 +216,19 @@ func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
 	if to == from || got != [2]string{from, to} {
 		t.Fatalf("moved %v; recorded address %s, held %s", got, to, from)
 	}
-	if !Serving(dir) {
-		t.Error("the relay does not serve the address it moved to")
+	if at, ok := Serving(dir); !ok || at != to {
+		t.Errorf("Serving = %s, %v; want the address it moved to, %s", at, ok, to)
 	}
-	if m, ok := RecentMove(dir, time.Now()); !ok || m.From != from || m.To != to {
-		t.Errorf("RecentMove = %+v, %v", m, ok)
+	if port, _ := strconv.Atoi(to[strings.LastIndex(to, ":")+1:]); port < movePortMin || port > movePortMax {
+		t.Errorf("moved to %s, outside the move range", to)
 	}
-	if _, ok := RecentMove(dir, time.Now().Add(MoveNotice)); ok {
-		t.Error("a move is told of past MoveNotice")
+	m, ok := LastMove(dir)
+	if !ok || m.From != from || m.To != to || m.Repointed || !m.Recent(time.Now()) || m.Recent(time.Now().Add(MoveNotice)) {
+		t.Errorf("LastMove = %+v, %v", m, ok)
+	}
+	Repointed(dir)
+	if m, _ := LastMove(dir); !m.Repointed {
+		t.Error("setup's re-pointing is not recorded")
 	}
 	if _, err := os.Stat(filepath.Join(dir, ErrorFile)); !os.IsNotExist(err) {
 		t.Errorf("a relay that moved left its failure to listen behind: %v", err)
@@ -252,21 +259,29 @@ func TestServingIsTheRelaysLockAndRecord(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if Serving(dir) {
+	serving := func() bool { _, ok := Serving(dir); return ok }
+	if serving() {
 		t.Fatal("serving with no relay")
 	}
 	unlock := pretendRunning(t, dir, addr)
-	if !Serving(dir) {
-		t.Error("a relay holding the lock and recording its address is not serving")
+	if at, ok := Serving(dir); !ok || at != addr {
+		t.Errorf("a relay holding the lock and recording its address: Serving = %s, %v", at, ok)
 	}
 	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(freeAddr(t)+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if Serving(dir) {
+	if serving() {
 		t.Error("a relay listening elsewhere serves the recorded address")
 	}
 	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
 		t.Fatal(err)
+	}
+	// A relay from before relays recorded their address is taken at its lock.
+	if err := os.WriteFile(filepath.Join(dir, RunFile), fmt.Appendf(nil, `{"pid":%d}`, os.Getpid()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !serving() {
+		t.Error("an earlier relay holding the lock is not serving")
 	}
 	dead := exec.Command(os.Args[0], "-test.run=^$")
 	if err := dead.Run(); err != nil {
@@ -275,11 +290,28 @@ func TestServingIsTheRelaysLockAndRecord(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, RunFile), fmt.Appendf(nil, `{"pid":%d,"addr":%q}`, dead.Process.Pid, addr), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if Serving(dir) {
+	if serving() {
 		t.Error("a dead relay's record counts as serving")
 	}
 	unlock()
-	if Serving(dir) {
+	if serving() {
 		t.Error("serving once the lock is free")
+	}
+}
+
+// A relay moves only off the address still recorded: setup may just have chosen another.
+func TestARelayMovesOnlyOffTheRecordedAddress(t *testing.T) {
+	t.Parallel()
+	_, dir, _ := setUpRelay(t)
+	from := freeAddr(t)
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(freeAddr(t)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if ln, err := move(dir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved off an address no longer recorded")
+	}
+	if _, ok := LastMove(dir); ok {
+		t.Error("recorded a move it did not make")
 	}
 }

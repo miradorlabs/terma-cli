@@ -36,13 +36,14 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 			wait = 0
 		}
 	}
-	addr := Addr(dir)
+	var addr string
 	for deadline := time.Now().Add(wait); ; time.Sleep(250 * time.Millisecond) {
-		// The token goes only to this user's relay: whatever else listens on its address
-		// would learn it. The relay may move as it starts, so its address is read again.
-		if Serving(dir) {
-			addr = Addr(dir)
-			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/heartbeat?reason="+semconv.TermaRelayHeartbeatReasonSetup, nil)
+		// The token goes only to this user's relay, at the address it is seen to serve (it may
+		// move as it starts): whatever else listens on the address would learn it.
+		at, serving := Serving(dir)
+		addr = at
+		if serving {
+			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+at+"/heartbeat?reason="+semconv.TermaRelayHeartbeatReasonSetup, nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 			if resp, err = client.Do(req); err == nil {
 				break
@@ -53,7 +54,7 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 		}
 	}
 	if resp == nil {
-		if !Serving(dir) && Squatted(addr) {
+		if _, serving := Serving(dir); !serving && Squatted(addr) {
 			return false, "another process listens on " + addr + ", where the relay should; `terma doctor` says what to do"
 		}
 		return false, "the relay did not answer on " + addr + "; `terma doctor` says why"
