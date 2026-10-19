@@ -47,10 +47,10 @@ func TestWrite(t *testing.T) {
 	}
 }
 
-// An export carries the session's content and the relay's token, so it goes straight to
-// the local relay whatever proxy the host would route it through: on Bun, the environment's
-// HTTP_PROXY, which its fetch reads itself; on Node, the proxy Pi puts its fetch behind,
-// which the driver stands in for. Each runtime found runs the extension.
+// An export goes straight to the local relay whatever proxy the host would route it
+// through: on Bun, the environment's HTTP_PROXY, which its fetch reads itself; on Node, the
+// proxy Pi puts its fetch behind, which the driver stands in for. Each runtime found runs
+// the extension.
 func TestExtensionBypassesProxies(t *testing.T) {
 	t.Parallel()
 	var runtimes [][]string

@@ -131,9 +131,9 @@ test("model calls become spans with tokens, cost and the session as trace", asyn
   expect(created.traceId).toBe(s.traceId)
 })
 
-// An export carries the session's content and the relay's token, so an HTTP proxy the
-// environment names must never see one to the local relay. The plugin runs in a Bun of
-// its own, with the proxy in its environment from the start, as OpenCode would.
+// An export goes straight to the local relay, never through an HTTP proxy the environment
+// names. The plugin runs in a Bun of its own, with the proxy in its environment from the
+// start, as OpenCode would.
 test("exports to the local relay bypass an HTTP proxy in the environment", async () => {
   received = []
   const proxied = []

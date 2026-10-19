@@ -84,8 +84,7 @@ func TestRefreshHermesPlugin(t *testing.T) {
 	}
 }
 
-// An export carries the session's content and the relay's token, so it goes straight to
-// the local relay whatever proxy the environment names.
+// An export goes straight to the local relay whatever proxy the environment names.
 func TestHermesPluginBypassesProxies(t *testing.T) {
 	t.Parallel()
 	python, err := exec.LookPath("python3")

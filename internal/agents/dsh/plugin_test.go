@@ -90,9 +90,8 @@ func TestRemovePluginTakesOutItsInsert(t *testing.T) {
 	}
 }
 
-// An export carries the session's content and the relay's token, so it goes straight to
-// the local relay whatever proxy dsh's own fetch would route it through; the driver stands
-// in for that fetch.
+// An export goes straight to the local relay whatever proxy dsh's own fetch would route it
+// through; the driver stands in for that fetch.
 func TestPluginBypassesProxies(t *testing.T) {
 	t.Parallel()
 	node, err := exec.LookPath("node")
