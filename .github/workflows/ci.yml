@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 
-# macOS runners are few and harness-telemetry holds four for ~5 minutes: a pull request's
+# macOS runners are few and harness-telemetry holds five for ~5 minutes: a pull request's
 # superseded runs are cancelled rather than queued ahead of its latest. Each push to main
 # runs in a group of its own.
 concurrency:
@@ -161,7 +161,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [claude, codex-a, codex-b, others]
+        shard: [claude, codex-a, codex-b, copilot, others]
     env:
       # TestRelay* is the local relay: the same harnesses exporting globally through
       # `terma relay run`, and nothing but the claimed session reaching the receiver.
@@ -176,9 +176,10 @@ jobs:
       TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
-      # Copilot CLI runs against GitHub's service on this job's token. A fork's pull request
-      # gets a read-only one, so there the Copilot tests skip rather than fail.
-      COPILOT_GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.token || '' }}
+      # Copilot CLI runs against GitHub's service on this job's token, in the copilot shard
+      # alone. A fork's pull request gets a read-only one, so there the Copilot tests skip
+      # rather than fail.
+      COPILOT_GITHUB_TOKEN: ${{ matrix.shard == 'copilot' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.token || '' }}
       TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
       # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
