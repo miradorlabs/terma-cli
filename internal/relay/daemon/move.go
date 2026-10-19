@@ -107,14 +107,19 @@ func move(stateDir, from string) (net.Listener, string, error) {
 		return nil, "", err
 	}
 	to := ln.Addr().String()
-	if err := config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(to+"\n"), 0o600); err != nil {
+	// The record, with the token it replaced, before the address: teardown needs that token
+	// for as long as an exporter may hold it.
+	prev, _ := LastMove(dir)
+	err = writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: append(prev.Replaced, old)})
+	if err == nil {
+		err = config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(to+"\n"), 0o600)
+	}
+	if err != nil {
 		// No move, so the token the agents hold stays the relay's.
 		_ = config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(old+"\n"), 0o600)
 		_ = ln.Close()
 		return nil, "", err
 	}
-	prev, _ := LastMove(dir)
-	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: append(prev.Replaced, old)})
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
 	return ln, token, nil
 }
@@ -130,10 +135,12 @@ func listenFree(host string) (net.Listener, error) {
 	return net.Listen("tcp", net.JoinHostPort(host, "0"))
 }
 
-func writeMove(dir string, m Move) {
-	if data, err := json.Marshal(m); err == nil {
-		_ = config.WriteFileAtomicNoSync(filepath.Join(dir, MovedFile), append(data, '\n'), 0o600)
+func writeMove(dir string, m Move) error {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
 	}
+	return config.WriteFileAtomic(filepath.Join(dir, MovedFile), append(data, '\n'), 0o600)
 }
 
 // LastMove is the relay's last move off an address it could not listen on, if it made one.
@@ -163,7 +170,7 @@ func Repointed(dir, to string) {
 	defer unlock()
 	if m, ok := LastMove(dir); ok && m.To == to && (!m.Repointed || len(m.Replaced) > 0) {
 		m.Repointed, m.Replaced = true, nil
-		writeMove(dir, m)
+		_ = writeMove(dir, m)
 	}
 }
 

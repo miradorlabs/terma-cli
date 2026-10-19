@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"time"
@@ -82,8 +83,9 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 
 // withExporters runs fn holding daemon.ExportersLockFile, so setup, teardown and a relay
 // that moved change the agents' relay exporters one at a time; whoever chooses which to
-// change chooses under it too. While another holds it past exportersLockWait, fn does not
-// run. A lock file there is none of (no relay directory yet) has no one to wait for.
+// change chooses under it too. While another holds it past exportersLockWait, or it cannot
+// be had at all, fn does not run; only before a first setup, with no relay directory to hold
+// it in, is there no one to wait for.
 func (app *App) withExporters(ctx context.Context, fn func() error) error {
 	lockCtx, cancel := context.WithTimeout(ctx, exportersLockWait)
 	unlock, err := flock.Lock(lockCtx, filepath.Join(claim.Dir(app.stateDir), daemon.ExportersLockFile))
@@ -93,6 +95,8 @@ func (app *App) withExporters(ctx context.Context, fn func() error) error {
 		defer unlock()
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		return errors.New("another terma is changing the agents' exporters; try again in a moment")
+	case !errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("lock the agents' exporters: %w", err)
 	}
 	return fn()
 }

@@ -243,10 +243,12 @@ func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
 	if err != nil || token == "tok" || len(m.Replaced) != 1 || m.Replaced[0] != "tok" {
 		t.Errorf("token %q, replaced %q: the move kept the token", token, m.Replaced)
 	}
+	// No connection kept open, which the relay's shutdown would wait out.
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
 	for tok, want := range map[string]int{"tok": http.StatusUnauthorized, token: http.StatusOK} {
 		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+to+"/stats", nil)
 		req.Header.Set("Authorization", "Bearer "+tok)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("nothing listens where the relay moved: %v", err)
 		}
@@ -343,6 +345,21 @@ func TestARelayMovesOnlyOffTheRecordedAddress(t *testing.T) {
 		t.Fatal("moved while setup was recording an address")
 	}
 	unlock()
+	// A move it cannot keep a record of, with the token it replaced, is no move: the
+	// address and the token stay as they were.
+	if err := os.Mkdir(filepath.Join(dir, MovedFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if ln, _, err := move(stateDir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved with no record of the move")
+	}
+	if tok, _ := Token(stateDir); tok != "tok" || Addr(dir) != from {
+		t.Errorf("a failed move left token %q and address %s", tok, Addr(dir))
+	}
+	if err := os.Remove(filepath.Join(dir, MovedFile)); err != nil {
+		t.Fatal(err)
+	}
 	// A relay whose token teardown has just removed moves nowhere, and gets no token back.
 	if err := os.Remove(token); err != nil {
 		t.Fatal(err)
