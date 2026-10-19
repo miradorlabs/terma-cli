@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -81,12 +82,16 @@ func (e Env) unpark(r *Repo) {
 // restamp stamps an event parked in r's git directory as a hook in r stamps one. The git
 // directory is an agent's sandbox's to write, so the project, repository and coverage the
 // line names are not taken, except a Global already set: it only withholds the event once
-// the policy leaves global mode, as it would have before it was parked.
+// the policy leaves global mode, as it would have before it was parked. A time to come is
+// now, so the spool's age limit holds it as any other.
 func (e Env) restamp(r *Repo, ev spool.Event) spool.Event {
 	global := ev.Global
 	delete(ev.Attrs, AttrProjectID)
 	ev = e.stamp(r, ev)
 	ev.Global = ev.Global || global
+	if now := time.Now(); ev.Time.After(now) {
+		ev.Time = now
+	}
 	return ev
 }
 
@@ -111,8 +116,12 @@ func (e Env) unparkPushes(r *Repo) {
 				continue
 			}
 			rec, ok := e.parkedPush(r, rec)
-			if !ok || len(recorded) == maxUnparkedPushes {
-				e.Logf("unpark pushes: dropped a record pre-push did not write, or one too many")
+			switch {
+			case !ok:
+				e.Logf("unpark pushes: dropped a record pre-push did not write")
+				continue
+			case len(recorded) == maxUnparkedPushes:
+				e.Logf("unpark pushes: dropped a record past %d", maxUnparkedPushes)
 				continue
 			}
 			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
@@ -140,9 +149,9 @@ func (e Env) unparkPushes(r *Repo) {
 // parkedPush holds a record parked in r's git directory, which an agent's sandbox may write,
 // to what PrePush parks there: an id it mints, so the record lands in PushesDir; the branch
 // updates ParsePushInput keeps, with full commit ids, and remote-tracking refs inside
-// refs/remotes. A time to come is now, which bounds the wait and the retries. Its repository
-// is r, whatever it names, and its event is stamped as a hook in r stamps one (restamp).
-// ok is false for a record that is not such a push.
+// refs/remotes. A time to come is now, which bounds the retries, and a process it names that
+// is still running is not waited on. Its repository is r, whatever it names, and its event is
+// stamped as a hook in r stamps one (restamp). ok is false for a record that is not such a push.
 func (e Env) parkedPush(r *Repo, rec pushRecord) (pushRecord, bool) {
 	if !validPushID(rec.ID) || len(rec.Refs) == 0 || rec.Event.Name != semconv.TermaPushEvent {
 		return rec, false
@@ -160,6 +169,11 @@ func (e Env) parkedPush(r *Repo, rec pushRecord) (pushRecord, bool) {
 	// The clock, not the hook's start: pre-push may have parked it since this hook started.
 	if now := time.Now(); rec.Time.After(now) {
 		rec.Time = now
+	}
+	// Its git push is long gone by the time a hook outside the sandbox runs: one the record
+	// names as running is not waited on, and the push's status reads unknown.
+	if rec.GitPID > 0 && procinfo.Alive(rec.GitPID) {
+		rec.GitPID = 0
 	}
 	rec.Root, rec.GitDir = r.Root, r.GitDir
 	rec.Event = e.restamp(r, rec.Event)

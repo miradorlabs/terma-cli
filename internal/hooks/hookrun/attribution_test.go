@@ -156,7 +156,8 @@ func sandboxedCommit(t *testing.T, workspace bool) {
 
 // The git directory is the sandbox's to write, so a parked event is stamped for the
 // repository it was parked in, as any hook there stamps one: whatever project and repository
-// the line names. A Global already set stays, since it only withholds the event.
+// the line names. A Global already set stays, since it only withholds the event, and a time
+// to come is now.
 func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
 	t.Parallel()
 	root, stateDir, sp := hookruntest.Project(t)
@@ -167,6 +168,7 @@ func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
 			Attrs: map[string]any{AttrProjectID: "project-b"}},
 		{Name: semconv.TermaCommitEvent, Time: now},
 		{Name: semconv.TermaCommitEvent, Time: now, Global: true, Attrs: map[string]any{AttrProjectID: hookruntest.Team}},
+		{Name: semconv.TermaCommitEvent, Time: now.Add(time.Hour)},
 	}
 	unpark := func(team string, policy config.Policy) []spool.Event {
 		t.Helper()
@@ -190,7 +192,8 @@ func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
 		t.Fatalf("spooled %d events, want %d", len(got), len(parked))
 	}
 	for i, ev := range got {
-		if ev.Attrs[AttrProjectID] != hookruntest.Team || ev.Repository.Origin != origin || ev.Global != parked[i].Global {
+		if ev.Attrs[AttrProjectID] != hookruntest.Team || ev.Repository.Origin != origin || ev.Global != parked[i].Global ||
+			ev.Time.After(time.Now()) {
 			t.Errorf("event %d spooled as %+v", i, ev)
 		}
 	}

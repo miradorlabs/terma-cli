@@ -566,6 +566,30 @@ func TestAParkedPushIsNeverFromTheFuture(t *testing.T) {
 	}
 }
 
+// A parked push's git push is long gone: a process the record names that still runs is not
+// waited on, and the push is reported at once, its status unknown.
+func TestAParkedPushWaitsOnNoProcess(t *testing.T) {
+	p := newPushRepo(t)
+	rec := p.parked()
+	rec.GitPID = os.Getpid()
+	awaited := p.unpark(t, rec)
+	if len(awaited) != 1 {
+		t.Fatalf("awaited %v", awaited)
+	}
+	if got, err := readPush(awaited[0]); err != nil || got.GitPID != 0 {
+		t.Fatalf("recorded git push %d (%v), want none", got.GitPID, err)
+	}
+	start := time.Now()
+	AwaitPush(context.Background(), Env{StateDir: p.stateDir, Spool: p.sp}, awaited[0])
+	if waited := time.Since(start); waited > pushWait/2 {
+		t.Errorf("waited %v", waited)
+	}
+	events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent)
+	if len(events) != 1 || events[0].Attrs[semconv.TermaPushStatusKey] != semconv.TermaPushStatusUnknown {
+		t.Errorf("events %+v", events)
+	}
+}
+
 // One hook records at most maxUnparkedPushes, and never over a record already there.
 func TestUnparkingPushesIsBounded(t *testing.T) {
 	p := newPushRepo(t)
