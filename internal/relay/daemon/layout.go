@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"encoding/json"
 	"errors"
 	"net"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -36,6 +38,8 @@ const (
 	EnvFile = "env.json"
 	// RunFile describes the running relay, its pid included (RunningRelay).
 	RunFile = "daemon.json"
+	// MovedFile records the relay's last move off an address another process held (RecentMove).
+	MovedFile = "moved.json"
 )
 
 // Dir is the relay's directory under terma's state directory stateDir, created if missing.
@@ -71,6 +75,24 @@ func Running(dir string) bool {
 		unlock()
 	}
 	return flock.IsBusy(err)
+}
+
+// Serving reports whether this state directory's relay is what listens on its address
+// (Addr): it holds the lock and recorded that it listens there. A port answering is no such
+// proof, since any account on the machine may listen on a loopback port this relay is not
+// holding. The lock is probed only once a live relay's record is there, so a relay still
+// starting never finds the probe holding its lock. A relay from before relays recorded their
+// address is taken at its lock.
+func Serving(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, RunFile))
+	if err != nil {
+		return false
+	}
+	var info RunInfo
+	if json.Unmarshal(data, &info) != nil || info.Addr != "" && info.Addr != Addr(dir) || info.PID <= 0 || !procinfo.Alive(info.PID) {
+		return false
+	}
+	return Running(dir)
 }
 
 // Squatted reports whether something else answers on addr while the relay is not running.

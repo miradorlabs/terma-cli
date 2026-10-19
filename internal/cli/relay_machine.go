@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -62,7 +63,39 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 			r.ok("Relay", what)
 		}
 	})
+	// A relay that found its address held moved off it (daemon.RecentMove): every agent follows.
+	if now := daemon.Addr(dir); now != addr {
+		if err := app.pointAgentsAtRelay(ctx, targets, now, token, func(string, string) {}, r.then); err != nil {
+			return err
+		}
+	}
+	if m, ok := daemon.RecentMove(dir, time.Now()); ok {
+		r.warn("Relay", m.Describe())
+	}
 	return nil
+}
+
+// relayMoved points the agents that export to from, an address another process held, at
+// to, where the relay listens now (daemon.Config.Moved). Only an exporter seen naming from
+// is rewritten: the relay's environment may place an agent's settings elsewhere than the
+// developer's does. `terma setup` points the rest, and doctor says so (daemon.RecentMove).
+func (app *App) relayMoved(ctx context.Context, from, to string, logf func(string, ...any)) {
+	token, err := daemon.Token(app.stateDir)
+	if err != nil {
+		return
+	}
+	var targets []string
+	for _, e := range app.agents.With[agents.RelayExporter]() {
+		if pointed, _ := e.RelayPointed(from); pointed {
+			targets = append(targets, e.Name())
+		}
+	}
+	err = app.pointAgentsAtRelay(ctx, targets, to, token, func(agent, detail string) {
+		logf("relay: %s now exports to %s%s", agent, to, detail)
+	}, func(note string) { logf("relay: %s", note) })
+	if err != nil {
+		logf("relay: pointing the agents at %s: %v", to, err)
+	}
 }
 
 // releaseDeselected undoes the relay exporter of every agent not in targets: global mode's catch-all would forward it.

@@ -184,7 +184,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 // it, its service is this terma's, and the team is chosen and keyed.
 func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env string, selected []string) Check {
 	addr, running := relay.Addr, relay.Running
-	if !running && relay.Squatted {
+	if relay.Squatted {
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
 			Fix: "stop it, or move the relay with `terma setup --relay-addr <host:port>`"}
 	}
@@ -209,6 +209,9 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	}
 	if len(wrong) > 0 {
 		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma setup"}
+	}
+	if relay.Moved != "" {
+		return Check{Status: Warn, Detail: relay.Moved, Fix: "restart those agents"}
 	}
 	if !running && relay.LastFailure != "" {
 		return Check{Status: Warn, Detail: "the local relay last failed to start: " + relay.LastFailure, Fix: "terma setup"}

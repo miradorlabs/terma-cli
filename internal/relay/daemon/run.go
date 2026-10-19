@@ -52,6 +52,10 @@ type Config struct {
 	// restarts on it.
 	Updater   *Updater
 	Listening func(addr net.Addr, hold time.Duration)
+	// Moved, when set, runs beside the engine once the relay found the address setup recorded
+	// held by another process and listens on to instead (Move): the agents' exporters still
+	// name from.
+	Moved func(from, to string)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
 }
@@ -148,9 +152,20 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		addr = Addr(dir)
 	}
 	ln, err := listen(dir, addr)
+	// Only the address setup recorded moves: one --addr names is meant.
+	moved := ""
+	if err != nil && c.Addr == "" && inUse(err, addr) {
+		if ml, merr := move(dir, addr); merr == nil {
+			ln, err, moved, addr = ml, nil, addr, ml.Addr().String()
+			c.Log.Printf("relay pid %d: another process holds %s, so the relay listens on %s instead", os.Getpid(), moved, addr)
+		}
+	}
 	if err != nil {
 		c.Log.Printf("relay pid %d: %v", os.Getpid(), err)
 		return res, err
+	}
+	if _, port, _ := net.SplitHostPort(addr); port == "0" {
+		addr = ln.Addr().String()
 	}
 	opts := c.Engine
 	opts.Token = token
@@ -166,7 +181,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	}
 	claim.Prune(c.StateDir, time.Now())
 	runPath := filepath.Join(dir, RunFile)
-	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
+	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Addr: addr, Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
 	}
 	// Gone before the lock is, so the next relay's records are never removed.
@@ -199,6 +214,9 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	var workers sync.WaitGroup
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
+	}
+	if moved != "" && c.Moved != nil {
+		workers.Go(func() { c.Moved(moved, addr) })
 	}
 	updated := make(chan string, 1)
 	if c.Updater != nil {
@@ -306,6 +324,8 @@ func setUp(stateDir string) bool {
 // RunInfo is what the running relay records about itself.
 type RunInfo struct {
 	PID int `json:"pid"`
+	// Addr is the address it listens on, as the relay's directory records it (Serving).
+	Addr string `json:"addr,omitempty"`
 	// Environment is the backend environment it delivers to.
 	Environment string `json:"environment"`
 	// Launch is what started the relay: the service manager, a hook, or a developer.

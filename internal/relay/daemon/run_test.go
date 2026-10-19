@@ -2,8 +2,10 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -174,5 +176,110 @@ func TestTheWaitingServiceRelayTakesOverAtOnce(t *testing.T) {
 	<-serviceDone
 	if AwaitRelay(dir, 50*time.Millisecond) {
 		t.Fatal("AwaitRelay reports a relay after both stopped")
+	}
+}
+
+// A relay whose recorded address another process holds listens on a free port of the same
+// host instead: it records that as its address, and the move, and says so (Config.Moved)
+// for the agents to follow. What answered on the old address never counts as the relay.
+// An address --addr names is not moved off.
+func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	held, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = held.Close() })
+	from := held.Addr().String()
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(from+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if Serving(dir) {
+		t.Fatal("another process listening on the relay's address counts as the relay")
+	}
+	c := runConfig(stateDir, time.Hour, nil)
+	c.Addr = ""
+	moved := make(chan [2]string, 1)
+	c.Moved = func(from, to string) { moved <- [2]string{from, to} }
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	var got [2]string
+	select {
+	case got = <-moved:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the relay never said it moved")
+	}
+	to := Addr(dir)
+	if to == from || got != [2]string{from, to} {
+		t.Fatalf("moved %v; recorded address %s, held %s", got, to, from)
+	}
+	if !Serving(dir) {
+		t.Error("the relay does not serve the address it moved to")
+	}
+	if m, ok := RecentMove(dir, time.Now()); !ok || m.From != from || m.To != to {
+		t.Errorf("RecentMove = %+v, %v", m, ok)
+	}
+	if _, ok := RecentMove(dir, time.Now().Add(MoveNotice)); ok {
+		t.Error("a move is told of past MoveNotice")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ErrorFile)); !os.IsNotExist(err) {
+		t.Errorf("a relay that moved left its failure to listen behind: %v", err)
+	}
+	conn, err := net.DialTimeout("tcp", to, time.Second)
+	if err != nil {
+		t.Fatalf("nothing listens where the relay moved: %v", err)
+	}
+	_ = conn.Close()
+	r.cancel()
+	<-r.done
+
+	c = runConfig(stateDir, time.Hour, nil)
+	c.Addr = from
+	if _, err := Run(t.Context(), c); err == nil {
+		t.Fatal("a relay told to listen on a held address ran anyway")
+	}
+	if now := Addr(dir); now != to {
+		t.Errorf("a relay told where to listen moved the recorded address to %s", now)
+	}
+}
+
+// Serving is the relay's lock and its record of listening on the recorded address, by a
+// live process: never a port that merely answers, nor a dead relay's record.
+func TestServingIsTheRelaysLockAndRecord(t *testing.T) {
+	_, dir, _ := setUpRelay(t)
+	addr := freeAddr(t)
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if Serving(dir) {
+		t.Fatal("serving with no relay")
+	}
+	unlock := pretendRunning(t, dir, addr)
+	if !Serving(dir) {
+		t.Error("a relay holding the lock and recording its address is not serving")
+	}
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(freeAddr(t)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if Serving(dir) {
+		t.Error("a relay listening elsewhere serves the recorded address")
+	}
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dead := exec.Command(os.Args[0], "-test.run=^$")
+	if err := dead.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, RunFile), fmt.Appendf(nil, `{"pid":%d,"addr":%q}`, dead.Process.Pid, addr), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if Serving(dir) {
+		t.Error("a dead relay's record counts as serving")
+	}
+	unlock()
+	if Serving(dir) {
+		t.Error("serving once the lock is free")
 	}
 }

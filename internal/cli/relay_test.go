@@ -99,8 +99,10 @@ func TestRelayRunsOnce(t *testing.T) {
 	}
 }
 
-// A squatter on the relay's port is reported by run, and named by status.
-func TestRelayReportsASquatter(t *testing.T) {
+// A squatter on the relay's port is named by doctor while no relay serves it; the relay
+// then moves to a free port, points the agents that exported to the squatter at it, and
+// doctor tells of the move.
+func TestARelayMovesOffASquattedPort(t *testing.T) {
 	dir := relaySandbox(t)
 	squatter, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -111,18 +113,25 @@ func TestRelayReportsASquatter(t *testing.T) {
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if out, err := within(3*time.Second).combined(t, "relay", "run", "--quiet"); err == nil {
-		t.Fatalf("relay started on a taken port:\n%s", out)
-	}
-	if _, err := os.Stat(filepath.Join(dir, daemon.ErrorFile)); err != nil {
-		t.Fatal("the failure was not recorded for doctor")
-	}
-	// Doctor names the squatter first; the recorded failure is there once the port is free.
-	facts := testApp.relayFacts()
-	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process is listening on "+addr) {
+	if c := doctor.RelayCheck(testApp.agents, testApp.relayFacts(), testApp.storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process is listening on "+addr) {
 		t.Errorf("squatted relay: %+v", c)
 	}
-	facts.Squatted = false
+	if out, err := within(10*time.Second).combined(t, "relay", "run", "--quiet", "--idle", "1ms"); err != nil {
+		t.Fatalf("relay run: %v\n%s", err, out)
+	}
+	moved := daemon.Addr(dir)
+	if moved == addr {
+		t.Fatal("the relay did not move off the squatted port")
+	}
+	codex, _ := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
+	if !strings.Contains(string(codex), "http://"+moved) || strings.Contains(string(codex), "http://"+addr) {
+		t.Errorf("Codex does not export to where the relay moved:\n%s", codex)
+	}
+	facts := testApp.relayFacts()
+	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "moved to "+moved) {
+		t.Errorf("moved relay: %+v", c)
+	}
+	facts.Moved, facts.LastFailure = "", "listen on "+addr+": address already in use"
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "last failed to start") {
 		t.Errorf("failed relay: %+v", c)
 	}

@@ -80,10 +80,15 @@ func (k Keys) has(agent, projectID string) bool {
 // Relay is the local relay as a run finds it: its state directory and address, whether
 // it runs, and whether something else listens there instead.
 type Relay struct {
-	Addr              string
-	Running, Squatted bool
+	Addr    string
+	Running bool
+	// Squatted means something other than the relay listens on Addr (daemon.Serving).
+	Squatted bool
 	// LastFailure is why the relay last failed to start, when none runs; "" if it did not fail.
 	LastFailure string
+	// Moved says the relay recently moved off an address another process held, "" if it did
+	// not (daemon.RecentMove).
+	Moved string
 	// Environment is the backend environment the running relay delivers to; "" when unknown
 	// (none runs, or a terma from before relays recorded it).
 	Environment string

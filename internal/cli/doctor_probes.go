@@ -96,7 +96,11 @@ func (app *App) serverKeyCredential(cfg *config.Config) (doctor.Credential, erro
 func (app *App) relayFacts() doctor.Relay {
 	dir := claim.Dir(app.stateDir)
 	r := doctor.Relay{Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
-	r.Squatted = !r.Running && daemon.Squatted(r.Addr)
+	// What answers on the relay's address is not proof it is the relay.
+	r.Squatted = !daemon.Serving(dir) && daemon.Squatted(r.Addr)
+	if m, ok := daemon.RecentMove(dir, time.Now()); ok {
+		r.Moved = m.Describe()
+	}
 	if data, err := os.ReadFile(filepath.Join(dir, daemon.ErrorFile)); err == nil && !r.Running {
 		r.LastFailure = strings.TrimSpace(string(data))
 	}
