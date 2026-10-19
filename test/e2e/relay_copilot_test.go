@@ -141,7 +141,7 @@ func TestCopilotAttribution(t *testing.T) {
 			t.Fatalf("Copilot reported no session:\n%s", tail(out, 2000))
 		}
 		if evs := sb.WaitEvents("terma.files.touched", sid, 10*time.Second); len(evs) == 0 {
-			t.Fatalf("no terma.files.touched for %s; spool: %+v", sid, sb.Spool())
+			t.Fatalf("no terma.files.touched for %s; spool: %+v; the session ran %s", sid, sb.Spool(), sb.CopilotTools(sid))
 		}
 		msg := sb.Commit("add hello")
 		if !strings.Contains(msg, "Agent-Session-Id: "+sid) || !strings.Contains(msg, "Agent-Tool: copilot") {

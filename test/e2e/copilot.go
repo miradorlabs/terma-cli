@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -80,6 +82,33 @@ func (sb *Sandbox) UseCopilot(b Binary) {
 }
 
 var copilotResume = regexp.MustCompile(`--resume=([0-9a-f-]{36})`)
+
+// CopilotTools names the tools session ran, from the runtime's own session log
+// (session-state/<id>/events.jsonl), and the model each turn used: what a failure needs
+// to say which tool or model terma's hooks did not expect.
+func (sb *Sandbox) CopilotTools(session string) string {
+	data, err := os.ReadFile(filepath.Join(sb.Home, ".copilot", "session-state", session, "events.jsonl"))
+	if err != nil {
+		return "no session log: " + err.Error()
+	}
+	var seen []string
+	for line := range strings.SplitSeq(string(data), "\n") {
+		var ev struct {
+			Type string `json:"type"`
+			Data struct {
+				ToolName string `json:"toolName"`
+				Model    string `json:"model"`
+			} `json:"data"`
+		}
+		if json.Unmarshal([]byte(line), &ev) != nil {
+			continue
+		}
+		if name := cmp.Or(ev.Data.ToolName, ev.Data.Model); name != "" && !slices.Contains(seen, ev.Type+"="+name) {
+			seen = append(seen, ev.Type+"="+name)
+		}
+	}
+	return strings.Join(seen, ", ")
+}
 
 // CopilotRun runs one headless `copilot -p` in dir, tools approved, the way the shell
 // function starts it, and returns the session id it reports and what it printed.

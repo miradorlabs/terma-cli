@@ -35,7 +35,7 @@ var pinnedSafeKeys = []string{
 	"gen_ai.output.type", "gen_ai.prompt.name", "gen_ai.provider.name",
 	"gen_ai.request.choice.count", "gen_ai.request.frequency_penalty",
 	"gen_ai.request.max_tokens", "gen_ai.request.model", "gen_ai.request.presence_penalty",
-	"gen_ai.request.previous_response.id",
+	"gen_ai.request.previous_response.id", "gen_ai.request.reasoning.level",
 	"gen_ai.request.seed", "gen_ai.response.finish_reasons", "gen_ai.response.id",
 	"gen_ai.response.model", "gen_ai.system", "gen_ai.token.modality", "gen_ai.token.type", "gen_ai.tool.call.id",
 	"gen_ai.tool.call_id", "gen_ai.tool.name", "gen_ai.tool.type",

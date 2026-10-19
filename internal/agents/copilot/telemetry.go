@@ -44,6 +44,9 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// The name VS Code's agent host gives the service it runs the runtime as, read
 			// from VS Code's source: what tells its sessions from the CLI's.
 			"service.namespace",
+			// The reasoning effort a request asked a reasoning model for (low, medium, high…),
+			// seen first on CI's exports in October 2026.
+			"gen_ai.request.reasoning.level",
 		},
 	}
 }
