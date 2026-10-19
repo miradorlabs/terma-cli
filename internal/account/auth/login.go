@@ -21,6 +21,9 @@ import (
 // loginTimeout bounds the wait at the browser, so an abandoned attempt releases the port.
 const loginTimeout = 5 * time.Minute
 
+// maxCallbackBody bounds a posted callback, which carries only a code and a state.
+const maxCallbackBody = 8 << 10
+
 // TokenExchanger performs the code exchange against the API gateway.
 type TokenExchanger interface {
 	ExchangeCode(ctx context.Context, code, verifier string, port int) (*Credential, error)
@@ -79,9 +82,10 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 			return
 		}
 
-		query := r.URL.Query()
-		gotState := query.Get("state")
-		code := query.Get("code")
+		gotState, code, ok := callbackParams(w, r)
+		if !ok {
+			return
+		}
 
 		// Ignore a mismatched callback rather than abort: anything that guesses the port
 		// could otherwise deny the login.
@@ -97,7 +101,7 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 		results <- callback{code: code}
 	})
 
-	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second}
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			results <- callback{err: fmt.Errorf("loopback server: %w", err)}
@@ -141,6 +145,31 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 	}
 }
 
+// callbackParams reads the state and the code the approval page sends back: from the form
+// body of a POST (application/x-www-form-urlencoded, as a plain HTML form sends it), which
+// keeps the code out of the address bar and the browser's history, or from the query of a
+// GET, as the page has sent them so far. Either way the caller checks the state, so a page
+// that posts here without it is ignored, as a GET is. ok is false once a response has been
+// written.
+func callbackParams(w http.ResponseWriter, r *http.Request) (state, code string, ok bool) {
+	switch r.Method {
+	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, maxCallbackBody)
+		if err := r.ParseForm(); err != nil {
+			writeResultPage(w, http.StatusBadRequest, "Authorization failed", "The authorization response could not be read.")
+			return "", "", false
+		}
+		return r.PostForm.Get("state"), r.PostForm.Get("code"), true
+	case http.MethodGet:
+		query := r.URL.Query()
+		return query.Get("state"), query.Get("code"), true
+	default:
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return "", "", false
+	}
+}
+
 // isLoopbackRequest reports whether the request is addressed to this listener on loopback.
 func isLoopbackRequest(r *http.Request, port int) bool {
 	host, hostPort, err := net.SplitHostPort(r.Host)
@@ -157,12 +186,16 @@ func isLoopbackRequest(r *http.Request, port int) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// buildAuthorizeURL is the approval page's link. response_mode=form_post (the name OAuth gives
+// the same handoff) tells the page this listener takes the code as a form POST, so the page
+// can tell a CLI that reads only a GET to update rather than send it a code it would ignore.
 func buildAuthorizeURL(appURL, challenge, state string, port int, label, organization string) string {
 	u := appURL + "/cli/auth"
 	q := url.Values{}
 	q.Set("challenge", challenge)
 	q.Set("state", state)
 	q.Set("port", strconv.Itoa(port))
+	q.Set("response_mode", "form_post")
 	if label != "" {
 		q.Set("label", label)
 	}

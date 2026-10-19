@@ -413,7 +413,8 @@ tested against a sub-50 ms budget.
 
 ## Privacy and security
 
-Authentication uses a browser handoff with PKCE and a loopback callback, or, with
+Authentication uses a browser handoff with PKCE and a loopback callback, which accepts the
+one-time code in a form POST so it need not appear in a URL, or, with
 `TERMA_API_KEY`, a team server key, which terma keeps as the team's key and sends only to
 the auth host it was set up against. Credentials and
 team keys stay in the user's configuration directory (`~/.config/terma`, or
