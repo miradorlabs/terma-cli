@@ -132,3 +132,6 @@ never on disk, and a stopping relay drops it.
   those files (`TERMA_NO_MODIFY_PATH` opts out). What a developer collects is the
   team policy's repository list, read through `config.Policy.Admits` alone.
 - Help text never mentions the hidden `dev` and `local` environments.
+- `TERMA_POLICY_STUB`, the offline policy tests and the hook bench use, is read only by a
+  build without the `release` build tag; goreleaser builds every release with it, which
+  `internal/boundary` checks.
