@@ -85,7 +85,7 @@ func TestOmpConnectWritesExtensionAndHelper(t *testing.T) {
 	if cfg.ResourceAttributes[semconv.MiradorProjectIDKey] != "proj_123" || cfg.ResourceAttributes[harness.AttrEnduserID] != "dev@example.com" {
 		t.Errorf("resource attributes = %v", cfg.ResourceAttributes)
 	}
-	if !reflect.DeepEqual(cfg.HookCommand, []string{"terma", "hook"}) {
+	if !reflect.DeepEqual(cfg.HookCommand, []string{testTerma, "hook"}) {
 		t.Errorf("hook command = %v", cfg.HookCommand)
 	}
 	// No secret in the file, so it is readable like any other hook.
@@ -318,7 +318,11 @@ func TestOmpConflicts(t *testing.T) {
 	}
 }
 
+// testTerma is where the tests' extension runs terma.
+const testTerma = "/opt/terma/bin/terma"
+
 func baseExporter() harness.Exporter {
 	return harness.Exporter{Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef", ProjectID: "proj_123", Signals: harness.AllSignals,
+		HookCommand:        []string{testTerma, "hook"},
 		ResourceAttributes: map[string]string{harness.AttrServiceName: "omp", harness.AttrEnduserID: "dev@example.com", semconv.MiradorProjectIDKey: "proj_123"}}
 }

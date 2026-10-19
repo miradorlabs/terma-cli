@@ -60,10 +60,11 @@ type Exporting interface {
 }
 
 // MachineRefresher is an agent with home-directory files `terma update --refresh` rewrites
-// to this build's templates; it rewrites only a file terma wrote, never creates one.
+// to this build's templates; it rewrites only a file terma wrote, never creates one. terma
+// is the absolute path the files run terma at.
 type MachineRefresher interface {
 	Agent
-	RefreshMachine() (path string, changed bool, err error)
+	RefreshMachine(terma string) (path string, changed bool, err error)
 }
 
 // ContentConsent is an agent whose hooks spool what was said (a reply, a thread's name)
@@ -76,7 +77,8 @@ type ContentConsent interface {
 // usage windows; machine-level, never repository policy.
 type StatusLiner interface {
 	Agent
-	InstallStatusLine() (bool, error)
+	// InstallStatusLine wraps it with terma at its absolute path terma.
+	InstallStatusLine(terma string) (bool, error)
 	StatusLineState(cwd string) (StatusLineState, error)
 	RemoveStatusLine() (bool, error)
 }
