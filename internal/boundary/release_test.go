@@ -1,10 +1,14 @@
 package boundary
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -47,11 +51,18 @@ func TestTheReleaseTagLeavesOutThePolicyStub(t *testing.T) {
 	t.Parallel()
 	const test = "TestReleaseBuildIgnoresThePolicyStub"
 	root := repoRoot(t)
-	// go test caches by what this process reads, not the go command it runs: read the
-	// package here, as listPackages does, or a change to it is answered from the cache.
-	files, err := filepath.Glob(filepath.Join(root, "internal", "config", "*.go"))
-	if err != nil || len(files) == 0 {
-		t.Fatalf("internal/config: %v", err)
+	// go test caches by what this process reads, not the go command it runs: read what the
+	// release test builds from here, as listPackages does, or a change is answered from the cache.
+	list := exec.Command("go", "list", "-deps", "-test", "-tags", releaseTag,
+		"-f", `{{if and (not .Standard) (ne .Name "main")}}{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .TestGoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{end}}`, "./internal/config/")
+	list.Dir = root
+	listed, err := list.Output()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+	files := append(strings.Fields(string(listed)), filepath.Join(root, "go.mod"), filepath.Join(root, "go.sum"))
+	if !slices.Contains(files, filepath.Join(root, "internal", "config", "policystub_release_test.go")) {
+		t.Fatalf("go list -tags %s does not build the release test:\n%s", releaseTag, listed)
 	}
 	for _, f := range files {
 		if _, err := os.ReadFile(f); err != nil {
@@ -63,5 +74,33 @@ func TestTheReleaseTagLeavesOutThePolicyStub(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil || !strings.Contains(string(out), "--- PASS: "+test) {
 		t.Fatalf("go test -tags %s: %v\n%s", releaseTag, err, out)
+	}
+}
+
+// TestOnlyConfigReadsThePolicyStub keeps TERMA_POLICY_STUB behind config.PolicyStub, the
+// one reader the release tag turns off: no other code reads the variable itself.
+func TestOnlyConfigReadsThePolicyStub(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	fset := token.NewFileSet()
+	for _, p := range listPackages(t) {
+		for _, name := range p.GoFiles {
+			path := filepath.Join(p.Dir, name)
+			f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rel, _ := filepath.Rel(root, path)
+			ast.Inspect(f, func(n ast.Node) bool {
+				lit, ok := n.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					return true
+				}
+				if v, _ := strconv.Unquote(lit.Value); v == "TERMA_POLICY_STUB" && filepath.ToSlash(rel) != "internal/config/policy.go" {
+					t.Errorf("%s names TERMA_POLICY_STUB; read it through config.PolicyStub", filepath.ToSlash(rel))
+				}
+				return true
+			})
+		}
 	}
 }
