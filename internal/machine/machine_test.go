@@ -1,10 +1,7 @@
 package machine
 
 import (
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
+	"errors"
 	"testing"
 )
 
@@ -18,6 +15,8 @@ func TestShortCutsTheDomain(t *testing.T) {
 		".local":                   ".local",
 		"":                         "",
 		"192-168-1-23.example.net": "192-168-1-23",
+		"10.0.0.5":                 "10.0.0.5",
+		"fe80::1":                  "fe80::1",
 	} {
 		if got := short(in); got != want {
 			t.Errorf("short(%q) = %q, want %q", in, got, want)
@@ -25,32 +24,28 @@ func TestShortCutsTheDomain(t *testing.T) {
 	}
 }
 
-// A Mac is named by its LocalHostName, which no network rewrites, never by the kernel's
-// hostname, which DHCP and reverse DNS do.
-func TestNameIsTheMacsLocalHostName(t *testing.T) {
+// The system's own name wins over a hostname the network handed out, whose first label is
+// not the machine's; only without one does the hostname name the machine.
+func TestPickPrefersTheSystemsOwnName(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS != "darwin" {
-		t.Skip("macOS only")
+	host := func(name string) func() (string, error) {
+		return func() (string, error) { return name, nil }
 	}
-	out, err := exec.Command("/usr/sbin/scutil", "--get", "LocalHostName").Output()
-	if err != nil {
-		t.Skipf("no LocalHostName: %v", err)
-	}
-	if got, want := Name(), strings.TrimSpace(string(out)); got != want {
-		t.Errorf("Name() = %q, want the LocalHostName %q", got, want)
-	}
-}
-
-func TestNameElsewhereIsTheShortHostname(t *testing.T) {
-	t.Parallel()
-	if runtime.GOOS == "darwin" {
-		t.Skip("a Mac answers its LocalHostName")
-	}
-	host, err := os.Hostname()
-	if err != nil {
-		t.Skip(err)
-	}
-	if got := Name(); got != short(host) {
-		t.Errorf("Name() = %q, want %q", got, short(host))
+	failed := func() (string, error) { return "", errors.New("no hostname") }
+	for _, c := range []struct {
+		local    string
+		hostname func() (string, error)
+		want     string
+	}{
+		{"Studio", host("c-73-1-2-3.hsd1.ca.comcast.net"), "Studio"},
+		{"Studio", host("studios-mbp.lan"), "Studio"},
+		{"Studio", failed, "Studio"},
+		{"", host("studio.lan"), "studio"},
+		{"", host("build-01"), "build-01"},
+		{"", failed, ""},
+	} {
+		if got := pick(c.local, c.hostname); got != c.want {
+			t.Errorf("pick(%q, …) = %q, want %q", c.local, got, c.want)
+		}
 	}
 }
