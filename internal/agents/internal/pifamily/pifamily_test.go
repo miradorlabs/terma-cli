@@ -50,15 +50,30 @@ func TestWrite(t *testing.T) {
 // An export goes straight to the local relay whatever proxy the host would route it
 // through: on Bun, the environment's HTTP_PROXY, which its fetch reads itself; on Node, the
 // proxy Pi puts its fetch behind, which the driver stands in for. Each runtime found runs
-// the extension.
+// the extension; CI names them in TERMA_EXPORTER_RUNTIMES, so one missing there fails.
 func TestExtensionBypassesProxies(t *testing.T) {
 	t.Parallel()
-	var runtimes [][]string
-	if bun, err := exec.LookPath("bun"); err == nil {
-		runtimes = append(runtimes, []string{bun})
+	names, required := []string{"bun", "node"}, false
+	if s := os.Getenv("TERMA_EXPORTER_RUNTIMES"); s != "" {
+		names, required = strings.Split(s, ","), true
 	}
-	if node, err := exec.LookPath("node"); err == nil && exec.Command(node, "--experimental-strip-types", "-e", "").Run() == nil {
-		runtimes = append(runtimes, []string{node, "--experimental-strip-types"})
+	var runtimes [][]string
+	for _, name := range names {
+		rt := []string{name}
+		if name == "node" {
+			rt = append(rt, "--experimental-strip-types")
+		}
+		path, err := exec.LookPath(name)
+		if err == nil {
+			rt[0] = path
+			err = exec.Command(path, append(rt[1:], "-e", "")...).Run()
+		}
+		switch {
+		case err == nil:
+			runtimes = append(runtimes, rt)
+		case required:
+			t.Fatalf("%s cannot run the extension: %v", name, err)
+		}
 	}
 	if len(runtimes) == 0 {
 		t.Skip("neither bun nor a node that runs TypeScript")
