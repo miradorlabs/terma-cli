@@ -22,8 +22,7 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 	if err != nil {
 		return false, err.Error()
 	}
-	token, err := Token(stateDir)
-	if err != nil {
+	if _, err := Token(stateDir); err != nil {
 		return false, err.Error()
 	}
 	client := &http.Client{Timeout: 20 * time.Second}
@@ -42,7 +41,9 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 		// move as it starts): whatever else listens on the address would learn it.
 		at, serving := Serving(dir)
 		addr = at
-		if serving {
+		// The token too: a relay that moved runs under a new one.
+		token, terr := Token(stateDir)
+		if serving && terr == nil {
 			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+at+"/heartbeat?reason="+semconv.TermaRelayHeartbeatReasonSetup, nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 			if resp, err = client.Do(req); err == nil {

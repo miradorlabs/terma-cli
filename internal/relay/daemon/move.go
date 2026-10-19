@@ -153,6 +153,14 @@ func LastMove(dir string) (Move, bool) {
 // last, with its token, so no exporter holds a token a move replaced; a later move is left
 // as it is.
 func Repointed(dir, to string) {
+	// Under the address lock, which a move holds while it records itself.
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err != nil {
+		return
+	}
+	defer unlock()
 	if m, ok := LastMove(dir); ok && m.To == to && (!m.Repointed || len(m.Replaced) > 0) {
 		m.Repointed, m.Replaced = true, nil
 		writeMove(dir, m)
