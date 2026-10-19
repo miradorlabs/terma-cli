@@ -68,6 +68,44 @@ func TestStopSignalsOnlyARelayHoldingTheLock(t *testing.T) {
 	<-stopped
 }
 
+// relayPID ties the record to the lock's holder: a lock seen held for an instant, or taken
+// by a relay that then clears a dead relay's record, names no pid.
+func TestRelayPIDIsTheLockHoldersRecord(t *testing.T) {
+	_, dir, _ := setUpRelay(t)
+	record := filepath.Join(dir, RunFile)
+	if err := os.WriteFile(record, fmt.Appendf(nil, `{"pid":%d}`, os.Getpid()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if pid := relayPID(dir); pid != 0 {
+		t.Fatalf("relayPID = %d with no lock held", pid)
+	}
+	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pid := relayPID(dir); pid != os.Getpid() {
+		t.Errorf("relayPID = %d, want the lock holder's %d", pid, os.Getpid())
+	}
+	prev := settle
+	t.Cleanup(func() { settle = prev })
+	settle = func() { _ = os.Remove(record) } // a relay taking the lock clears the record
+	if pid := relayPID(dir); pid != 0 {
+		t.Errorf("relayPID = %d once a new relay cleared the record", pid)
+	}
+	unlock()
+	if err := os.WriteFile(record, fmt.Appendf(nil, `{"pid":%d}`, os.Getpid()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err = flock.TryLock(filepath.Join(dir, LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settle = func() { unlock() } // a probe that held the lock for an instant
+	if pid := relayPID(dir); pid != 0 {
+		t.Errorf("relayPID = %d for a lock held only an instant", pid)
+	}
+}
+
 // A relay that takes the lock clears a dead relay's record before anything else, so the
 // pid in it is never taken for its own.
 func TestARelayClearsADeadRelaysRecord(t *testing.T) {
