@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -245,6 +246,43 @@ func TestExportersChangeOnlyUnderTheirLock(t *testing.T) {
 	ran = false
 	if err := testApp.withExporters(ctx, func() error { ran = true; return nil }); err == nil || ran {
 		t.Fatalf("changed the exporters while another held their lock: ran %v, %v", ran, err)
+	}
+}
+
+// `relay setup` follows a move only when it points every agent that exports to the relay: an
+// agent it leaves out keeps the token teardown finds it by.
+func TestRelaySetupFollowsAMoveOnlyForEveryExporter(t *testing.T) {
+	dir := relaySandbox(t)
+	t.Setenv("GEMINI_CLI_HOME", t.TempDir())
+	to := freeAddr(t)
+	if _, err := daemon.Dir(testApp.stateDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := daemon.RecordAddr(dir, to); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testApp.ensureRelayToken(); err != nil {
+		t.Fatal(err)
+	}
+	moved := fmt.Sprintf(`{"from":%q,"to":%q,"at":%q,"replaced":["old"]}`, freeAddr(t), to, time.Now().UTC().Format(time.RFC3339))
+	if err := os.WriteFile(filepath.Join(dir, daemon.MovedFile), []byte(moved), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--harness", "codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if m, _ := daemon.LastMove(dir); m.Repointed || len(m.Replaced) != 1 {
+		t.Errorf("a setup of some agents marked the move followed: %+v", m)
+	}
+	var every []string
+	for _, e := range testApp.agents.With[agents.RelayExporter]() {
+		every = append(every, e.Name())
+	}
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--harness", strings.Join(every, ",")); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if m, _ := daemon.LastMove(dir); !m.Repointed || len(m.Replaced) != 0 {
+		t.Errorf("a setup of every agent did not mark the move followed: %+v", m)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,8 +66,11 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// The agents it pointed now follow any move the relay made (doctor reads this).
-			daemon.Repointed(dir, addr)
+			// Pointing every agent that exports to the relay follows any move it made (doctor
+			// reads this); a subset leaves the rest, and the tokens teardown finds them by.
+			if pointsEveryExporter(app.agents, splitCommas(agents)) {
+				daemon.Repointed(dir, addr)
+			}
 			fmt.Fprintln(out, "Hooks in the repositories your team collects claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it.
 			daemon.Stop(dir)
@@ -84,6 +88,16 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 	cmd.Flags().StringVar(&agents, "harness", strings.Join(app.agents.RelayTargets(app.availableAgentNames()), ","), "the agents to point at the relay")
 	cmd.Flags().BoolVar(&noStart, "no-start", false, "do not start the relay now (the next hook that claims a session will)")
 	return cmd
+}
+
+// pointsEveryExporter reports whether selected names every agent that can export to the relay.
+func pointsEveryExporter(reg *agents.Registry, selected []string) bool {
+	for _, e := range reg.With[agents.RelayExporter]() {
+		if !slices.Contains(selected, e.Name()) {
+			return false
+		}
+	}
+	return true
 }
 
 // withExporters runs fn holding daemon.ExportersLockFile, so setup, teardown and a relay

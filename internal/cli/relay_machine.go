@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -111,12 +110,8 @@ func (app *App) relayMoved(ctx context.Context, from, to string, logf func(strin
 // releaseDeselected undoes the relay exporter of every agent not in targets: global mode's
 // catch-all would forward it. Callers hold withExporters.
 func (app *App) releaseDeselected(ctx context.Context, targets []string, r relayReport) error {
-	token, _ := daemon.Token(app.stateDir)
-	tokens := []string{token}
 	// An exporter the relay could not re-point when it moved holds a token the move replaced.
-	if m, ok := daemon.LastMove(claim.Dir(app.stateDir)); ok {
-		tokens = append(tokens, m.Replaced...)
-	}
+	tokens := daemon.Tokens(app.stateDir)
 	for _, e := range app.agents.With[agents.RelayExporter]() {
 		if slices.Contains(targets, e.Name()) {
 			continue

@@ -95,6 +95,25 @@ func Current(stateDir string) (addr, token string, err error) {
 	return Addr(dir), token, err
 }
 
+// Tokens are every relay token an exporter may hold: the current one, then those moves
+// replaced since setup last re-pointed every agent, read as one snapshot under the lock a
+// move holds while it rotates the token and records the one it replaced.
+func Tokens(stateDir string) []string {
+	dir := claim.Dir(stateDir)
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
+	token, _ := Token(stateDir)
+	tokens := []string{token}
+	if m, ok := LastMove(dir); ok {
+		tokens = append(tokens, m.Replaced...)
+	}
+	return tokens
+}
+
 // move listens on a free port of the host of from, where the relay of stateDir could not,
 // and records it as the relay's address, and the move. It moves nothing when the recorded
 // address is no longer from: setup has just chosen another (RecordAddr). It gives the relay
