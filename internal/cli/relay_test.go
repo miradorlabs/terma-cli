@@ -126,8 +126,9 @@ func TestARelayMovesOffASquattedPort(t *testing.T) {
 		t.Fatal("the relay did not move off the squatted port")
 	}
 	codex, _ := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
-	if !strings.Contains(string(codex), "http://"+moved) || strings.Contains(string(codex), "http://"+addr) {
-		t.Errorf("Codex does not export to where the relay moved:\n%s", codex)
+	token, _ := daemon.Token(testApp.stateDir)
+	if !strings.Contains(string(codex), "http://"+moved) || strings.Contains(string(codex), "http://"+addr) || !strings.Contains(string(codex), token) {
+		t.Errorf("Codex does not export to where the relay moved, with its new token:\n%s", codex)
 	}
 	facts := testApp.relayFacts()
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "moved to "+moved) {
@@ -197,6 +198,31 @@ func TestSetupFollowsTheRelaysMove(t *testing.T) {
 		return strings.Contains(w, "moved to "+to) && strings.Contains(w, "still send to "+from)
 	}) {
 		t.Errorf("setup did not tell of the move: %q", warned)
+	}
+}
+
+// Teardown undoes an exporter the relay could not re-point when it moved, though it holds the
+// token the move replaced.
+func TestTeardownFindsAnExporterByATokenAMoveReplaced(t *testing.T) {
+	dir := relaySandbox(t)
+	t.Setenv("GEMINI_CLI_HOME", t.TempDir())
+	from := freeAddr(t)
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", from, "--harness", "gemini"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	old, _ := daemon.Token(testApp.stateDir)
+	if err := os.WriteFile(claim.TokenPath(testApp.stateDir), []byte("rotated\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	moved := fmt.Sprintf(`{"from":%q,"to":%q,"at":%q,"replaced":[%q]}`, from, freeAddr(t), time.Now().UTC().Format(time.RFC3339), old)
+	if err := os.WriteFile(filepath.Join(dir, daemon.MovedFile), []byte(moved), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.releaseDeselected(t.Context(), nil, relayReport{ok: func(string, string) {}, then: func(string) {}}); err != nil {
+		t.Fatal(err)
+	}
+	if settings, _ := os.ReadFile(filepath.Join(os.Getenv("GEMINI_CLI_HOME"), ".gemini", "settings.json")); strings.Contains(string(settings), old) {
+		t.Fatalf("teardown left Gemini exporting with the replaced token:\n%s", settings)
 	}
 }
 

@@ -42,6 +42,9 @@ type Move struct {
 	// Repointed means `terma setup` has since pointed every agent it set up at To, those
 	// whose exporter the relay cannot read included.
 	Repointed bool `json:"repointed,omitempty"`
+	// Replaced are the relay tokens moves replaced, latest last: what held the address may
+	// have read one from an export (rotateToken).
+	Replaced []string `json:"replaced,omitempty"`
 }
 
 // Ports a moved relay picks from: below every platform's default ephemeral range (Linux's
@@ -98,7 +101,8 @@ func move(dir, from string) (net.Listener, error) {
 		_ = ln.Close()
 		return nil, err
 	}
-	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC()})
+	prev, _ := LastMove(dir)
+	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: prev.Replaced})
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
 	return ln, nil
 }

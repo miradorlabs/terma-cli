@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -140,11 +138,9 @@ func (app *App) ensureRelayToken() (string, error) {
 			return token, nil
 		}
 	}
-	path := claim.TokenPath(app.stateDir)
-	b := make([]byte, 24)
-	if _, err := rand.Read(b); err != nil {
+	token, err := daemon.NewToken()
+	if err != nil {
 		return "", err
 	}
-	token := hex.EncodeToString(b)
-	return token, config.WriteFileAtomic(path, []byte(token+"\n"), 0o600)
+	return token, config.WriteFileAtomic(claim.TokenPath(app.stateDir), []byte(token+"\n"), 0o600)
 }

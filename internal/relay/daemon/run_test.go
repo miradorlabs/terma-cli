@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -237,11 +238,23 @@ func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ErrorFile)); !os.IsNotExist(err) {
 		t.Errorf("a relay that moved left its failure to listen behind: %v", err)
 	}
-	conn, err := net.DialTimeout("tcp", to, time.Second)
-	if err != nil {
-		t.Fatalf("nothing listens where the relay moved: %v", err)
+	// What held the address may have read the token: the moved relay takes only a new one.
+	token, err := Token(stateDir)
+	if err != nil || token == "tok" || len(m.Replaced) != 1 || m.Replaced[0] != "tok" {
+		t.Errorf("token %q, replaced %q: the move kept the token", token, m.Replaced)
 	}
-	_ = conn.Close()
+	for tok, want := range map[string]int{"tok": http.StatusUnauthorized, token: http.StatusOK} {
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+to+"/stats", nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("nothing listens where the relay moved: %v", err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("the moved relay answered %d to token %q, want %d", resp.StatusCode, tok, want)
+		}
+	}
 	r.cancel()
 	<-r.done
 

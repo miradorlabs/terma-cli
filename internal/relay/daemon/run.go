@@ -160,6 +160,11 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		if ml, merr := move(dir, addr); merr == nil {
 			c.Log.Printf("relay pid %d: %v, so the relay listens on %s instead", os.Getpid(), err, ml.Addr())
 			ln, err, moved, addr = ml, nil, addr, ml.Addr().String()
+			// What held the address may have read the token from an export: the relay goes on
+			// under a new one, which the agents it re-points get (Config.Moved).
+			if t, rerr := rotateToken(c.StateDir, dir); rerr == nil {
+				token = t
+			}
 		}
 	}
 	if err != nil {

@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -18,6 +20,38 @@ import (
 // served, and setup under that same sign-in restores it instead of minting another: a
 // teardown and setup refuse nothing an agent still running sends. Removing the token
 // still stops collection, since without it no relay runs and no hook claims a session.
+
+// NewToken is a fresh relay token.
+func NewToken() (string, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// maxReplaced bounds the tokens a moved relay keeps for teardown (Move.Replaced).
+const maxReplaced = 8
+
+// rotateToken gives the relay of stateDir, whose directory is dir, a new token and returns
+// it, keeping the one it replaced beside the move (Move.Replaced): an exporter the relay
+// could not re-point still holds it, and teardown finds what it wrote by it.
+func rotateToken(stateDir, dir string) (string, error) {
+	old, _ := Token(stateDir)
+	token, err := NewToken()
+	if err != nil {
+		return "", err
+	}
+	if err := config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	if m, ok := LastMove(dir); ok && old != "" {
+		m.Replaced = append(m.Replaced, old)
+		m.Replaced = m.Replaced[max(0, len(m.Replaced)-maxReplaced):]
+		writeMove(dir, m)
+	}
+	return token, nil
+}
 
 // RetiredTokenFile is the token teardown removed and the sign-in it served, in the
 // state directory.

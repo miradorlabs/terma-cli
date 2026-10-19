@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -61,9 +62,14 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 		}
 	})
 	// A relay that could not listen on its address moved (daemon.LastMove): every agent follows.
+	// The move gave the relay a new token too (daemon.rotateToken).
 	now := daemon.Addr(dir)
 	if now != addr {
 		if err := app.withExporters(ctx, func() error {
+			var err error
+			if token, err = daemon.Token(app.stateDir); err != nil {
+				return err
+			}
 			return app.pointAgentsAtRelay(ctx, targets, now, token, func(string, string) {}, r.then)
 		}); err != nil {
 			return err
@@ -108,13 +114,22 @@ func (app *App) relayMoved(ctx context.Context, from, to string, logf func(strin
 // catch-all would forward it. Callers hold withExporters.
 func (app *App) releaseDeselected(ctx context.Context, targets []string, r relayReport) error {
 	token, _ := daemon.Token(app.stateDir)
+	tokens := []string{token}
+	// An exporter the relay could not re-point when it moved holds a token the move replaced.
+	if m, ok := daemon.LastMove(claim.Dir(app.stateDir)); ok {
+		tokens = append(tokens, m.Replaced...)
+	}
 	for _, e := range app.agents.With[agents.RelayExporter]() {
 		if slices.Contains(targets, e.Name()) {
 			continue
 		}
-		result, err := e.UnconfigureRelay(ctx, token)
-		if err != nil {
-			return fmt.Errorf("%s: stop sending to the relay: %w", e.DisplayName(), err)
+		var result agents.RelayResult
+		for _, t := range tokens {
+			undone, err := e.UnconfigureRelay(ctx, t)
+			if err != nil {
+				return fmt.Errorf("%s: stop sending to the relay: %w", e.DisplayName(), err)
+			}
+			result.Paths, result.Notes = append(result.Paths, undone.Paths...), append(result.Notes, undone.Notes...)
 		}
 		if len(result.Paths) > 0 {
 			paths := make([]string, 0, len(result.Paths))
