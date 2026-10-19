@@ -227,16 +227,13 @@ func TestTeardownFindsAnExporterByATokenAMoveReplaced(t *testing.T) {
 	}
 }
 
-// While another holds the exporters lock past its wait, nothing changes the exporters; with
-// no relay directory yet there is no one to wait for.
+// While another holds the exporters lock past its wait, nothing changes the exporters, before
+// a first setup too.
 func TestExportersChangeOnlyUnderTheirLock(t *testing.T) {
 	dir := relaySandbox(t)
 	ran := false
 	if err := testApp.withExporters(t.Context(), func() error { ran = true; return nil }); err != nil || !ran {
 		t.Fatalf("no relay directory yet: ran %v, %v", ran, err)
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatal(err)
 	}
 	unlock, err := flock.TryLock(filepath.Join(dir, daemon.ExportersLockFile))
 	if err != nil {
