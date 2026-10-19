@@ -60,7 +60,7 @@ type Exporting interface {
 }
 
 // MachineRefresher is an agent with home-directory files `terma update --refresh` rewrites
-// to this build's templates; it rewrites only a file terma wrote, never creates one.
+// to this build's templates; it rewrites only an agent's file terma wrote, never creates one.
 type MachineRefresher interface {
 	Agent
 	RefreshMachine() (path string, changed bool, err error)
