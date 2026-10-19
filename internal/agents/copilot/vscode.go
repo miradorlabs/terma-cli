@@ -104,6 +104,9 @@ var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACE
 // chat.agentHost.otel.exporterType.
 const shellExporterType = "COPILOT_OTEL_EXPORTER_TYPE"
 
+// shellProtocols pick the OTLP exporter's wire protocol, which no setting overrides.
+var shellProtocols = []string{harness.EnvOTLPProtocol, "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "COPILOT_OTEL_PROTOCOL"}
+
 // shellEndpoint names an exporter variable exported where terma runs that sends the agent
 // host's spans elsewhere than the relay at addr: an OTLP endpoint that is not the relay's, or
 // an exporter type that writes a file or the console. VS Code applies its settings only to the
@@ -122,6 +125,12 @@ func shellEndpoint(addr string) (string, bool) {
 	// VS Code hosts take the same exporter, and the relay has no gRPC listener.
 	if v := strings.ToLower(strings.TrimSpace(os.Getenv(shellExporterType))); v != "" && v != otlpHTTP {
 		return shellExporterType, true
+	}
+	// grpc (and http/grpc) is gRPC, which the relay does not serve either.
+	for _, name := range shellProtocols {
+		if strings.Contains(strings.ToLower(os.Getenv(name)), "grpc") {
+			return name, true
+		}
 	}
 	return "", false
 }

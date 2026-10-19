@@ -33,7 +33,7 @@ func sandbox(t *testing.T) (Agent, string) {
 	t.Setenv("SHELL", "/bin/nu")
 	t.Setenv("PATH", "")
 	t.Setenv("TERMA_SHELL_LAUNCHERS", "")
-	for _, name := range shellEndpoints {
+	for _, name := range append(append(slices.Clone(shellEndpoints), shellProtocols...), shellExporterType) {
 		t.Setenv(name, "")
 	}
 	base, err := os.UserConfigDir()
@@ -514,6 +514,26 @@ func TestVSCodePointedNeedsTheOTLPExporter(t *testing.T) {
 	}
 	if vscodePointed(settings, "127.0.0.1:43180") {
 		t.Fatal("a file exporter read as pointed at the relay")
+	}
+}
+
+// A protocol inherited from the shell that picks gRPC keeps the spans from the relay, which
+// serves OTLP/HTTP alone; the HTTP encodings Claude Code's and Codex's exporters set do not.
+func TestShellGRPCProtocolIsAConflict(t *testing.T) {
+	for _, name := range append(slices.Clone(shellEndpoints), shellExporterType) {
+		t.Setenv(name, "")
+	}
+	for _, name := range shellProtocols {
+		t.Setenv(name, "")
+	}
+	for _, name := range shellProtocols {
+		for value, conflict := range map[string]bool{"": false, "http/protobuf": false, "http/json": false, "grpc": true, " GRPC ": true, "http/grpc": true} {
+			t.Setenv(name, value)
+			if got, set := shellEndpoint("127.0.0.1:43180"); set != conflict || set && got != name {
+				t.Errorf("%s=%q: shellEndpoint = %q, %v; want a conflict %v", name, value, got, set, conflict)
+			}
+		}
+		t.Setenv(name, "")
 	}
 }
 
