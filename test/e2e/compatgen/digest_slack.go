@@ -81,10 +81,7 @@ type attachment struct {
 // then, under a divider, each harness's changes as attachments (slackChanges), as many whole
 // harnesses as one message holds.
 func (d Drift) slack() map[string]any {
-	summary := "Harness drift: no changes"
-	if !d.Quiet() {
-		summary = "Harness drift: changes to look at"
-	}
+	summary := d.summary()
 	blocks := d.slackSummary()
 	var harnesses [][]attachment
 	for _, h := range d.Harnesses {
@@ -126,25 +123,42 @@ func (d Drift) slack() map[string]any {
 	return payload
 }
 
-// slackSummary is the digest's summary as blocks: a header, the alarms, the new releases, the
-// builds unchanged, what is still withheld, compatibility, and a link to the run.
+// slackSummary is the digest's summary as blocks: a header, the alarms, each harness's
+// verdict, then what is to note: new fields, what is still withheld, compatibility, and a
+// link to the run.
 func (d Drift) slackSummary() []block {
 	blocks := []block{{"type": "header", "text": block{"type": "plain_text", "text": "Harness drift — " + d.GeneratedAt.Format("2006-01-02")}}}
 	for _, a := range d.alarms() {
 		blocks = append(blocks, slackSection(":warning: *"+a+"*"))
 	}
-	if len(d.Releases) == 0 {
-		blocks = append(blocks, slackSection("*New releases:* none tonight"))
-	} else {
-		blocks = append(blocks, slackSection("*New releases*\n• "+strings.Join(d.releaseLines(func(s string) string { return "*" + s + "*" }), "\n• ")))
+	// The verdicts, as many sections as they need: red first, so none is cut, and a long night
+	// is split rather than clipped.
+	title := "*Does each harness send all the telemetry terma expects?*"
+	if len(d.Status) == 0 {
+		blocks = append(blocks, slackSection(title+"\n_No harness was tested tonight._"))
 	}
+	text := title
+	for _, l := range d.statusLines(func(s string) string { return "*" + s + "*" }) {
+		if len(slackText(text+"\n"+l)) > sectionLimit {
+			blocks = append(blocks, slackSection(text))
+			text = ""
+		}
+		text = strings.TrimPrefix(text+"\n"+l, "\n")
+	}
+	if len(d.Status) > 0 {
+		blocks = append(blocks, slackSection(text))
+	}
+	var notes []string
 	if d.Quiet() {
-		blocks = append(blocks, slackSection("No changes. Censused: "+d.unchanged()+"."))
-	} else if u := d.unchanged(); u != "" {
-		blocks = append(blocks, slackSection("_Unchanged:_ "+u))
+		notes = append(notes, "No field changes.")
 	}
-	if s := d.stillWithheld(); s != "" {
-		blocks = append(blocks, slackSection(s))
+	for _, n := range []string{d.newFields(), d.metUnclassified(), d.stillWithheld()} {
+		if n != "" {
+			notes = append(notes, n)
+		}
+	}
+	if len(notes) > 0 {
+		blocks = append(blocks, slackSection("*To note*\n"+strings.Join(notes, "\n")))
 	}
 	if len(d.SourceErrors) > 0 {
 		blocks = append(blocks, slackSection("_Source links left out: "+strings.Join(d.SourceErrors, "; ")+"._"))

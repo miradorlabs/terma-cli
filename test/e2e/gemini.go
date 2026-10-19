@@ -37,7 +37,7 @@ func forEachGemini(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("no Gemini CLI build to test")
 	}
 	for _, b := range builds {
-		t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 	}
 }
 

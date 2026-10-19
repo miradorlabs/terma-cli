@@ -28,7 +28,7 @@ func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("omp is not installed")
 	}
 	b := Binary{Harness: "omp", Version: numberOf(Version(path)), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 }
 
 // UseOmpProvider points the sandbox's omp at an OpenAI-compatible endpoint.

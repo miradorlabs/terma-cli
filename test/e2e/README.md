@@ -101,8 +101,9 @@ The main CI workflow runs this module's offline contracts with the race detector
 and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
-`E2E harness contracts` (`live.yml`) runs nightly and on manual dispatch against the latest
-three releases. Every contract that needs no account runs against local fixture providers, as
+`E2E harness contracts` (`live.yml`) runs nightly and on manual dispatch against the newest
+build of each harness the published history checked on macOS and every release since
+(`checked`, below); DeepSeek, which ships prereleases alone, against its newest build. Every contract that needs no account runs against local fixture providers, as
 PR CI's do: the relay and hook contracts, the field census and the drift digest. One that needs
 an account runs where the `live-harnesses` environment has its secret, `OPENAI_API_KEY` for
 Codex's real API scenarios and `ANTHROPIC_API_KEY` for Claude's, and is skipped where it has
@@ -222,19 +223,36 @@ what the night changed against them, then merges the night in and publishes it (
 compat` and `make drift` do the same locally, into `docs/`, where git ignores them). Its two
 git steps are `compatgen/publish.sh restore` and `publish`, which `TestPublishTwoNights`
 runs over two nights against a scratch origin. The digest,
-`report/drift.md`, `drift.json` and `slack.json`, leads with the night's **new releases**:
-each harness build tested for the first time and newer than any tested before (an older
-build, re-run or backported, is no news), against the newest build known before it, with whether it passed every capability check it
-ran (each capability on each platform once; a skipped one is not counted, and one censused
-that ran none says so) and what its census found new or gone, or that the night took none.
-A build the night skipped every check of, and took no census of, is no release until a night
-runs it. A night
-with none says so too. A release's failures are said on its line, not again among the
-capability changes, and a release that failed or ran no checks makes the night no quiet
-one. What came and what went are signed as a diff signs them (`+key`, `-key`) and coloured:
-in Slack each harness's are an attachment with a green bar and one with a red, and in the
-run's summary each line has a green or red mark. Then it gives for each harness's newest
-build:
+`report/drift.md`, `drift.json` and `slack.json`, leads with one verdict a harness: does its
+newest build tested tonight send all the telemetry terma expects? ✅ where every capability
+check it ran passed (each capability on each platform once; a skipped one is not counted), ❌
+naming the checks it failed and whether it passed them before, ⚪ where it ran none; a newer
+build whose every check was skipped is named beside the newest that ran, and older builds
+tested tonight that failed are named too. A scenario that cannot drive a build skips it
+through `SkipBuild`, saying why, and the reason goes beside its ⚪: T3 0.1.0, whose API the
+driver does not speak yet, is untested in the open, never failed. The history keeps the
+reason, and it replaces what an earlier run recorded of that build; the matrix's newest build
+verified is the newest that ran a check. A build tested for the first time, and newer than
+any tested before (an older one, re-run or backported, is no news), is marked new, against the
+newest build known before it. Red comes first, and the list is split across Slack sections
+rather than cut. The notification says whether every harness sends what terma expects, or how
+many do not and how many ran no checks.
+
+A field the relay has not classified is never a failure there: the nightly runs the scenarios'
+tripwire for one (`failUnclassified`) with `TERMA_E2E_UNCLASSIFIED=note`, so the field is
+withheld, as always, and noted, and the harness stays green. Each run writes what it noted to
+`report/notes.json`, which both platforms upload, so a key only the Linux machines met is
+still said under what is to note. A key is noted with the harness of the scenario that met it
+(each `forEach…` helper's build says it, and `Proves`), and weighed against that harness's census alone: one harness withholding `state`
+does not hide another meeting it, even on a night the other's census is missing. T3 Code and
+the desktop apps, which take no census, are weighed against the census of the agents they run. Pull-request CI leaves it unset, so a pinned build bumped
+past a new field fails until the field is classified.
+
+What is to note follows, never red: the fields new tonight that the relay withholds until
+someone classifies them, those it has withheld for longer, and each harness's field changes.
+What came and what went are signed as a diff signs them (`+key`, `-key`) and coloured: in Slack
+each harness's are an attachment with a green bar and one with a red, and in the run's summary
+each line has a green or red mark. For each harness's newest build it gives:
 
 - **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
   span is one line, not one per key
@@ -299,8 +317,14 @@ starts, so those cells fail by design; what they lost is the measurement.
 ## Versions
 
 Each scenario runs against the installed binary and the last three releases
-(`TERMA_E2E_CLAUDE_VERSIONS`, `TERMA_E2E_CODEX_VERSIONS`: `installed`, `lastN`,
-or a comma list), oldest first. Version lists come from the npm registry;
+(`TERMA_E2E_CLAUDE_VERSIONS`, `TERMA_E2E_CODEX_VERSIONS`, and each harness's own: `installed`,
+`lastN`, `checked`, or a comma list), oldest first. `checked` is what the nightly runs: the
+newest release the history at `TERMA_E2E_CHECKED` has a pass or a failure of on this platform
+(the Linux machine job's rows say nothing of what macOS checked), and every release since. It
+keeps terma tested on the build people run, and judges what is new against it on the same
+night. Of a burst of more than five releases between nights, only the newest five are tested,
+and the next night starts from the newest. Where the history has no release of a harness on
+this platform, or cannot be read, it is the last three, and the report says why. Version lists come from the npm registry;
 binaries come from Claude Code's download service (manifest checksum) and
 Codex's GitHub release tarballs (CLI and code-mode host), cached under `versions/`. A recording shim in
 front of `terma` keeps every hook payload each build sends, so payload shapes

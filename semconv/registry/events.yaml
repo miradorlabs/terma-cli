@@ -2,7 +2,8 @@ file_format: definition/2
 # Every hook event is an OTLP log record named by its EventName field, with scope and
 # service.name terma-cli, session.id on the record and, for Codex's records of a turn, the
 # turn's trace id in its TraceId field. Each one's resource carries service.name,
-# service.version, mirador.project.id and terma.schema.version.
+# service.version, mirador.project.id and terma.schema.version, and terma.user.id when terma
+# names the signed-in user.
 attribute_groups:
   - id: terma.resource
     visibility: public
@@ -17,6 +18,9 @@ attribute_groups:
         requirement_level: required
       - ref: terma.schema.version
         requirement_level: required
+      - ref: terma.user.id
+        requirement_level:
+          conditionally_required: When terma names the signed-in user for the team the event goes to.
   - id: terma.relay.stamp
     visibility: public
     stability: development
@@ -28,6 +32,9 @@ attribute_groups:
         requirement_level: required
       - ref: terma.relay.attribution
       - ref: terma.relay.session.id
+      - ref: terma.user.id
+        requirement_level:
+          conditionally_required: When terma names the signed-in user for the team the part goes to.
       - ref: terma.repository.root
       - ref: terma.working_directory
       - ref: terma.repository.worktree.linked

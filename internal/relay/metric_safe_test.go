@@ -12,8 +12,12 @@ import (
 
 // The keys an agent makes safe on one metric alone, as composed, pinned like the safe keys.
 var pinnedMetricSafeKeys = map[string][]string{
-	"codex.shell_snapshot.command": {"state"},
-	"codex.shell_snapshot.wait_ms": {"state"},
+	"codex.shell_snapshot.command":           {"state"},
+	"codex.shell_snapshot.wait_ms":           {"state"},
+	"codex.sandbox_integrity.check":          {"backend", "checker", "dependency"},
+	"codex.sandbox_integrity.duration_ms":    {"backend"},
+	"codex.sandbox_integrity.preparation_ms": {"backend"},
+	"codex.tools.registered":                 {"exposure", "tool_mode"},
 }
 
 func TestComposedMetricSafeKeysArePinned(t *testing.T) {
@@ -92,5 +96,25 @@ func TestEveryPointKindTakesItsMetricsSafeKeys(t *testing.T) {
 	}
 	if attr(scope.Attributes, "state") != "" {
 		t.Error("the metric's scope kept state: a scope is no metric's")
+	}
+}
+
+// Codex 0.163's new metric fields are safe on their own metrics, and a name as generic as
+// backend stays unclassified on another of Codex's (guardian_v2's, of other values).
+func TestCodexSandboxAndToolFieldsAreSafeOnTheirMetrics(t *testing.T) {
+	t.Parallel()
+	q := func(metric, key string) FieldQuery { return FieldQuery{Site: SiteMetric, Event: metric, Key: key} }
+	got := Classify(testCapturers, []FieldQuery{
+		q("codex.sandbox_integrity.check", "backend"), q("codex.sandbox_integrity.check", "checker"),
+		q("codex.sandbox_integrity.check", "dependency"), q("codex.sandbox_integrity.duration_ms", "backend"),
+		q("codex.sandbox_integrity.preparation_ms", "backend"), q("codex.tools.registered", "exposure"),
+		q("codex.tools.registered", "tool_mode"), q("codex.guardian_v2.decisions_comparison.duration_ms", "backend"),
+		{Site: SiteRecord, Key: "permission_mode"},
+	})
+	want := []FieldClass{FieldSafe, FieldSafe, FieldSafe, FieldSafe, FieldSafe, FieldSafe, FieldSafe, FieldUnclassified, FieldSafe}
+	for i := range want {
+		if got[i].Class != want[i] {
+			t.Errorf("query %d: %s, want %s", i, got[i].Class, want[i])
+		}
 	}
 }

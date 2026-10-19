@@ -33,7 +33,7 @@ func forEachHermes(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("hermes is not installed")
 	}
 	b := Binary{Harness: "hermes", Version: numberOf(Version(path)), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { run(t, b) })
+	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
 }
 
 // hermesHome is the sandbox's HERMES_HOME.

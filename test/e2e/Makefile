@@ -63,6 +63,7 @@ machines: machine-image
 	 -e TERMA_E2E=1 -e TERMA_ENV=dev -e TERMA_E2E_BINARY=/work/e2e/bin/linux/terma \
 	 -e TERMA_E2E_CLAUDE_VERSIONS=installed -e TERMA_E2E_CODEX_VERSIONS=installed \
 	 -e TERMA_E2E_KNOWN_UPSTREAM=codex-session-end -e TERMA_E2E_REPORT=report/linux \
+	 -e TERMA_E2E_UNCLASSIFIED \
 	 $(MACHINE_IMAGE):$(CLAUDE_VERSION)-$(CODEX_VERSION) \
 	 ./bin/linux/e2e.test -test.v -test.timeout 40m -test.run '$(if $(RUN),$(RUN),$(MACHINE_RUN))'
 
@@ -75,7 +76,8 @@ machines: machine-image
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
 FIELD_RUNS ?= $(wildcard report/fields.json)
 CENSUS_RUNS ?= $(wildcard report/census.json)
-COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f)) $(foreach c,$(CENSUS_RUNS),-census $(c))
+NOTE_RUNS ?= $(wildcard report/notes.json report/linux/notes.json)
+COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f)) $(foreach c,$(CENSUS_RUNS),-census $(c)) $(foreach n,$(NOTE_RUNS),-notes $(n))
 .PHONY: compat drift
 compat:
 	$(COMPATGEN)

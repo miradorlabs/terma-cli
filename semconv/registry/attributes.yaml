@@ -787,10 +787,14 @@ attributes:
     brief: The Mirador user terma is signed in as, by id.
     note: >-
       On the relay heartbeat, a record attribute read as each beat is sent, since the developer
-      can sign in, out or switch while the relay runs. Left out when terma is signed out, signed
-      in for another organization or environment than its profile's, or set up with a server
-      key, and on a beat that goes with any key but that of the team whose validated policy the
-      login fetched, to any ingest but the profile's own, or with a key filed with another
-      deployment's API host: such a key may belong to another organization or environment. The
-      relay sets it, so the platform shows it and never authorizes with it.
+      can sign in, out or switch while the relay runs. On the resource of every part the relay
+      forwards, for every agent, read as the relay accepts the part, and of every hook event
+      terma delivers, read as the spool is flushed: an id, not a name, so it leaves under any
+      content policy, and terma's to set, so whatever an agent sent under the key on the
+      resource goes first. Left out when terma is signed out, signed in for another organization
+      or environment than its profile's, or set up with a server key, and on anything that goes
+      with any key but that of the team whose validated policy the login fetched, to any ingest
+      but the profile's own, or with a key filed with another deployment's API host: such a key
+      may belong to another organization or environment. Terma sets it, so the platform shows it
+      and never authorizes with it.
     examples: ["5b0e5f8c-3c2a-4d1e-9f6b-2a7c8d9e0f11"]
