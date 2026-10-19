@@ -401,6 +401,26 @@ events:
         note: async_launched, completed or unknown.
       - ref: terma.operation.duration_ms
 
+  - name: terma.scheduled_loop.iteration
+    stability: development
+    requirement_level: recommended
+    brief: A schedule, not the developer, started the turn; one record per turn it woke.
+    note: >
+      Only Claude Code reports what started a turn. Its time is when the turn was submitted.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.turn.id
+        requirement_level: required
+        note: The turn the schedule started, the prompt.id on the agent's own telemetry of it.
+      - ref: terma.scheduled_loop.trigger
+        requirement_level: required
+      - ref: terma.scheduled_loop.id
+        requirement_level: required
+      - ref: terma.evidence.source
+
   - name: terma.session.observation
     stability: development
     requirement_level: recommended
