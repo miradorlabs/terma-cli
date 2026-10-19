@@ -1,6 +1,7 @@
 package pifamily
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // The agent and lifecycle switch reach the rendered extension, the file is private, and
@@ -86,12 +88,19 @@ func TestExtensionBypassesProxies(t *testing.T) {
 	if len(runtimes) == 0 {
 		t.Skip("neither bun nor a node that runs TypeScript")
 	}
-	const driver = `const [plugin, relay, proxy] = process.argv.slice(2)
-if (!("Bun" in globalThis)) {
-  // Pi's own fetch, behind its proxy dispatcher.
-  const direct = globalThis.fetch
-  globalThis.fetch = (url, init) => direct(proxy + new URL(url).pathname, init)
-}
+	const driver = `import { Agent, request } from "node:http"
+const [plugin, relay, proxy] = process.argv.slice(2)
+// sendViaProxy stands in for a fetch behind a proxy dispatcher: it sends every request to
+// the proxy, in the absolute form a proxy takes, on an agent no NODE_USE_ENV_PROXY reaches.
+const sendViaProxy = (url, init = {}) => new Promise((resolve, reject) => {
+  const via = new URL(proxy)
+  const req = request({ host: via.hostname, port: via.port, path: String(url), method: init.method || "GET", headers: init.headers, agent: new Agent() },
+    (res) => { res.resume(); res.on("end", () => resolve(new Response(null, { status: res.statusCode }))) })
+  req.on("error", reject)
+  req.end(init.body)
+})
+// Pi's own fetch, behind its proxy dispatcher.
+if (!("Bun" in globalThis)) globalThis.fetch = sendViaProxy
 // A plain fetch first: it goes to the proxy, which is live for 127.0.0.1.
 await fetch(relay + "/probe", { method: "POST", body: "{}" }).catch(() => {})
 const { default: extension } = await import(plugin)
@@ -116,14 +125,15 @@ await on.session_shutdown({}, ctx)
 			if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command(rt[0], append(rt[1:], script, plugin, relay.URL, proxy.URL)...)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, rt[0], append(rt[1:], script, plugin, relay.URL, proxy.URL)...)
 			// NODE_USE_ENV_PROXY puts node:http's own default agent behind the proxy too.
 			cmd.Env = append(withProxy(proxy.URL), "NODE_USE_ENV_PROXY=1")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("%s: %v\n%s", rt[0], err, out)
 			}
-			// One request, the probe: under NODE_USE_ENV_PROXY a Node may tunnel it with CONNECT.
-			if got := proxied(); len(got) != 1 || strings.Contains(got[0], "Bearer") {
+			if got := proxied(); !slices.Equal(got, []string{"/probe "}) {
 				t.Errorf("the proxy saw %q, want only the probe", got)
 			}
 			if got := received(); !slices.Equal(got, []string{"/v1/logs Bearer tok"}) {
