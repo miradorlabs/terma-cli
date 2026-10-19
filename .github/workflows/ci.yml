@@ -153,6 +153,11 @@ jobs:
     name: harness-telemetry (${{ matrix.shard }})
     runs-on: macos-latest
     timeout-minutes: 30
+    # copilot-requests lets the Copilot CLI run on this job's own token, its AI credits
+    # billed to the organization (its "Copilot CLI billed to the organization" policy).
+    permissions:
+      contents: read
+      copilot-requests: write
     strategy:
       fail-fast: false
       matrix:
@@ -162,7 +167,7 @@ jobs:
       # `terma relay run`, and nothing but the claimed session reaching the receiver.
       # TestMachineHooks* is where setup's machine-wide hooks record: beside a
       # repository's own, in the repositories the team admits.
-      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$'
+      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*)$'
       TERMA_ENV: dev
       TERMA_E2E: "1"
       TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
@@ -170,6 +175,10 @@ jobs:
       TERMA_E2E_OPENCODE_VERSIONS: "1.18.33"
       TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
+      TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
+      # Copilot CLI runs against GitHub's service on this job's token. A fork's pull request
+      # gets a read-only one, so there the Copilot tests skip rather than fail.
+      COPILOT_GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.token || '' }}
       TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
       # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
