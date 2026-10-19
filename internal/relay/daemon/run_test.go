@@ -319,12 +319,12 @@ func TestServingIsTheRelaysLockAndRecord(t *testing.T) {
 // A relay moves only off the address still recorded, and never while setup records one
 // (RecordAddr): setup may just have chosen another.
 func TestARelayMovesOnlyOffTheRecordedAddress(t *testing.T) {
-	_, dir, _ := setUpRelay(t)
+	stateDir, dir, token := setUpRelay(t)
 	from := freeAddr(t)
 	if err := RecordAddr(dir, freeAddr(t)); err != nil {
 		t.Fatal(err)
 	}
-	if ln, err := move(dir, from); err == nil {
+	if ln, _, err := move(stateDir, from); err == nil {
 		_ = ln.Close()
 		t.Fatal("moved off an address no longer recorded")
 	}
@@ -338,11 +338,22 @@ func TestARelayMovesOnlyOffTheRecordedAddress(t *testing.T) {
 	prev := addrLockWait
 	addrLockWait = 50 * time.Millisecond
 	t.Cleanup(func() { addrLockWait = prev })
-	if ln, err := move(dir, from); err == nil {
+	if ln, _, err := move(stateDir, from); err == nil {
 		_ = ln.Close()
 		t.Fatal("moved while setup was recording an address")
 	}
 	unlock()
+	// A relay whose token teardown has just removed moves nowhere, and gets no token back.
+	if err := os.Remove(token); err != nil {
+		t.Fatal(err)
+	}
+	if ln, _, err := move(stateDir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved with its token gone")
+	}
+	if _, err := os.Stat(token); !os.IsNotExist(err) {
+		t.Error("a move brought back a token teardown removed")
+	}
 	if _, ok := LastMove(dir); ok || Addr(dir) != from {
 		t.Errorf("recorded a move it did not make: address %s", Addr(dir))
 	}

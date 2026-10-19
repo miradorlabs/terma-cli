@@ -14,6 +14,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
 // A relay that cannot listen on the address setup recorded does not keep failing there:
@@ -74,37 +75,46 @@ func RecordAddr(dir, addr string) error {
 	return config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600)
 }
 
-// move listens on a free port of the host of from, where the relay could not, and records
-// it as the relay's address, and the move. It moves nothing when the recorded address is no
-// longer from: setup has just chosen another (RecordAddr).
-func move(dir, from string) (net.Listener, error) {
+// move listens on a free port of the host of from, where the relay of stateDir could not,
+// and records it as the relay's address, and the move. It moves nothing when the recorded
+// address is no longer from: setup has just chosen another (RecordAddr). It gives the relay
+// a new token first and returns it: whoever reads the new address reads the new token with
+// it, and an export to from may have carried the old one.
+func move(stateDir, from string) (net.Listener, string, error) {
+	dir := claim.Dir(stateDir)
 	host, _, err := net.SplitHostPort(from)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
 	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
 	cancel()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer unlock()
 	if Addr(dir) != from {
-		return nil, errors.New("relay: the recorded address changed")
+		return nil, "", errors.New("relay: the recorded address changed")
 	}
 	ln, err := listenFree(host)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	old, token, err := rotateToken(stateDir)
+	if err != nil {
+		_ = ln.Close()
+		return nil, "", err
 	}
 	to := ln.Addr().String()
 	if err := config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(to+"\n"), 0o600); err != nil {
 		_ = ln.Close()
-		return nil, err
+		return nil, "", err
 	}
 	prev, _ := LastMove(dir)
-	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: prev.Replaced})
+	replaced := append(prev.Replaced, old)
+	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: replaced[max(0, len(replaced)-maxReplaced):]})
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
-	return ln, nil
+	return ln, token, nil
 }
 
 // listenFree listens on a random port of host in the move range, else any port.

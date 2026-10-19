@@ -157,14 +157,12 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	// Only the address setup recorded moves: one --addr names is meant.
 	moved := ""
 	if err != nil && c.Addr == "" {
-		if ml, merr := move(dir, addr); merr == nil {
+		// The move gives the relay a new token as well, which the agents it re-points get.
+		if ml, t, merr := move(c.StateDir, addr); merr == nil {
 			c.Log.Printf("relay pid %d: %v, so the relay listens on %s instead", os.Getpid(), err, ml.Addr())
-			ln, err, moved, addr = ml, nil, addr, ml.Addr().String()
-			// What held the address may have read the token from an export: the relay goes on
-			// under a new one, which the agents it re-points get (Config.Moved).
-			if t, rerr := rotateToken(c.StateDir, dir); rerr == nil {
-				token = t
-			}
+			ln, err, moved, addr, token = ml, nil, addr, ml.Addr().String(), t
+		} else {
+			c.Log.Printf("relay pid %d: could not move off %s: %v", os.Getpid(), addr, merr)
 		}
 	}
 	if err != nil {

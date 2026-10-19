@@ -40,10 +40,11 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 		if dir, err = daemon.Dir(app.stateDir); err != nil {
 			return err
 		}
+		// The address before the token: a relay that moves writes its new token first.
+		addr = daemon.Addr(dir)
 		if token, err = app.ensureRelayToken(); err != nil {
 			return err
 		}
-		addr = daemon.Addr(dir)
 		return app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
 			r.ok(agent, "sends to the local relay"+detail)
 		}, r.then)
@@ -61,16 +62,11 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 			r.ok("Relay", what)
 		}
 	})
-	// A relay that could not listen on its address moved (daemon.LastMove): every agent follows.
-	// The move gave the relay a new token too (daemon.rotateToken).
+	// A move gives the relay a new address and token; either changed, every agent follows.
 	now := daemon.Addr(dir)
-	if now != addr {
+	if latest, err := daemon.Token(app.stateDir); err == nil && (now != addr || latest != token) {
 		if err := app.withExporters(ctx, func() error {
-			var err error
-			if token, err = daemon.Token(app.stateDir); err != nil {
-				return err
-			}
-			return app.pointAgentsAtRelay(ctx, targets, now, token, func(string, string) {}, r.then)
+			return app.pointAgentsAtRelay(ctx, targets, now, latest, func(string, string) {}, r.then)
 		}); err != nil {
 			return err
 		}

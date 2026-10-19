@@ -33,24 +33,16 @@ func NewToken() (string, error) {
 // maxReplaced bounds the tokens a moved relay keeps for teardown (Move.Replaced).
 const maxReplaced = 8
 
-// rotateToken gives the relay of stateDir, whose directory is dir, a new token and returns
-// it, keeping the one it replaced beside the move (Move.Replaced): an exporter the relay
-// could not re-point still holds it, and teardown finds what it wrote by it.
-func rotateToken(stateDir, dir string) (string, error) {
-	old, _ := Token(stateDir)
-	token, err := NewToken()
-	if err != nil {
-		return "", err
+// rotateToken gives the relay of stateDir a new token, returning the one it replaced and
+// the new one. A relay whose token teardown has just removed gets none back.
+func rotateToken(stateDir string) (old, token string, err error) {
+	if old, err = Token(stateDir); err != nil {
+		return "", "", err
 	}
-	if err := config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
-		return "", err
+	if token, err = NewToken(); err != nil {
+		return "", "", err
 	}
-	if m, ok := LastMove(dir); ok && old != "" {
-		m.Replaced = append(m.Replaced, old)
-		m.Replaced = m.Replaced[max(0, len(m.Replaced)-maxReplaced):]
-		writeMove(dir, m)
-	}
-	return token, nil
+	return old, token, config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(token+"\n"), 0o600)
 }
 
 // RetiredTokenFile is the token teardown removed and the sign-in it served, in the
