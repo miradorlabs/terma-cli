@@ -362,10 +362,11 @@ a file or console one of yours) and lists those settings under
 other byte of the file, comments included, and `terma teardown` puts back what the
 settings held before; restart VS Code after setup. VS Code reads an exporter from its
 environment ahead of its settings, so where `OTEL_EXPORTER_OTLP_ENDPOINT` in your shell
-names a collector of your own, or `COPILOT_OTEL_EXPORTER_TYPE` any exporter but
-`otlp-http`, setup writes none of its settings into VS Code and says so: Copilot there
-already exports where that says, and terma's settings would only add what was said to
-it. The agent host's exporter is VS Code's, not Copilot's alone: the Claude and Codex
+names a collector of your own (or the relay over `https`), `COPILOT_OTEL_EXPORTER_TYPE`
+any exporter but `otlp-http`, or a protocol variable (`OTEL_EXPORTER_OTLP_PROTOCOL`, its
+traces variant, `COPILOT_OTEL_PROTOCOL`) gRPC, setup writes none of its settings into VS
+Code and says so: Copilot there already exports where that says, and terma's settings
+would only add what was said to it. The agent host's exporter is VS Code's, not Copilot's alone: the Claude and Codex
 agents you have VS Code host there are handed the same one.
 Copilot Chat's own exporter (`github.copilot.chat.otel.*`) is never switched on: VS Code
 would copy its endpoint into every extension's environment. The Copilot CLI reads its
