@@ -56,7 +56,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 			// Claude Code's settings name a headers helper, which holds the token instead.
 			credential := map[string]string{}
 			if runtime.GOOS != "windows" {
-				credential["claude"] = "terma/helpers/claude-otel-relay"
+				credential["claude"] = "terma/helpers/claude-relay"
 			}
 			for name, path := range paths {
 				if name == e.Name() {

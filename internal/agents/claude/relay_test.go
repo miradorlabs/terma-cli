@@ -60,11 +60,19 @@ func assertRelayHelper(t *testing.T, c exporter, path string) {
 	}
 }
 
-// assertRestored checks unconfiguring put the settings back and took the helper with them.
+// assertRestored checks unconfiguring put the settings back, warning of nothing, and took
+// the helper and terma's record of the install with them.
 func assertRestored(t *testing.T, a Agent, c exporter, path, want string) {
 	t.Helper()
-	if _, err := a.UnconfigureRelay(t.Context(), relayToken); err != nil {
+	res, err := a.UnconfigureRelay(t.Context(), relayToken)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(res.Notes) > 0 {
+		t.Errorf("unconfigure noted %q", res.Notes)
+	}
+	if j, err := harness.LoadJournal(c.dir, c.Name(), path); err != nil || j != nil {
+		t.Errorf("a record of the install outlived unconfigure: %+v, %v", j, err)
 	}
 	var got, original map[string]any
 	if err := json.Unmarshal([]byte(want), &original); err != nil {
@@ -164,6 +172,22 @@ func TestRefreshLeavesOtherExportsAlone(t *testing.T) {
 				t.Fatal(err)
 			}
 		},
+		"a helper of the developer's": func(t *testing.T, c exporter, path string) {
+			earlierRelayInstall(t, c)
+			s, err := loadSettings(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.root[claudeOtelHeadersHelper] = json.RawMessage(`"/usr/local/bin/my-headers"`)
+			if err := s.save(true); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"not the relay": func(t *testing.T, c exporter, _ string) {
+			if err := c.Connect(harness.Exporter{Endpoint: "https://otel.example.com", APIKey: relayToken, Signals: harness.AllSignals}, true); err != nil {
+				t.Fatal(err)
+			}
+		},
 		"no record": func(t *testing.T, _ exporter, path string) {
 			body := `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_EXPORTER_OTLP_ENDPOINT":"` + relayEndpoint +
 				`","OTEL_EXPORTER_OTLP_HEADERS":"Authorization=Bearer ` + relayToken + `"}}`
@@ -189,5 +213,18 @@ func TestRefreshLeavesOtherExportsAlone(t *testing.T) {
 				t.Errorf("a relay helper was written: %v", err)
 			}
 		})
+	}
+}
+
+// The relay listens on a loopback address, however it is spelled.
+func TestLoopbackHTTP(t *testing.T) {
+	t.Parallel()
+	for endpoint, want := range map[string]bool{
+		"http://127.0.0.1:43180": true, "http://localhost:43180": true, "http://[::1]:43180": true, "http://127.0.0.2:1": true,
+		"https://127.0.0.1:43180": false, "http://otel.example.com": false, "http://10.0.0.1:43180": false, "": false,
+	} {
+		if got := loopbackHTTP(endpoint); got != want {
+			t.Errorf("loopbackHTTP(%q) = %v, want %v", endpoint, got, want)
+		}
 	}
 }

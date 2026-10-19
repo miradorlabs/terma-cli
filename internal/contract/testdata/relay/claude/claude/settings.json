@@ -12,5 +12,5 @@
     "OTEL_METRICS_EXPORTER": "otlp",
     "OTEL_TRACES_EXPORTER": "otlp"
   },
-  "otelHeadersHelper": "$ROOT/.terma-state/helpers/claude-otel-relay"
+  "otelHeadersHelper": "$ROOT/.terma-state/helpers/claude-relay"
 }

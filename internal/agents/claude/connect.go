@@ -63,6 +63,7 @@ func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 
 	// Clear managed keys this render omits: a leftover OTEL_EXPORTER_OTLP_HEADERS outranks the helper,
 	// so a previous project's key keeps winning while everything reports connected. Only this scope's keys.
+	var omitted []string
 	for _, key := range c.managedKeys() {
 		if _, rendered := env[key]; rendered {
 			continue
@@ -85,11 +86,17 @@ func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 			cleared[key] = restore
 		}
 		delete(s.env, key)
+		omitted = append(omitted, key)
 	}
 
 	// Recorded before the merge, so disconnect can put the previous values back.
 	j := harness.NewJournal(c.Name(), path, s.env, env, cleared, clearedSettings, previousJournal)
 	j.ProjectID = e.ProjectID
+	// A key cleared above is no longer terma's: its earlier value, if any, is in Cleared.
+	for _, key := range omitted {
+		delete(j.Installed, key)
+		delete(j.Previous, key)
+	}
 	for key, value := range settings {
 		j.InstalledSettings[key] = value
 		current := stringSetting(s.root, key)
