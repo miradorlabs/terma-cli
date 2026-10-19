@@ -26,8 +26,14 @@ const RELEASE_KEYS = [
 ];
 // An ed25519 key's DER SubjectPublicKeyInfo is this, then the key's 32 bytes.
 const ED25519_SPKI = Buffer.from('302a300506032b6570032100', 'hex');
-// The signature file is a few lines of base64 (internal/selfupdate's maxSignature).
+// The most bytes each download may be: the signature file is a few lines of base64
+// (internal/selfupdate's maxSignature), checksums.txt a line per archive, and an archive
+// at most internal/selfupdate's maxDownload.
 const MAX_SIGNATURE = 4096;
+const MAX_CHECKSUMS = 1 << 20;
+const MAX_ARCHIVE = 256 << 20;
+// A connection that sends nothing for this long fails.
+const STALL_MS = 60_000;
 
 function assetName() {
   const osName = { darwin: 'Darwin', linux: 'Linux', win32: 'Windows' }[process.platform];
@@ -38,13 +44,20 @@ function assetName() {
   return `terma_${osName}_${arch}.${process.platform === 'win32' ? 'zip' : 'tar.gz'}`;
 }
 
-function fetch(url, redirects = 5) {
+// Fetches url, following redirects, and fails past limit bytes or after stallMs without
+// data. client is node:https; tests pass node:http.
+function fetch(url, limit, { redirects = 5, stallMs = STALL_MS, client = https } = {}) {
   return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers: { 'user-agent': `terma-npm-shim/${pkg.version}` } }, (res) => {
+    const fail = (message) => {
+      reject(new Error(`${url}: ${message}`));
+      req.destroy();
+    };
+    const req = client
+      .get(url, { headers: { 'user-agent': `terma-npm-shim/${pkg.version}` }, timeout: stallMs }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
           res.resume();
-          resolve(fetch(new URL(res.headers.location, url).toString(), redirects - 1));
+          const next = new URL(res.headers.location, url).toString();
+          resolve(fetch(next, limit, { redirects: redirects - 1, stallMs, client }));
           return;
         }
         if (res.statusCode !== 200) {
@@ -53,10 +66,19 @@ function fetch(url, redirects = 5) {
           return;
         }
         const chunks = [];
-        res.on('data', (c) => chunks.push(c));
+        let size = 0;
+        res.on('data', (c) => {
+          size += c.length;
+          if (size > limit) {
+            fail(`larger than ${limit} bytes`);
+            return;
+          }
+          chunks.push(c);
+        });
         res.on('end', () => resolve(Buffer.concat(chunks)));
         res.on('error', reject);
       })
+      .on('timeout', () => fail(`no data for ${stallMs / 1000} s`))
       .on('error', reject);
   });
 }
@@ -82,13 +104,12 @@ function signedBy(keys, tag, sums, sig) {
 }
 
 // Downloads asset from release tag and returns it once checksums.txt, signed by one of
-// keys, names its digest.
+// keys, names its digest. The archive is downloaded only once checksums.txt verifies.
 async function download(tag, asset, { get = fetch, keys = RELEASE_KEYS } = {}) {
   const base = `https://github.com/${REPO}/releases/download/${tag}`;
-  const [archive, sums, sig] = await Promise.all([
-    get(`${base}/${asset}`),
-    get(`${base}/checksums.txt`),
-    get(`${base}/checksums.txt.sig`),
+  const [sums, sig] = await Promise.all([
+    get(`${base}/checksums.txt`, MAX_CHECKSUMS),
+    get(`${base}/checksums.txt.sig`, MAX_SIGNATURE),
   ]);
   if (!signedBy(keys, tag, sums, sig)) {
     throw new Error(`${tag} is not signed by a key this installer trusts; refusing to install`);
@@ -96,6 +117,7 @@ async function download(tag, asset, { get = fetch, keys = RELEASE_KEYS } = {}) {
   const line = sums.toString('utf8').split('\n').find((l) => l.trim().endsWith(`  ${asset}`));
   if (!line) throw new Error(`checksums.txt has no entry for ${asset}`);
   const expected = line.trim().split(/\s+/)[0];
+  const archive = await get(`${base}/${asset}`, MAX_ARCHIVE);
   const actual = crypto.createHash('sha256').update(archive).digest('hex');
   if (actual !== expected) throw new Error(`checksum mismatch for ${asset}`);
   return archive;
@@ -156,7 +178,7 @@ function installArchive(archive, asset, { vendor = VENDOR, tmpRoot = os.tmpdir()
   }
 }
 
-module.exports = { RELEASE_KEYS, download, installArchive, signedBy };
+module.exports = { RELEASE_KEYS, download, fetch, installArchive, signedBy };
 
 if (require.main === module) main().catch((err) => {
   console.error(`terma: ${err.message}`);

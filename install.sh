@@ -138,11 +138,11 @@ case "$arch" in
   *) die "unsupported architecture: $arch" ;;
 esac
 
-# ed25519_ok <key> <file> <signature>: whether signature (base64) is key's (base64
-# SubjectPublicKeyInfo) over file.
+# ed25519_ok <key> <file> <signature>: whether signature (base64, any whitespace in it
+# ignored) is key's (base64 SubjectPublicKeyInfo) over file.
 ed25519_ok() {
   printf '%s\n' '-----BEGIN PUBLIC KEY-----' "$1" '-----END PUBLIC KEY-----' >"$tmp/key.pem" &&
-    printf '%s' "$3" | openssl base64 -d -A >"$tmp/sig.bin" 2>/dev/null &&
+    printf '%s' "$3" | tr -d '[:space:]' | openssl base64 -d -A >"$tmp/sig.bin" 2>/dev/null &&
     openssl pkeyutl -verify -pubin -inkey "$tmp/key.pem" -rawin -in "$2" -sigfile "$tmp/sig.bin" >/dev/null 2>&1
 }
 
@@ -179,7 +179,8 @@ if loopback_http "$BASE"; then proto='=http,https'; fi
 version="${TERMA_VERSION:-}"
 case "$version" in
   ""|latest)
-    latest="$(curl -fsS --proto "$proto" --tlsv1.2 --retry 3 -o /dev/null -w '%{redirect_url}' "${BASE}/latest")" ||
+    latest="$(curl -fsS --proto "$proto" --tlsv1.2 --retry 3 --connect-timeout 30 --max-time 60 \
+      -o /dev/null -w '%{redirect_url}' "${BASE}/latest")" ||
       die "could not look up the latest release at ${BASE}/latest"
     case "$latest" in
       */tag/*) tag="${latest##*/tag/}" ;;
@@ -192,23 +193,24 @@ case "$tag" in v[0-9]*) ;; *) die "not a release: ${tag}" ;; esac
 case "$tag" in *[!A-Za-z0-9._-]*) die "not a release: ${tag}" ;; esac
 release="${BASE}/download/${tag}"
 
+# fetch <url> <file> <most bytes>; a download that stalls for a minute fails.
 fetch() {
-  curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 -o "$2" "$1" \
-    || die "download failed: $1"
+  curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 --connect-timeout 30 \
+    --speed-limit 1 --speed-time 60 --max-filesize "$3" -o "$2" "$1" || die "download failed: $1"
 }
 
 tmp="$(mktemp -d 2>/dev/null || mktemp -d -t terma)"
 trap 'rm -rf "$tmp"' EXIT
 
 say "Downloading ${asset} (${tag})..."
-fetch "${release}/${asset}" "$tmp/$asset"
-fetch "${release}/checksums.txt" "$tmp/checksums.txt"
-fetch "${release}/checksums.txt.sig" "$tmp/checksums.txt.sig"
+fetch "${release}/checksums.txt" "$tmp/checksums.txt" 1048576
+fetch "${release}/checksums.txt.sig" "$tmp/checksums.txt.sig" 4096
 
-# Verify before extracting anything. checksums.txt names every archive's digest, and its
-# signature, over the tag and then the file, is what says the release is ours: any line
-# of checksums.txt.sig by any key in RELEASE_KEYS, as internal/selfupdate.Verify reads it.
-# Without an openssl that can check one, say so: the digest is still checked below.
+# Verify before downloading the archive, and the archive before extracting anything.
+# checksums.txt names every archive's digest, and its signature, over the tag and then
+# the file, is what says the release is ours: any line of checksums.txt.sig by any key in
+# RELEASE_KEYS, as internal/selfupdate.Verify reads it. Without an openssl that can check
+# one, say so: the digest is still checked below.
 if can_verify; then
   { printf 'terma release %s\n' "$tag"; cat "$tmp/checksums.txt"; } >"$tmp/signed"
   signed=''
@@ -225,6 +227,7 @@ else
 fi
 expected="$(grep "  ${asset}\$" "$tmp/checksums.txt" | awk '{print $1}')"
 [ -n "$expected" ] || die "checksums.txt has no entry for ${asset}"
+fetch "${release}/${asset}" "$tmp/$asset" 268435456 # internal/selfupdate's maxDownload
 actual="$(sha256 "$tmp/$asset")"
 [ "$actual" = "$expected" ] || die "checksum mismatch for ${asset} (expected ${expected}, got ${actual})"
 

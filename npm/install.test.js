@@ -5,9 +5,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const http = require('node:http');
 const { execFileSync } = require('node:child_process');
 const { test } = require('node:test');
-const { RELEASE_KEYS, download, installArchive, signedBy } = require('./install');
+const { RELEASE_KEYS, download, fetch, installArchive, signedBy } = require('./install');
 
 // A release key for the tests' releases: its public half as hex, as RELEASE_KEYS holds
 // one, and sign(tag, data), one line of a checksums.txt.sig as internal/selfupdate.Sign
@@ -208,16 +209,17 @@ test('a signature verifies with the key that made it, for its tag and data alone
   assert.equal(signedBy([key.hex], 'v1.2.3', data, Buffer.from(other.sign('v1.2.3', data) + key.sign('v1.2.3', data))), true);
 });
 
-// A release served as the test describes it: each file by its name.
+// A release served as the test describes it: each file by its name. fetched lists the
+// files asked for, in order, each with the most bytes it was allowed.
 function release(files) {
-  const urls = [];
-  const get = async (url) => {
-    urls.push(url);
+  const fetched = [];
+  const get = async (url, limit) => {
     const name = url.slice(url.lastIndexOf('/') + 1);
+    fetched.push([name, limit]);
     if (!(name in files)) throw new Error(`${url}: HTTP 404`);
     return Buffer.from(files[name]);
   };
-  return { get, urls };
+  return { get, fetched };
 }
 
 test('downloads an archive only from a signed release whose checksums name it', async () => {
@@ -227,8 +229,8 @@ test('downloads an archive only from a signed release whose checksums name it', 
   const sums = Buffer.from(`${crypto.createHash('sha256').update(archive).digest('hex')}  ${asset}\n`);
   const served = release({ [asset]: archive, 'checksums.txt': sums, 'checksums.txt.sig': key.sign('v1.2.3', sums) });
   assert.deepEqual(await download('v1.2.3', asset, { get: served.get, keys: [key.hex] }), archive);
-  assert.deepEqual(served.urls.map((u) => u.replace(/^.*\/releases\/download\//, '')).sort(),
-    ['v1.2.3/checksums.txt', 'v1.2.3/checksums.txt.sig', `v1.2.3/${asset}`]);
+  // Each file is bounded, and the archive is asked for last, once checksums.txt verified.
+  assert.deepEqual(served.fetched, [['checksums.txt', 1 << 20], ['checksums.txt.sig', 4096], [asset, 256 << 20]]);
 
   const other = releaseKey();
   const cases = {
@@ -241,12 +243,15 @@ test('downloads an archive only from a signed release whose checksums name it', 
       'checksums.txt': `${crypto.createHash('sha256').update('other bytes').digest('hex')}  ${asset}\n`,
       'checksums.txt.sig': key.sign('v1.2.3', sums),
     }, /not signed/],
-    // A signed checksums.txt still has to name this archive's digest.
-    'archive changed': [{ [asset]: Buffer.from('other bytes'), 'checksums.txt': sums, 'checksums.txt.sig': key.sign('v1.2.3', sums) }, /checksum mismatch/],
+    // A signed checksums.txt still has to name this archive's digest: the one case that
+    // gets as far as the archive.
+    'archive changed': [{ [asset]: Buffer.from('other bytes'), 'checksums.txt': sums, 'checksums.txt.sig': key.sign('v1.2.3', sums) }, /checksum mismatch/, true],
     'no entry': [{ [asset]: archive, 'checksums.txt': '', 'checksums.txt.sig': key.sign('v1.2.3', Buffer.alloc(0)) }, /no entry/],
   };
-  for (const [name, [files, error]] of Object.entries(cases)) {
-    await assert.rejects(download('v1.2.3', asset, { get: release(files).get, keys: [key.hex] }), error, name);
+  for (const [name, [files, error, fetchesArchive = false]] of Object.entries(cases)) {
+    const served = release(files);
+    await assert.rejects(download('v1.2.3', asset, { get: served.get, keys: [key.hex] }), error, name);
+    assert.equal(served.fetched.some(([file]) => file === asset), fetchesArchive, `${name}: archive fetched`);
   }
 });
 
@@ -257,4 +262,44 @@ test('the built-in keys are what a download checks by default', async () => {
   const sums = Buffer.from(`${crypto.createHash('sha256').update(archive).digest('hex')}  ${asset}\n`);
   const served = release({ [asset]: archive, 'checksums.txt': sums, 'checksums.txt.sig': key.sign('v1.2.3', sums) });
   await assert.rejects(download('v1.2.3', asset, { get: served.get }), /not signed by a key this installer trusts/);
+});
+
+// A local server for fetch: each test's handler answers every request.
+async function serve(t, handler) {
+  const server = http.createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    server.closeAllConnections?.();
+    server.close();
+  });
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+test('fetch follows a redirect and returns the body within its limit', async (t) => {
+  const base = await serve(t, (req, res) => {
+    if (req.url === '/moved') {
+      res.writeHead(302, { location: '/file' });
+      res.end();
+      return;
+    }
+    res.end('0123456789');
+  });
+  assert.equal((await fetch(`${base}/moved`, 10, { client: http })).toString(), '0123456789');
+});
+
+test('fetch refuses a body past its limit, whatever the server claims', async (t) => {
+  const base = await serve(t, (_req, res) => {
+    res.writeHead(200); // no content-length: only the bytes say how large it is
+    res.write('0123456789');
+    res.end('abc');
+  });
+  await assert.rejects(fetch(`${base}/file`, 10, { client: http }), /larger than 10 bytes/);
+});
+
+test('fetch gives up on a connection that stops sending', async (t) => {
+  const base = await serve(t, (_req, res) => {
+    res.writeHead(200);
+    res.write('partial'); // and nothing more
+  });
+  await assert.rejects(fetch(`${base}/file`, 1 << 20, { client: http, stallMs: 200 }), /no data for 0.2 s/);
 });

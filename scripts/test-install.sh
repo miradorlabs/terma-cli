@@ -75,7 +75,9 @@ pub="$("$work/releasesign" keygen "$work/release.key" | sed -n 's/^public key: /
 # sign <tag> signs the mirror's checksums.txt for tag, as a release is signed.
 sign() { TERMA_SIGNING_KEY="$(cat "$work/release.key")" "$work/releasesign" sign "$1" "$sums" "$sums.sig"; }
 sign "$TAG"
-spki="$(python3 -I -c 'import base64, sys; print(base64.b64encode(bytes.fromhex("302a300506032b6570032100" + sys.argv[1])).decode())' "$pub")"
+# spki_of <hex key> prints it as RELEASE_KEYS holds one: its DER SubjectPublicKeyInfo, base64.
+spki_of() { python3 -I -c 'import base64, sys; print(base64.b64encode(bytes.fromhex("302a300506032b6570032100" + sys.argv[1])).decode())' "$1"; }
+spki="$(spki_of "$pub")"
 INSTALLER="$work/install.sh"
 sed "s|^RELEASE_KEYS=.*|RELEASE_KEYS='$spki'|" "$RELEASED" >"$INSTALLER"
 [ "$(diff "$RELEASED" "$INSTALLER" | grep -c '^>')" = 1 ] || fail "pinning this run's key changed more than RELEASE_KEYS"
@@ -347,6 +349,36 @@ else
   echo "== refuses a checksums.txt changed after it was signed"
   sed 's/^[0-9a-f]\{4\}/dead/' "$work/checksums.good" >"$sums"
   refused "$INSTALLER" "$unsigned" PATH="$ssl:$PATH"
+  restore
+
+  echo "== reads checksums.txt.sig as terma update does: any line, by any pinned key"
+  other="$("$work/releasesign" keygen "$work/other.key" | sed -n 's/^public key: //p')"
+  "$work/releasesign" keygen "$work/unpinned.key" >/dev/null
+  # line <key file> prints the line that key signs the mirror's checksums.txt with.
+  line() { TERMA_SIGNING_KEY="$(cat "$1")" "$work/releasesign" sign "$TAG" "$sums" "$work/line.sig" && cat "$work/line.sig"; }
+  # accepts <installer> <case>: installs the pinned release with that installer, and fails
+  # unless it does.
+  accepts() {
+    local dest out
+    dest="$(mktemp -d "$work/accepted.XXXXXX")"
+    out="$(PATH="$ssl:$PATH" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$dest" sh "$1" 2>&1)" \
+      || fail "$2: $out"
+    [ "$("$dest/terma" version)" = "$want" ] || fail "$2: $out"
+  }
+  rotating="$work/install-rotating.sh" # pins two keys, as a release that rotates one does
+  sed "s|^RELEASE_KEYS=.*|RELEASE_KEYS='$(spki_of "$other") $spki'|" "$RELEASED" >"$rotating"
+  printf 'not a signature\n%s\n%s\n' "$(line "$work/unpinned.key")" "$(line "$work/release.key")" >"$sums.sig"
+  accepts "$rotating" "the second pinned key's line, after no signature and an unpinned key's"
+  line "$work/other.key" >"$sums.sig"
+  accepts "$rotating" "the first pinned key's line"
+  printf 'not a signature\r\n%s' "$(line "$work/release.key")" >"$sums.sig"
+  accepts "$INSTALLER" "CRLF lines, the last with no newline"
+  : >"$sums.sig"
+  refused "$INSTALLER" "$unsigned" PATH="$ssl:$PATH"
+  printf '%s\n' '-----' 'AAAA' "$(line "$work/unpinned.key")" >"$sums.sig"
+  refused "$INSTALLER" "$unsigned" PATH="$ssl:$PATH"
+  { line "$work/release.key"; printf '%4096s\n' ''; } >"$sums.sig"
+  refused "$INSTALLER" "download failed: $BASE/download/$TAG/checksums.txt.sig" PATH="$ssl:$PATH"
   restore
 fi
 
