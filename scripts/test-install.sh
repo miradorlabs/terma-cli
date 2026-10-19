@@ -438,7 +438,7 @@ for f in checksums.txt.sig checksums.txt; do
     [ -z "$sent" ] || break
     sleep 0.1
   done
-  [ -n "$sent" ] && [ "$sent" -lt $((32 << 20)) ] || fail "$f: the server sent ${sent:-nothing} bytes"
+  if [ -z "$sent" ] || [ "$sent" -ge $((32 << 20)) ]; then fail "$f: the server sent ${sent:-nothing} bytes"; fi
 done
 
 echo "== a download cut short is tried again from the start"
