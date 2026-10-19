@@ -65,6 +65,8 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// The agents it pointed now follow any move the relay made (doctor reads this).
+			daemon.Repointed(dir, addr)
 			fmt.Fprintln(out, "Hooks in the repositories your team collects claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it.
 			daemon.Stop(dir)

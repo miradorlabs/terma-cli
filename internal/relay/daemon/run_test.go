@@ -437,3 +437,27 @@ func TestCurrentIsTheRelaysAddressAndToken(t *testing.T) {
 		t.Fatalf("Current = %s, %q, %v", got, token, err)
 	}
 }
+
+// A move an earlier relay recorded is followed again by the next relay on its address until
+// setup has re-pointed the agents: the earlier one may have stopped before it did.
+func TestARelayFollowsAnUnfinishedMove(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	from, to := freeAddr(t), freeAddr(t)
+	if err := RecordAddr(dir, to); err != nil {
+		t.Fatal(err)
+	}
+	for _, repointed := range []bool{false, true} {
+		if err := writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Repointed: repointed}); err != nil {
+			t.Fatal(err)
+		}
+		c := runConfig(stateDir, time.Millisecond, nil)
+		c.Addr = ""
+		var told [2]string
+		c.Moved = func(from, to string) { told = [2]string{from, to} }
+		run(t, c)
+		if want := [2]string{from, to}; repointed && told != [2]string{} || !repointed && told != want {
+			t.Errorf("repointed %v: told of %v", repointed, told)
+		}
+	}
+}

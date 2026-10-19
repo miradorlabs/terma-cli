@@ -236,6 +236,11 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
 	}
+	// A move an earlier relay recorded but may not have followed through (it stopped first)
+	// is followed again: re-pointing only rewrites exporters still naming the old address.
+	if m, ok := LastMove(dir); moved == "" && ok && !m.Repointed && m.To == recorded {
+		moved = m.From
+	}
 	if moved != "" && c.Moved != nil {
 		workers.Go(func() { c.Moved(moved, addr) })
 	}
