@@ -97,5 +97,8 @@ func repositoryURL(r config.Repository) string {
 	if strings.HasSuffix(path, ".git") {
 		path += ".git"
 	}
+	if strings.Contains(host, ":") { // an IPv6 literal; the key has no port
+		host = "[" + host + "]"
+	}
 	return (&url.URL{Scheme: "https", Host: host, Path: "/" + path}).String()
 }

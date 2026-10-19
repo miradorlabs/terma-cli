@@ -123,6 +123,7 @@ func TestRepositoryURLKeysBackToItsAdmission(t *testing.T) {
 		"https://github.com/acme/./app":                        "https://github.com/acme/./app",
 		"https://git.example.com/acme/repo.git.git.git":        "https://git.example.com/acme/repo.git.git",
 		"https://github.com/acme/app?tab=readme#top":           "https://github.com/acme/app",
+		"ssh://git@[2001:db8::1]:2222/group/repo.git":          "https://[2001:db8::1]/group/repo",
 	} {
 		key := gitx.RepositoryID(origin)
 		got := repositoryURL(config.Repository{Origin: key})
