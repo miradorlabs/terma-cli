@@ -196,13 +196,25 @@ release="${BASE}/download/${tag}"
 # fetch <url> <file> <most bytes>: fails past that many bytes, however the server sends
 # them (curl before 8.4 ignores --max-filesize without a length; head reads one byte past
 # the bound, then stops reading, which stops curl), or when the download stalls for a
-# minute.
+# minute. A connection that fails, times out, is cut short or answers an HTTP error is
+# tried again from the start, four attempts in all: curl's own --retry cannot take back
+# what it has already written to a pipe.
 fetch() {
-  rm -f "$tmp/failed"
-  { curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 --connect-timeout 30 \
-      --speed-limit 1 --speed-time 60 --max-filesize "$3" "$1" || : >"$tmp/failed"; } |
-    head -c "$(($3 + 1))" >"$2"
-  if [ -e "$tmp/failed" ] || [ "$(($(wc -c <"$2")))" -gt "$3" ]; then die "download failed: $1"; fi
+  for attempt in 1 2 3 4; do
+    rm -f "$tmp/failed"
+    { curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --connect-timeout 30 \
+        --speed-limit 1 --speed-time 60 --max-filesize "$3" "$1" 2>"$tmp/curl.err" ||
+        echo "$?" >"$tmp/failed"; } | head -c "$(($3 + 1))" >"$2"
+    [ "$(($(wc -c <"$2")))" -le "$3" ] || die "download failed: $1 is larger than $3 bytes"
+    [ -e "$tmp/failed" ] || return 0
+    case "$(cat "$tmp/failed")" in
+      7|18|22|28|35|52|55|56) [ "$attempt" = 4 ] || sleep 1 ;;
+      63) die "download failed: $1 is larger than $3 bytes" ;;
+      *) break ;;
+    esac
+  done
+  cat "$tmp/curl.err" >&2
+  die "download failed: $1"
 }
 
 tmp="$(mktemp -d 2>/dev/null || mktemp -d -t terma)"

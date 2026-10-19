@@ -41,9 +41,10 @@ mkdir -p "$mirror/download/$TAG"
 cp "$DIST"/*.tar.gz "$DIST"/checksums.txt "$mirror/download/$TAG/"
 sums="$mirror/download/$TAG/checksums.txt"
 
-# python3's file server, plus GitHub's redirect from releases/latest to the latest tag,
-# and a file beside a <file>.endless sent over and over with no length, until the client
-# hangs up (or 64 MiB), logging how much it sent.
+# python3's file server, plus GitHub's redirect from releases/latest to the latest tag;
+# a file beside a <file>.endless sent over and over with no length, until the client
+# hangs up (or 64 MiB), logging how much it sent; and one beside a <file>.flaky cut short
+# once, halfway through.
 cat >"$work/serve.py" <<'EOF'
 import functools, http.server, os, sys
 
@@ -59,6 +60,16 @@ class Mirror(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             return None
         file = self.translate_path(self.path)
+        if os.path.exists(file + '.flaky'):
+            os.remove(file + '.flaky')
+            with open(file, 'rb') as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data[:len(data) // 2])
+            self.log_message('cut %s short', self.path)
+            return None
         if os.path.exists(file + '.endless'):
             self.send_response(200)
             self.end_headers()
@@ -429,6 +440,17 @@ for f in checksums.txt.sig checksums.txt; do
   done
   [ -n "$sent" ] && [ "$sent" -lt $((32 << 20)) ] || fail "$f: the server sent ${sent:-nothing} bytes"
 done
+
+echo "== a download cut short is tried again from the start"
+case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; *) arch=arm64 ;; esac
+archive="$mirror/download/$TAG/terma_$(uname -s)_$arch.tar.gz"
+: >"$archive.flaky"
+out="$(TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$work/bin8" sh "$INSTALLER" 2>&1)" \
+  || fail "a retried download was refused: $out"
+[ "$("$work/bin8/terma" version)" = "$want" ] || fail "retried install: $out"
+if [ -e "$archive.flaky" ] || ! grep -q "cut .*/${archive##*/} short" "$work/http.log"; then
+  fail "the archive was not cut short: $out"
+fi
 
 echo "== refuses a checksum that does not match, signed or not"
 sed 's/^[0-9a-f]\{4\}/dead/' "$work/checksums.good" >"$sums"
