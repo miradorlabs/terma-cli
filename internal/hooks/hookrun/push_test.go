@@ -502,12 +502,12 @@ func TestAParkedPushIsHeldToWhatPrePushWrites(t *testing.T) {
 	p := newPushRepo(t)
 	p.git("commit", "-q", "--allow-empty", "-m", "more")
 	outside := t.TempDir()
-	settings := filepath.Join(outside, "settings.json")
+	other := filepath.Join(outside, "other.json")
 	const kept = `{"kept":true}`
-	if err := os.WriteFile(settings, []byte(kept), 0o600); err != nil {
+	if err := os.WriteFile(other, []byte(kept), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	escape, err := filepath.Rel(filepath.Join(p.stateDir, PushesDir), filepath.Join(outside, "settings"))
+	escape, err := filepath.Rel(filepath.Join(p.stateDir, PushesDir), filepath.Join(outside, "other"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -515,18 +515,17 @@ func TestAParkedPushIsHeldToWhatPrePushWrites(t *testing.T) {
 		name string
 		edit func(*pushRecord)
 	}{
-		{"an id that leaves the pushes directory", func(r *pushRecord) { r.ID = escape }},
-		{"an absolute id", func(r *pushRecord) { r.ID = filepath.Join(outside, "settings") }},
+		{"a relative id", func(r *pushRecord) { r.ID = escape }},
+		{"an absolute id", func(r *pushRecord) { r.ID = filepath.Join(outside, "other") }},
 		{"an id outside rand.Text's alphabet", func(r *pushRecord) { r.ID = strings.ToLower(r.ID) }},
 		{"a short id", func(r *pushRecord) { r.ID = r.ID[:8] }},
 		{"no id", func(r *pushRecord) { r.ID = "" }},
-		{"a time to come", func(r *pushRecord) { r.Time = time.Now().Add(time.Hour) }},
 		{"no refs", func(r *pushRecord) { r.Refs = nil }},
 		{"a commit that is no commit id", func(r *pushRecord) { r.Refs[0].LocalSHA = "--all" }},
 		{"an old commit that is no commit id", func(r *pushRecord) { r.Refs[0].RemoteSHA = "HEAD~1" }},
 		{"a deleted branch", func(r *pushRecord) { r.Refs[0].LocalSHA = zero }},
 		{"a ref that is no branch", func(r *pushRecord) { r.Refs[0].RemoteRef = "refs/tags/v1" }},
-		{"a tracking ref outside refs/remotes", func(r *pushRecord) { r.Refs[0].Tracking = "../../settings" }},
+		{"a tracking ref outside refs/remotes", func(r *pushRecord) { r.Refs[0].Tracking = "../../other" }},
 		{"a tracking ref that leaves refs/remotes", func(r *pushRecord) { r.Refs[0].Tracking = "refs/remotes/../../../" }},
 		{"a tracking commit that is no commit id", func(r *pushRecord) { r.Refs[0].TrackingBefore = "main" }},
 		{"an excluded commit that is no commit id", func(r *pushRecord) { r.Excluded = []string{"--all"} }},
@@ -543,12 +542,52 @@ func TestAParkedPushIsHeldToWhatPrePushWrites(t *testing.T) {
 			}
 		})
 	}
-	if data, err := os.ReadFile(settings); err != nil || string(data) != kept {
-		t.Errorf("a file outside the state directory became %q (%v)", data, err)
+	if data, err := os.ReadFile(other); err != nil || string(data) != kept {
+		t.Errorf("%s became %q (%v)", other, data, err)
 	}
 	// A dropped record leaves the rest of the parking to be recorded.
 	if awaited := p.unpark(t, p.parked(), pushRecord{ID: escape}, p.parked()); len(awaited) != 2 {
 		t.Errorf("awaited %v, want the two pushes", awaited)
+	}
+}
+
+// A parked push's time is when pre-push ran, which may be after the hook that unparks it
+// started; a time to come is now, so its wait and its retries stay bounded.
+func TestAParkedPushIsNeverFromTheFuture(t *testing.T) {
+	p := newPushRepo(t)
+	rec := p.parked()
+	rec.Time = time.Now().Add(time.Hour)
+	awaited := p.unpark(t, rec)
+	if len(awaited) != 1 {
+		t.Fatalf("awaited %v", awaited)
+	}
+	if got, err := readPush(awaited[0]); err != nil || got.Time.After(time.Now()) {
+		t.Errorf("recorded at %v (%v), want no later than now", got.Time, err)
+	}
+}
+
+// One hook records at most maxUnparkedPushes, and never over a record already there.
+func TestUnparkingPushesIsBounded(t *testing.T) {
+	p := newPushRepo(t)
+	recs := make([]pushRecord, maxUnparkedPushes+1)
+	for i := range recs {
+		recs[i] = p.parked()
+	}
+	if awaited := p.unpark(t, recs...); len(awaited) != maxUnparkedPushes {
+		t.Errorf("awaited %d pushes, want %d", len(awaited), maxUnparkedPushes)
+	}
+
+	pending := p.parked()
+	pending.Remote = "pending"
+	path := filepath.Join(p.stateDir, PushesDir, pending.ID+".json")
+	if err := config.WriteJSON(path, pending, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if awaited := p.unpark(t, pushRecord{ID: pending.ID, Time: pending.Time, Refs: pending.Refs, Event: pending.Event}); !slices.Equal(awaited, []string{path}) {
+		t.Errorf("awaited %v, want the pending record", awaited)
+	}
+	if got, err := readPush(path); err != nil || got.Remote != "pending" {
+		t.Errorf("the pending record became %+v (%v)", got, err)
 	}
 }
 

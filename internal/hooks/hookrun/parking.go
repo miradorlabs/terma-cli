@@ -3,8 +3,10 @@ package hookrun
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -88,9 +90,15 @@ func (e Env) restamp(r *Repo, ev spool.Event) spool.Event {
 	return ev
 }
 
+// maxUnparkedPushes bounds the pushes one hook records from the parking, and so the
+// AwaitPush it starts: pre-push parks one per push, and hooks outside the sandbox unpark as
+// they run.
+const maxUnparkedPushes = 64
+
 // unparkPushes records the pushes a sandboxed pre-push parked in r's git directory and starts their
 // AwaitPush, which reports each at once, its git push long gone. A record pre-push could not
-// have parked there is dropped (parkedPush).
+// have parked there is dropped (parkedPush), as is any past maxUnparkedPushes; one already
+// recorded is awaited as it is.
 func (e Env) unparkPushes(r *Repo) {
 	if e.AwaitPush == nil {
 		return
@@ -103,11 +111,15 @@ func (e Env) unparkPushes(r *Repo) {
 				continue
 			}
 			rec, ok := e.parkedPush(r, rec)
-			if !ok {
-				e.Logf("unpark pushes: dropped a record pre-push did not write")
+			if !ok || len(recorded) == maxUnparkedPushes {
+				e.Logf("unpark pushes: dropped a record pre-push did not write, or one too many")
 				continue
 			}
 			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
+			if _, err := os.Lstat(path); err == nil {
+				recorded = append(recorded, path)
+				continue
+			}
 			if err := config.WriteJSON(path, rec, 0o600); err != nil {
 				return err
 			}
@@ -126,13 +138,13 @@ func (e Env) unparkPushes(r *Repo) {
 }
 
 // parkedPush holds a record parked in r's git directory, which an agent's sandbox may write,
-// to what PrePush parks there: an id it mints, so the record lands in PushesDir; a time
-// already past, which bounds the wait and the retries; the branch updates ParsePushInput
-// keeps, with full commit ids, and remote-tracking refs inside refs/remotes. Its repository
+// to what PrePush parks there: an id it mints, so the record lands in PushesDir; the branch
+// updates ParsePushInput keeps, with full commit ids, and remote-tracking refs inside
+// refs/remotes. A time to come is now, which bounds the wait and the retries. Its repository
 // is r, whatever it names, and its event is stamped as a hook in r stamps one (restamp).
 // ok is false for a record that is not such a push.
 func (e Env) parkedPush(r *Repo, rec pushRecord) (pushRecord, bool) {
-	if !validPushID(rec.ID) || rec.Time.After(e.Time()) || len(rec.Refs) == 0 || rec.Event.Name != semconv.TermaPushEvent {
+	if !validPushID(rec.ID) || len(rec.Refs) == 0 || rec.Event.Name != semconv.TermaPushEvent {
 		return rec, false
 	}
 	for _, ref := range rec.Refs {
@@ -145,6 +157,10 @@ func (e Env) parkedPush(r *Repo, rec pushRecord) (pushRecord, bool) {
 			return rec, false
 		}
 	}
+	// The clock, not the hook's start: pre-push may have parked it since this hook started.
+	if now := time.Now(); rec.Time.After(now) {
+		rec.Time = now
+	}
 	rec.Root, rec.GitDir = r.Root, r.GitDir
 	rec.Event = e.restamp(r, rec.Event)
 	return rec, true
@@ -153,10 +169,13 @@ func (e Env) parkedPush(r *Repo, rec pushRecord) (pushRecord, bool) {
 // pushIDAlphabet is rand.Text's, RFC 4648 base32: an id in it is a file name and no path.
 const pushIDAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
-// validPushID reports whether id is one rand.Text mints: 26 characters today, which a later
-// Go may lengthen.
+// pushIDMin is rand.Text's length today, 128 bits in base32, and pushIDMax leaves room for
+// the longer text its documentation allows a later Go to return.
+const pushIDMin, pushIDMax = 26, 64
+
+// validPushID reports whether id is one rand.Text mints.
 func validPushID(id string) bool {
-	return len(id) >= 26 && len(id) <= 64 && strings.Trim(id, pushIDAlphabet) == ""
+	return len(id) >= pushIDMin && len(id) <= pushIDMax && strings.Trim(id, pushIDAlphabet) == ""
 }
 
 // validTracking reports whether ref's remote-tracking ref is one PrePush reads: none, or a

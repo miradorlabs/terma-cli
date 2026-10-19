@@ -1,7 +1,9 @@
 package session
 
 import (
+	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -277,5 +279,47 @@ func TestUnparkDropsOnlyWhatWasDelivered(t *testing.T) {
 	}
 	if err := s.Unpark("events", func([]byte) error { t.Fatal("unparked twice"); return nil }); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// One Unpark reads at most maxUnpark: what does not fit waits for the next, and a file
+// that never could, or is not a regular file, is removed unread.
+func TestUnparkIsBounded(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	plant := func(name string, size int) {
+		t.Helper()
+		line := append(bytes.Repeat([]byte("x"), size-1), '\n')
+		if err := os.WriteFile(filepath.Join(s.dir, name), line, fileMode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Park("events", []byte("first\n")); err != nil {
+		t.Fatal(err)
+	}
+	plant("events~huge"+parkedExt, maxUnpark)
+	plant("events~half"+parkedExt, maxUnpark/2)
+	plant("events~more"+parkedExt, maxUnpark/2)
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("not parked\n"), fileMode); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(s.dir, "events~link"+parkedExt)); err != nil {
+		t.Fatal(err)
+	}
+	var sizes []int
+	for range 3 {
+		if err := s.Unpark("events", func(lines []byte) error { sizes = append(sizes, len(lines)); return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(sizes) != 2 || sizes[0] >= maxUnpark || sizes[1] >= maxUnpark || sizes[0]+sizes[1] != maxUnpark+len("first\n") {
+		t.Errorf("unparked %v bytes, want the two halves and the line across two calls", sizes)
+	}
+	if left := s.parked("events"); len(left) != 0 {
+		t.Errorf("left parked: %v", left)
+	}
+	if data, err := os.ReadFile(outside); err != nil || string(data) != "not parked\n" {
+		t.Errorf("a link's target became %q (%v)", data, err)
 	}
 }

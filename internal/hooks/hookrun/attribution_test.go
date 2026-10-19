@@ -168,7 +168,7 @@ func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
 		{Name: semconv.TermaCommitEvent, Time: now},
 		{Name: semconv.TermaCommitEvent, Time: now, Global: true, Attrs: map[string]any{AttrProjectID: hookruntest.Team}},
 	}
-	unpark := func(team string) []spool.Event {
+	unpark := func(team string, policy config.Policy) []spool.Event {
 		t.Helper()
 		for _, ev := range parked {
 			line, err := json.Marshal(ev)
@@ -179,13 +179,13 @@ func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		env := Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Team: team}
+		env := Env{StateDir: stateDir, Now: now, Cwd: root, Policy: policy, Spool: sp, Team: team}
 		if _, err := env.Repo(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		return hookruntest.Spooled(t, sp)
 	}
-	got := unpark(hookruntest.Team)
+	got := unpark(hookruntest.Team, hookruntest.Admitting(root))
 	if len(got) != len(parked) {
 		t.Fatalf("spooled %d events, want %d", len(got), len(parked))
 	}
@@ -195,9 +195,16 @@ func TestAParkedEventIsStampedForItsRepository(t *testing.T) {
 		}
 	}
 	// With no team to route to, a project the line names is not taken either.
-	for i, ev := range unpark("") {
+	for i, ev := range unpark("", hookruntest.Admitting(root)) {
 		if id, ok := ev.Attrs[AttrProjectID]; ok {
 			t.Errorf("event %d kept project %v", i, id)
+		}
+	}
+	// Parked before the policy switched to global mode, an event goes where any hook now sends it.
+	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}
+	for i, ev := range unpark(hookruntest.Team, global) {
+		if ev.Attrs[AttrProjectID] != "p-default" || !ev.Global || ev.Repository.Origin != origin {
+			t.Errorf("event %d spooled as %+v", i, ev)
 		}
 	}
 }
