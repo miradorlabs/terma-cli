@@ -45,16 +45,19 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Only an address asked for is recorded: writing back the one read would undo a
+			// relay's move made meanwhile.
 			if addr == "" {
 				addr = daemon.Addr(dir)
-			}
-			if err := daemon.RecordAddr(dir, addr); err != nil {
+			} else if err := daemon.RecordAddr(dir, addr); err != nil {
 				return err
 			}
 			out := cmd.OutOrStdout()
-			err = app.pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
-				fmt.Fprintf(out, "%s exports to the relay at %s%s.\n", agent, addr, detail)
-			}, func(note string) { fmt.Fprintln(out, note) })
+			err = app.withExporters(cmd.Context(), func() error {
+				return app.pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
+					fmt.Fprintf(out, "%s exports to the relay at %s%s.\n", agent, addr, detail)
+				}, func(note string) { fmt.Fprintln(out, note) })
+			})
 			if err != nil {
 				return err
 			}
@@ -77,15 +80,23 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 	return cmd
 }
 
-func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
-	// One writer at a time: setup and a relay that moved may both point the agents at once.
-	// A lock that cannot be had costs the writes their exclusivity, never the writes.
+// withExporters runs fn holding daemon.ExportersLockFile, so setup, teardown and a relay
+// that moved change the agents' relay exporters one at a time; whoever chooses which to
+// change chooses under it too. A lock that cannot be had costs fn its exclusivity, never
+// its run.
+func (app *App) withExporters(ctx context.Context, fn func() error) error {
 	lockCtx, cancel := context.WithTimeout(ctx, exportersLockWait)
 	unlock, err := flock.Lock(lockCtx, filepath.Join(claim.Dir(app.stateDir), daemon.ExportersLockFile))
 	cancel()
 	if err == nil {
 		defer unlock()
 	}
+	return fn()
+}
+
+// pointAgentsAtRelay points the selected agents' exporters at the relay on addr; callers
+// hold withExporters.
+func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
 	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand()}
 	for _, name := range selected {
 		integration, ok := app.agents.Find[agents.RelayExporter](name)

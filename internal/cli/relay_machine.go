@@ -30,25 +30,23 @@ type relayReport struct {
 // exporter pointed at it, and the relay itself; claims decide per repository what leaves.
 func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayService string, r relayReport) error {
 	targets := app.agents.RelayTargets(agents)
-	if err := app.releaseDeselected(ctx, targets, r); err != nil {
-		return err
-	}
-	if len(targets) == 0 {
-		return nil
-	}
-	dir, err := daemon.Dir(app.stateDir)
-	if err != nil {
-		return err
-	}
-	token, err := app.ensureRelayToken()
-	if err != nil {
-		return err
-	}
-	addr := daemon.Addr(dir)
-	err = app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
-		r.ok(agent, "sends to the local relay"+detail)
-	}, r.then)
-	if err != nil {
+	var dir, token, addr string
+	if err := app.withExporters(ctx, func() error {
+		err := app.releaseDeselected(ctx, targets, r)
+		if err != nil || len(targets) == 0 {
+			return err
+		}
+		if dir, err = daemon.Dir(app.stateDir); err != nil {
+			return err
+		}
+		if token, err = app.ensureRelayToken(); err != nil {
+			return err
+		}
+		addr = daemon.Addr(dir)
+		return app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
+			r.ok(agent, "sends to the local relay"+detail)
+		}, r.then)
+	}); err != nil || len(targets) == 0 {
 		return err
 	}
 	env := ""
@@ -65,7 +63,9 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 	// A relay that could not listen on its address moved (daemon.LastMove): every agent follows.
 	now := daemon.Addr(dir)
 	if now != addr {
-		if err := app.pointAgentsAtRelay(ctx, targets, now, token, func(string, string) {}, r.then); err != nil {
+		if err := app.withExporters(ctx, func() error {
+			return app.pointAgentsAtRelay(ctx, targets, now, token, func(string, string) {}, r.then)
+		}); err != nil {
 			return err
 		}
 	}
@@ -87,21 +87,25 @@ func (app *App) relayMoved(ctx context.Context, from, to string, logf func(strin
 	if err != nil {
 		return
 	}
-	var targets []string
-	for _, e := range app.agents.With[agents.RelayExporter]() {
-		if pointed, _ := e.RelayPointed(from); pointed {
-			targets = append(targets, e.Name())
+	// Chosen under the lock as well: an exporter setup or teardown undoes meanwhile stays undone.
+	err = app.withExporters(ctx, func() error {
+		var targets []string
+		for _, e := range app.agents.With[agents.RelayExporter]() {
+			if pointed, _ := e.RelayPointed(from); pointed {
+				targets = append(targets, e.Name())
+			}
 		}
-	}
-	err = app.pointAgentsAtRelay(ctx, targets, to, token, func(agent, detail string) {
-		logf("relay: %s now exports to %s%s", agent, to, detail)
-	}, func(note string) { logf("relay: %s", note) })
+		return app.pointAgentsAtRelay(ctx, targets, to, token, func(agent, detail string) {
+			logf("relay: %s now exports to %s%s", agent, to, detail)
+		}, func(note string) { logf("relay: %s", note) })
+	})
 	if err != nil {
 		logf("relay: pointing the agents at %s: %v", to, err)
 	}
 }
 
-// releaseDeselected undoes the relay exporter of every agent not in targets: global mode's catch-all would forward it.
+// releaseDeselected undoes the relay exporter of every agent not in targets: global mode's
+// catch-all would forward it. Callers hold withExporters.
 func (app *App) releaseDeselected(ctx context.Context, targets []string, r relayReport) error {
 	token, _ := daemon.Token(app.stateDir)
 	for _, e := range app.agents.With[agents.RelayExporter]() {

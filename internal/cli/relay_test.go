@@ -200,6 +200,31 @@ func TestSetupFollowsTheRelaysMove(t *testing.T) {
 	}
 }
 
+// A relay that moved chooses the exporters to re-point under the exporters lock, so one that
+// setup or teardown undoes meanwhile stays undone.
+func TestARelayMoveLeavesAnExporterUndoneMeanwhile(t *testing.T) {
+	dir := relaySandbox(t)
+	from, to := freeAddr(t), freeAddr(t)
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", from, "--harness", "codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	unlock, err := flock.TryLock(filepath.Join(dir, daemon.ExportersLockFile)) // teardown, releasing
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := make(chan struct{})
+	go func() { testApp.relayMoved(t.Context(), from, to, func(string, ...any) {}); close(moved) }()
+	err = testApp.releaseDeselected(t.Context(), nil, relayReport{ok: func(string, string) {}, then: func(string) {}})
+	unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-moved
+	if codex, _ := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")); strings.Contains(string(codex), "http://"+to) {
+		t.Fatalf("the relay pointed an exporter teardown had undone at where it moved:\n%s", codex)
+	}
+}
+
 // doctor's export check on a relayed machine names what stops sessions leaving, with fixes.
 func TestRelayDoctorCheck(t *testing.T) {
 	relaySandbox(t)
