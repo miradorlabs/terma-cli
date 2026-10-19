@@ -134,6 +134,9 @@ func (a Agent) UnconfigureRelay(_ context.Context, token string) (agents.RelayRe
 // addr. It is unknown on a machine with no VS Code Copilot runs in, where only the CLI's
 // environment could say, and where an endpoint in the shell keeps setup from writing the
 // settings: RelayProblem says that.
+// Accepted risk: an organization's Copilot telemetry policy outranks the settings and is not
+// read, so under one that manages the exporter this reports pointed while the relay gets
+// nothing. Upgrade path: read the managed configuration once its shape is known (README).
 func (Agent) RelayPointed(addr string) (pointed, known bool) {
 	dirs := vscodeUserDirs(false)
 	for _, dir := range dirs {

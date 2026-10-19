@@ -367,7 +367,13 @@ any exporter but `otlp-http`, or a protocol variable (`OTEL_EXPORTER_OTLP_PROTOC
 traces variant, `COPILOT_OTEL_PROTOCOL`) gRPC, setup writes none of its settings into VS
 Code and says so: Copilot there already exports where that says, and terma's settings
 would only add what was said to it. The agent host's exporter is VS Code's, not Copilot's alone: the Claude and Codex
-agents you have VS Code host there are handed the same one.
+agents you have VS Code host there are handed the same one. An organization's policy for
+Copilot's telemetry outranks both your environment and these settings, and terma reads
+neither the policy nor what it sets: where it manages the agent host's exporter, Copilot
+in VS Code exports where the policy says, the relay receives nothing from it, and `terma
+doctor` still reports VS Code pointed at the relay, since it reads only the settings setup
+wrote. Where the policy names an endpoint and leaves content capture to you, the
+`captureContent` setup writes applies to that endpoint.
 Copilot Chat's own exporter (`github.copilot.chat.otel.*`) is never switched on: VS Code
 would copy its endpoint into every extension's environment. The Copilot CLI reads its
 exporter only from its environment, so setup defines a `copilot` shell function in your
