@@ -69,6 +69,9 @@ func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr,
 	// An extension terma writes reaches `terma hook` by this binary's absolute path, never
 	// the PATH: a desktop-started agent has the system's, and a session's may name its checkout.
 	terma, err := app.hookExecutable()
+	if err == nil && !filepath.IsAbs(terma) {
+		err = fmt.Errorf("%q is not an absolute path", terma)
+	}
 	if err != nil {
 		return fmt.Errorf("locate terma: %w", err)
 	}

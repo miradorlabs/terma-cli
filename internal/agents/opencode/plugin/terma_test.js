@@ -191,8 +191,11 @@ test("session and file events reach terma hook with the session attached", async
 
 test("terma runs only by an absolute path, never found on the PATH", async () => {
   const path = process.env.PATH
-  // The fake terma is on the PATH: a hook command naming it bare, or none at all, still runs nothing.
+  const cwd = process.cwd()
+  // The fake terma is on the PATH and in the working directory: a hook command naming it
+  // bare or relative, or none at all, still runs nothing.
   process.env.PATH = `${dir}:${path}`
+  process.chdir(dir)
   try {
     for (const hookCommand of [["terma", "hook"], ["./terma", "hook"], undefined, []]) {
       for (const f of readdirSync(hookLog)) rmSync(join(hookLog, f))
@@ -204,6 +207,7 @@ test("terma runs only by an absolute path, never found on the PATH", async () =>
     }
   } finally {
     process.env.PATH = path
+    process.chdir(cwd)
   }
 })
 

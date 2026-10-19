@@ -18,7 +18,7 @@ type Refresher struct {
 	StateDir string
 	Agents   *agents.Registry
 	Version  string
-	// Terma is the absolute path the refreshed files run terma at.
+	// Terma locates terma, by the absolute path the refreshed files run it at; required.
 	Terma func() (string, error)
 	// RelayService rewrites the relay's service when it is not what this build would
 	// install, returning its path and whether it did; nil leaves the service alone.
