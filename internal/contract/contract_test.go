@@ -72,9 +72,16 @@ func TestRelayExporterFiles(t *testing.T) {
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
 				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
-				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh",
+				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot", "VSCODE_APPDATA": "vscode",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
+			}
+			// An editor Copilot has run in here: one it never has gets no settings. Nor does
+			// one in a shell that exports an endpoint of the developer's own.
+			t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+			t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+			if err := os.MkdirAll(filepath.Join(home, "vscode", "Code", "User", "globalStorage", "github.copilot-chat"), 0o700); err != nil {
+				t.Fatal(err)
 			}
 			state := filepath.Join(home, ".terma-state", "relay")
 			if err := os.MkdirAll(state, 0o700); err != nil {

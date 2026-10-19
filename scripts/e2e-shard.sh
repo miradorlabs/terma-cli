@@ -6,7 +6,7 @@
 # balanced by the times CI measured (about four to five minutes each).
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SHARDS="claude codex-a codex-b others"
+SHARDS="claude codex-a codex-b copilot others"
 
 [ $# -eq 2 ] || { echo "usage: $0 <$(echo "$SHARDS" | tr ' ' '|')|list> '<go test -run pattern>'" >&2; exit 2; }
 
@@ -18,6 +18,8 @@ pattern() {
 	codex-a) echo '^Test(RelayWorkloadsCodex|RelayCodexLongTurn|RelayCodexDaemonTUI|RelayCodexDesktop.*|CodexTelemetry)$' ;;
 	# The rest of Codex, DeepSeek Harness and Pi.
 	codex-b) echo 'Codex|Dsh|Pi([A-Z]|$)' ;;
+	# GitHub Copilot, which runs against GitHub's service: its own check.
+	copilot) echo 'Copilot' ;;
 	others) echo '.' ;;
 	*) echo "unknown shard $1; one of: $SHARDS" >&2; exit 2 ;;
 	esac

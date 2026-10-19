@@ -25,7 +25,8 @@ var testApp = func() *App {
 }()
 
 // TestMain gives the package a private HOME so no test can rewrite the developer's agent
-// configuration; Go's caches stay put, or every test build would recompile the world.
+// configuration, nor, where ZDOTDIR moves zsh's startup files out of HOME, their shell's;
+// Go's caches stay put, or every test build would recompile the world.
 func TestMain(m *testing.M) {
 	os.Exit(runIsolated(m))
 }
@@ -54,6 +55,9 @@ func runIsolated(m *testing.M) int {
 		"TERMA_CONFIG_DIR":    home + "/.config/terma",
 		"TERMA_STATE_DIR":     home + "/.local/state/terma",
 		"GEMINI_CLI_HOME":     home,
+		"COPILOT_HOME":        home + "/.copilot",
+		"VSCODE_APPDATA":      home + "/.vscode-data",
+		"ZDOTDIR":             home,
 		"GIT_CONFIG_NOSYSTEM": "1",
 		// Offline; policy integration tests clear this and use the real HTTP path.
 		"TERMA_POLICY_STUB": `{"mode":"repo","repositories":["github.com/acme/app"],"include_prompts":true,"include_tool_content":true,"default_project_id":"team"}`,

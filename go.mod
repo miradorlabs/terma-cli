@@ -5,6 +5,7 @@ go 1.27.2
 require (
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/spf13/cobra v1.10.2
+	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	github.com/zalando/go-keyring v0.2.8
 	go.opentelemetry.io/proto/otlp v1.7.0
 	golang.org/x/sys v0.47.0
