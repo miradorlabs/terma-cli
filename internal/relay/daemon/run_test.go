@@ -354,4 +354,16 @@ func TestARelayMakesWayWhenItsAddressChanges(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("the relay kept listening on an address setup replaced")
 	}
+	// An address that names port 0 is the one recorded, though the relay listens on a port
+	// the system chose: no reason to make way.
+	if err := RecordAddr(dir, "127.0.0.1:0"); err != nil {
+		t.Fatal(err)
+	}
+	r = startRun(t, c)
+	r.await(t, "the relay on port 0")
+	select {
+	case <-r.done:
+		t.Fatal("a relay on a recorded port 0 made way for its own address")
+	case <-time.After(2500 * time.Millisecond):
+	}
 }

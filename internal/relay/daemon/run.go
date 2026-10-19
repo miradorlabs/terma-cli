@@ -166,6 +166,11 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		c.Log.Printf("relay pid %d: %v", os.Getpid(), err)
 		return res, err
 	}
+	// The address as the relay's directory records it, which watch compares; "" for --addr.
+	recorded := addr
+	if c.Addr != "" {
+		recorded = ""
+	}
 	if _, port, _ := net.SplitHostPort(addr); port == "0" {
 		addr = ln.Addr().String()
 	}
@@ -231,10 +236,6 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { u.Run(engineCtx, updated) })
 	}
 
-	recorded := addr
-	if c.Addr != "" {
-		recorded = ""
-	}
 	why, serveErr := watch(ctx, r, c.StateDir, recorded, c.Idle, served, updated)
 	res.Replaced = why == stopReplaced
 	res.Updated = why == stopUpdated
