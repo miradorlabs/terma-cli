@@ -26,7 +26,7 @@ func TestSpoolTitleSendsEachNameOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	long := strings.Repeat("é", TitleMaxBytes) // two bytes each: the cut falls inside one
+	long := "a" + strings.Repeat("é", TitleMaxBytes) // é is two bytes from an odd offset: the cut falls inside one
 	attrs := map[string]any{"agent": "copilot"}
 	for _, read := range []struct {
 		title string
@@ -46,7 +46,7 @@ func TestSpoolTitleSendsEachNameOnce(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("spooled %d titles, want 2: %+v", len(events), events)
 	}
-	want := []string{"Fix the build", strings.Repeat("é", TitleMaxBytes/2)}
+	want := []string{"Fix the build", "a" + strings.Repeat("é", (TitleMaxBytes-1)/2)}
 	for i, ev := range events {
 		if ev.Name != semconv.TermaSessionTitleEvent || ev.SessionID != "sess-title-1" {
 			t.Errorf("event %d is %s for %s", i, ev.Name, ev.SessionID)

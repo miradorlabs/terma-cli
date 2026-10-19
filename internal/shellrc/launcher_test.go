@@ -37,6 +37,17 @@ func TestLauncherInstallsOnceAndRemovesCleanly(t *testing.T) {
 	if !LauncherInstalled("agentx") || LauncherInstalled("other") {
 		t.Fatal("LauncherInstalled does not read the block it wrote")
 	}
+	// A login shell reads only its login file: without the block there, it is not installed.
+	login, _ := os.ReadFile(want[1])
+	if err := os.WriteFile(want[1], []byte(mine+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if LauncherInstalled("agentx") {
+		t.Fatal("LauncherInstalled with the block in .bashrc alone")
+	}
+	if err := os.WriteFile(want[1], login, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if again, err := InstallLauncher("agentx"); err != nil || len(again) > 0 {
 		t.Fatalf("a second install changed %v, %v", again, err)
 	}

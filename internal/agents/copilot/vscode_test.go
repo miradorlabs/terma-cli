@@ -517,6 +517,27 @@ func TestVSCodePointedNeedsTheOTLPExporter(t *testing.T) {
 	}
 }
 
+// Only plain HTTP to the relay's address is the relay: the relay serves no TLS, and another
+// address is someone else's. A path without the token is still the relay's, since the token
+// may ride the exporter's headers.
+func TestRelayURLIsPlainHTTPToTheRelay(t *testing.T) {
+	for raw, relay := range map[string]bool{
+		"http://127.0.0.1:43180/tok":           true,
+		"http://127.0.0.1:43180/tok/v1/traces": true,
+		"http://127.0.0.1:43180":               true,
+		"http://127.0.0.1:43180/v1/traces":     true,
+		`"http://127.0.0.1:43180/tok"`:         true,
+		"https://127.0.0.1:43180/tok":          false,
+		"HTTPS://127.0.0.1:43180":              false,
+		"http://localhost:43180/tok":           false,
+		"http://127.0.0.1:4318/v1/traces":      false,
+	} {
+		if got := relayURL(raw, "127.0.0.1:43180"); got != relay {
+			t.Errorf("relayURL(%q) = %v, want %v", raw, got, relay)
+		}
+	}
+}
+
 // An exporter type inherited from the shell picks the agent host's exporter ahead of the
 // settings: anything but OTLP/HTTP keeps the spans from the relay, which has no gRPC listener.
 func TestShellExporterTypeIsAConflict(t *testing.T) {

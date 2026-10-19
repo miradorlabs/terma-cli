@@ -86,18 +86,24 @@ func RemoveLauncher(name string) ([]string, error) {
 	return changed, err
 }
 
-// LauncherInstalled reports whether the startup file a new shell reads defines name's launcher.
+// LauncherInstalled reports whether every startup file setup writes defines name's launcher:
+// bash reads .bashrc in an interactive shell and its login file in a login shell (a macOS
+// terminal), and either may start the command.
 func LauncherInstalled(name string) bool {
 	rc, ok := ShellRC()
 	if !ok || len(rc.Paths) == 0 {
 		return false
 	}
-	data, err := os.ReadFile(rc.Paths[0])
-	if err != nil {
-		return false
+	for _, path := range rc.Paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		if _, _, found := cutLauncher(string(data), name); !found {
+			return false
+		}
 	}
-	_, _, found := cutLauncher(string(data), name)
-	return found
+	return true
 }
 
 func editLaunchers(name string, install bool) ([]string, error) {

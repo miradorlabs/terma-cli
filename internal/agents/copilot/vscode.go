@@ -126,10 +126,13 @@ func shellEndpoint(addr string) (string, bool) {
 	return "", false
 }
 
-// relayURL reports whether raw is a URL of the relay at addr.
+// relayURL reports whether raw is a URL of the relay at addr: plain HTTP to its address, which
+// TLS would never reach. The token may ride the path or OTEL_EXPORTER_OTLP_HEADERS (Claude
+// Code's exporter), so a path without one is still the relay's; a wrong or missing token the
+// relay refuses, and counts.
 func relayURL(raw, addr string) bool {
 	u, err := url.Parse(strings.Trim(raw, `"'`))
-	return err == nil && addr != "" && u.Host == addr
+	return err == nil && addr != "" && u.Scheme == "http" && u.Host == addr
 }
 
 // exporterSettings are the members that send the agent host's exporter to the relay, each

@@ -97,6 +97,7 @@ func editedPaths(raw json.RawMessage) []string {
 		Path         string `json:"path"`
 		FilePath     string `json:"file_path"`
 		FilePathVS   string `json:"filePath"`
+		NotebookPath string `json:"notebook_path"`
 		Input        string `json:"input"`
 		Replacements []struct {
 			FilePath string `json:"filePath"`
@@ -111,7 +112,7 @@ func editedPaths(raw json.RawMessage) []string {
 			out = append(out, p)
 		}
 	}
-	add(cmp.Or(input.Path, input.FilePath, input.FilePathVS))
+	add(cmp.Or(input.Path, input.FilePath, input.FilePathVS, input.NotebookPath))
 	for _, r := range input.Replacements {
 		add(r.FilePath)
 	}

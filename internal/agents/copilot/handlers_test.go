@@ -114,6 +114,7 @@ func TestEditedPaths(t *testing.T) {
 		{"vscode create", `{"filePath":"/r/c.txt","content":"x"}`, []string{"/r/c.txt"}},
 		{"vscode replacements", `{"explanation":"x","replacements":[{"filePath":"/r/a.go"},{"filePath":"/r/b.go"},{"filePath":"/r/a.go"}]}`, []string{"/r/a.go", "/r/b.go"}},
 		{"vscode patch", `{"input":"*** Begin Patch\n*** Update File: /r/a.go\n*** Move to: /r/z.go\n*** End Patch","explanation":"x"}`, []string{"/r/a.go", "/r/z.go"}},
+		{"notebook edit", `{"notebook_path":"/r/n.ipynb","new_source":"x"}`, []string{"/r/n.ipynb"}},
 		{"no path", `{"old_str":"a"}`, nil},
 		{"not an input", `[1,2]`, nil},
 		{"nothing", ``, nil},
