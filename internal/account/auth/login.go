@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/machine"
 )
 
 // loginTimeout bounds the wait at the browser, so an abandoned attempt releases the port.
@@ -172,11 +174,10 @@ func buildAuthorizeURL(appURL, challenge, state string, port int, label, organiz
 
 // DefaultLabel names the machine in the approval prompt and the session list.
 func DefaultLabel() string {
-	host, err := os.Hostname()
-	if err != nil || host == "" {
-		return runtime.GOOS
+	if host := machine.Name(); host != "" {
+		return host
 	}
-	return host
+	return runtime.GOOS
 }
 
 func openBrowser(target string) error {

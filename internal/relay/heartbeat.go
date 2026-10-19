@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 
+	"github.com/miradorlabs/terma-cli/internal/machine"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -101,7 +101,7 @@ func NameHeartbeatUser(beat *logspb.LogsData, user string) {
 }
 
 func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb.LogsData {
-	host, _ := os.Hostname()
+	host := machine.Name()
 	now := uint64(r.opts.Now().UnixNano())
 	rec := &logspb.LogRecord{
 		TimeUnixNano: now, ObservedTimeUnixNano: now,
