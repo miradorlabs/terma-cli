@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -81,14 +82,17 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 
 // withExporters runs fn holding daemon.ExportersLockFile, so setup, teardown and a relay
 // that moved change the agents' relay exporters one at a time; whoever chooses which to
-// change chooses under it too. A lock that cannot be had costs fn its exclusivity, never
-// its run.
+// change chooses under it too. While another holds it past exportersLockWait, fn does not
+// run. A lock file there is none of (no relay directory yet) has no one to wait for.
 func (app *App) withExporters(ctx context.Context, fn func() error) error {
 	lockCtx, cancel := context.WithTimeout(ctx, exportersLockWait)
 	unlock, err := flock.Lock(lockCtx, filepath.Join(claim.Dir(app.stateDir), daemon.ExportersLockFile))
 	cancel()
-	if err == nil {
+	switch {
+	case err == nil:
 		defer unlock()
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		return errors.New("another terma is changing the agents' exporters; try again in a moment")
 	}
 	return fn()
 }
@@ -125,7 +129,7 @@ func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr,
 }
 
 // exportersLockWait bounds the wait for daemon.ExportersLockFile.
-const exportersLockWait = 10 * time.Second
+const exportersLockWait = 30 * time.Second
 
 // ensureRelayToken is the relay's token: the one there is, else the one teardown kept for
 // this sign-in, which agents still running present, else a new one.

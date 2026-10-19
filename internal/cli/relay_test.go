@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -223,6 +224,30 @@ func TestTeardownFindsAnExporterByATokenAMoveReplaced(t *testing.T) {
 	}
 	if settings, _ := os.ReadFile(filepath.Join(os.Getenv("GEMINI_CLI_HOME"), ".gemini", "settings.json")); strings.Contains(string(settings), old) {
 		t.Fatalf("teardown left Gemini exporting with the replaced token:\n%s", settings)
+	}
+}
+
+// While another holds the exporters lock past its wait, nothing changes the exporters; with
+// no relay directory yet there is no one to wait for.
+func TestExportersChangeOnlyUnderTheirLock(t *testing.T) {
+	dir := relaySandbox(t)
+	ran := false
+	if err := testApp.withExporters(t.Context(), func() error { ran = true; return nil }); err != nil || !ran {
+		t.Fatalf("no relay directory yet: ran %v, %v", ran, err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := flock.TryLock(filepath.Join(dir, daemon.ExportersLockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	ran = false
+	if err := testApp.withExporters(ctx, func() error { ran = true; return nil }); err == nil || ran {
+		t.Fatalf("changed the exporters while another held their lock: ran %v, %v", ran, err)
 	}
 }
 

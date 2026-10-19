@@ -43,8 +43,9 @@ type Move struct {
 	// Repointed means `terma setup` has since pointed every agent it set up at To, those
 	// whose exporter the relay cannot read included.
 	Repointed bool `json:"repointed,omitempty"`
-	// Replaced are the relay tokens moves replaced, latest last: what held the address may
-	// have read one from an export (rotateToken).
+	// Replaced are the relay tokens moves replaced since setup last pointed every agent at
+	// the relay, latest last: an exporter the relay could not re-point may hold any of them,
+	// and teardown finds what it wrote by it.
 	Replaced []string `json:"replaced,omitempty"`
 }
 
@@ -113,8 +114,7 @@ func move(stateDir, from string) (net.Listener, string, error) {
 		return nil, "", err
 	}
 	prev, _ := LastMove(dir)
-	replaced := append(prev.Replaced, old)
-	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: replaced[max(0, len(replaced)-maxReplaced):]})
+	writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: append(prev.Replaced, old)})
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
 	return ln, token, nil
 }
@@ -150,10 +150,11 @@ func LastMove(dir string) (Move, bool) {
 }
 
 // Repointed records that `terma setup` has pointed every agent at to, where the relay moved
-// last; a later move is left as it is.
+// last, with its token, so no exporter holds a token a move replaced; a later move is left
+// as it is.
 func Repointed(dir, to string) {
-	if m, ok := LastMove(dir); ok && m.To == to && !m.Repointed {
-		m.Repointed = true
+	if m, ok := LastMove(dir); ok && m.To == to && (!m.Repointed || len(m.Replaced) > 0) {
+		m.Repointed, m.Replaced = true, nil
 		writeMove(dir, m)
 	}
 }

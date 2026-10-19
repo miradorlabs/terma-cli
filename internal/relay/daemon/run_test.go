@@ -232,8 +232,8 @@ func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
 		t.Error("setup's re-pointing at another address is recorded for this move")
 	}
 	Repointed(dir, to)
-	if m, _ := LastMove(dir); !m.Repointed {
-		t.Error("setup's re-pointing is not recorded")
+	if m, _ := LastMove(dir); !m.Repointed || len(m.Replaced) != 0 {
+		t.Errorf("setup's re-pointing is not recorded, or keeps the tokens no exporter holds now: %+v", m)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ErrorFile)); !os.IsNotExist(err) {
 		t.Errorf("a relay that moved left its failure to listen behind: %v", err)

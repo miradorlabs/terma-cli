@@ -30,9 +30,6 @@ func NewToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// maxReplaced bounds the tokens a moved relay keeps for teardown (Move.Replaced).
-const maxReplaced = 8
-
 // rotateToken gives the relay of stateDir a new token, returning the one it replaced and
 // the new one. A relay whose token teardown has just removed gets none back.
 func rotateToken(stateDir string) (old, token string, err error) {
