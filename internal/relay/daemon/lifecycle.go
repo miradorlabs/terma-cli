@@ -24,10 +24,11 @@ const RetryAfter = time.Minute
 
 // Stop asks a running relay to stop and waits for its lock, so a changed address or token
 // takes effect; it also returns once another relay, such as the service's waiting behind
-// it, has taken over.
+// it, has taken over. Only a relay holding the lock is asked: the record a relay that
+// crashed, or ran before a reboot, left behind names a pid another process may have now.
 func Stop(dir string) {
 	pid := recordedPID(dir)
-	if pid <= 1 {
+	if pid <= 1 || !Running(dir) {
 		return
 	}
 	proc, err := os.FindProcess(pid)
