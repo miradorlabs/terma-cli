@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -232,7 +231,11 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { u.Run(engineCtx, updated) })
 	}
 
-	why, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
+	recorded := addr
+	if c.Addr != "" {
+		recorded = ""
+	}
+	why, serveErr := watch(ctx, r, c.StateDir, recorded, c.Idle, served, updated)
 	res.Replaced = why == stopReplaced
 	res.Updated = why == stopUpdated
 	// A relay stopped once its token went (teardown) is done for good, however it was stopped.
@@ -362,25 +365,13 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	return info, true
 }
 
-// listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
-func listen(dir, addr string) (net.Listener, error) {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		err = fmt.Errorf("relay: listen on %s: %w", addr, err)
-		_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ErrorFile), []byte(time.Now().UTC().Format(time.RFC3339)+" "+err.Error()+"\n"), 0o600)
-		return nil, err
-	}
-	_ = os.Remove(filepath.Join(dir, ErrorFile))
-	return ln, nil
-}
-
 // watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
 // finds its hold empty, no export in flight and none for updateQuiet (for none at all after
 // updatePauseWait), however long that takes: the release is already in place for every
 // hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
 // on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
 // is answered by that same wait.
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
+func watch(ctx context.Context, r *relay.Relay, stateDir, addr string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
 	var upgraded time.Time  // when it installed one itself
@@ -408,6 +399,10 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			return stopSetupGone, nil
 		}
 		if requested(dir, StopFile) {
+			return stopAsked, nil
+		}
+		// Setup chose another address: the next relay listens there.
+		if addr != "" && Addr(dir) != addr {
 			return stopAsked, nil
 		}
 		if replacing.IsZero() && requested(dir, ReplaceFile) {

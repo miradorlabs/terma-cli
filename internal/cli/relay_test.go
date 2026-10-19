@@ -147,6 +147,13 @@ func TestARelayMovesOffASquattedPort(t *testing.T) {
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex", "gemini"}); strings.Contains(c.Detail, "moved to") {
 		t.Errorf("a move past its notice, setup since: %+v", c)
 	}
+	// An address setup chose since replaces the move.
+	if err := testApp.moveRelay(freeAddr(t)); err != nil {
+		t.Fatal(err)
+	}
+	if m := testApp.relayFacts().Move; m != nil {
+		t.Errorf("doctor still tells of a move to an address setup replaced: %+v", m)
+	}
 	facts.Move, facts.LastFailure = nil, "listen on "+addr+": address already in use"
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "last failed to start") {
 		t.Errorf("failed relay: %+v", c)

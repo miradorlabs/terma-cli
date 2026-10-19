@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 // A relay that cannot listen on the address setup recorded does not keep failing there:
@@ -19,6 +21,18 @@ import (
 // theirs, which every export to it would reach. It listens on a free port of the same host
 // instead, records that as its address and the move, and tells the CLI (Config.Moved) to
 // point the agents' exporters there.
+
+// listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
+func listen(dir, addr string) (net.Listener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		err = fmt.Errorf("relay: listen on %s: %w", addr, err)
+		_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ErrorFile), []byte(time.Now().UTC().Format(time.RFC3339)+" "+err.Error()+"\n"), 0o600)
+		return nil, err
+	}
+	_ = os.Remove(filepath.Join(dir, ErrorFile))
+	return ln, nil
+}
 
 // Move is the relay's last move off an address it could not listen on (MovedFile).
 type Move struct {
@@ -38,14 +52,40 @@ const (
 	movePortTries = 20
 )
 
+// addrLockFile is held by RecordAddr and move while they write the relay's address.
+const addrLockFile = "addr.lock"
+
+// addrLockWait bounds the wait for addrLockFile; a variable so a test need not wait it out.
+var addrLockWait = 5 * time.Second
+
+// RecordAddr records addr as where the relay listens, never in the middle of a relay's move.
+// A lock that cannot be had costs the write its exclusivity, never the write: the address
+// is the developer's choice.
+func RecordAddr(dir, addr string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
+	return config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600)
+}
+
 // move listens on a free port of the host of from, where the relay could not, and records
 // it as the relay's address, and the move. It moves nothing when the recorded address is no
-// longer from: setup has just chosen another.
+// longer from: setup has just chosen another (RecordAddr).
 func move(dir, from string) (net.Listener, error) {
 	host, _, err := net.SplitHostPort(from)
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	if Addr(dir) != from {
 		return nil, errors.New("relay: the recorded address changed")
 	}

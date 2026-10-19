@@ -303,19 +303,55 @@ func TestServingIsTheRelaysLockAndRecord(t *testing.T) {
 	}
 }
 
-// A relay moves only off the address still recorded: setup may just have chosen another.
+// A relay moves only off the address still recorded, and never while setup records one
+// (RecordAddr): setup may just have chosen another.
 func TestARelayMovesOnlyOffTheRecordedAddress(t *testing.T) {
-	t.Parallel()
 	_, dir, _ := setUpRelay(t)
 	from := freeAddr(t)
-	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(freeAddr(t)+"\n"), 0o600); err != nil {
+	if err := RecordAddr(dir, freeAddr(t)); err != nil {
 		t.Fatal(err)
 	}
 	if ln, err := move(dir, from); err == nil {
 		_ = ln.Close()
 		t.Fatal("moved off an address no longer recorded")
 	}
-	if _, ok := LastMove(dir); ok {
-		t.Error("recorded a move it did not make")
+	if err := RecordAddr(dir, from); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := flock.TryLock(filepath.Join(dir, addrLockFile)) // setup, recording
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := addrLockWait
+	addrLockWait = 50 * time.Millisecond
+	t.Cleanup(func() { addrLockWait = prev })
+	if ln, err := move(dir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved while setup was recording an address")
+	}
+	unlock()
+	if _, ok := LastMove(dir); ok || Addr(dir) != from {
+		t.Errorf("recorded a move it did not make: address %s", Addr(dir))
+	}
+}
+
+// A relay whose recorded address setup changes makes way, so the next one listens there.
+func TestARelayMakesWayWhenItsAddressChanges(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	if err := RecordAddr(dir, freeAddr(t)); err != nil {
+		t.Fatal(err)
+	}
+	c := runConfig(stateDir, time.Hour, nil)
+	c.Addr = ""
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	if err := RecordAddr(dir, freeAddr(t)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-r.done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the relay kept listening on an address setup replaced")
 	}
 }

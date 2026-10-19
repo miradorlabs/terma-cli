@@ -100,7 +100,8 @@ func (app *App) relayFacts() doctor.Relay {
 	// not yet recorded reads as not serving for the milliseconds until it is.
 	_, serving := daemon.Serving(dir)
 	r.Squatted = !serving && daemon.Squatted(r.Addr)
-	if m, ok := daemon.LastMove(dir); ok {
+	// A move to an address setup has since replaced is history.
+	if m, ok := daemon.LastMove(dir); ok && m.To == r.Addr {
 		r.Move = &doctor.RelayMove{Detail: m.Describe(), From: m.From, Recent: m.Recent(time.Now()), Repointed: m.Repointed}
 	}
 	if data, err := os.ReadFile(filepath.Join(dir, daemon.ErrorFile)); err == nil && !r.Running {

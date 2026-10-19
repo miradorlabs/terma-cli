@@ -48,7 +48,7 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if addr == "" {
 				addr = daemon.Addr(dir)
 			}
-			if err := config.WriteFileAtomic(filepath.Join(dir, daemon.AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+			if err := daemon.RecordAddr(dir, addr); err != nil {
 				return err
 			}
 			out := cmd.OutOrStdout()

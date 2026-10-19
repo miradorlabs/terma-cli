@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -153,7 +152,7 @@ func (app *App) moveRelay(addr string) error {
 	if err != nil {
 		return err
 	}
-	if err := config.WriteFileAtomic(filepath.Join(dir, daemon.AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+	if err := daemon.RecordAddr(dir, addr); err != nil {
 		return err
 	}
 	daemon.Stop(dir)
