@@ -184,12 +184,16 @@ func isLoopbackRequest(r *http.Request, port int) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// buildAuthorizeURL is the approval page's link. response_mode=form_post (the name OAuth gives
+// the same handoff) tells the page this listener takes the code as a form POST, so the page
+// can tell a CLI that reads only a GET to update rather than send it a code it would ignore.
 func buildAuthorizeURL(appURL, challenge, state string, port int, label, organization string) string {
 	u := appURL + "/cli/auth"
 	q := url.Values{}
 	q.Set("challenge", challenge)
 	q.Set("state", state)
 	q.Set("port", strconv.Itoa(port))
+	q.Set("response_mode", "form_post")
 	if label != "" {
 		q.Set("label", label)
 	}

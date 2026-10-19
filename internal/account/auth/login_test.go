@@ -154,6 +154,10 @@ func TestLogin_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
 		t.Error("the PKCE verifier leaked into the browser URL")
 	}
 
+	if mode := parsed.Query().Get("response_mode"); mode != "form_post" {
+		t.Errorf("response_mode = %q, want form_post: the page posts the code only to a CLI that says it takes a POST", mode)
+	}
+
 	wantPort, _ := strconv.Atoi(parsed.Query().Get("port"))
 	if exchanger.port != wantPort {
 		t.Errorf("exchanged port = %d, advertised %d", exchanger.port, wantPort)
