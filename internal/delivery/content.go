@@ -2,6 +2,8 @@ package delivery
 
 import (
 	"maps"
+	"net/url"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -62,13 +64,41 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 }
 
 // wire is a batch as it is sent: the project leaves as the resource's mirador.project.id,
-// so the routing key each event is queued under stays behind.
+// so the routing key each event is queued under stays behind. Each event names the
+// repository it was admitted under as vcs.repository.url.full, unless it names its own (a
+// touch, commit or push), so the server keys every record as the policy admitted it, those
+// queued before terma stamped it too.
 func wire(batch []spool.Event) []spool.Event {
 	out := make([]spool.Event, len(batch))
 	for i, e := range batch {
 		e.Attrs = maps.Clone(e.Attrs)
 		delete(e.Attrs, hookrun.AttrProjectID)
+		if _, named := e.Attrs[semconv.VCSRepositoryURLFullKey]; !named {
+			if u := repositoryURL(e.Repository); u != "" {
+				if e.Attrs == nil {
+					e.Attrs = map[string]any{}
+				}
+				e.Attrs[semconv.VCSRepositoryURLFullKey] = u
+			}
+		}
 		out[i] = e
 	}
 	return out
+}
+
+// repositoryURL is the https URL of the repository admitted as r, `host/path`, that the
+// server keys back to r exactly: it drops one `.git`, as gitx.NormalizeRemote did before
+// RepositoryID dropped another, so a key still ending in `.git` gets one back. "" outside git.
+func repositoryURL(r config.Repository) string {
+	host, path, ok := strings.Cut(r.Origin, "/")
+	if !ok || host == "" || path == "" {
+		return ""
+	}
+	if strings.HasSuffix(path, ".git") {
+		path += ".git"
+	}
+	if strings.Contains(host, ":") { // an IPv6 literal; the key has no port
+		host = "[" + host + "]"
+	}
+	return (&url.URL{Scheme: "https", Host: host, Path: "/" + path}).String()
 }
