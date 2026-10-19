@@ -287,6 +287,35 @@ test('fetch follows a redirect and returns the body within its limit', async (t)
   assert.equal((await fetch(`${base}/moved`, 10, { client: http })).toString(), '0123456789');
 });
 
+// endless(res, status, headers) answers with a body that never ends, and resolves, once
+// the client has closed it, to how many bytes it wrote.
+function endless(res, status, headers) {
+  return new Promise((resolve) => {
+    res.writeHead(status, headers);
+    let written = 0;
+    const timer = setInterval(() => {
+      res.write('x'.repeat(1024));
+      written += 1024;
+    }, 2);
+    res.on('close', () => {
+      clearInterval(timer);
+      resolve(written);
+    });
+  });
+}
+
+test('fetch closes a redirect or an error it does not read, never drains it', { timeout: 10_000 }, async (t) => {
+  const closed = [];
+  const base = await serve(t, (req, res) => {
+    if (req.url === '/moved') closed.push(endless(res, 302, { location: '/file' }));
+    else if (req.url === '/broken') closed.push(endless(res, 500, {}));
+    else res.end('0123456789');
+  });
+  assert.equal((await fetch(`${base}/moved`, 10, { client: http })).toString(), '0123456789');
+  await assert.rejects(fetch(`${base}/broken`, 10, { client: http }), /HTTP 500/);
+  for (const written of await Promise.all(closed)) assert.ok(written < 1 << 20, `${written} bytes written`);
+});
+
 test('fetch refuses a body past its limit, whatever the server claims', async (t) => {
   const base = await serve(t, (_req, res) => {
     res.writeHead(200); // no content-length: only the bytes say how large it is

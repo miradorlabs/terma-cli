@@ -193,10 +193,16 @@ case "$tag" in v[0-9]*) ;; *) die "not a release: ${tag}" ;; esac
 case "$tag" in *[!A-Za-z0-9._-]*) die "not a release: ${tag}" ;; esac
 release="${BASE}/download/${tag}"
 
-# fetch <url> <file> <most bytes>; a download that stalls for a minute fails.
+# fetch <url> <file> <most bytes>: fails past that many bytes, however the server sends
+# them (curl before 8.4 ignores --max-filesize without a length; head reads one byte past
+# the bound, then stops reading, which stops curl), or when the download stalls for a
+# minute.
 fetch() {
-  curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 --connect-timeout 30 \
-    --speed-limit 1 --speed-time 60 --max-filesize "$3" -o "$2" "$1" || die "download failed: $1"
+  rm -f "$tmp/failed"
+  { curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 --connect-timeout 30 \
+      --speed-limit 1 --speed-time 60 --max-filesize "$3" "$1" || : >"$tmp/failed"; } |
+    head -c "$(($3 + 1))" >"$2"
+  if [ -e "$tmp/failed" ] || [ "$(($(wc -c <"$2")))" -gt "$3" ]; then die "download failed: $1"; fi
 }
 
 tmp="$(mktemp -d 2>/dev/null || mktemp -d -t terma)"
@@ -214,13 +220,11 @@ fetch "${release}/checksums.txt.sig" "$tmp/checksums.txt.sig" 4096
 if can_verify; then
   { printf 'terma release %s\n' "$tag"; cat "$tmp/checksums.txt"; } >"$tmp/signed"
   signed=''
-  if [ "$(($(wc -c <"$tmp/checksums.txt.sig")))" -le 4096 ]; then
-    while IFS= read -r sig || [ -n "$sig" ]; do
-      for key in $RELEASE_KEYS; do
-        if ed25519_ok "$key" "$tmp/signed" "$sig"; then signed=1; break 2; fi
-      done
-    done <"$tmp/checksums.txt.sig"
-  fi
+  while IFS= read -r sig || [ -n "$sig" ]; do
+    for key in $RELEASE_KEYS; do
+      if ed25519_ok "$key" "$tmp/signed" "$sig"; then signed=1; break 2; fi
+    done
+  done <"$tmp/checksums.txt.sig"
   [ -n "$signed" ] || die "${tag} is not signed by a key this installer trusts; refusing to install"
 else
   say "Warning: ${tag}'s signature is not checked: that needs OpenSSL 3, and there is none on PATH here. ${asset} is checked against checksums.txt alone."

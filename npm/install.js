@@ -45,24 +45,31 @@ function assetName() {
 }
 
 // Fetches url, following redirects, and fails past limit bytes or after stallMs without
-// data. client is node:https; tests pass node:http.
+// data. A response it does not read (a redirect, an error) is closed, not drained. client
+// is node:https; tests pass node:http.
 function fetch(url, limit, { redirects = 5, stallMs = STALL_MS, client = https } = {}) {
   return new Promise((resolve, reject) => {
-    const fail = (message) => {
+    // Fails the fetch and closes stream: the request, or once it answered, the response.
+    const fail = (message, stream = req) => {
       reject(new Error(`${url}: ${message}`));
-      req.destroy();
+      stream.destroy();
     };
     const req = client
       .get(url, { headers: { 'user-agent': `terma-npm-shim/${pkg.version}` }, timeout: stallMs }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
-          res.resume();
-          const next = new URL(res.headers.location, url).toString();
+          let next;
+          try {
+            next = new URL(res.headers.location, url).toString();
+          } catch {
+            fail('redirect to an invalid URL', res);
+            return;
+          }
           resolve(fetch(next, limit, { redirects: redirects - 1, stallMs, client }));
+          res.destroy();
           return;
         }
         if (res.statusCode !== 200) {
-          res.resume();
-          reject(new Error(`${url}: HTTP ${res.statusCode}`));
+          fail(`HTTP ${res.statusCode}`, res);
           return;
         }
         const chunks = [];
@@ -70,7 +77,7 @@ function fetch(url, limit, { redirects = 5, stallMs = STALL_MS, client = https }
         res.on('data', (c) => {
           size += c.length;
           if (size > limit) {
-            fail(`larger than ${limit} bytes`);
+            fail(`larger than ${limit} bytes`, res);
             return;
           }
           chunks.push(c);

@@ -41,9 +41,11 @@ mkdir -p "$mirror/download/$TAG"
 cp "$DIST"/*.tar.gz "$DIST"/checksums.txt "$mirror/download/$TAG/"
 sums="$mirror/download/$TAG/checksums.txt"
 
-# python3's file server, plus GitHub's redirect from releases/latest to the latest tag.
+# python3's file server, plus GitHub's redirect from releases/latest to the latest tag,
+# and a file beside a <file>.endless sent over and over with no length, until the client
+# hangs up (or 64 MiB), logging how much it sent.
 cat >"$work/serve.py" <<'EOF'
-import functools, http.server, sys
+import functools, http.server, os, sys
 
 root, port, tag = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 
@@ -55,6 +57,21 @@ class Mirror(http.server.SimpleHTTPRequestHandler):
             self.send_header('Location', path[:-len('latest')] + 'tag/' + tag)
             self.send_header('Content-Length', '0')
             self.end_headers()
+            return None
+        file = self.translate_path(self.path)
+        if os.path.exists(file + '.endless'):
+            self.send_response(200)
+            self.end_headers()
+            with open(file, 'rb') as f:
+                data = f.read() or b'\n'
+            sent = 0
+            try:
+                while sent < 64 << 20:
+                    self.wfile.write(data)
+                    sent += len(data)
+            except OSError:
+                pass
+            self.log_message('streamed %d bytes of %s', sent, self.path)
             return None
         return super().send_head()
 
@@ -371,8 +388,10 @@ else
   accepts "$rotating" "the second pinned key's line, after no signature and an unpinned key's"
   line "$work/other.key" >"$sums.sig"
   accepts "$rotating" "the first pinned key's line"
-  printf 'not a signature\r\n%s' "$(line "$work/release.key")" >"$sums.sig"
-  accepts "$INSTALLER" "CRLF lines, the last with no newline"
+  printf 'not a signature\r\n%s\r\n' "$(line "$work/release.key")" >"$sums.sig"
+  accepts "$INSTALLER" "lines ending CRLF"
+  printf 'not a signature\n%s' "$(line "$work/release.key")" >"$sums.sig"
+  accepts "$INSTALLER" "a last line with no newline"
   : >"$sums.sig"
   refused "$INSTALLER" "$unsigned" PATH="$ssl:$PATH"
   printf '%s\n' '-----' 'AAAA' "$(line "$work/unpinned.key")" >"$sums.sig"
@@ -396,6 +415,20 @@ rm "$sums.sig"
 refused "$INSTALLER" "download failed: $BASE/download/$TAG/checksums.txt.sig"
 refused "$INSTALLER" "download failed: $BASE/download/$TAG/checksums.txt.sig" PATH="$work/nossl:$PATH"
 restore
+
+echo "== reads no more than a file's bound when the server sends no length"
+for f in checksums.txt.sig checksums.txt; do
+  : >"$mirror/download/$TAG/$f.endless"
+  refused "$INSTALLER" "download failed: $BASE/download/$TAG/$f"
+  rm "$mirror/download/$TAG/$f.endless"
+  sent=''
+  for _ in $(seq 1 50); do
+    sent="$(sed -n "s|.*streamed \([0-9]*\) bytes of .*/$f\$|\1|p" "$work/http.log" | tail -n 1)"
+    [ -z "$sent" ] || break
+    sleep 0.1
+  done
+  [ -n "$sent" ] && [ "$sent" -lt $((32 << 20)) ] || fail "$f: the server sent ${sent:-nothing} bytes"
+done
 
 echo "== refuses a checksum that does not match, signed or not"
 sed 's/^[0-9a-f]\{4\}/dead/' "$work/checksums.good" >"$sums"
