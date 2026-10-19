@@ -21,6 +21,17 @@ attribute_groups:
       - ref: terma.user.id
         requirement_level:
           conditionally_required: When terma names the signed-in user for the team the event goes to.
+  - id: terma.delivery.stamp
+    visibility: public
+    stability: development
+    brief: What delivery adds to every hook record it sends.
+    attributes:
+      - ref: vcs.repository.url.full
+        requirement_level:
+          conditionally_required: When the event was spooled in a git repository with an origin.
+        note: >
+          The repository the event was admitted under, as https://host/path; an event that
+          names its own (a touch, commit or push) keeps it.
   - id: terma.relay.stamp
     visibility: public
     stability: development
