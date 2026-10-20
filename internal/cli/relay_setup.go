@@ -2,16 +2,18 @@ package cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -39,22 +41,35 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			token, err := app.ensureRelayToken()
+			// Only an address asked for is recorded: writing back the one read would undo a
+			// relay's move made meanwhile.
+			if addr != "" {
+				if err := daemon.RecordAddr(dir, addr); err != nil {
+					return err
+				}
+			}
+			if _, err := app.ensureRelayToken(); err != nil {
+				return err
+			}
+			// One pair, never a moving relay's new token with its old address.
+			current, token, err := daemon.Current(app.stateDir)
 			if err != nil {
 				return err
 			}
-			if addr == "" {
-				addr = daemon.Addr(dir)
-			}
-			if err := config.WriteFileAtomic(filepath.Join(dir, daemon.AddrFile), []byte(addr+"\n"), 0o600); err != nil {
-				return err
-			}
+			addr = current
 			out := cmd.OutOrStdout()
-			err = app.pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
-				fmt.Fprintf(out, "%s exports to the relay at %s%s.\n", agent, addr, detail)
-			}, func(note string) { fmt.Fprintln(out, note) })
+			err = app.withExporters(cmd.Context(), func() error {
+				return app.pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
+					fmt.Fprintf(out, "%s exports to the relay at %s%s.\n", agent, addr, detail)
+				}, func(note string) { fmt.Fprintln(out, note) })
+			})
 			if err != nil {
 				return err
+			}
+			// Pointing every agent that exports to the relay follows any move it made (doctor
+			// reads this); a subset leaves the rest, and the tokens teardown finds them by.
+			if pointsEveryExporter(app.agents, splitCommas(agents)) {
+				daemon.Repointed(dir, addr)
 			}
 			fmt.Fprintln(out, "Hooks in the repositories your team collects claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it.
@@ -75,6 +90,40 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 	return cmd
 }
 
+// pointsEveryExporter reports whether selected names every agent that can export to the relay.
+func pointsEveryExporter(reg *agents.Registry, selected []string) bool {
+	for _, e := range reg.With[agents.RelayExporter]() {
+		if !slices.Contains(selected, e.Name()) {
+			return false
+		}
+	}
+	return true
+}
+
+// withExporters runs fn holding daemon.ExportersLockFile, so setup, teardown and a relay
+// that moved change the agents' relay exporters one at a time; whoever chooses which to
+// change chooses under it too. While another holds it past exportersLockWait, or it cannot
+// be had at all, fn does not run.
+func (app *App) withExporters(ctx context.Context, fn func() error) error {
+	dir, err := daemon.Dir(app.stateDir) // the lock's home, before a first setup too
+	if err != nil {
+		return err
+	}
+	lockCtx, cancel := context.WithTimeout(ctx, exportersLockWait)
+	unlock, err := flock.Lock(lockCtx, filepath.Join(dir, daemon.ExportersLockFile))
+	cancel()
+	switch {
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		return errors.New("another terma is changing the agents' exporters; try again in a moment")
+	case err != nil:
+		return fmt.Errorf("lock the agents' exporters: %w", err)
+	}
+	defer unlock()
+	return fn()
+}
+
+// pointAgentsAtRelay points the selected agents' exporters at the relay on addr; callers
+// hold withExporters.
 func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
 	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand()}
 	for _, name := range selected {
@@ -104,6 +153,9 @@ func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr,
 	return nil
 }
 
+// exportersLockWait bounds the wait for daemon.ExportersLockFile.
+const exportersLockWait = 30 * time.Second
+
 // ensureRelayToken is the relay's token: the one there is, else the one teardown kept for
 // this sign-in, which agents still running present, else a new one.
 func (app *App) ensureRelayToken() (string, error) {
@@ -116,11 +168,9 @@ func (app *App) ensureRelayToken() (string, error) {
 			return token, nil
 		}
 	}
-	path := claim.TokenPath(app.stateDir)
-	b := make([]byte, 24)
-	if _, err := rand.Read(b); err != nil {
+	token, err := daemon.NewToken()
+	if err != nil {
 		return "", err
 	}
-	token := hex.EncodeToString(b)
-	return token, config.WriteFileAtomic(path, []byte(token+"\n"), 0o600)
+	return token, config.WriteFileAtomic(claim.TokenPath(app.stateDir), []byte(token+"\n"), 0o600)
 }

@@ -52,6 +52,10 @@ type Config struct {
 	// restarts on it.
 	Updater   *Updater
 	Listening func(addr net.Addr, hold time.Duration)
+	// Moved, when set, runs beside the engine once the relay could not listen on the address
+	// setup recorded, which another process may hold, and listens on to instead (Move): the
+	// agents' exporters still name from.
+	Moved func(from, to string)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
 }
@@ -151,9 +155,28 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		addr = Addr(dir)
 	}
 	ln, err := listen(dir, addr)
+	// Only the address setup recorded moves: one --addr names is meant.
+	moved := ""
+	if err != nil && c.Addr == "" {
+		// The move gives the relay a new token as well, which the agents it re-points get.
+		if ml, t, merr := move(c.StateDir, addr); merr == nil {
+			c.Log.Printf("relay pid %d: %v, so the relay listens on %s instead", os.Getpid(), err, ml.Addr())
+			ln, err, moved, addr, token = ml, nil, addr, ml.Addr().String(), t
+		} else {
+			c.Log.Printf("relay pid %d: could not move off %s: %v", os.Getpid(), addr, merr)
+		}
+	}
 	if err != nil {
 		c.Log.Printf("relay pid %d: %v", os.Getpid(), err)
 		return res, err
+	}
+	// The address as the relay's directory records it, which watch compares; "" for --addr.
+	recorded := addr
+	if c.Addr != "" {
+		recorded = ""
+	}
+	if _, port, _ := net.SplitHostPort(addr); port == "0" {
+		addr = ln.Addr().String()
 	}
 	opts := c.Engine
 	opts.Token = token
@@ -167,13 +190,23 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
-	claim.Prune(c.StateDir, time.Now())
+	// Recorded before anything slower: a hook that started this relay waits for the record
+	// (Serving) before the agent goes on.
+	// Without it the relay is never Serving, so it does not run unrecorded.
 	runPath := filepath.Join(dir, RunFile)
-	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
-		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
+	data, err := json.Marshal(RunInfo{PID: os.Getpid(), Addr: addr, Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version})
+	if err == nil {
+		err = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
+	}
+	if err != nil {
+		_ = ln.Close()
+		err = fmt.Errorf("relay: record itself: %w", err)
+		c.Log.Printf("relay pid %d: %v", os.Getpid(), err)
+		return res, err
 	}
 	// Gone before the lock is, so the next relay's records are never removed.
 	defer func() { _ = os.Remove(runPath) }()
+	claim.Prune(c.StateDir, time.Now())
 
 	// The engine outlives a stop signal until the server has shut down, so its final sweep
 	// sees, and its exit count includes, everything the last exports held.
@@ -203,6 +236,14 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
 	}
+	// A move an earlier relay recorded but may not have followed through (it stopped first)
+	// is followed again: re-pointing only rewrites exporters still naming the old address.
+	if m, ok := LastMove(dir); moved == "" && ok && !m.Repointed && m.To == recorded {
+		moved = m.From
+	}
+	if moved != "" && c.Moved != nil {
+		workers.Go(func() { c.Moved(moved, addr) })
+	}
 	updated := make(chan string, 1)
 	if c.Updater != nil {
 		u := *c.Updater
@@ -212,7 +253,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { u.Run(engineCtx, updated) })
 	}
 
-	why, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
+	why, serveErr := watch(ctx, r, c.StateDir, recorded, c.Idle, served, updated)
 	res.Replaced = why == stopReplaced
 	res.Updated = why == stopUpdated
 	// A relay stopped once its token went (teardown) is done for good, however it was stopped.
@@ -306,59 +347,13 @@ func setUp(stateDir string) bool {
 	return err == nil
 }
 
-// RunInfo is what the running relay records about itself.
-type RunInfo struct {
-	PID int `json:"pid"`
-	// Environment is the backend environment it delivers to.
-	Environment string `json:"environment"`
-	// Launch is what started the relay: the service manager, a hook, or a developer.
-	Launch Launch `json:"launch"`
-	// Service is Launch == LaunchService, still written for a terma from before Launch,
-	// and read from one: its record has no launch.
-	Service bool `json:"service"`
-	// Version is the terma it runs.
-	Version string `json:"version,omitempty"`
-}
-
-// RunningRelay is what the relay holding dir's lock recorded about itself; false when none
-// runs, or it is a terma from before the record.
-func RunningRelay(dir string) (RunInfo, bool) {
-	if !Running(dir) {
-		return RunInfo{}, false
-	}
-	data, err := os.ReadFile(filepath.Join(dir, RunFile))
-	if err != nil {
-		return RunInfo{}, false
-	}
-	var info RunInfo
-	if json.Unmarshal(data, &info) != nil || info.PID <= 0 {
-		return RunInfo{}, false
-	}
-	if info.Launch == "" && info.Service {
-		info.Launch = LaunchService
-	}
-	return info, true
-}
-
-// listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
-func listen(dir, addr string) (net.Listener, error) {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		err = fmt.Errorf("relay: listen on %s: %w", addr, err)
-		_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ErrorFile), []byte(time.Now().UTC().Format(time.RFC3339)+" "+err.Error()+"\n"), 0o600)
-		return nil, err
-	}
-	_ = os.Remove(filepath.Join(dir, ErrorFile))
-	return ln, nil
-}
-
 // watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
 // finds its hold empty, no export in flight and none for updateQuiet (for none at all after
 // updatePauseWait), however long that takes: the release is already in place for every
 // hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
 // on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
 // is answered by that same wait.
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
+func watch(ctx context.Context, r *relay.Relay, stateDir, addr string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
 	var upgraded time.Time  // when it installed one itself
@@ -386,6 +381,10 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			return stopSetupGone, nil
 		}
 		if requested(dir, StopFile) {
+			return stopAsked, nil
+		}
+		// Setup chose another address: the next relay listens there.
+		if addr != "" && Addr(dir) != addr {
 			return stopAsked, nil
 		}
 		if replacing.IsZero() && requested(dir, ReplaceFile) {

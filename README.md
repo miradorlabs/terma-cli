@@ -388,7 +388,11 @@ cost, and a file one of its shell commands writes is not attributed to its sessi
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
 rewrites a service an earlier terma wrote. `terma doctor` shows whether it runs and
-delivers; `terma teardown` stops it and removes its service.
+delivers; `terma teardown` stops it and removes its service. A relay that cannot listen on
+its port, which another process may hold, listens on a free one instead, under a new local
+token, and points the agents whose settings name the old port there; `terma setup` points
+the rest. Agents already
+running keep sending to the old port until restarted: `terma setup` and `terma doctor` say so.
 
 ## Hooks and commit attribution
 

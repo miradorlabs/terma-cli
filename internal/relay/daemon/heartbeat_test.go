@@ -60,15 +60,62 @@ func TestRelayCheckIn(t *testing.T) {
 			fmt.Fprint(w, tc.body)
 		})}
 		go func() { _ = srv.Serve(ln) }()
-		unlock, _ := flock.TryLock(filepath.Join(dir, LockFile)) // "running"
+		unlock := pretendRunning(t, dir, addr)
 		ok, what := CheckIn(t.Context(), stateDir)
-		if unlock != nil {
-			unlock()
-		}
+		unlock()
 		_ = srv.Close()
 		if ok != tc.ok || !strings.Contains(what, tc.says) {
 			t.Errorf("%d %s: %v %q", tc.status, tc.body, ok, what)
 		}
+	}
+}
+
+// pretendRunning holds dir's lock and records a relay listening on addr, as Run does.
+func pretendRunning(t *testing.T, dir, addr string) func() {
+	t.Helper()
+	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, RunFile), fmt.Appendf(nil, `{"pid":%d,"addr":%q}`, os.Getpid(), addr), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return func() { _ = os.Remove(filepath.Join(dir, RunFile)); unlock() }
+}
+
+// Something else listening on the relay's address never gets the relay's token from setup's
+// check-in: no relay holds the lock, or the one that does listens elsewhere.
+func TestACheckInSendsTheTokenOnlyToTheRelay(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var asked atomic.Int32
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked.Add(1)
+		fmt.Fprint(w, `{}`)
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	if ok, what := CheckIn(t.Context(), stateDir); ok || !strings.Contains(what, "another process listens on "+addr) {
+		t.Errorf("no relay running: %v %q", ok, what)
+	}
+	// A relay that runs, but on another address than the one recorded, is not what answers.
+	unlock := pretendRunning(t, dir, freeAddr(t))
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	ok, what := CheckIn(ctx, stateDir)
+	cancel()
+	unlock()
+	if ok || !strings.Contains(what, "another process listens on "+addr) {
+		t.Errorf("a relay on another address: %v %q", ok, what)
+	}
+	if n := asked.Load(); n != 0 {
+		t.Fatalf("the check-in sent %d requests to a process that is not the relay", n)
 	}
 }
 

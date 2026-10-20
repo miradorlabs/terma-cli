@@ -1,0 +1,226 @@
+package daemon
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"math/rand/v2"
+	"net"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+)
+
+// A relay that cannot listen on the address setup recorded does not keep failing there:
+// another process may hold it, and on a machine shared with other accounts it may be one of
+// theirs, which every export to it would reach. It listens on a free port of the same host
+// instead, records that as its address and the move, and tells the CLI (Config.Moved) to
+// point the agents' exporters there.
+
+// listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
+func listen(dir, addr string) (net.Listener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		err = fmt.Errorf("relay: listen on %s: %w", addr, err)
+		_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ErrorFile), []byte(time.Now().UTC().Format(time.RFC3339)+" "+err.Error()+"\n"), 0o600)
+		return nil, err
+	}
+	_ = os.Remove(filepath.Join(dir, ErrorFile))
+	return ln, nil
+}
+
+// Move is the relay's last move off an address it could not listen on (MovedFile).
+type Move struct {
+	From string    `json:"from"`
+	To   string    `json:"to"`
+	At   time.Time `json:"at"`
+	// Repointed means `terma setup` has since pointed every agent it set up at To, those
+	// whose exporter the relay cannot read included.
+	Repointed bool `json:"repointed,omitempty"`
+	// Replaced are the relay tokens moves replaced since setup last pointed every agent at
+	// the relay, latest last: an exporter the relay could not re-point may hold any of them,
+	// and teardown finds what it wrote by it.
+	Replaced []string `json:"replaced,omitempty"`
+}
+
+// Ports a moved relay picks from: below every platform's default ephemeral range (Linux's
+// starts at 32768, macOS's and Windows' at 49152), so no client's port is ever its own.
+const (
+	movePortMin   = 20000
+	movePortMax   = 32767
+	movePortTries = 20
+)
+
+// addrLockFile is held by RecordAddr and move while they write the relay's address.
+const addrLockFile = "addr.lock"
+
+// addrLockWait bounds the wait for addrLockFile; a variable so a test need not wait it out.
+var addrLockWait = 5 * time.Second
+
+// RecordAddr records addr as where the relay listens, never in the middle of a relay's move.
+// A lock that cannot be had costs the write its exclusivity, never the write: the address
+// is the developer's choice.
+func RecordAddr(dir, addr string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
+	return config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600)
+}
+
+// Current is the relay's address and token as one pair: read under the lock a move holds
+// while it writes its new token and then its new address, never the new token with the old
+// address.
+func Current(stateDir string) (addr, token string, err error) {
+	dir := claim.Dir(stateDir)
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	switch {
+	case err == nil:
+		defer unlock()
+	case !errors.Is(err, fs.ErrNotExist):
+		return "", "", err
+	}
+	token, err = Token(stateDir)
+	return Addr(dir), token, err
+}
+
+// Tokens are every relay token an exporter may hold: the current one, then those moves
+// replaced since setup last re-pointed every agent, read as one snapshot under the lock a
+// move holds while it rotates the token and records the one it replaced.
+func Tokens(stateDir string) []string {
+	dir := claim.Dir(stateDir)
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
+	token, _ := Token(stateDir)
+	tokens := []string{token}
+	if m, ok := LastMove(dir); ok {
+		tokens = append(tokens, m.Replaced...)
+	}
+	return tokens
+}
+
+// move listens on a free port of the host of from, where the relay of stateDir could not,
+// and records it as the relay's address, and the move. It moves nothing when the recorded
+// address is no longer from: setup has just chosen another (RecordAddr). It gives the relay
+// a new token first and returns it: whoever reads the new address reads the new token with
+// it, and an export to from may have carried the old one.
+func move(stateDir, from string) (net.Listener, string, error) {
+	dir := claim.Dir(stateDir)
+	host, _, err := net.SplitHostPort(from)
+	if err != nil {
+		return nil, "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlock()
+	if Addr(dir) != from {
+		return nil, "", errors.New("relay: the recorded address changed")
+	}
+	ln, err := listenFree(host)
+	if err != nil {
+		return nil, "", err
+	}
+	old, token, err := rotateToken(stateDir)
+	if err != nil {
+		_ = ln.Close()
+		return nil, "", err
+	}
+	to := ln.Addr().String()
+	// The record, with the token it replaced, before the address: teardown needs that token
+	// for as long as an exporter may hold it.
+	prev, _ := LastMove(dir)
+	err = writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Replaced: append(prev.Replaced, old)})
+	if err == nil {
+		err = config.WriteFileAtomic(filepath.Join(dir, AddrFile), []byte(to+"\n"), 0o600)
+	}
+	if err != nil {
+		// No move, so the token the agents hold stays the relay's.
+		_ = config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(old+"\n"), 0o600)
+		_ = ln.Close()
+		return nil, "", err
+	}
+	_ = os.Remove(filepath.Join(dir, ErrorFile))
+	return ln, token, nil
+}
+
+// listenFree listens on a random port of host in the move range, else any port.
+func listenFree(host string) (net.Listener, error) {
+	for range movePortTries {
+		port := movePortMin + rand.IntN(movePortMax-movePortMin+1)
+		if ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port))); err == nil {
+			return ln, nil
+		}
+	}
+	return net.Listen("tcp", net.JoinHostPort(host, "0"))
+}
+
+func writeMove(dir string, m Move) error {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return config.WriteFileAtomic(filepath.Join(dir, MovedFile), append(data, '\n'), 0o600)
+}
+
+// LastMove is the relay's last move off an address it could not listen on, if it made one.
+func LastMove(dir string) (Move, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, MovedFile))
+	if err != nil {
+		return Move{}, false
+	}
+	var m Move
+	if json.Unmarshal(data, &m) != nil || m.From == "" || m.To == "" {
+		return Move{}, false
+	}
+	return m, true
+}
+
+// Repointed records that `terma setup` has pointed every agent at to, where the relay moved
+// last, with its token, so no exporter holds a token a move replaced; a later move is left
+// as it is.
+func Repointed(dir, to string) {
+	// Under the address lock, which a move holds while it records itself.
+	ctx, cancel := context.WithTimeout(context.Background(), addrLockWait)
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, addrLockFile))
+	cancel()
+	if err != nil {
+		return
+	}
+	defer unlock()
+	if m, ok := LastMove(dir); ok && m.To == to && (!m.Repointed || len(m.Replaced) > 0) {
+		m.Repointed, m.Replaced = true, nil
+		_ = writeMove(dir, m)
+	}
+}
+
+// MoveNotice is how long after a move doctor still tells of it: agents started before it
+// keep sending to the address the relay left until they are restarted.
+const MoveNotice = 24 * time.Hour
+
+// Recent reports whether the move is within MoveNotice of now.
+func (m Move) Recent(now time.Time) bool { return now.Sub(m.At) < MoveNotice }
+
+// Describe says what happened, and what it means for agents already running.
+func (m Move) Describe() string {
+	return fmt.Sprintf("the relay could not listen on %s, which another process may hold, so it moved to %s at %s; coding agents started before then still send to %s until restarted",
+		m.From, m.To, m.At.Local().Format("Jan 2 15:04"), m.From)
+}

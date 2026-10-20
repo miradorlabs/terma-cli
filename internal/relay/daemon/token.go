@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -18,6 +20,27 @@ import (
 // served, and setup under that same sign-in restores it instead of minting another: a
 // teardown and setup refuse nothing an agent still running sends. Removing the token
 // still stops collection, since without it no relay runs and no hook claims a session.
+
+// NewToken is a fresh relay token.
+func NewToken() (string, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// rotateToken gives the relay of stateDir a new token, returning the one it replaced and
+// the new one. A relay whose token teardown has just removed gets none back.
+func rotateToken(stateDir string) (old, token string, err error) {
+	if old, err = Token(stateDir); err != nil {
+		return "", "", err
+	}
+	if token, err = NewToken(); err != nil {
+		return "", "", err
+	}
+	return old, token, config.WriteFileAtomic(claim.TokenPath(stateDir), []byte(token+"\n"), 0o600)
+}
 
 // RetiredTokenFile is the token teardown removed and the sign-in it served, in the
 // state directory.

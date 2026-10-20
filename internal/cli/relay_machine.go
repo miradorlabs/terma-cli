@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -30,25 +30,26 @@ type relayReport struct {
 // exporter pointed at it, and the relay itself; claims decide per repository what leaves.
 func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayService string, r relayReport) error {
 	targets := app.agents.RelayTargets(agents)
-	if err := app.releaseDeselected(ctx, targets, r); err != nil {
-		return err
-	}
-	if len(targets) == 0 {
-		return nil
-	}
-	dir, err := daemon.Dir(app.stateDir)
-	if err != nil {
-		return err
-	}
-	token, err := app.ensureRelayToken()
-	if err != nil {
-		return err
-	}
-	addr := daemon.Addr(dir)
-	err = app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
-		r.ok(agent, "sends to the local relay"+detail)
-	}, r.then)
-	if err != nil {
+	var dir, token, addr string
+	if err := app.withExporters(ctx, func() error {
+		err := app.releaseDeselected(ctx, targets, r)
+		if err != nil || len(targets) == 0 {
+			return err
+		}
+		if dir, err = daemon.Dir(app.stateDir); err != nil {
+			return err
+		}
+		if _, err = app.ensureRelayToken(); err != nil {
+			return err
+		}
+		// One pair, never a moving relay's new token with its old address.
+		if addr, token, err = daemon.Current(app.stateDir); err != nil {
+			return err
+		}
+		return app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
+			r.ok(agent, "sends to the local relay"+detail)
+		}, r.then)
+	}); err != nil || len(targets) == 0 {
 		return err
 	}
 	env := ""
@@ -62,19 +63,66 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 			r.ok("Relay", what)
 		}
 	})
+	// A move gives the relay a new address and token; either changed, every agent follows.
+	now, latest, err := daemon.Current(app.stateDir)
+	if err == nil && (now != addr || latest != token) {
+		if err := app.withExporters(ctx, func() error {
+			return app.pointAgentsAtRelay(ctx, targets, now, latest, func(string, string) {}, r.then)
+		}); err != nil {
+			return err
+		}
+	}
+	if m, ok := daemon.LastMove(dir); ok && m.To == now {
+		daemon.Repointed(dir, now)
+		if m.Recent(time.Now()) {
+			r.warn("Relay", m.Describe())
+		}
+	}
 	return nil
 }
 
-// releaseDeselected undoes the relay exporter of every agent not in targets: global mode's catch-all would forward it.
+// relayMoved points the agents that export to from, an address the relay could not listen
+// on, at to, where it listens now (daemon.Config.Moved). Only an exporter seen naming from
+// is rewritten: the relay's environment may place an agent's settings elsewhere than the
+// developer's does. `terma setup` points the rest, and doctor says so until it has.
+func (app *App) relayMoved(ctx context.Context, from, to string, logf func(string, ...any)) {
+	token, err := daemon.Token(app.stateDir)
+	if err != nil {
+		return
+	}
+	// Chosen under the lock as well: an exporter setup or teardown undoes meanwhile stays undone.
+	err = app.withExporters(ctx, func() error {
+		var targets []string
+		for _, e := range app.agents.With[agents.RelayExporter]() {
+			if pointed, _ := e.RelayPointed(from); pointed {
+				targets = append(targets, e.Name())
+			}
+		}
+		return app.pointAgentsAtRelay(ctx, targets, to, token, func(agent, detail string) {
+			logf("relay: %s now exports to %s%s", agent, to, detail)
+		}, func(note string) { logf("relay: %s", note) })
+	})
+	if err != nil {
+		logf("relay: pointing the agents at %s: %v", to, err)
+	}
+}
+
+// releaseDeselected undoes the relay exporter of every agent not in targets: global mode's
+// catch-all would forward it. Callers hold withExporters.
 func (app *App) releaseDeselected(ctx context.Context, targets []string, r relayReport) error {
-	token, _ := daemon.Token(app.stateDir)
+	// An exporter the relay could not re-point when it moved holds a token the move replaced.
+	tokens := daemon.Tokens(app.stateDir)
 	for _, e := range app.agents.With[agents.RelayExporter]() {
 		if slices.Contains(targets, e.Name()) {
 			continue
 		}
-		result, err := e.UnconfigureRelay(ctx, token)
-		if err != nil {
-			return fmt.Errorf("%s: stop sending to the relay: %w", e.DisplayName(), err)
+		var result agents.RelayResult
+		for _, t := range tokens {
+			undone, err := e.UnconfigureRelay(ctx, t)
+			if err != nil {
+				return fmt.Errorf("%s: stop sending to the relay: %w", e.DisplayName(), err)
+			}
+			result.Paths, result.Notes = append(result.Paths, undone.Paths...), append(result.Notes, undone.Notes...)
 		}
 		if len(result.Paths) > 0 {
 			paths := make([]string, 0, len(result.Paths))
@@ -116,7 +164,7 @@ func (app *App) moveRelay(addr string) error {
 	if err != nil {
 		return err
 	}
-	if err := config.WriteFileAtomic(filepath.Join(dir, daemon.AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+	if err := daemon.RecordAddr(dir, addr); err != nil {
 		return err
 	}
 	daemon.Stop(dir)

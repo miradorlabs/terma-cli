@@ -3,7 +3,6 @@ package daemon
 import (
 	"encoding/json"
 	"errors"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,6 +102,9 @@ func Spawn(stateDir, version string) {
 	if err != nil {
 		return
 	}
+	// No relay holds the lock, so a record is a dead relay's: the wait below must neither
+	// take it for the relay this starts nor probe the lock that relay is about to take.
+	_ = os.Remove(filepath.Join(dir, RunFile))
 	unlock()
 	// A relay that just failed to start is not retried by every hook: each would fail the same way.
 	if info, err := os.Stat(filepath.Join(dir, ErrorFile)); err == nil && time.Since(info.ModTime()) < RetryAfter {
@@ -112,11 +114,9 @@ func Spawn(stateDir, version string) {
 		return
 	}
 	// Wait until it listens: an agent may export as soon as the hook returns, and never
-	// retries a refused connection.
-	addr := Addr(dir)
+	// retries a refused connection. Something else answering on the address is not it.
 	for deadline := time.Now().Add(StartWait); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond); err == nil {
-			_ = conn.Close()
+		if _, ok := Serving(dir); ok {
 			return
 		}
 	}
@@ -216,17 +216,13 @@ const StartWait = time.Second
 // listen before starting one itself: launchd and systemd start it in well under a second.
 const ServiceStartWait = 5 * time.Second
 
-// AwaitRelay waits up to wait for a relay to hold dir's lock and answer on its address,
-// reporting whether one does. Starting another relay before the service's has taken the
-// lock would leave the service waiting behind it.
+// AwaitRelay waits up to wait for a relay to hold dir's lock and listen on its address
+// (Serving), reporting whether one does. Starting another relay before the service's has
+// taken the lock would leave the service waiting behind it.
 func AwaitRelay(dir string, wait time.Duration) bool {
-	addr := Addr(dir)
 	for deadline := time.Now().Add(wait); ; time.Sleep(20 * time.Millisecond) {
-		if Running(dir) {
-			if conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond); err == nil {
-				_ = conn.Close()
-				return true
-			}
+		if _, ok := Serving(dir); ok {
+			return true
 		}
 		if time.Now().After(deadline) {
 			return false

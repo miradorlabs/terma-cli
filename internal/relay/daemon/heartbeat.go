@@ -22,11 +22,9 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 	if err != nil {
 		return false, err.Error()
 	}
-	token, err := Token(stateDir)
-	if err != nil {
+	if _, err := Token(stateDir); err != nil {
 		return false, err.Error()
 	}
-	addr := Addr(dir)
 	client := &http.Client{Timeout: 20 * time.Second}
 	var resp *http.Response
 	// Waited for only when one is running or its service will start it again.
@@ -37,15 +35,29 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 			wait = 0
 		}
 	}
+	var addr string
 	for deadline := time.Now().Add(wait); ; time.Sleep(250 * time.Millisecond) {
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/heartbeat?reason="+semconv.TermaRelayHeartbeatReasonSetup, nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		resp, err = client.Do(req)
-		if err == nil || time.Now().After(deadline) || ctx.Err() != nil {
+		// The token goes only to this user's relay, at the address it is seen to serve (it may
+		// move as it starts): whatever else listens on the address would learn it.
+		at, serving := Serving(dir)
+		addr = at
+		// The token too: a relay that moved runs under a new one.
+		token, terr := Token(stateDir)
+		if serving && terr == nil {
+			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+at+"/heartbeat?reason="+semconv.TermaRelayHeartbeatReasonSetup, nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			if resp, err = client.Do(req); err == nil {
+				break
+			}
+		}
+		if time.Now().After(deadline) || ctx.Err() != nil {
 			break
 		}
 	}
-	if err != nil {
+	if resp == nil {
+		if _, serving := Serving(dir); !serving && Squatted(addr) {
+			return false, "another process listens on " + addr + ", where the relay should; `terma doctor` says what to do"
+		}
 		return false, "the relay did not answer on " + addr + "; `terma doctor` says why"
 	}
 	defer resp.Body.Close()

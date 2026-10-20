@@ -80,10 +80,14 @@ func (k Keys) has(agent, projectID string) bool {
 // Relay is the local relay as a run finds it: its state directory and address, whether
 // it runs, and whether something else listens there instead.
 type Relay struct {
-	Addr              string
-	Running, Squatted bool
+	Addr    string
+	Running bool
+	// Squatted means something other than the relay listens on Addr (daemon.Serving).
+	Squatted bool
 	// LastFailure is why the relay last failed to start, when none runs; "" if it did not fail.
 	LastFailure string
+	// Move is the relay's last move off an address it could not listen on, nil if none.
+	Move *RelayMove
 	// Environment is the backend environment the running relay delivers to; "" when unknown
 	// (none runs, or a terma from before relays recorded it).
 	Environment string
@@ -97,6 +101,15 @@ type Relay struct {
 	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
 	// this terma would install, in the environment install recorded.
 	ServiceInstalled, ServiceCurrent bool
+}
+
+// RelayMove is the relay's last move off an address it could not listen on (daemon.LastMove).
+type RelayMove struct {
+	// Detail says what happened; From is the address the relay left.
+	Detail, From string
+	// Recent means the move is within its notice; Repointed that setup has since pointed
+	// every agent at the relay, those whose exporter no settings file shows included.
+	Recent, Repointed bool
 }
 
 // SpoolState is the event queue as a run finds it.

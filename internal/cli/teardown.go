@@ -95,9 +95,11 @@ key itself is revoked in the Terma web app.`,
 // relay's token aside for a setup under the same sign-in (daemon.RetireToken).
 func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) error {
 	// Before the journals and the relay's token, which recognise what terma wrote, go.
-	if err := app.releaseDeselected(ctx, nil, relayReport{
-		ok:   func(label, what string) { fmt.Fprintf(out, "%s %s.\n", label, what) },
-		then: func(step string) { fmt.Fprintln(out, step) },
+	if err := app.withExporters(ctx, func() error {
+		return app.releaseDeselected(ctx, nil, relayReport{
+			ok:   func(label, what string) { fmt.Fprintf(out, "%s %s.\n", label, what) },
+			then: func(step string) { fmt.Fprintln(out, step) },
+		})
 	}); err != nil {
 		return err
 	}

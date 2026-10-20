@@ -2,9 +2,14 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,5 +162,285 @@ func TestTheWaitingServiceRelayTakesOverAtOnce(t *testing.T) {
 	service.stop(t, "the service relay")
 	if AwaitRelay(dir, 50*time.Millisecond) {
 		t.Fatal("AwaitRelay reports a relay after both stopped")
+	}
+}
+
+// A relay whose recorded address another process holds listens on a free port of the same
+// host instead: it records that as its address, and the move, and says so (Config.Moved)
+// for the agents to follow. What answered on the old address never counts as the relay.
+// An address --addr names is not moved off.
+func TestARelayMovesOffAnAddressAnotherProcessHolds(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	held, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = held.Close() })
+	from := held.Addr().String()
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(from+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := Serving(dir); ok {
+		t.Fatal("another process listening on the relay's address counts as the relay")
+	}
+	c := runConfig(stateDir, time.Hour, nil)
+	c.Addr = ""
+	moved := make(chan [2]string, 1)
+	c.Moved = func(from, to string) { moved <- [2]string{from, to} }
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	var got [2]string
+	select {
+	case got = <-moved:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the relay never said it moved")
+	}
+	to := Addr(dir)
+	if to == from || got != [2]string{from, to} {
+		t.Fatalf("moved %v; recorded address %s, held %s", got, to, from)
+	}
+	if at, ok := Serving(dir); !ok || at != to {
+		t.Errorf("Serving = %s, %v; want the address it moved to, %s", at, ok, to)
+	}
+	if port, _ := strconv.Atoi(to[strings.LastIndex(to, ":")+1:]); port < movePortMin || port > movePortMax {
+		t.Errorf("moved to %s, outside the move range", to)
+	}
+	m, ok := LastMove(dir)
+	if !ok || m.From != from || m.To != to || m.Repointed || !m.Recent(time.Now()) || m.Recent(time.Now().Add(MoveNotice)) {
+		t.Errorf("LastMove = %+v, %v", m, ok)
+	}
+	Repointed(dir, from)
+	if m, _ := LastMove(dir); m.Repointed {
+		t.Error("setup's re-pointing at another address is recorded for this move")
+	}
+	Repointed(dir, to)
+	if m, _ := LastMove(dir); !m.Repointed || len(m.Replaced) != 0 {
+		t.Errorf("setup's re-pointing is not recorded, or keeps the tokens no exporter holds now: %+v", m)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ErrorFile)); !os.IsNotExist(err) {
+		t.Errorf("a relay that moved left its failure to listen behind: %v", err)
+	}
+	// What held the address may have read the token: the moved relay takes only a new one.
+	token, err := Token(stateDir)
+	if err != nil || token == "tok" || len(m.Replaced) != 1 || m.Replaced[0] != "tok" {
+		t.Errorf("token %q, replaced %q: the move kept the token", token, m.Replaced)
+	}
+	// No connection kept open, which the relay's shutdown would wait out.
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
+	for tok, want := range map[string]int{"tok": http.StatusUnauthorized, token: http.StatusOK} {
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+to+"/stats", nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("nothing listens where the relay moved: %v", err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("the moved relay answered %d to token %q, want %d", resp.StatusCode, tok, want)
+		}
+	}
+	r.cancel()
+	<-r.done
+
+	c = runConfig(stateDir, time.Hour, nil)
+	c.Addr = from
+	if _, err := Run(t.Context(), c); err == nil {
+		t.Fatal("a relay told to listen on a held address ran anyway")
+	}
+	if now := Addr(dir); now != to {
+		t.Errorf("a relay told where to listen moved the recorded address to %s", now)
+	}
+}
+
+// Serving is the relay's lock and its record of listening on the recorded address, by a
+// live process: never a port that merely answers, nor a dead relay's record.
+func TestServingIsTheRelaysLockAndRecord(t *testing.T) {
+	_, dir, _ := setUpRelay(t)
+	addr := freeAddr(t)
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	serving := func() bool { _, ok := Serving(dir); return ok }
+	if serving() {
+		t.Fatal("serving with no relay")
+	}
+	unlock := pretendRunning(t, dir, addr)
+	if at, ok := Serving(dir); !ok || at != addr {
+		t.Errorf("a relay holding the lock and recording its address: Serving = %s, %v", at, ok)
+	}
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(freeAddr(t)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if serving() {
+		t.Error("a relay listening elsewhere serves the recorded address")
+	}
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A relay from before relays recorded their address is taken at its lock.
+	if err := os.WriteFile(filepath.Join(dir, RunFile), fmt.Appendf(nil, `{"pid":%d}`, os.Getpid()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !serving() {
+		t.Error("an earlier relay holding the lock is not serving")
+	}
+	dead := exec.Command(os.Args[0], "-test.run=^$")
+	if err := dead.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, RunFile), fmt.Appendf(nil, `{"pid":%d,"addr":%q}`, dead.Process.Pid, addr), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if serving() {
+		t.Error("a dead relay's record counts as serving")
+	}
+	unlock()
+	if serving() {
+		t.Error("serving once the lock is free")
+	}
+}
+
+// A relay moves only off the address still recorded, and never while setup records one
+// (RecordAddr): setup may just have chosen another.
+func TestARelayMovesOnlyOffTheRecordedAddress(t *testing.T) {
+	stateDir, dir, token := setUpRelay(t)
+	from := freeAddr(t)
+	if err := RecordAddr(dir, freeAddr(t)); err != nil {
+		t.Fatal(err)
+	}
+	if ln, _, err := move(stateDir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved off an address no longer recorded")
+	}
+	if err := RecordAddr(dir, from); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := flock.TryLock(filepath.Join(dir, addrLockFile)) // setup, recording
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := addrLockWait
+	addrLockWait = 50 * time.Millisecond
+	t.Cleanup(func() { addrLockWait = prev })
+	if ln, _, err := move(stateDir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved while setup was recording an address")
+	}
+	unlock()
+	// A move it cannot keep a record of, with the token it replaced, is no move: the
+	// address and the token stay as they were.
+	if err := os.Mkdir(filepath.Join(dir, MovedFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if ln, _, err := move(stateDir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved with no record of the move")
+	}
+	if tok, _ := Token(stateDir); tok != "tok" || Addr(dir) != from {
+		t.Errorf("a failed move left token %q and address %s", tok, Addr(dir))
+	}
+	if err := os.Remove(filepath.Join(dir, MovedFile)); err != nil {
+		t.Fatal(err)
+	}
+	// A relay whose token teardown has just removed moves nowhere, and gets no token back.
+	if err := os.Remove(token); err != nil {
+		t.Fatal(err)
+	}
+	if ln, _, err := move(stateDir, from); err == nil {
+		_ = ln.Close()
+		t.Fatal("moved with its token gone")
+	}
+	if _, err := os.Stat(token); !os.IsNotExist(err) {
+		t.Error("a move brought back a token teardown removed")
+	}
+	if _, ok := LastMove(dir); ok || Addr(dir) != from {
+		t.Errorf("recorded a move it did not make: address %s", Addr(dir))
+	}
+}
+
+// A relay whose recorded address setup changes makes way, so the next one listens there.
+func TestARelayMakesWayWhenItsAddressChanges(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	if err := RecordAddr(dir, freeAddr(t)); err != nil {
+		t.Fatal(err)
+	}
+	c := runConfig(stateDir, time.Hour, nil)
+	c.Addr = ""
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	if err := RecordAddr(dir, freeAddr(t)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-r.done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the relay kept listening on an address setup replaced")
+	}
+	// An address that names port 0 is the one recorded, though the relay listens on a port
+	// the system chose: no reason to make way.
+	if err := RecordAddr(dir, "127.0.0.1:0"); err != nil {
+		t.Fatal(err)
+	}
+	r = startRun(t, c)
+	r.await(t, "the relay on port 0")
+	select {
+	case <-r.done:
+		t.Fatal("a relay on a recorded port 0 made way for its own address")
+	case <-time.After(2500 * time.Millisecond):
+	}
+}
+
+// A relay that cannot record itself does not run: unrecorded, it would never be Serving.
+func TestARelayThatCannotRecordItselfDoesNotRun(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, time.Hour, nil)
+	c.Listening = func(net.Addr, time.Duration) {
+		// The record's place is taken once the relay has cleared any old one.
+		if err := os.Mkdir(filepath.Join(dir, RunFile), 0o700); err != nil {
+			t.Error(err)
+		}
+	}
+	if _, err := Run(t.Context(), c); err == nil || !strings.Contains(err.Error(), "record itself") {
+		t.Fatalf("Run = %v, want a failure to record itself", err)
+	}
+}
+
+// Current reads the relay's address and token together.
+func TestCurrentIsTheRelaysAddressAndToken(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	addr := freeAddr(t)
+	if err := RecordAddr(dir, addr); err != nil {
+		t.Fatal(err)
+	}
+	if got, token, err := Current(stateDir); err != nil || got != addr || token != "tok" {
+		t.Fatalf("Current = %s, %q, %v", got, token, err)
+	}
+}
+
+// A move an earlier relay recorded is followed again by the next relay on its address until
+// setup has re-pointed the agents: the earlier one may have stopped before it did.
+func TestARelayFollowsAnUnfinishedMove(t *testing.T) {
+	t.Parallel()
+	stateDir, dir, _ := setUpRelay(t)
+	from, to := freeAddr(t), freeAddr(t)
+	if err := RecordAddr(dir, to); err != nil {
+		t.Fatal(err)
+	}
+	for _, repointed := range []bool{false, true} {
+		if err := writeMove(dir, Move{From: from, To: to, At: time.Now().UTC(), Repointed: repointed}); err != nil {
+			t.Fatal(err)
+		}
+		c := runConfig(stateDir, time.Millisecond, nil)
+		c.Addr = ""
+		var told [2]string
+		c.Moved = func(from, to string) { told = [2]string{from, to} }
+		run(t, c)
+		if want := [2]string{from, to}; repointed && told != [2]string{} || !repointed && told != want {
+			t.Errorf("repointed %v: told of %v", repointed, told)
+		}
 	}
 }

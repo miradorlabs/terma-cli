@@ -54,6 +54,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
 					}
 				},
+				Moved: func(from, to string) { app.relayMoved(ctx, from, to, log.Printf) },
 			})
 			if err != nil {
 				if res.LastBeatDue() {
