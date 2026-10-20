@@ -139,6 +139,9 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		return res, nil
 	}
 	defer unlock()
+	// A record there while this relay holds the lock is a dead relay's: Stop must not take
+	// its pid for this relay's.
+	_ = os.Remove(filepath.Join(dir, RunFile))
 	token, err := Token(c.StateDir)
 	if err != nil {
 		return res, err

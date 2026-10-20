@@ -24,10 +24,12 @@ const RetryAfter = time.Minute
 
 // Stop asks a running relay to stop and waits for its lock, so a changed address or token
 // takes effect; it also returns once another relay, such as the service's waiting behind
-// it, has taken over.
+// it, has taken over. Only the relay holding the lock is asked (relayPID): the record a
+// relay that crashed, or ran before a reboot, left behind names a pid another process may
+// have now.
 func Stop(dir string) {
-	pid := recordedPID(dir)
-	if pid <= 1 {
+	pid := relayPID(dir)
+	if pid == 0 {
 		return
 	}
 	proc, err := os.FindProcess(pid)
@@ -51,6 +53,28 @@ func Stop(dir string) {
 			return
 		}
 	}
+}
+
+// lockSettle is how long relayPID waits to see the lock still held.
+const lockSettle = 25 * time.Millisecond
+
+// settle is relayPID's wait; tests act in it.
+var settle = func() { time.Sleep(lockSettle) }
+
+// relayPID is the pid the relay holding dir's lock recorded, 0 when none holds it. A held
+// lock alone does not tie the record to its holder, so the record is read again once the
+// lock has been held for lockSettle: a relay that has just taken it clears a dead relay's
+// record first (Run), and a probe holds it for an instant only.
+func relayPID(dir string) int {
+	pid := recordedPID(dir)
+	if pid <= 1 || !Running(dir) {
+		return 0
+	}
+	settle()
+	if !Running(dir) || recordedPID(dir) != pid {
+		return 0
+	}
+	return pid
 }
 
 // recordedPID is the pid the running relay recorded, 0 when none.
