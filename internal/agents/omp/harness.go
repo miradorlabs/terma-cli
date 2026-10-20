@@ -95,13 +95,6 @@ type ompConfig struct {
 	ResourceAttributes map[string]string `json:"resourceAttributes,omitempty"`
 
 	HookCommand []string `json:"hookCommand,omitempty"`
-
-	// PerRepo resolves the repository's binding and helper per session, with no fixed
-	// destination or key.
-	PerRepo          bool   `json:"perRepo,omitempty"`
-	HelpersDir       string `json:"helpersDir,omitempty"`
-	HelperPrefix     string `json:"helperPrefix,omitempty"`
-	ProjectAttribute string `json:"projectAttribute,omitempty"`
 }
 
 // ompPolicy is the repository-scope file: what a repository may decide. Content is not
@@ -139,7 +132,7 @@ func (c exporter) config(e harness.Exporter) ompConfig {
 			}
 		}
 	}
-	cfg.HookCommand = []string{"terma", "hook"}
+	cfg.HookCommand = e.HookCommand
 	return cfg
 }
 

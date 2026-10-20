@@ -34,6 +34,29 @@ func relaySandbox(t *testing.T) string {
 	return claim.Dir(testApp.stateDir)
 }
 
+// An extension's hook command names terma by an absolute path or setup writes none: there
+// is no falling back to a terma the PATH finds.
+func TestRelaySetupNeedsTermasAbsolutePath(t *testing.T) {
+	relaySandbox(t)
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	prev := testApp.hookExecutable
+	t.Cleanup(func() { testApp.hookExecutable = prev })
+	for name, locate := range map[string]func() (string, error){
+		"unlocated": func() (string, error) { return "", fmt.Errorf("no executable") },
+		"relative":  func() (string, error) { return "terma", nil },
+	} {
+		testApp.hookExecutable = locate
+		err := testApp.pointAgentsAtRelay(t.Context(), []string{"opencode"}, freeAddr(t), "tok", func(string, string) {}, func(string) {})
+		if err == nil || !strings.Contains(err.Error(), "locate terma") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(xdg, "opencode", "plugins", "terma.js")); err == nil {
+		t.Fatal("setup wrote OpenCode's plugin without terma's absolute path")
+	}
+}
+
 // setup points the agents at the relay with the local token, journaled for disconnect.
 func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	relaySandbox(t)

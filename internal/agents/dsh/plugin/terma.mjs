@@ -23,6 +23,7 @@ const CONFIG = null /* terma:config */
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
+import { isAbsolute } from "node:path"
 
 export const name = "terma"
 
@@ -137,8 +138,10 @@ function usageAttrs(u) {
 // --- terma hook ------------------------------------------------------------------------
 
 // termaHook hands an event to `terma hook dsh-*`, as this process's child — which is
-// what lets its claim name this process. Best-effort; it never delays the agent.
+// what lets its claim name this process. Best-effort; it never delays the agent. terma
+// is run by the absolute path CONFIG names, never looked up on the PATH.
 function termaHook(event, payload) {
+  if (!CONFIG || !Array.isArray(CONFIG.hookCommand) || !isAbsolute(String(CONFIG.hookCommand[0] ?? ""))) return
   try {
     const [cmd, ...args] = CONFIG.hookCommand
     const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })

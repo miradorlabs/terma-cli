@@ -42,9 +42,6 @@ func ForRelay(agent string, lifecycle bool, cfg agents.RelayConfig) Config {
 // Render splices cfg into the template.
 func Render(cfg Config) (string, error) {
 	cfg.Version = 1
-	if len(cfg.HookCommand) == 0 {
-		cfg.HookCommand = []string{"terma", "hook"}
-	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return "", err

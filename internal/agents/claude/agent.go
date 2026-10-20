@@ -72,9 +72,9 @@ func (Agent) ManagedDeploy() string {
 // Harness is how terma configures the agent's exporter.
 func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 
-// RefreshMachine rewrites the status-line wrap.
-func (a Agent) RefreshMachine() (string, bool, error) {
-	return exporter{dir: a.ConfigDir}.RefreshStatusLine()
+// RefreshMachine rewrites the status-line wrap to run terma at its absolute path terma.
+func (a Agent) RefreshMachine(terma string) (string, bool, error) {
+	return exporter{dir: a.ConfigDir}.RefreshStatusLine(terma)
 }
 
 // Renders is the wrapped statusLine command; the renderer has its own deadline.
@@ -94,9 +94,9 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportFull}
 }
 
-// InstallStatusLine wraps the user's status line.
-func (a Agent) InstallStatusLine() (bool, error) {
-	return exporter{dir: a.ConfigDir}.InstallStatusLine()
+// InstallStatusLine wraps the user's status line with terma at its absolute path terma.
+func (a Agent) InstallStatusLine(terma string) (bool, error) {
+	return exporter{dir: a.ConfigDir}.InstallStatusLine(terma)
 }
 
 // StatusLineState is the status line as cwd's settings leave it.
