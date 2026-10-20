@@ -29,6 +29,19 @@ func (Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, erro
 	return relayexport.RemoveOwn(filepath.Join(dir, "extensions", "terma.ts"))
 }
 
+// RefreshMachine rewrites terma's Pi extension in this build's template.
+func (Agent) RefreshMachine() (string, bool, error) {
+	dir, err := agentDir()
+	if err != nil {
+		return "", false, err
+	}
+	path := filepath.Join(dir, "extensions", "terma.ts")
+	changed, err := pifamily.Refresh(path)
+	return path, changed, err
+}
+
+var _ agents.MachineRefresher = Agent{}
+
 // agentDir is Pi's user configuration directory: PI_CODING_AGENT_DIR, else ~/.pi/agent.
 func agentDir() (string, error) {
 	if d := os.Getenv("PI_CODING_AGENT_DIR"); d != "" {

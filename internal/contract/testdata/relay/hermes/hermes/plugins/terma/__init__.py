@@ -82,6 +82,10 @@ _spans = []
 _logs = []
 _wake = threading.Event()
 
+# An opener with no proxies: exports go straight to the local relay, never through a proxy
+# the environment or the system names.
+_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def _post(path, body):
     try:
@@ -91,7 +95,7 @@ def _post(path, body):
             headers={"Content-Type": "application/json", **CONFIG.get("headers", {})},
             method="POST",
         )
-        urllib.request.urlopen(req, timeout=10).close()
+        _opener.open(req, timeout=10).close()
     except Exception:
         pass  # A telemetry failure must never surface in the agent.
 
