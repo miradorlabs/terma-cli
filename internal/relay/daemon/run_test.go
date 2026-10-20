@@ -123,50 +123,61 @@ func TestRestart(t *testing.T) {
 func TestTheWaitingServiceRelayTakesOverAtOnce(t *testing.T) {
 	t.Parallel()
 	stateDir, dir, _ := setUpRelay(t)
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := func(idle time.Duration, listening func(net.Addr, time.Duration)) Config {
-		c := runConfig(stateDir, idle, listening)
-		c.Addr = ""
-		return c
-	}
 
+	// The hook-started relay takes any free port and records it as setup would. A port
+	// reserved and freed beforehand could go to another test's listener in between.
 	hookCtx, stopHook := context.WithCancel(t.Context())
 	hookUp := make(chan struct{})
-	hookDone := make(chan time.Time, 1)
+	type exit struct {
+		at  time.Time
+		err error
+	}
+	hookDone := make(chan exit, 1)
 	go func() {
-		_, _ = Run(hookCtx, cfg(time.Hour, func(net.Addr, time.Duration) { close(hookUp) }))
-		hookDone <- time.Now()
+		_, err := Run(hookCtx, runConfig(stateDir, time.Hour, func(a net.Addr, _ time.Duration) {
+			if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(a.String()+"\n"), 0o600); err != nil {
+				t.Error(err)
+			}
+			close(hookUp)
+		}))
+		hookDone <- exit{time.Now(), err}
 	}()
-	<-hookUp
+	select {
+	case <-hookUp:
+	case e := <-hookDone:
+		t.Fatalf("the hook-started relay exited without listening: %v", e.err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the hook-started relay never listened")
+	}
 	if !AwaitRelay(dir, time.Second) {
 		t.Fatal("AwaitRelay misses a relay that holds the lock and listens")
 	}
 
 	serviceCtx, stopService := context.WithCancel(t.Context())
 	serviceUp := make(chan time.Time, 1)
-	serviceDone := make(chan struct{})
+	serviceDone := make(chan error, 1)
 	go func() {
-		defer close(serviceDone)
-		c := cfg(0, func(net.Addr, time.Duration) { serviceUp <- time.Now() })
+		c := runConfig(stateDir, 0, func(net.Addr, time.Duration) { serviceUp <- time.Now() })
+		c.Addr = "" // the address setup recorded
 		c.Service = true
-		_, _ = Run(serviceCtx, c)
+		_, err := Run(serviceCtx, c)
+		serviceDone <- err
 	}()
 	time.Sleep(300 * time.Millisecond) // waiting on the lock
 	stopHook()
-	exited := <-hookDone
+	var exited exit
+	select {
+	case exited = <-hookDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the hook-started relay did not stop")
+	}
 	select {
 	case up := <-serviceUp:
-		if gap := up.Sub(exited); gap > time.Second {
+		if gap := up.Sub(exited.at); gap > time.Second {
 			t.Fatalf("the service's relay listened %v after the hook-started one exited", gap)
 		}
+	case err := <-serviceDone:
+		t.Fatalf("the service's relay exited without taking over: %v", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("the service's relay never took over")
 	}
