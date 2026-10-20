@@ -36,9 +36,10 @@ func (Agent) Installed(context.Context) bool {
 	return len(vscodeUserDirs(false)) > 0
 }
 
-// Surfaces is Copilot as one choice: the CLI and VS Code share the hooks directory.
+// Surfaces is Copilot as one choice, marked beta at setup: the CLI and VS Code share the
+// hooks directory.
 func (a Agent) Surfaces() []agents.Surface {
-	return []agents.Surface{{Name: name, DisplayName: "GitHub Copilot CLI & VS Code", Installed: a.Installed}}
+	return []agents.Surface{{Name: name, DisplayName: "Copilot (beta)", Installed: a.Installed}}
 }
 
 func (Agent) Events() map[string]agents.Handler {
