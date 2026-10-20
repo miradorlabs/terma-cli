@@ -385,10 +385,16 @@ func checkedBuildsOn(platform, harness string, releases []string) (builds []stri
 	if err := json.Unmarshal(data, &history); err != nil {
 		return nil, "the history of checked builds is unreadable"
 	}
+	// A build of another major is no baseline: OpenCode releases each major as its own
+	// package, and asks for the builds since each one's own checked build.
+	majors := map[string]bool{}
+	for _, v := range releases {
+		majors[majorOf(v)] = true
+	}
 	var checked []string
 	for _, e := range history {
 		// A build whose every check was skipped was not checked.
-		if e.Harness == harness && e.Platform == platform && (e.Result == "pass" || e.Result == "fail") {
+		if e.Harness == harness && e.Platform == platform && (e.Result == "pass" || e.Result == "fail") && majors[majorOf(e.Version)] {
 			checked = append(checked, e.Version)
 		}
 	}
@@ -397,6 +403,12 @@ func checkedBuildsOn(platform, harness string, releases []string) (builds []stri
 		return nil, "the history has checked no " + harness + " release on " + platform
 	}
 	return builds, ""
+}
+
+// majorOf is a version's major number, as written.
+func majorOf(version string) string {
+	major, _, _ := strings.Cut(version, ".")
+	return major
 }
 
 // sinceChecked picks from releases, oldest first: the newest checked build, which is the

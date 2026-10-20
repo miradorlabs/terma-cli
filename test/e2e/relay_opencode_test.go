@@ -40,7 +40,7 @@ func TestRelayOpenCode(t *testing.T) {
 				var calls atomic.Int32
 				provider := httptest.NewServer(openAIChatProvider(&calls))
 				defer provider.Close()
-				sb.UseOpenCodeProvider(provider.URL)
+				sb.UseOpenCodeProvider(b, provider.URL)
 				sb.UseRelay(RelayOptions{Start: true, Content: content})
 				sid := sb.OpenCodeRun(b, sb.Repo, "", openCodePrompt)
 				deadline := time.Now().Add(30 * time.Second)
@@ -89,7 +89,7 @@ func TestRelayOpenCodeNegative(t *testing.T) {
 		var calls atomic.Int32
 		provider := httptest.NewServer(openAIChatProvider(&calls))
 		defer provider.Close()
-		sb.UseOpenCodeProvider(provider.URL)
+		sb.UseOpenCodeProvider(b, provider.URL)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second, Content: true})
 		personal := filepath.Join(sb.Dir, "personal")
 		if err := os.MkdirAll(personal, 0o700); err != nil {
