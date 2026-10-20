@@ -282,6 +282,8 @@ func (sb *Sandbox) directClaude() {
 		env[k] = v
 	}
 	doc["env"] = env
+	// Setup's relay credential: its headers would outrank the receiver's key.
+	delete(doc, "otelHeadersHelper")
 	data, _ := json.MarshalIndent(doc, "", "  ")
 	sb.writeAbs(path, string(data)+"\n")
 	sb.useLiveKey()

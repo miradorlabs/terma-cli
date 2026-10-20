@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,21 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
+
+// claudeExport is Claude Code's user settings followed by the headers helper they name, if
+// any: what its exporter sends, its credential included.
+func claudeExport(t *testing.T) string {
+	t.Helper()
+	data, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
+	var doc struct {
+		Helper string `json:"otelHeadersHelper"`
+	}
+	if json.Unmarshal(data, &doc) == nil && doc.Helper != "" {
+		helper, _ := os.ReadFile(doc.Helper)
+		data = append(data, helper...)
+	}
+	return string(data)
+}
 
 // awaitRelayRecord waits for the relay directory dir's run file, which a relay writes once
 // it holds its lock and listens, failing at once if done delivers (the relay exited). Not
