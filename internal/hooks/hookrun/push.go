@@ -1,7 +1,6 @@
 package hookrun
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -74,15 +73,20 @@ func ParsePushInput(input string) []PushRef {
 	var refs []PushRef
 	for line := range strings.Lines(input) {
 		f := strings.Split(strings.TrimRight(line, "\r\n"), " ")
-		if len(f) != 4 || !gitx.ValidOID(f[1]) || !gitx.ValidOID(f[3]) || gitx.ZeroOID(f[1]) {
+		if len(f) != 4 {
 			continue
 		}
-		if !strings.HasPrefix(f[2], "refs/heads/") {
-			continue
+		if ref := (PushRef{LocalRef: f[0], LocalSHA: f[1], RemoteRef: f[2], RemoteSHA: f[3]}); ref.reportable() {
+			refs = append(refs, ref)
 		}
-		refs = append(refs, PushRef{LocalRef: f[0], LocalSHA: f[1], RemoteRef: f[2], RemoteSHA: f[3]})
 	}
 	return refs
+}
+
+// reportable is a branch update terma reports, both its commit ids full ones.
+func (ref PushRef) reportable() bool {
+	return gitx.ValidOID(ref.LocalSHA) && gitx.ValidOID(ref.RemoteSHA) && !gitx.ZeroOID(ref.LocalSHA) &&
+		strings.HasPrefix(ref.RemoteRef, "refs/heads/")
 }
 
 // gitPushPID is git push's process: terma runs under the hook's shell, which git started.
@@ -177,37 +181,6 @@ func PrePush(ctx context.Context, env Env) error {
 	}
 	env.AwaitPush(path)
 	return nil
-}
-
-// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory and starts their
-// AwaitPush, which reports each at once, its git push long gone.
-func (e Env) unparkPushes(r *Repo) {
-	if e.AwaitPush == nil {
-		return
-	}
-	var recorded []string
-	err := r.parking().Unpark(parkedPushes, func(lines []byte) error {
-		for line := range bytes.Lines(lines) {
-			var rec pushRecord
-			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
-				continue
-			}
-			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
-			if err := config.WriteJSON(path, rec, 0o600); err != nil {
-				return err
-			}
-			recorded = append(recorded, path)
-		}
-		return nil
-	})
-	if err != nil {
-		// Still parked: the next hook records them all again and awaits each once.
-		e.Logf("unpark pushes: %v", err)
-		return
-	}
-	for _, path := range recorded {
-		e.AwaitPush(path)
-	}
 }
 
 // AwaitPush waits for git push to exit, then reports the push recorded at path and
