@@ -271,10 +271,11 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: git tag v0.0.0-ci
-      - uses: goreleaser/goreleaser-action@v6
+      # The same action and GoReleaser version as release.yml, so this renders what a release would.
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
-          version: "~> v2"
-          # `before` is `go test`, which the test job already runs; `sign` needs the
+          version: v2.18.3
+          # `before` (go mod verify) runs in a real release; `sign` needs the
           # release signing key, which only a release has.
           args: release --clean --skip=publish,validate,announce,before,sign
         env:
