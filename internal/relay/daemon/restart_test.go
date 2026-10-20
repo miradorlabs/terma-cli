@@ -36,23 +36,28 @@ func freeAddr(t *testing.T) string {
 
 type relayRun struct {
 	cancel context.CancelFunc
-	up     chan struct{}
-	// done is closed once Run returned res.
-	done chan struct{}
-	res  Result
+	// up is closed once the relay listened on addr, at upAt.
+	up   chan struct{}
+	addr net.Addr
+	upAt time.Time
+	// done is closed once Run returned res, at doneAt.
+	done   chan struct{}
+	res    Result
+	doneAt time.Time
 }
 
 func startRun(t *testing.T, c Config) *relayRun {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	r := &relayRun{cancel: cancel, up: make(chan struct{}), done: make(chan struct{})}
-	c.Listening = func(net.Addr, time.Duration) { close(r.up) }
+	c.Listening = func(a net.Addr, _ time.Duration) { r.addr, r.upAt = a, time.Now(); close(r.up) }
 	go func() {
 		defer close(r.done)
 		var err error
 		if r.res, err = Run(ctx, c); err != nil {
 			t.Error(err)
 		}
+		r.doneAt = time.Now()
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -69,9 +74,20 @@ func (r *relayRun) await(t *testing.T, what string) {
 	select {
 	case <-r.up:
 	case <-r.done:
-		t.Fatalf("%s stopped before it listened", what)
+		t.Fatalf("%s stopped before it listened: %+v", what, r.res)
 	case <-time.After(15 * time.Second):
 		t.Fatalf("%s never listened", what)
+	}
+}
+
+// stop asks the relay to stop and waits until Run returns.
+func (r *relayRun) stop(t *testing.T, what string) {
+	t.Helper()
+	r.cancel()
+	select {
+	case <-r.done:
+	case <-time.After(15 * time.Second):
+		t.Fatalf("%s never stopped", what)
 	}
 }
 
