@@ -19,8 +19,12 @@ import (
 )
 
 const (
-	sendTimeout   = 15 * time.Second
-	maxMergeBytes = 4 << 20
+	sendTimeout = 15 * time.Second
+	// maxMergeBytes bounds one request, and enqueue splits a larger export to it. A request the
+	// host cannot take in within sendTimeout is resent whole forever: 4 MiB merges of an
+	// agent's spans timed out on every attempt against a busy OTLP gateway; 512 KiB ones
+	// finished in a third of the timeout at the same throughput.
+	maxMergeBytes = 512 << 10
 	maxMergeFiles = 64
 	minBackoff    = time.Second
 	maxBackoff    = 2 * time.Minute
@@ -59,23 +63,31 @@ func (r *Relay) sender(rt route) *sender {
 }
 
 // enqueue writes a part to its route's outbox before the export is answered, so a crash
-// loses none. It runs under deliverMu, so files are named in arrival order.
+// loses none, as files no larger than maxMergeBytes. It runs under deliverMu, so files are
+// named in arrival order.
 func (r *Relay) enqueue(c claim.Claim, p *part) {
 	rt := routeOf(c)
-	body, err := proto.Marshal(p.msg)
-	if err != nil {
-		r.stats.dropped(p.signal, "encode_failed", p.records)
-		return
+	var s *sender
+	for _, q := range p.within(maxMergeBytes) {
+		body, err := proto.Marshal(q.msg)
+		if err != nil {
+			r.stats.dropped(q.signal, "encode_failed", q.records)
+			continue
+		}
+		e := newEntry(r.opts.Now(), q.signal, q.records)
+		if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
+			r.stats.dropped(q.signal, "outbox_write_failed", q.records)
+			r.warnf("outbox %s: %v; dropped %d %s", rt, err, q.records, q.signal)
+			continue
+		}
+		if s == nil {
+			s = r.sender(rt)
+		}
+		s.push(e)
 	}
-	e := newEntry(r.opts.Now(), p.signal, p.records)
-	if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
-		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
-		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
-		return
+	if s != nil {
+		s.poke()
 	}
-	s := r.sender(rt)
-	s.push(e)
-	s.poke()
 }
 
 func (s *sender) poke() {
