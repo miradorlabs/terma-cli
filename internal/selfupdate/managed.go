@@ -25,7 +25,8 @@ type Manager struct {
 	writes []string
 }
 
-// ManagedBy reports the package manager that owns the binary at exe, from its path alone.
+// ManagedBy reports the package manager that owns the binary at exe, from its path, and for
+// npm also the link its global install keeps (globalNpm).
 func ManagedBy(exe string) (Manager, bool) {
 	return managedBy(exe, runtime.GOOS)
 }

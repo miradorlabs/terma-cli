@@ -244,6 +244,8 @@ func TestTheScopeProbeOutlivesAStoppingRelay(t *testing.T) {
 // writing to its own file, now the previous log, never into this one's.
 func TestAnUpgradesLogIsItsOwn(t *testing.T) {
 	t.Parallel()
+	// Windows renames no open file; terma runs no package manager there (Install.CanUpdate).
+	unixLayouts(t)
 	path := upgradeLog(t)
 	earlier := openLog(path)
 	if earlier == nil {

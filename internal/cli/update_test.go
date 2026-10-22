@@ -537,6 +537,9 @@ func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
 // doctor says how this terma updates, what it last installed by itself, which a relay only
 // logs, and why its last automatic install of a newer release failed, until it is retried.
 func TestDoctorShowsTheLastAutomaticUpdate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a Windows binary updates by hand")
+	}
 	app := New(builtin.Agents, "1.2.0")
 	app.dir, app.stateDir = t.TempDir(), t.TempDir()
 	exe := filepath.Join(app.stateDir, "bin", "terma")
@@ -660,9 +663,46 @@ func TestARelayWhoseBinaryWasReplacedRestartsOnIt(t *testing.T) {
 			if err := os.Symlink(terma(tc.next), link); err != nil {
 				t.Fatal(err)
 			}
+			// Not while an interactive `terma update` holds the update lock: its refresh asks
+			// the relay to make way itself.
+			unlock, err := selfupdate.Lock(app.stateDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p, err := updater.Update(t.Context()); p != (daemon.Pass{}) || err != nil {
+				t.Fatalf("the relay's pass while terma update runs = %+v, %v; want none", p, err)
+			}
+			unlock()
 			if p, err := updater.Update(t.Context()); p != (daemon.Pass{Installed: tc.want, Replaced: true}) || err != nil {
 				t.Fatalf("the relay's pass = %+v, %v; want %q in place", p, err, tc.want)
 			}
+			// Said once: the passes while the relay waits to restart find it again.
+			if p, err := updater.Update(t.Context()); p != (daemon.Pass{}) || err != nil {
+				t.Fatalf("the next pass = %+v, %v; want none", p, err)
+			}
 		})
+	}
+}
+
+// A release the relay's own pass installed is no other install's when the binary it started
+// from is found replaced, as Homebrew's versioned keg is on Linux after the relay's upgrade;
+// another release found there is, once.
+func TestTheRelayTellsItsOwnInstallsFromAnotherInstalls(t *testing.T) {
+	t.Parallel()
+	var put relayInstalls
+	if p := put.installed("1.2.1"); p != (daemon.Pass{Installed: "1.2.1"}) {
+		t.Fatalf("installed = %+v", p)
+	}
+	if p := put.replaced("1.2.1"); p != (daemon.Pass{}) {
+		t.Fatalf("its own install found in place = %+v, want none", p)
+	}
+	if p := put.replaced("1.2.2"); p != (daemon.Pass{Installed: "1.2.2", Replaced: true}) {
+		t.Fatalf("another install's = %+v", p)
+	}
+	if p := put.replaced("1.2.2"); p != (daemon.Pass{}) {
+		t.Fatalf("another install's again = %+v, want none", p)
+	}
+	if p := put.replaced(""); p != (daemon.Pass{}) {
+		t.Fatalf("no release in place = %+v", p)
 	}
 }

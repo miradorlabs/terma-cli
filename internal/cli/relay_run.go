@@ -153,10 +153,19 @@ func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
 	// is installed over that one (selfupdate.Client.Auto).
 	client := app.updateClient()
 	client.RunsHomebrew = true
+	var put relayInstalls
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (daemon.Pass, error) {
-		// A downgrade by hand, or a reinstall, while updates are off restarts the relay too.
-		if client.Replaced(install.Exe) {
-			return app.replacedBy(ctx, install), nil
+		// A downgrade by hand, or a reinstall, while updates are off restarts the relay too;
+		// asked under the update lock, which an interactive `terma update` holds while it
+		// installs and refreshes, its refresh then asking this relay to make way itself.
+		unlock, err := selfupdate.Lock(app.stateDir)
+		if err != nil {
+			return daemon.Pass{}, nil
+		}
+		replaced := client.Replaced(install.Exe)
+		unlock()
+		if replaced {
+			return put.replaced(app.replacedBy(ctx, install)), nil
 		}
 		if app.updateAuto(install) != semconv.TermaUpdateAutoOn {
 			return daemon.Pass{}, nil
@@ -164,25 +173,48 @@ func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
 		o := client.Auto(ctx, app.dir, app.stateDir, install.Exe, nil)
 		if o.Replaced {
 			// Replaced during the pass, under the update lock.
-			return app.replacedBy(ctx, install), nil
+			return put.replaced(app.replacedBy(ctx, install)), nil
 		}
-		return daemon.Pass{Installed: o.Installed}, o.Err
+		return put.installed(o.Installed), o.Err
 	}}
 }
 
-// replacedBy is the release another install put in place of the relay's terma, none when
-// its stable link (install.Terma) runs none: Homebrew left to finish by an earlier relay
+// relayInstalls is the release the relay's passes last put in place, so that the binary it
+// started from, replaced by its own upgrade, is not taken for another install's: on Linux it
+// is Homebrew's versioned keg, which an upgrade the relay ran leaves behind or removes.
+type relayInstalls struct{ last string }
+
+// installed is the pass that installed version, "" for none.
+func (r *relayInstalls) installed(version string) daemon.Pass {
+	if version != "" {
+		r.last = version
+	}
+	return daemon.Pass{Installed: version}
+}
+
+// replaced is the pass that found version in place of the relay's terma: none when it is
+// the release the relay last put there itself, or found already.
+func (r *relayInstalls) replaced(version string) daemon.Pass {
+	if version == "" || version == r.last {
+		return daemon.Pass{}
+	}
+	r.last = version
+	return daemon.Pass{Installed: version, Replaced: true}
+}
+
+// replacedBy is the release another install put in place of the relay's terma, "" when its
+// stable link (install.Terma) runs none: Homebrew left to finish by an earlier relay
 // after this one started, `brew reinstall`, `npm i -g`, install.sh run again, `npm rebuild`
 // or a downgrade by hand. The relay restarts on it from that link (afterRelay), whatever its
 // version, since a relay whose binary was replaced installs nothing more
 // (selfupdate.Client.Replaced), and may run one an upgrade removed. Its successor starts
 // afresh from the binary in place, and updates it if it is behind and updates are on.
-func (app *App) replacedBy(ctx context.Context, install selfupdate.Install) daemon.Pass {
+func (app *App) replacedBy(ctx context.Context, install selfupdate.Install) string {
 	installed, err := selfupdate.InstalledVersion(ctx, install.Terma())
 	if err != nil {
-		return daemon.Pass{}
+		return ""
 	}
-	return daemon.Pass{Installed: installed, Replaced: true}
+	return installed
 }
 
 // installed is how this terma was installed, as its relay reports it and updates it. A

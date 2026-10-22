@@ -28,8 +28,8 @@ type Install struct {
 	writes []string
 }
 
-// InstallOf tells how the terma at exe, at version, was installed, from its path and version
-// alone. The version comes first: a build that is not a release (IsRelease) is a source
+// InstallOf tells how the terma at exe, at version, was installed, from its path, version
+// and, for npm, its global install's link (ManagedBy). The version comes first: a build that is not a release (IsRelease) is a source
 // build wherever it is, a package manager's directory included. An exe of "" is a binary
 // the process could not find: a release's has no method, and is never updated (Automatic).
 func InstallOf(exe, version string) Install {

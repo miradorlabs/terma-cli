@@ -47,11 +47,11 @@ type Updater struct {
 }
 
 // Run asks for an update after a jittered wait and then every Every, until ctx ends, sending
-// each release it installs on installed. It goes on asking after an install: the relay may
+// each release it installs, or finds another install put in place, on installed. It goes on asking after an install: the relay may
 // wait hours for its agents to pause before it restarts, and a release published meanwhile
 // would otherwise reach the machine only once it had. Every must be positive: asking without
 // pause would only hammer the release lookup, so an updater without one asks nothing.
-func (u Updater) Run(ctx context.Context, installed chan<- string) {
+func (u Updater) Run(ctx context.Context, installed chan<- Pass) {
 	if u.Every <= 0 {
 		return
 	}
@@ -86,7 +86,7 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 				logf("installed terma %s; restarting on it once no agent is exporting", pass.Installed)
 			}
 			select {
-			case installed <- pass.Installed:
+			case installed <- pass:
 			case <-ctx.Done():
 				return
 			}
