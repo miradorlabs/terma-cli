@@ -11,9 +11,9 @@ import (
 const recordFraming = 6
 
 // within divides a part whose encoding is over limit into parts that each fit it, record by
-// record in order, each record under its own resource and scope, so maxMergeBytes bounds every
-// request the sender makes. A record larger than limit goes alone; a host refusing it is
-// counted like any refused part.
+// record in order, each record under its own resource and scope. A record larger than limit
+// goes alone, a host refusing it counted like any refused part, and a resource or scope over
+// half the limit packs as packRuns says.
 func (p *part) within(limit int) []*part {
 	if proto.Size(p.msg) <= limit {
 		return []*part{p}
@@ -126,18 +126,21 @@ type run struct{ block, from, to int }
 
 // packRuns lays every block's records out in order into messages whose encoding stays within
 // limit, repeating a block's resource and scope in each message it spans. heads[b] is block b's
-// framed resource and scope, sizes[b] its framed records. A record over limit goes alone.
+// framed resource and scope, sizes[b] its framed records. A record over limit goes alone. A
+// block whose header is over half the limit packs to twice its header instead, so its records
+// outweigh each copy of the header and splitting never more than doubles the bytes.
 func packRuns(limit int, heads []int, sizes [][]int) [][]run {
 	var msgs [][]run
 	size, records := 0, 0
 	for b, recs := range sizes {
+		fit := max(limit, 2*heads[b])
 		open := false
 		for i, n := range recs {
 			need := n
 			if !open {
 				need += heads[b]
 			}
-			if msgs == nil || records > 0 && size+need > limit {
+			if msgs == nil || records > 0 && size+need > fit {
 				msgs = append(msgs, nil)
 				size, records, open, need = 0, 0, false, n+heads[b]
 			}

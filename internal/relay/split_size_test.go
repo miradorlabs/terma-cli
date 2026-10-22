@@ -229,3 +229,33 @@ func TestRelaySendsALargeExportInBoundedRequests(t *testing.T) {
 		t.Fatalf("dropped records: %v", c)
 	}
 }
+
+// A resource too big to fit the limit with any records is not copied once per record: its records
+// outweigh each copy, so splitting at most doubles the bytes and every record still arrives once, in order.
+func TestPartWithinBoundsAnOversizedHeader(t *testing.T) {
+	t.Parallel()
+	const limit = 16 << 10
+	td := bigTraces(400, 60)
+	for _, rs := range td.ResourceSpans {
+		rs.Resource.Attributes = append(rs.Resource.Attributes, kv("huge", strings.Repeat("r", limit)))
+	}
+	parts := (&part{signal: Traces, msg: td, records: 400}).within(limit)
+	var got []placedSpan
+	total := 0
+	for _, q := range parts {
+		total += proto.Size(q.msg)
+		got = append(got, placedSpans(q.msg.(*tracepb.TracesData))...)
+	}
+	if total > 2*proto.Size(td) {
+		t.Fatalf("splitting a %d-byte export wrote %d bytes in %d parts, over twice the export", proto.Size(td), total, len(parts))
+	}
+	want := placedSpans(td)
+	if len(got) != len(want) {
+		t.Fatalf("parts carry %d spans, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if !proto.Equal(got[i].span, want[i].span) || !proto.Equal(got[i].resource, want[i].resource) {
+			t.Fatalf("span %d changed or moved off its resource", i)
+		}
+	}
+}

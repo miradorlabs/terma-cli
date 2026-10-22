@@ -20,10 +20,12 @@ import (
 
 const (
 	sendTimeout = 15 * time.Second
-	// maxMergeBytes bounds one request, and enqueue splits a larger export to it. A request the
-	// host cannot take in within sendTimeout is resent whole forever: 4 MiB merges of an
-	// agent's spans timed out on every attempt against a busy OTLP gateway; 512 KiB ones
-	// finished in a third of the timeout at the same throughput.
+	// maxMergeBytes bounds the entries enqueue writes and the merges the sender builds from
+	// them. A request the host cannot take in within sendTimeout is resent whole forever: 4 MiB
+	// merges of an agent's spans timed out on every attempt against a busy OTLP gateway;
+	// 512 KiB ones finished in a third of the timeout at the same throughput. Send-time
+	// withholding can add a few bytes per record, and an entry an older relay wrote over the
+	// bound is sent alone, as before.
 	maxMergeBytes = 512 << 10
 	maxMergeFiles = 64
 	minBackoff    = time.Second
