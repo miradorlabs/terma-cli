@@ -100,10 +100,11 @@ func TestAutomaticIsTheRelaysOneRule(t *testing.T) {
 		{"homebrew in CI", homebrew, on, env(map[string]string{"CI": "1"}), semconv.TermaUpdateAutoOff},
 		{"global npm", npm, on, none, semconv.TermaUpdateAutoOn},
 		{"global npm, turned off", npm, off, none, semconv.TermaUpdateAutoOff},
+		// Its binary is replaced in place: npm itself is never needed.
+		{"global npm without npm", InstallOn(filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "linux"), on, none, semconv.TermaUpdateAutoOn},
 		// terma runs the package manager that owns the install, never another: without it,
 		// the developer is told the command.
 		{"homebrew not found", InstallOn(filepath.Join(root, "elsewhere", "Caskroom", "terma", "1.0.0", "terma"), "1.0.0", "darwin"), on, none, semconv.TermaUpdateAutoUnsupported},
-		{"npm not found", InstallOn(filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "linux"), on, none, semconv.TermaUpdateAutoUnsupported},
 		{"windows npm", InstallOn("C:/Users/d/AppData/Roaming/npm/node_modules/@miradorlabs/terma/vendor/terma.exe", "1.0.0", "windows"), on, none, semconv.TermaUpdateAutoUnsupported},
 		{"npm project", InstallOn(filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "darwin"), on, none, semconv.TermaUpdateAutoUnsupported},
 		{"source build", InstallOn(filepath.Join(root, ".local", "bin", "terma"), "dev", "darwin"), on, none, semconv.TermaUpdateAutoUnsupported},
@@ -121,8 +122,8 @@ func TestAutomaticIsTheRelaysOneRule(t *testing.T) {
 	}
 }
 
-// An install terma may not write, a root-owned npm prefix, another user's Homebrew or a
-// binary installed with sudo, never updates by itself, however often it tried: unsupported,
+// An install terma may not write, a root-owned npm prefix (its package's vendor folder),
+// another user's Homebrew or a binary installed with sudo, never updates by itself, however often it tried: unsupported,
 // until its permissions are put right.
 func TestAnInstallTermaMayNotWriteIsUnsupported(t *testing.T) {
 	unixLayouts(t)
@@ -149,7 +150,7 @@ func TestAnInstallTermaMayNotWriteIsUnsupported(t *testing.T) {
 	for _, tc := range []struct{ name, exe, locked, goos string }{
 		{"homebrew", cask, filepath.Join(brew, "Caskroom", "terma"), "darwin"},
 		{"homebrew's bin", cask, filepath.Join(brew, "bin"), "darwin"},
-		{"global npm", pkg, filepath.Join(npm, "lib", "node_modules", "@miradorlabs"), "linux"},
+		{"global npm", pkg, filepath.Dir(pkg), "linux"},
 		{"install script", script, filepath.Dir(script), "linux"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

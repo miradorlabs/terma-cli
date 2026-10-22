@@ -40,10 +40,10 @@ terma checks for a newer release and installs it by itself, a patch at once and 
 or major version after it has been out for 24 hours. The local relay checks every few minutes
 in the background, so a patch reaches a machine within 10 minutes even if nobody runs terma
 on it; interactive commands also check, hourly. Never inside agent hooks, scripts, or CI.
-The relay upgrades a Homebrew or global npm installation through the package manager that
-owns it; the next command you run says what it installed. Use --auto off for notices only,
-and --auto on to go back to automatic updates. A project's npm dependency, and Windows,
-receive notices only.
+The relay upgrades a Homebrew installation through Homebrew, and a global npm installation
+in place, as the install script's, replacing the package's binary; the next command you run
+says what it installed. Use --auto off for notices only, and --auto on to go back to
+automatic updates. A project's npm dependency, and Windows, receive notices only.
 
 Updates compare the installed release version with the latest published release.
 Source builds are not updated automatically; use --force to switch one to the latest
@@ -61,7 +61,7 @@ release.`,
 						return err
 					}
 					if automatic == "on" {
-						fmt.Fprintln(out, "Automatic updates enabled: terma installs each new release in the background, through Homebrew or npm when one of them installed it. A project's npm dependency and Windows receive notices only; unversioned development builds are skipped.")
+						fmt.Fprintln(out, "Automatic updates enabled: terma installs each new release in the background, through Homebrew when Homebrew installed it, and in place otherwise, a global npm package's binary included. A project's npm dependency and Windows receive notices only; unversioned development builds are skipped.")
 					} else {
 						fmt.Fprintln(out, "Automatic updates disabled; update notices remain enabled.")
 					}
@@ -123,6 +123,9 @@ func updatesSummary(install selfupdate.Install, auto bool) string {
 		return "by hand: download each new release from https://github.com/" + selfupdate.Repo + "/releases"
 	case !auto:
 		return "when you run `terma update` (automatic updates are off: `terma update --auto on`)"
+	case install.Method == semconv.TermaInstallMethodNpm:
+		return "automatically, in place: terma updates the npm package's binary itself in the background; " +
+			"npm's own record (`npm ls -g`) catches up at your next `npm i -g` or `terma update`"
 	case m.Name != "":
 		return "automatically: the local relay has " + m.Name + " install each new release in the background"
 	}

@@ -149,68 +149,6 @@ func TestHomebrewUpgradesTermaInTheBackground(t *testing.T) {
 	}
 }
 
-// npm is asked first whether its registry has the release, which it publishes after GitHub;
-// then it installs exactly that version, finding node beside npm though a service's PATH
-// has none, and running the install script that downloads the binary whatever
-// ignore-scripts says. A prefix it may not write is a failed install.
-func TestNpmUpgradesTermaInTheBackground(t *testing.T) {
-	unixLayouts(t)
-	for _, tc := range []struct {
-		name, registry, install string
-		ignoreScripts           bool
-		want                    string
-		offered, installed      bool
-	}{
-		{"published", "1.0.1", "upgrade", false, "1.0.1", true, true},
-		// npm would install the package and skip the script that downloads the binary.
-		{"scripts ignored by the developer's npm config", "1.0.1", "upgrade", true, "1.0.1", true, true},
-		{"not published yet", "", "upgrade", false, "", false, false},
-		{"root-owned prefix", "1.0.1", "echo 'npm error code EACCES' >&2; exit 243", false, "", true, true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			// What a service's relay finds on PATH: no node.
-			t.Setenv("PATH", "/usr/bin:/bin")
-			if tc.ignoreScripts {
-				t.Setenv("npm_config_ignore_scripts", "true")
-			}
-			root, err := filepath.EvalSymlinks(t.TempDir())
-			if err != nil {
-				t.Fatal(err)
-			}
-			prefix := filepath.Join(root, "node")
-			exe := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
-			termaScript(t, exe, "1.0.0")
-			script(t, filepath.Join(prefix, "bin", "node"), "exit 0")
-			install := tc.install
-			if install == "upgrade" {
-				install = fmt.Sprintf("printf '#!/bin/sh\\necho \"terma 1.0.1\"\\n' > %s", exe)
-			}
-			ran := filepath.Join(root, "ran")
-			// Like npm, it skips the package's install script when ignore-scripts is set and
-			// the command line does not say otherwise: the package lands without its binary.
-			script(t, filepath.Join(prefix, "bin", "npm"), fmt.Sprintf(`command -v node >/dev/null || { echo 'env: node: No such file or directory' >&2; exit 127; }
-case "$1" in
-view) [ -n '%[2]s' ] && echo '%[2]s' ;;
-install) echo "$@" > %[1]s.args
-  case " $* " in *" --ignore-scripts=false "*) ;; *) [ "$npm_config_ignore_scripts" = true ] && { rm -f %[4]s; exit 0; } ;; esac
-  %[3]s ;;
-esac`, ran, tc.registry, install, exe))
-			m, ok := ManagedBy(exe)
-			if !ok || len(m.Argv) == 0 {
-				t.Fatalf("ManagedBy = %+v, %v", m, ok)
-			}
-			got, err := m.Upgrade(t.Context(), UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)})
-			if got != tc.want || (err == nil) != (tc.want != "") || errors.Is(err, ErrNotOffered) == tc.offered {
-				t.Fatalf("Upgrade = %q, %v; want %q, offered %v", got, err, tc.want, tc.offered)
-			}
-			args, _ := os.ReadFile(ran + ".args")
-			if want := "install --global --prefix " + prefix + " --ignore-scripts=false @miradorlabs/terma@1.0.1\n"; tc.installed != (string(args) == want) {
-				t.Fatalf("npm install ran with %q; want it run %v, as %q", args, tc.installed, want)
-			}
-		})
-	}
-}
-
 // A relay stopping while its package manager runs leaves it to finish by itself, since
 // stopping it halfway can leave terma uninstalled, and says what it installed should the
 // release be in place already; one that runs past its time is stopped, with every process
@@ -280,30 +218,6 @@ func TestAStoppingRelayStartsNoPackageManager(t *testing.T) {
 	}
 	if eventually(func() bool { _, err := os.Stat(started); return err == nil }, 2*time.Second) {
 		t.Fatal("brew started for a relay told to stop")
-	}
-}
-
-// A relay stopped while it asks npm's registry, before npm installs anything, leaves nothing
-// running: what lands later is not its doing.
-func TestAStopDuringNpmViewLeavesNothingRunning(t *testing.T) {
-	unixLayouts(t)
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	prefix := filepath.Join(root, "node")
-	exe := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
-	termaScript(t, exe, "1.0.0")
-	installed := filepath.Join(root, "installed")
-	script(t, filepath.Join(prefix, "bin", "npm"), `case "$1" in view) sleep 5; echo 1.0.1 ;; install) touch `+installed+` ;; esac`)
-	m, _ := ManagedBy(exe)
-	ctx, stop := context.WithCancel(t.Context())
-	time.AfterFunc(300*time.Millisecond, stop)
-	if _, err := m.Upgrade(ctx, UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)}); err == nil || errors.Is(err, errLeftRunning) {
-		t.Fatalf("Upgrade = %v, want it stopped with nothing left running", err)
-	}
-	if _, err := os.Stat(installed); err == nil {
-		t.Fatal("npm install ran for a relay told to stop")
 	}
 }
 

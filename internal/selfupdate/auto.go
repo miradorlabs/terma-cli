@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"time"
-
-	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // Replaced reports whether the executable at exe is no longer the one this process started
@@ -64,15 +62,15 @@ type Outcome struct {
 // patch release, which installs without a soak, reaches a machine within one of the relay's
 // waits; a failed look still backs off (retryAfter). It installs the release for the terma
 // at exe, unless the developer turned automatic updates off in configDir: in place of a
-// release binary that updates itself, and through its package manager for a Homebrew or
-// global npm install, when this client runs package managers (RunsManagers); the check's
-// records go in stateDir. A new minor or major version waits out SoakTime first, and is
-// looked up again before it is installed in place, so a release pulled since the check is
-// not; a package manager needs no more than this pass's look. Each release is attempted once
-// per AttemptInterval at most, so a failing install is not retried at every pass; a release
+// release binary, the install script's or a global npm package's, and through Homebrew for
+// a Homebrew install, when this client runs Homebrew (RunsHomebrew); the check's records go
+// in stateDir. A new minor or major version waits out SoakTime first, and is looked up
+// again before it is installed in place, so a release pulled since the check is not;
+// Homebrew needs no more than this pass's look. Each release is attempted once per
+// AttemptInterval at most, so a failing install is not retried at every pass; a release
 // still being built and signed (ErrNotReady) is no attempt, and each look asks after its
-// files again (look), and one a package manager does not offer yet, or that found it busy,
-// is tried again after retryAfter (Attempt). A process that installed a release goes on as
+// files again (look), and one Homebrew does not offer yet, or that found it busy, is tried
+// again after retryAfter (Attempt). A process that installed a release goes on as
 // it (current), so its later passes install the releases after it. progress, when set, is
 // told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
@@ -117,13 +115,13 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 		// was left to finish: an update like any other, said once.
 		cache.installed()
 		SaveCache(stateDir, cache)
-		saveUpdated(stateDir, Updated{At: time.Now(), From: cache.AttemptedBy, To: current, Through: install.Manager.Name})
+		saveUpdated(stateDir, Updated{At: time.Now(), From: cache.AttemptedBy, To: current, Through: install.through(), Method: install.Method})
 	}
 	if !p.Auto || c.Binary == nil || cache.Unbuilt || !Newer(current, cache.Latest) || !c.installs(install) ||
 		cache.held(cache.Latest, c.Version, time.Now()) || Soaking(current, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, current)}
 	}
-	managed := install.Method != semconv.TermaInstallMethodScript
+	managed := install.throughHomebrew()
 	timeout := installTimeout
 	if managed {
 		timeout = UpgradeTimeout
@@ -201,21 +199,21 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	}
 	SaveCache(stateDir, cache)
 	// A pass that reports its progress has said so already.
-	saveUpdated(stateDir, Updated{At: time.Now(), From: current, To: installed, Through: install.Manager.Name, Told: progress != nil})
+	saveUpdated(stateDir, Updated{At: time.Now(), From: current, To: installed, Through: install.through(), Method: install.Method, Told: progress != nil})
 	return Outcome{Installed: installed}
 }
 
 // installs reports whether this client installs new releases for install by itself: one
-// terma can update (Install.Automatic does not say unsupported), and for a package manager's
-// install only a client that runs package managers (RunsManagers), as the relay's does.
+// terma can update (Install.Automatic does not say unsupported), and a Homebrew install only
+// for a client that runs Homebrew (RunsHomebrew), as the relay's does.
 func (c *Client) installs(i Install) bool {
-	return i.updatable() && (i.Method == semconv.TermaInstallMethodScript || c.RunsManagers)
+	return i.updatable() && (!i.throughHomebrew() || c.RunsHomebrew)
 }
 
-// install puts rel in place for i: in place of its binary, or through its package manager
-// as r asks, the process going on as the release at the link the manager moved to it.
+// install puts rel in place for i: in place of its binary, or through Homebrew as r asks,
+// the process going on as the release at the link Homebrew moved to it.
 func (c *Client) install(ctx context.Context, i Install, rel *Release, r UpgradeRequest, progress io.Writer) (string, error) {
-	if i.Method == semconv.TermaInstallMethodScript {
+	if !i.throughHomebrew() {
 		return c.Apply(ctx, rel, i.Exe, progress)
 	}
 	upgrade := c.upgrade

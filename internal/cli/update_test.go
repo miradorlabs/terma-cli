@@ -251,8 +251,10 @@ func TestUpdatesSummary(t *testing.T) {
 		{"homebrew", filepath.Join(brew, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "the local relay has Homebrew install each new release"},
 		{"homebrew, turned off", filepath.Join(brew, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", false, "`terma update --auto on`"},
 		{"homebrew not found", filepath.Join(home, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew: `brew upgrade terma`"},
-		{"npm", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "the local relay has npm install each new release"},
-		{"npm not found", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install -g @miradorlabs/terma@latest`"},
+		{"npm", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "automatically, in place: terma updates the npm package's binary itself"},
+		// Its binary is replaced in place: no npm is needed.
+		{"npm not found", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "npm's own record (`npm ls -g`) catches up"},
+		{"npm, turned off", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", false, "`terma update --auto on`"},
 		{"npm project", filepath.Join(home, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install @miradorlabs/terma@latest`"},
 		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
 		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
@@ -535,12 +537,10 @@ func TestDoctorShowsTheLastAutomaticUpdate(t *testing.T) {
 	}
 }
 
-// Setup and doctor run in the developer's shell, the relay's service with the system's PATH:
-// for a global npm install under a prefix of its own (`npm config set prefix ~/.npm-global`)
-// whose npm is elsewhere on the shell's PATH, both say what the service does, from the one
-// rule, whichever PATH asks. With the prefix's own npm, both say it updates in the
-// background.
-func TestSetupPromisesOnlyNpmUpdatesTheServiceMakes(t *testing.T) {
+// A global npm install updates in place, so setup, doctor, the heartbeat and the relay say
+// and do the same whatever PATH they run with: the developer's shell, with node and npm, or
+// the relay service's, with neither.
+func TestAGlobalNpmInstallUpdatesTheSameUnderAnyPath(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix npm layouts")
 	}
@@ -550,8 +550,7 @@ func TestSetupPromisesOnlyNpmUpdatesTheServiceMakes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prefix := filepath.Join(root, ".npm-global")
-	pkg := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	pkg := filepath.Join(root, ".npm-global", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
 	shellNpm := filepath.Join(root, "opt", "homebrew", "bin", "npm")
 	for _, f := range []string{pkg, shellNpm} {
 		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
@@ -563,37 +562,20 @@ func TestSetupPromisesOnlyNpmUpdatesTheServiceMakes(t *testing.T) {
 	}
 	app := New(builtin.Agents, "1.2.0")
 	app.dir, app.stateDir = t.TempDir(), t.TempDir()
-	says := func(path string) (summary, auto string, updater bool) {
+	for _, path := range []string{filepath.Dir(shellNpm) + ":/usr/bin:/bin", "/usr/bin:/bin:/usr/sbin:/sbin"} {
 		t.Setenv("PATH", path)
 		install := selfupdate.InstallOf(pkg, "1.2.0")
-		return updatesSummary(install, true), app.updateAuto(install), app.relayUpdater(install) != nil
-	}
-	shellPath, servicePath := filepath.Dir(shellNpm)+":/usr/bin:/bin", "/usr/bin:/bin:/usr/sbin:/sbin"
-	for _, path := range []string{shellPath, servicePath} {
-		summary, auto, updater := says(path)
-		if !strings.Contains(summary, "through npm: `npm install -g @miradorlabs/terma@latest`") || auto != semconv.TermaUpdateAutoUnsupported || updater {
-			t.Errorf("PATH %s: setup says %q, the heartbeat %s, the relay updates: %v", path, summary, auto, updater)
-		}
-	}
-	// The npm the install's own prefix keeps is the service's too.
-	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(prefix, "bin", "npm"), []byte("#!/bin/sh\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range []string{shellPath, servicePath} {
-		summary, auto, updater := says(path)
-		if !strings.Contains(summary, "automatically") || auto != semconv.TermaUpdateAutoOn || !updater {
-			t.Errorf("own npm, PATH %s: setup says %q, the heartbeat %s, the relay updates: %v", path, summary, auto, updater)
+		summary, auto := updatesSummary(install, true), app.updateAuto(install)
+		if !strings.Contains(summary, "automatically, in place") || auto != semconv.TermaUpdateAutoOn || app.relayUpdater(install) == nil {
+			t.Errorf("PATH %s: setup says %q, the heartbeat %s, the relay updates: %v", path, summary, auto, app.relayUpdater(install) != nil)
 		}
 	}
 }
 
-// A relay whose binary another install replaced with a newer release, as Homebrew left to
-// finish by an earlier relay does, takes it for one it installed itself, and so restarts on
-// it from the stable link, rather than run a binary the upgrade removed.
-func TestARelayReplacedByANewerReleaseRestartsOnIt(t *testing.T) {
+// A relay whose binary another install replaced, as Homebrew left to finish by an earlier
+// relay does, takes it for one it installed itself, and so restarts on it from the stable
+// link, rather than run a binary the upgrade removed and install nothing more.
+func TestARelayWhoseBinaryWasReplacedRestartsOnIt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix Homebrew layout")
 	}
@@ -623,7 +605,10 @@ func TestARelayReplacedByANewerReleaseRestartsOnIt(t *testing.T) {
 	if err := os.Symlink(terma("1.2.0"), link); err != nil {
 		t.Fatal(err)
 	}
-	for _, tc := range []struct{ next, want string }{{"1.2.1", "1.2.1"}, {"1.1.9", ""}} {
+	// Newer (Homebrew left to finish), the same (`brew reinstall`, install.sh again) or older
+	// (`npm rebuild` of npm's recorded version): the relay restarts on what is installed, and
+	// its successor updates it if it is behind.
+	for _, tc := range []struct{ next, want string }{{"1.2.1", "1.2.1"}, {"1.2.0", "1.2.0"}, {"1.1.9", "1.1.9"}} {
 		t.Run(tc.next, func(t *testing.T) {
 			app := New(builtin.Agents, "1.2.0")
 			app.dir, app.stateDir = t.TempDir(), t.TempDir()

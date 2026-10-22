@@ -87,12 +87,11 @@ type Client struct {
 	// longer the version installed (Replaced), and Auto replaces nothing for it; nor for a
 	// process that does not know what it started from.
 	Binary os.FileInfo
-	// RunsManagers has Auto upgrade a Homebrew or global npm install through the package
-	// manager that owns it (Manager.Upgrade), as the relay's client does. Without it, as for
-	// an interactive command, such an install gets the notice only: the manager may take
-	// minutes, and the terminal is the developer's.
-	RunsManagers bool
-	// upgrade runs the package manager, Manager.Upgrade when nil; tests replace it.
+	// RunsHomebrew has Auto upgrade a Homebrew install through Homebrew (Manager.Upgrade), as
+	// the relay's client does. Without it, as for an interactive command, such an install gets
+	// the notice only: Homebrew may take minutes, and the terminal is the developer's.
+	RunsHomebrew bool
+	// upgrade runs Homebrew, Manager.Upgrade when nil; tests replace it.
 	upgrade func(ctx context.Context, m Manager, r UpgradeRequest) (string, error)
 	// installed is the release Apply or Upgrade last put in place of Binary, "" before any
 	// (current).

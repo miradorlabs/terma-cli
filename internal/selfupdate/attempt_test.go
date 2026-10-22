@@ -115,6 +115,16 @@ func TestAnInterruptedAttemptLandsOnItsRelease(t *testing.T) {
 	if !a.landed("1.0.1", began.Add(3*time.Minute)) {
 		t.Error("a retry lost the claim of the manager the first attempt left")
 	}
+	// One that also leaves its manager running extends the window to its own: either may
+	// have installed the release.
+	if a.landed("1.0.1", began.Add(30*time.Minute)) {
+		t.Error("a release installed after the first manager's time is claimed before a later one ran")
+	}
+	a.begin("1.0.1", "1.0.0", began.Add(25*time.Minute))
+	a.stopped(true)
+	if !a.landed("1.0.1", began.Add(30*time.Minute)) || !a.landed("1.0.1", began.Add(3*time.Minute)) {
+		t.Error("the window is not from the first left-running attempt to the latest's time")
+	}
 	// A stop that left nothing running claims nothing.
 	idle := Attempt{AttemptAt: began, Attempted: "1.0.1", AttemptedBy: "1.0.0"}
 	idle.stopped(false)

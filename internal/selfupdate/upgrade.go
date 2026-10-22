@@ -21,17 +21,17 @@ import (
 // first, which takes minutes.
 const UpgradeTimeout = 15 * time.Minute
 
-// probeTimeout bounds asking npm's registry for a release, and the upgraded terma its version.
+// probeTimeout bounds asking the upgraded terma its version, and systemd-run whether it
+// makes a scope.
 const probeTimeout = time.Minute
 
-// ErrNotOffered means a package manager does not offer a published release yet: Homebrew's
-// tap and npm's registry are published after the release itself, npm's by a job of its own
-// that may wait. It is no failed install, held back a day, but tried again soon
+// ErrNotOffered means Homebrew does not offer a published release yet: its tap is published
+// after the release itself. It is no failed install, held back a day, but tried again soon
 // (Attempt.Retries).
 var ErrNotOffered = errors.New("its package manager does not offer it yet; terma asks again later")
 
-// ErrBusy means another of the package manager's processes held its lock, as the developer's
-// own `brew upgrade` does while it runs: tried again soon too.
+// ErrBusy means another of Homebrew's processes held its lock, as the developer's own
+// `brew upgrade` does while it runs: tried again soon too.
 var ErrBusy = errors.New("another of its package manager's processes is running; terma asks again later")
 
 // errLeftRunning means a program RunDetached started was left to finish when its ctx was
@@ -44,62 +44,44 @@ func logNote(path string) string {
 	return "its output is in " + path + " (" + filepath.Base(path) + ".1 once terma tries again)"
 }
 
-// UpgradeRequest is one upgrade of terma through the package manager that owns it.
+// UpgradeRequest is one upgrade of terma through Homebrew.
 type UpgradeRequest struct {
 	// From is the release installed now, and To the one to install.
 	From, To string
-	// Log is the file the manager's output goes to, a new one for each upgrade, the last
-	// one's kept as <Log>.1 (openLog): a file, which the manager goes on writing to should
-	// the relay stop first.
+	// Log is the file Homebrew's output goes to, a new one for each upgrade, the last one's
+	// kept as <Log>.1 (openLog): a file, which Homebrew goes on writing to should the relay
+	// stop first.
 	Log string
 	// RefreshTaps has Homebrew update its taps before the upgrade, which it otherwise does
 	// once a day: the first few tries at a release ask for it, not every retry.
 	RefreshTaps bool
 }
 
-// Upgrade has the package manager install release r.To of terma in the background, as the
-// relay does, and returns the version the terma at Terma then reports. Nothing waits on a
-// terminal: the manager's input is empty, it is never asked to prompt, and what it prints
-// goes to r.Log. It runs for UpgradeTimeout at most, after which it is stopped with every
-// process it started; ctx ending as the relay stops leaves it to finish by itself
-// (RunDetached), since stopping a package manager halfway can leave terma uninstalled.
+// Upgrade has Homebrew install release r.To of terma in the background, as the relay does,
+// and returns the version the terma at Terma then reports; the relay updates every other
+// install in place, an npm package's binary included, and never runs npm. Nothing waits on
+// a terminal: Homebrew's input is empty, it is never asked to prompt, and what it prints goes
+// to r.Log. It runs for UpgradeTimeout at most, after which it is stopped with every process
+// it started; ctx ending as the relay stops leaves it to finish by itself (RunDetached),
+// since stopping it halfway can leave terma uninstalled.
 //
-// Success is the upgraded binary's version, never the manager's exit status, and it is read
+// Success is the upgraded binary's version, never Homebrew's exit status, and it is read
 // however the run ended: any release newer than r.From is installed, r.To or one between
-// that a lagging tap still names, also when the relay stopped meanwhile. A manager that
-// leaves r.From in place without failing (a tap or registry not updated yet) is
-// ErrNotOffered, one that found another of its processes running is ErrBusy, and any other
-// failure, Homebrew refusing an untrusted tap or npm a prefix it may not write (EACCES), is
-// a failed install.
-//
-// Homebrew upgrades terma alone, without the cleanup that would prune the developer's other
-// packages or upgrades of their dependents; a developer's HOMEBREW_NO_AUTO_UPDATE, and
-// Homebrew's own brew.env files, still apply. npm is asked first whether its registry has
-// the release, then installs exactly that version with its install script, which downloads
-// the binary, run whatever ignore-scripts says: a lagging registry never has npm install the
-// same release again, and the package never lands without its binary.
+// that a lagging tap still names, also when the relay stopped meanwhile. One that leaves
+// r.From in place without failing (a tap not updated yet) is ErrNotOffered, one that found
+// another of its processes running is ErrBusy, and any other failure, such as an untrusted
+// tap, is a failed install. It upgrades terma alone, without the cleanup that would prune
+// the developer's other packages or upgrades of their dependents; a developer's
+// HOMEBREW_NO_AUTO_UPDATE, and Homebrew's own brew.env files, still apply.
 func (m Manager) Upgrade(ctx context.Context, r UpgradeRequest) (string, error) {
 	// A relay told to stop starts nothing that would outlive it.
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if len(m.Argv) == 0 || m.Project != "" {
+	if m.Name != "Homebrew" || len(m.Argv) == 0 {
 		return "", fmt.Errorf("terma cannot run %s for this installation; run `%s`", m.Name, m.Command)
 	}
-	env := m.backgroundEnv(os.Environ(), r.RefreshTaps)
-	argv := m.Argv
-	if m.Name == "npm" {
-		// npm answers a version its registry does not have with E404, as it does a registry
-		// it cannot reach: both are asked again soon.
-		offered, err := probe(ctx, env, m.Argv[0], "view", npmPackage+"@"+r.To, "version")
-		if err != nil {
-			return "", fmt.Errorf("npm view found no terma %s (%w): %w", r.To, err, ErrNotOffered)
-		}
-		if offered != r.To {
-			return "", fmt.Errorf("npm view found no terma %s: %w", r.To, ErrNotOffered)
-		}
-		argv = append(slices.Clone(m.Argv[:len(m.Argv)-1]), "--ignore-scripts=false", npmPackage+"@"+r.To)
-	}
+	env, argv := m.backgroundEnv(os.Environ(), r.RefreshTaps), m.Argv
 	log := openLog(r.Log)
 	if log != nil {
 		defer func() { _ = log.Close() }()
@@ -128,30 +110,17 @@ func (m Manager) Upgrade(ctx context.Context, r UpgradeRequest) (string, error) 
 	return "", fmt.Errorf("%s left terma at %s, not %s: %w", m.Name, got, r.To, ErrNotOffered)
 }
 
-// backgroundEnv is environ for the package manager, run with no one at a terminal.
+// backgroundEnv is environ for Homebrew, run with no one at a terminal.
 func (m Manager) backgroundEnv(environ []string, refreshTaps bool) []string {
-	switch m.Name {
-	case "Homebrew":
-		environ = append(environ,
-			// Ask mode is Homebrew's default, though without a terminal it only prints its plan.
-			"HOMEBREW_NO_ASK=1",
-			// Leave the developer's other packages alone.
-			"HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1",
-			"HOMEBREW_NO_ENV_HINTS=1", "HOMEBREW_NO_UPDATE_REPORT_NEW=1")
-		if refreshTaps {
-			// Update the taps first, whenever they were last updated.
-			environ = append(environ, "HOMEBREW_AUTO_UPDATE_SECS=0")
-		}
-		return environ
-	case "npm":
-		// npm and the package's install script run on node, which a service's minimal PATH
-		// lacks: it sits beside the npm that owns this terma, or in its prefix's bin.
-		path := filepath.Dir(m.Argv[0]) + string(os.PathListSeparator) + filepath.Join(m.prefix, "bin")
-		if old := envValue(environ, "PATH"); old != "" {
-			path += string(os.PathListSeparator) + old
-		}
-		return append(environ, "PATH="+path,
-			"npm_config_update_notifier=false", "npm_config_fund=false", "npm_config_audit=false")
+	environ = append(environ,
+		// Ask mode is Homebrew's default, though without a terminal it only prints its plan.
+		"HOMEBREW_NO_ASK=1",
+		// Leave the developer's other packages alone.
+		"HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1",
+		"HOMEBREW_NO_ENV_HINTS=1", "HOMEBREW_NO_UPDATE_REPORT_NEW=1")
+	if refreshTaps {
+		// Update the taps first, whenever they were last updated.
+		environ = append(environ, "HOMEBREW_AUTO_UPDATE_SECS=0")
 	}
 	return environ
 }
@@ -306,7 +275,7 @@ func probe(ctx context.Context, env []string, argv ...string) (string, error) {
 	c.Env, c.Stdout, c.Stderr = env, &stdout, &stderr
 	c.WaitDelay = time.Second
 	if err := c.Run(); err != nil {
-		// Its first line says why: npm's error code, a shell's missing node.
+		// Its first line says why.
 		if why, _, _ := strings.Cut(strings.TrimSpace(stderr.String()), "\n"); why != "" {
 			return "", fmt.Errorf("%w: %s", err, why)
 		}

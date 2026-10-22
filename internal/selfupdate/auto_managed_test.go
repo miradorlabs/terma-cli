@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // upgrades stands in for the package managers the relay runs (Client.upgrade): each call
@@ -70,7 +72,7 @@ func relayAt(t *testing.T, version, path, github string, u *upgrades) *Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := &Client{ReleaseKeys: testKeys(), BaseURL: github, Version: version, Binary: started, RunsManagers: u != nil}
+	c := &Client{ReleaseKeys: testKeys(), BaseURL: github, Version: version, Binary: started, RunsHomebrew: u != nil}
 	if u != nil {
 		c.upgrade = u.upgrade
 	}
@@ -247,7 +249,7 @@ func TestAnUpgradeTheRelayWasStoppedDuringIsSaidByTheNext(t *testing.T) {
 		{"left running, installed meanwhile", fmt.Errorf("%w: %w", context.Canceled, errLeftRunning), 2 * time.Minute, said},
 		// Installed long after: by hand, not by the manager the relay left.
 		{"left running, installed long after", fmt.Errorf("%w: %w", context.Canceled, errLeftRunning), 2 * time.Hour, ""},
-		// Stopped before any manager started (during npm view, or refused to start).
+		// Stopped before Homebrew started (RunDetached refused to start it).
 		{"nothing left running", context.Canceled, 2 * time.Minute, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -380,7 +382,7 @@ func TestOnlyAnInstallByHandUnclaims(t *testing.T) {
 	stateDir := t.TempDir()
 	began := time.Now()
 	SaveCache(stateDir, Cache{Current: "1.0.0", Latest: "1.0.1",
-		Attempt: Attempt{AttemptAt: began, Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: began}})
+		Attempt: Attempt{AttemptAt: began, Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: began, InterruptedLast: began}})
 	Checked(stateDir, "1.0.0", &Release{TagName: "v1.0.1", PublishedAt: time.Now()})
 	if cache := LoadCache(stateDir); !cache.landed("1.0.1", began.Add(time.Minute)) {
 		t.Fatalf("terma update --check took the claim off: %+v", cache.Attempt)
@@ -388,5 +390,50 @@ func TestOnlyAnInstallByHandUnclaims(t *testing.T) {
 	InstalledByHand(stateDir)
 	if cache := LoadCache(stateDir); cache.landed("1.0.1", began.Add(time.Minute)) {
 		t.Fatalf("an install by hand is still claimed: %+v", cache.Attempt)
+	}
+}
+
+// A global npm install updates in place, as the install script's: the relay replaces the
+// package's vendor binary, which the shim only runs, with the signed release, and never runs
+// npm or node, which a service's PATH has neither of.
+func TestAGlobalNpmInstallUpdatesInPlaceWithoutNpm(t *testing.T) {
+	unixLayouts(t)
+	t.Setenv("PATH", "/usr/bin:/bin")
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := filepath.Join(root, "node")
+	vendor := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	if err := os.MkdirAll(filepath.Dir(vendor), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(vendor, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ran := filepath.Join(root, "npm-ran")
+	script(t, filepath.Join(prefix, "bin", "npm"), "touch "+ran+"; exit 1")
+	if i := InstallOf(vendor, "1.0.0"); i.Method != semconv.TermaInstallMethodNpm || !i.CanUpdate() {
+		t.Fatalf("the global npm install is %s, CanUpdate %v", i.Method, i.CanUpdate())
+	}
+	var github publishing
+	srv := github.serve(t, "v1.0.1", true)
+	started, err := os.Stat(vendor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	relay := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started, RunsHomebrew: true}
+	if o := relay.Auto(context.Background(), t.TempDir(), stateDir, vendor, nil); o.Installed != "1.0.1" || o.Err != nil {
+		t.Fatalf("the relay's pass = %+v, want 1.0.1 installed in place", o)
+	}
+	if got := installedAt(t, vendor); got != "terma v1.0.1" {
+		t.Fatalf("the vendor binary is %q", got)
+	}
+	if _, err := os.Stat(ran); err == nil {
+		t.Fatal("the relay ran npm")
+	}
+	if line := TellUpdated(stateDir); line != "terma updated itself in the background: 1.0.0 → 1.0.1 (npm package, in place)." {
+		t.Fatalf("the next command says %q", line)
 	}
 }

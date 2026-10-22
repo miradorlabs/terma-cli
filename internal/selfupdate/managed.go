@@ -20,15 +20,9 @@ type Manager struct {
 	Terma string
 	// Project is set for a project dependency: Command runs there, never by terma.
 	Project string
-	// prefix is a global npm install's prefix, whose bin keeps the node that npm runs on.
-	prefix string
-	// writes are the directories an upgrade through the manager writes in: where it keeps
-	// terma's versions or package, and the bin its link is in.
+	// writes are the directories a Homebrew upgrade writes in: where it keeps terma's
+	// versions, and the bin its link is in.
 	writes []string
-	// own means Argv runs the manager the install's own prefix keeps, which the relay's
-	// service finds whatever its PATH; an npm found on PATH instead is the developer's
-	// shell's, run by `terma update` alone.
-	own bool
 }
 
 // ManagedBy reports the package manager that owns the binary at exe, from its path alone.
@@ -51,7 +45,7 @@ func managedBy(exe, goos string) (Manager, bool) {
 		m := Manager{Name: "Homebrew", Command: "brew upgrade terma", Terma: filepath.FromSlash(prefix + "/bin/terma"),
 			writes: []string{filepath.FromSlash(prefix + strings.TrimSuffix(kind.dir, "/")), filepath.FromSlash(prefix + "/bin")}}
 		if brew := filepath.FromSlash(prefix + "/bin/brew"); isExecutable(brew) {
-			m.Argv, m.own = []string{brew, "upgrade"}, true
+			m.Argv = []string{brew, "upgrade"}
 			if kind.cask != "" {
 				m.Argv = append(m.Argv, kind.cask)
 			}
@@ -71,15 +65,15 @@ func managedBy(exe, goos string) (Manager, bool) {
 			m.Command, m.Project = "npm install "+npmPackage+"@latest", filepath.FromSlash(before)
 			return m, true
 		}
-		// An explicit prefix makes a PATH npm upgrade this copy, not another.
+		// `terma update` runs npm, in the developer's shell; the relay never does, and updates
+		// a global install's binary in place (Install.CanUpdate). An explicit prefix makes a
+		// PATH npm upgrade this copy, not another.
 		npm := filepath.FromSlash(prefix + "/bin/npm")
-		if m.own = isExecutable(npm); !m.own {
+		if !isExecutable(npm) {
 			npm, _ = exec.LookPath("npm")
 		}
-		m.prefix = filepath.FromSlash(prefix)
-		m.writes = []string{filepath.FromSlash(before + "/node_modules/@miradorlabs"), filepath.FromSlash(prefix + "/bin")}
 		if npm != "" {
-			m.Argv = []string{npm, "install", "--global", "--prefix", m.prefix, npmPackage + "@latest"}
+			m.Argv = []string{npm, "install", "--global", "--prefix", filepath.FromSlash(prefix), npmPackage + "@latest"}
 		}
 		return m, true
 	}

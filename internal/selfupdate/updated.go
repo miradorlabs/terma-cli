@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // updatedFile records the last release terma installed by itself, beside the check.
@@ -19,8 +20,11 @@ type Updated struct {
 	At   time.Time `json:"at"`
 	From string    `json:"from"`
 	To   string    `json:"to"`
-	// Through is the package manager that installed it, "Homebrew" or "npm"; "" in place.
+	// Through is the package manager that installed it, "Homebrew"; "" in place.
 	Through string `json:"through,omitempty"`
+	// Method is how terma was installed (Install.Method): for one in place, the install
+	// script's binary or an npm package's.
+	Method string `json:"method,omitempty"`
 	// Told means a command has said so.
 	Told bool `json:"told,omitempty"`
 }
@@ -40,12 +44,16 @@ func saveUpdated(dir string, u Updated) {
 	_ = config.WriteJSON(statePath(dir, updatedFile), u, 0o600)
 }
 
-// How names how u was installed, for the developer: "Homebrew", "npm" or "in place".
+// How names how u was installed, for the developer: "Homebrew", "npm package, in place" or
+// "in place".
 func (u Updated) How() string {
-	if u.Through == "" {
-		return "in place"
+	switch {
+	case u.Through != "":
+		return u.Through
+	case u.Method == semconv.TermaInstallMethodNpm:
+		return "npm package, in place"
 	}
-	return u.Through
+	return "in place"
 }
 
 // TellUpdated is the line saying, once, that terma updated itself in the background since

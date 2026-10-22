@@ -45,20 +45,26 @@ func InstallOn(exe, version, goos string) Install {
 		i.Method = semconv.TermaInstallMethodSource
 	case exe == "":
 	case !managed:
-		// The new binary is written beside the one it replaces, its link resolved.
-		resolved := exe
-		if r, err := filepath.EvalSymlinks(exe); err == nil {
-			resolved = r
-		}
-		i.Method, i.writes = semconv.TermaInstallMethodScript, []string{filepath.Dir(resolved)}
+		i.Method, i.writes = semconv.TermaInstallMethodScript, inPlace(exe)
 	case m.Name == "Homebrew":
 		i.Method, i.Manager, i.writes = semconv.TermaInstallMethodHomebrew, m, m.writes
 	case m.Project != "":
 		i.Method, i.Manager = semconv.TermaInstallMethodNpmProject, m
 	default:
-		i.Method, i.Manager, i.writes = semconv.TermaInstallMethodNpm, m, m.writes
+		// The npm package is a shim that runs its vendor binary, which is the one terma
+		// replaces in place, as the install script's.
+		i.Method, i.Manager, i.writes = semconv.TermaInstallMethodNpm, m, inPlace(exe)
 	}
 	return i
+}
+
+// inPlace is where an update in place of the binary at exe writes: beside it, its link
+// resolved.
+func inPlace(exe string) []string {
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return []string{filepath.Dir(exe)}
 }
 
 // Automatic is terma.update.auto for this install, under the developer's choice p and the
@@ -80,25 +86,39 @@ func (i Install) Automatic(p Preferences, getenv func(string) string) string {
 }
 
 // CanUpdate reports whether terma could ever install new releases here by itself, whatever
-// the developer chose: in place of a release binary it replaces itself, or through the
-// package manager of a Homebrew or global npm install, which must be the one the install's
-// own prefix keeps: the relay's service runs with the system's PATH, so an npm found on the
-// developer's PATH is not one it would find, and setup's word, read in that shell, must not
-// promise what the service does not do. Not a source build, which has no release to follow, nor a project's npm
-// dependency, whose lockfile is the project's, nor on Windows, where a running binary cannot
-// be swapped yet and terma runs no package manager; nor a binary the process could not find.
-// Nothing changes it while a process runs; whether it may write there now can (updatable).
+// the developer chose: in place of a release binary, the install script's or a global npm
+// package's, whose shim only runs it, so the relay never needs npm or node; or through
+// Homebrew, whose own brew it must find (Manager.Argv). Not a source build, which has no
+// release to follow, nor a project's npm dependency, whose lockfile is the project's, nor
+// on Windows, where a running binary cannot be swapped yet; nor a binary the process could
+// not find. Nothing changes it while a process runs; whether it may write there now can
+// (updatable).
 func (i Install) CanUpdate() bool {
 	if i.Exe == "" || i.goos == "windows" {
 		return false
 	}
 	switch i.Method {
-	case semconv.TermaInstallMethodScript:
+	case semconv.TermaInstallMethodScript, semconv.TermaInstallMethodNpm:
 		return true
-	case semconv.TermaInstallMethodHomebrew, semconv.TermaInstallMethodNpm:
-		return len(i.Manager.Argv) > 0 && i.Manager.own
+	case semconv.TermaInstallMethodHomebrew:
+		return len(i.Manager.Argv) > 0
 	}
 	return false
+}
+
+// throughHomebrew reports whether new releases are installed through Homebrew rather than in
+// place of the binary.
+func (i Install) throughHomebrew() bool {
+	return i.Method == semconv.TermaInstallMethodHomebrew
+}
+
+// through is the package manager that installs new releases here (Updated.Through):
+// "Homebrew", or "" for an update in place.
+func (i Install) through() string {
+	if i.throughHomebrew() {
+		return i.Manager.Name
+	}
+	return ""
 }
 
 // updatable reports whether terma can install new releases here by itself now: it could
@@ -126,15 +146,15 @@ func OptedOut(getenv func(string) string) bool {
 }
 
 // installedAt is when the release in place here was put there, as the file system has it:
-// the directory its package manager installed it in, which each version gets anew
-// (Caskroom|Cellar/terma/<version>, the npm package's vendor folder), or the binary terma
-// wrote in place; zero when it cannot be told.
+// for Homebrew, the directory it installed the binary in, which each version gets anew
+// (Caskroom/terma/<version>, or Cellar/terma/<version>/bin); else the binary terma wrote in
+// place; zero when it cannot be told.
 func (i Install) installedAt() time.Time {
 	path := i.Terma()
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		path = resolved
 	}
-	if i.Manager.Name != "" {
+	if i.throughHomebrew() {
 		path = filepath.Dir(path)
 	}
 	info, err := os.Stat(path)
