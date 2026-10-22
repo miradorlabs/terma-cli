@@ -143,7 +143,7 @@ func (app *App) printUpdateNotice(cmd *cobra.Command) {
 }
 
 func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
-	if !interactive || (app.flags.output != "" && app.flags.output != "table") || os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+	if !interactive || (app.flags.output != "" && app.flags.output != "table") || selfupdate.OptedOut(os.Getenv) {
 		return false
 	}
 	for c := cmd; c != nil; c = c.Parent() {

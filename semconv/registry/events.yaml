@@ -85,7 +85,8 @@ attribute_groups:
       - ref: terma.relay.launch
         requirement_level: required
       - ref: terma.install.method
-        requirement_level: required
+        requirement_level:
+          conditionally_required: Unless the relay cannot find its own binary.
 
 events:
   - name: terma.session.start
