@@ -1,7 +1,7 @@
 # End-to-end tests: real harness binaries, real provider credentials, the real terma
 # binary, checked against the collection matrix. Built in the pinned Go image,
 # run natively where the harnesses and their logins are.
-GO_IMAGE := golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
+GO_IMAGE := golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5
 HOST_OS   := $(shell uname -s | tr A-Z a-z)
 HOST_ARCH := $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 ROOT      := $(abspath ../..)
