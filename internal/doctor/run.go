@@ -29,6 +29,9 @@ type Env struct {
 	Root, GitDir string
 	RepoErr      error
 	Probes       Probes
+	// Updates are the rows saying how this terma gets new releases and what it last
+	// installed by itself, among the context doctor prints first.
+	Updates []Row
 }
 
 // Probes reach the event spool and the platform's APIs for a run.

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -53,7 +54,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
-				Updater: app.relayUpdater(install),
+				Updater: app.relayUpdater(install, cmd.ErrOrStderr()),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -69,7 +70,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			if res.AlreadyRunning && !quiet {
 				fmt.Fprintln(cmd.OutOrStdout(), "The relay is already running.")
 			}
-			return app.afterRelay(res)
+			return app.afterRelay(res, install, cmd.ErrOrStderr())
 		},
 	}
 	// Long, because an agent may export before its first hook.
@@ -91,14 +92,26 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 }
 
 // afterRelay ends a relay's run. A relay that should run again exits for the service manager
-// to start the newer terma, whoever installed it. A hook-started relay has no manager: one
-// that updated itself starts its successor now that its lock is free, since an agent may
-// export before the next hook (unless teardown removed its setup meanwhile), and one replaced
-// by a newer terma is followed by the relay Supersede started. The last heartbeat goes once
-// that successor is under way (Result.LastBeatDue).
-func (app *App) afterRelay(res daemon.Result) error {
-	if res.Updated && !res.Service && !res.SetupGone {
-		app.spawnRelay(app.stateDir, app.version)
+// to start the newer terma, whoever installed it. A relay that updated itself first has the
+// new release refresh what earlier versions installed, as `terma update` does (finishUpdate),
+// now that it holds nothing a service the refresh rewrites and restarts could lose. A
+// hook-started relay has no manager: one that updated itself starts its successor now that
+// its lock is free, since an agent may export before the next hook (unless teardown removed
+// its setup meanwhile), and one replaced by a newer terma is followed by the relay Supersede
+// started. Both run the new release where install's is found after an update
+// (selfupdate.Install.Terma): a package manager's link, not the versioned path the relay
+// started from. The last heartbeat goes once that successor is under way
+// (Result.LastBeatDue). out takes the refresh's output: the relay's log.
+func (app *App) afterRelay(res daemon.Result, install selfupdate.Install, out io.Writer) error {
+	if res.Updated && !res.SetupGone {
+		ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
+		if err := app.backgroundStep(ctx, out, install.Terma(), "update", "--refresh"); err != nil {
+			fmt.Fprintf(out, "terma: the relay could not refresh what terma installed for the new release: %v\n", err)
+		}
+		cancel()
+		if !res.Service {
+			app.spawnRelay(install.Terma(), app.stateDir, app.version)
+		}
 	}
 	if res.LastBeatDue() {
 		res.ExitBeat()
@@ -109,20 +122,25 @@ func (app *App) afterRelay(res daemon.Result) error {
 	return nil
 }
 
-// relayUpdater has the relay install each new release in place of its own binary, as
-// interactive commands do, so a machine nobody runs terma on still updates. It is nil where
-// the relay could never install one (updateAuto says unsupported): a development build, a
-// package manager's or a Windows binary, or one this process could not find. Each pass asks
-// updateAuto first and installs only when it says on, so the relay does what its heartbeat
-// reports: turned off with `terma update --auto off`, or in CI, it asks nothing, not even
-// GitHub.
-func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
+// relayUpdater has the relay install each new release by itself, as interactive commands
+// do, so a machine nobody runs terma on still updates: in place of its own binary, or
+// through the package manager that owns a Homebrew or global npm install, which writes what
+// it prints to out, the relay's log. It is nil where the relay could never install one
+// (updateAuto says unsupported): a development build, a project's npm dependency, a Windows
+// binary, a package manager terma cannot find, or a binary this process could not find.
+// Each pass asks updateAuto first and installs only when it says on, so the relay does what
+// its heartbeat reports: turned off with `terma update --auto off`, or in CI, it asks
+// nothing, not even GitHub.
+func (app *App) relayUpdater(install selfupdate.Install, out io.Writer) *daemon.Updater {
 	if app.updateAuto(install) == semconv.TermaUpdateAutoUnsupported {
 		return nil
 	}
 	// One client for the relay's life: it goes on as each release it installs, so the next
 	// is installed over that one (selfupdate.Client.Auto).
 	client := app.updateClient()
+	client.Upgrade = func(ctx context.Context, m selfupdate.Manager, version string) (string, error) {
+		return m.Upgrade(ctx, version, out)
+	}
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
 		if app.updateAuto(install) != semconv.TermaUpdateAutoOn {
 			return "", nil

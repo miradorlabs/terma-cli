@@ -25,10 +25,11 @@ type Install struct {
 // build wherever it is, a package manager's directory included. An exe of "" is a binary
 // the process could not find: a release's has no method, and is never updated (Automatic).
 func InstallOf(exe, version string) Install {
-	return installOf(exe, version, runtime.GOOS)
+	return InstallOn(exe, version, runtime.GOOS)
 }
 
-func installOf(exe, version, goos string) Install {
+// InstallOn is InstallOf for a terma built for goos, as a test names another platform's.
+func InstallOn(exe, version, goos string) Install {
 	i := Install{Exe: exe, goos: goos}
 	m, managed := managedBy(exe, goos)
 	switch {
@@ -53,15 +54,42 @@ func installOf(exe, version, goos string) Install {
 // CI or TERMA_NO_UPDATE_CHECK=1, which keep terma's updates out of automation), or never
 // can, whatever the developer chooses (Unsupported). It is the one rule: the relay's
 // updater installs releases exactly when it says on, so what the heartbeat reports is what
-// the relay does. Only a release binary terma replaces itself is supported: a source build
-// has no release to follow, a package manager's install is that manager's to upgrade, and
-// a running Windows binary cannot be swapped yet.
+// the relay does.
 func (i Install) Automatic(p Preferences, getenv func(string) string) string {
 	switch {
-	case i.Exe == "" || i.Method != semconv.TermaInstallMethodScript || i.goos == "windows":
+	case !i.updatable():
 		return semconv.TermaUpdateAutoUnsupported
 	case !p.Auto || getenv("CI") != "" || getenv("TERMA_NO_UPDATE_CHECK") == "1":
 		return semconv.TermaUpdateAutoOff
 	}
 	return semconv.TermaUpdateAutoOn
+}
+
+// updatable reports whether terma can install new releases here by itself, whatever the
+// developer chose: in place of a release binary it replaces itself, or through the package
+// manager of a Homebrew or global npm install, which it must be able to run (Manager.Argv).
+// Not a source build, which has no release to follow, nor a project's npm dependency, whose
+// lockfile is the project's, nor on Windows, where a running binary cannot be swapped yet
+// and terma runs no package manager; nor a binary the process could not find.
+func (i Install) updatable() bool {
+	if i.Exe == "" || i.goos == "windows" {
+		return false
+	}
+	switch i.Method {
+	case semconv.TermaInstallMethodScript:
+		return true
+	case semconv.TermaInstallMethodHomebrew, semconv.TermaInstallMethodNpm:
+		return len(i.Manager.Argv) > 0
+	}
+	return false
+}
+
+// Terma is where this install's terma is found after an update: the link its package
+// manager moves to each version (Manager.Terma), never the versioned path an upgrade may
+// remove, or the binary terma replaces in place.
+func (i Install) Terma() string {
+	if i.Manager.Terma != "" {
+		return i.Manager.Terma
+	}
+	return i.Exe
 }

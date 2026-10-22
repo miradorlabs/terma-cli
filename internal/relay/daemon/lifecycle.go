@@ -94,7 +94,12 @@ func recordedPID(dir string) int {
 // running; of two racing hooks, the second's relay exits at its lock. A running relay of an
 // earlier release than version is asked to make way, as the next command of a daemon-backed
 // CLI restarts a daemon older than itself.
-func Spawn(stateDir, version string) {
+func Spawn(stateDir, version string) { SpawnFrom("", stateDir, version) }
+
+// SpawnFrom is Spawn running the terma at exe, this process's own when "": a relay whose
+// package manager upgraded it starts its successor from the link that manager moved to the
+// new release, never the versioned path it ran from, which the upgrade may have removed.
+func SpawnFrom(exe, stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
 	if flock.IsBusy(err) {
@@ -108,7 +113,7 @@ func Spawn(stateDir, version string) {
 	if info, err := os.Stat(filepath.Join(dir, ErrorFile)); err == nil && time.Since(info.ModTime()) < RetryAfter {
 		return
 	}
-	if start(dir) != nil {
+	if start(dir, exe) != nil {
 		return
 	}
 	// Wait until it listens: an agent may export as soon as the hook returns, and never
@@ -168,15 +173,19 @@ var follow = func(dir string) {
 		return
 	}
 	unlock()
-	_ = start(dir, "--follow")
+	_ = start(dir, "", "--follow")
 }
 
 // serviceRunsThis reports whether the installed service starts this terma.
 var serviceRunsThis = func(stateDir string) bool { return CheckService(stateDir).Current }
 
-// start starts `terma relay run --quiet` detached with args, logging to the relay's log.
-func start(dir string, args ...string) error {
-	exe, err := os.Executable()
+// start starts `terma relay run --quiet` detached with args, logging to the relay's log: the
+// terma at exe, or this process's own when exe is "".
+func start(dir, exe string, args ...string) error {
+	var err error
+	if exe == "" {
+		exe, err = os.Executable()
+	}
 	// A test binary is no relay: started as one, it would run its package's tests detached,
 	// holding the relay's log open.
 	if err != nil || testing.Testing() {

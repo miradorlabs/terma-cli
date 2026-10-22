@@ -25,8 +25,8 @@ curl -fsSL https://terma.ai/install.sh | bash
 terma setup
 ```
 
-**Homebrew** (macOS and Linux). It updates with `brew upgrade terma`; `terma update` runs
-that through the Homebrew that owns this terma.
+**Homebrew** (macOS and Linux). terma keeps it up to date through the Homebrew that owns it
+(see [Updates](#updates)); `terma update` runs `brew upgrade terma` there at once.
 
 ```bash
 brew tap miradorlabs/tap
@@ -35,9 +35,11 @@ brew install terma
 terma setup
 ```
 
-**npm**. It updates with `npm install -g @miradorlabs/terma@latest`; `terma update` runs
-that through the npm that owns this terma. The npm shim adds Node's startup time to every commit, so prefer the
-installer script or Homebrew where terma runs inside git hooks.
+**npm**. terma keeps a global install up to date through the npm that owns it (see
+[Updates](#updates)); `terma update` runs `npm install -g @miradorlabs/terma@latest` there at
+once. A project's own dependency is upgraded in that project. The npm shim adds Node's
+startup time to every commit, so prefer the installer script or Homebrew where terma runs
+inside git hooks.
 
 ```bash
 npm install -g @miradorlabs/terma
@@ -134,11 +136,13 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 terma keeps itself up to date. It looks for a new release (after a failed lookup, again in
 15 minutes, then less often, up to hourly) and installs it in place, verified against the
-release checksum. The local relay does this every few minutes in the background, so a machine
-nobody runs a terma command on still updates, and each terma command you run in a terminal
-does it at most hourly. Hooks,
-scripts, CI and `--output` other than a table never look. A relay that installed a
-release keeps running until nothing it holds is waiting, no export is arriving and none
+release checksum, or through Homebrew or npm where one of them installed terma. The local
+relay does this every few minutes in the background, so a machine nobody runs a terma
+command on still updates, and each terma command you run in a terminal does it at most
+hourly, though it leaves a package manager's upgrade, which can take minutes, to the
+relay and only says a release is out. Hooks, scripts, CI and `--output` other than a
+table never look. A relay that installed a release keeps running until nothing it holds
+is waiting, no export is arriving and none
 has for half a minute (after 12 hours it stops waiting for that pause), then restarts on
 the new binary. It never restarts while it holds anything, so the restart loses nothing:
 what it has queued for delivery is on disk, and the new relay sends it; an export that
@@ -167,12 +171,27 @@ terma update --auto on      # install new releases automatically again (the defa
 terma update --auto status  # show the current choice
 ```
 
-terma never replaces a Homebrew or npm installation or a Windows binary by itself; those
-only get the notice, and `terma setup` says which applies to yours. `terma update`
-upgrades Homebrew and npm through the package manager that owns them, and when it cannot
-find that package manager it names the command to run; a Windows binary is replaced by
-hand, as Get started says. A build between release tags is never updated and gets no
-notice.
+A Homebrew or global npm installation updates the same way, on the same schedule, through
+the package manager that owns it — that one, never whichever is first on PATH — which the
+relay runs with no terminal, its output in the relay's log. Homebrew updates its taps
+before an upgrade only once a day, so the relay has it update them first; it upgrades terma
+alone, and leaves your other packages, and Homebrew's cleanup of them, alone. npm is asked
+first whether its registry has the release, then installs exactly that version. The tap
+and the registry are published a little after the release itself: when the package
+manager does not have the release yet, the relay asks again in 15 minutes, then less
+often, up to hourly, rather than waiting a day as it does after a failed install, such as
+a tap Homebrew does not trust or a global prefix npm may not write. A relay that installed
+a release has it refresh what terma installed (see below), then restarts on the link the
+package manager moved to it.
+
+The relay prints nothing, so the next terma command you run in a terminal says what it
+installed, once, and `terma doctor` shows how yours updates, the last release terma
+installed by itself, and why the last attempt failed, if it did. `terma setup` says how
+yours updates too. A project's npm dependency, and a Homebrew or npm installation whose
+package manager terma cannot find, only get the notice; `terma update` runs the package
+manager's upgrade at once, and when it cannot find that package manager it names the
+command to run. A Windows binary only gets the notice, and is replaced by hand, as Get
+started says. A build between release tags is never updated and gets no notice.
 
 **Signed releases.** Every release's `checksums.txt`, which names each archive's digest, is
 signed together with the release's tag, and terma installs only a release whose signature
@@ -201,8 +220,9 @@ installs it automatically.
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
 keeping every choice you made. It works from what is on disk, never signs in, and never
-adds a file. After an update the relay installed, it runs at your next terma command. On
-the latest release, `terma update` does just that refresh.
+adds a file. After an update the relay installed, the relay has the new version run it
+before it restarts, and otherwise your next terma command runs it. On the latest release,
+`terma update` does just that refresh.
 
 ## Scripted and headless setup
 

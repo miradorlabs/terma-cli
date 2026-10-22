@@ -788,9 +788,10 @@ attributes:
       A record attribute on the relay heartbeat, read as each beat is sent, since the developer
       can turn automatic updates on or off while the relay runs. It is the relay's own
       decision, from the one rule its updater follows, so it never says on for a relay that
-      would not update. A source build, a project's npm dependency, a Windows binary, and a
-      binary the relay cannot find are unsupported, and so is a Homebrew or npm install,
-      whose package manager upgrades it.
+      would not update. A Homebrew or global npm install is on or off like the install
+      script's, the relay upgrading it through the package manager that owns it. A source
+      build, a project's npm dependency, a Windows binary, a binary the relay cannot find, and
+      a Homebrew or npm install whose package manager terma cannot find are unsupported.
   - key: terma.relay.exit.reason
     type:
       members:

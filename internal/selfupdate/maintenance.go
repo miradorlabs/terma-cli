@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -63,6 +62,13 @@ type Cache struct {
 	// later build is not held back by it (held): the failure may have been the earlier
 	// build's own, such as a release key it lacks or a fault since fixed.
 	AttemptedBy string `json:"attempted_by,omitempty"`
+	// Unoffered counts the attempts in a row whose package manager ran but did not have
+	// Attempted yet (ErrNotOffered): its tap or registry is published after the release, so
+	// it is tried again after retryAfter rather than AttemptInterval.
+	Unoffered int `json:"unoffered,omitempty"`
+	// Failure is why the install of Attempted failed, or its package manager did not offer
+	// it, for doctor; "" when neither.
+	Failure string `json:"failure,omitempty"`
 }
 
 // Found records rel as the latest release, with whether its files are there yet (Unbuilt):
@@ -74,7 +80,7 @@ func (c *Cache) Found(rel *Release) {
 
 // attempt is the record of the last install tried alone, which outlives what a look found.
 func (c Cache) attempt() Cache {
-	return Cache{AttemptAt: c.AttemptAt, Attempted: c.Attempted, AttemptedBy: c.AttemptedBy}
+	return Cache{AttemptAt: c.AttemptAt, Attempted: c.Attempted, AttemptedBy: c.AttemptedBy, Unoffered: c.Unoffered, Failure: c.Failure}
 }
 
 // Checked records in dir a look that `terma update` made for itself, which found rel for a
@@ -89,9 +95,18 @@ func Checked(dir, current string, rel *Release) Cache {
 }
 
 // held reports whether latest is a release whose install failed less than AttemptInterval
-// ago, tried by this build (running) or a later one, so that it is not tried again yet.
+// ago, tried by this build (running) or a later one, so that it is not tried again yet. One
+// its package manager did not offer yet waits only retryAfter its count of such attempts.
 func (c Cache) held(running string) bool {
-	return c.Attempted == c.Latest && time.Since(c.AttemptAt) < AttemptInterval && !Newer(c.AttemptedBy, running)
+	return c.Attempted == c.Latest && time.Now().Before(c.Retry()) && !Newer(c.AttemptedBy, running)
+}
+
+// Retry is when the release last attempted may be tried again after it failed.
+func (c Cache) Retry() time.Time {
+	if c.Unoffered > 0 {
+		return c.AttemptAt.Add(retryAfter(c.Unoffered))
+	}
+	return c.AttemptAt.Add(AttemptInterval)
 }
 
 // maxRetryWait caps retryAfter: the window GitHub's rate limit resets in, so a machine back
@@ -274,163 +289,4 @@ func notice(cache Cache, current string) string {
 		return ""
 	}
 	return fmt.Sprintf("A newer terma is available (%s → %s). Run `terma update`.", current, cache.Latest)
-}
-
-// UpdatesItself reports whether the binary at exe is one terma replaces on its own: not a
-// package manager's, and not on Windows, where a running binary cannot be swapped yet.
-func UpdatesItself(exe string) bool {
-	return ManagedCommand(exe) == "" && runtime.GOOS != "windows"
-}
-
-// Replaced reports whether the executable at exe is no longer the one this process started
-// from or installed (Binary): another install has put a release in place since, so this
-// process's version no longer says what is installed, and it must not replace it. False
-// without Binary, which cannot tell. The file's size and time are compared too: a file this
-// process installed is not held open as the one it started from is, so once another install
-// replaces it, a later file may be given its inode.
-func (c *Client) Replaced(exe string) bool {
-	if c.Binary == nil {
-		return false
-	}
-	now, err := os.Stat(exe)
-	return err != nil || !os.SameFile(now, c.Binary) || now.Size() != c.Binary.Size() || !now.ModTime().Equal(c.Binary.ModTime())
-}
-
-// current is the release installed where this process started: its own, or the one it has
-// installed in its place since. A process that keeps running after it installed a release,
-// as the relay does until its agents pause, compares the next release to that one.
-func (c *Client) current() string {
-	if c.installed != "" {
-		return c.installed
-	}
-	return c.Version
-}
-
-// adopt has this process go on as version, which it just installed at exe: what is
-// installed is no longer what it started from but is its own doing, so the next release is
-// installed over it rather than refused as another install's (Replaced).
-func (c *Client) adopt(version, exe string) {
-	if info, err := os.Stat(exe); err == nil {
-		c.installed, c.Binary = version, info
-	}
-}
-
-// Outcome is what one automatic update pass did.
-type Outcome struct {
-	// Installed is the release now in place of the binary, "" when none was installed.
-	Installed string
-	// Notice names a newer release the pass did not install.
-	Notice string
-	// Replaced means another install put a release in place while this process ran, so it
-	// did nothing: the next command runs that release.
-	Replaced bool
-	// Err is a failed install; the next attempt waits AttemptInterval.
-	Err error
-}
-
-// Auto is the relay's pass: it looks for a newer release on every call, a cheap probe of the
-// latest tag (latestTag) unless that moved, as the relay spaces its calls itself, and so a
-// patch release, which installs without a soak, reaches a machine within one of the relay's
-// waits; a failed look still backs off (retryAfter). It installs the release in place of exe
-// for a release build that updates itself, unless the developer turned automatic updates
-// off in configDir; the check's records go in stateDir. A new minor or major version waits
-// out SoakTime first, and is looked up again before it is installed, so a release pulled
-// since the check is not. Each release is attempted once per AttemptInterval at most, so a
-// failing install is not retried at every pass; a release still being built and signed
-// (ErrNotReady) is no attempt, and each look asks after its files again (look). A process
-// that installed a release goes on as it (current), so its later passes install the releases
-// after it. progress, when set, is told of the download.
-func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
-	return c.auto(ctx, 0, configDir, stateDir, exe, progress)
-}
-
-// auto is Auto with every as the least time between looks.
-func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
-	current := c.current()
-	if !IsRelease(current) {
-		return Outcome{}
-	}
-	p, err := LoadPreferences(configDir)
-	if err != nil {
-		return Outcome{}
-	}
-	unlock, err := Lock(stateDir)
-	if err != nil {
-		return Outcome{}
-	}
-	defer unlock()
-	// Checked under the lock: another install may have put a later release in place, which
-	// this process's version says nothing about.
-	if c.Replaced(exe) {
-		return Outcome{Replaced: true}
-	}
-	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
-	if !p.Auto || c.Binary == nil || cache.Unbuilt || !Newer(current, cache.Latest) || !UpdatesItself(exe) || cache.held(c.Version) ||
-		Soaking(current, cache.Latest, cache.Published, time.Now()) {
-		return Outcome{Notice: notice(cache, current)}
-	}
-	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	if rel == nil {
-		// A check that failed waits out its backoff before any lookup, this one included.
-		if cache.Failed {
-			return Outcome{Notice: notice(cache, current)}
-		}
-		if rel, err = c.Latest(updateCtx); err != nil {
-			// A failed lookup, retried as a failed check is, not held back a day as an install;
-			// one its process was stopped during is neither.
-			if ctx.Err() == nil {
-				cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
-				SaveCache(stateDir, cache)
-			}
-			return Outcome{Err: err}
-		}
-		// The release may have been pulled, or followed by another, since the check.
-		cache.Found(rel)
-	}
-	// One that followed may be without its files still, or not be one to install by itself.
-	if cache.Unbuilt || !Newer(current, rel.TagName) || Soaking(current, rel.Version(), rel.PublishedAt, time.Now()) {
-		SaveCache(stateDir, cache)
-		return Outcome{Notice: notice(cache, current)}
-	}
-	cache.AttemptAt, cache.Attempted, cache.AttemptedBy = time.Now(), rel.Version(), c.Version
-	SaveCache(stateDir, cache)
-	if progress != nil {
-		fmt.Fprintf(progress, "Updating terma %s → %s…\n", current, rel.Version())
-	}
-	_, err = c.Apply(updateCtx, rel, exe, progress)
-	replaced := errors.Is(err, ErrReplaced)
-	if replaced || err != nil && ctx.Err() != nil {
-		// Not the release's failure, so it is not held back: another install's binary is in
-		// place, whose own process may try at once, or this process was stopped during the
-		// install, as a relay is that restarts on the release before.
-		cache.AttemptAt, cache.Attempted, cache.AttemptedBy = time.Time{}, "", ""
-		SaveCache(stateDir, cache)
-	}
-	if replaced {
-		return Outcome{Replaced: true}
-	}
-	if err != nil {
-		return Outcome{Err: err}
-	}
-	// Recorded as the new version's check, so its first pass does not look again.
-	cache.Latest, cache.Published, cache.Current, cache.CheckedAt = rel.Version(), rel.PublishedAt, rel.Version(), time.Now()
-	SaveCache(stateDir, cache)
-	return Outcome{Installed: rel.Version()}
-}
-
-// Maintain is Auto after a human-facing command, looking every CommandCheckInterval at most
-// and saying what it did. Errors never change the command's result.
-func (c *Client) Maintain(ctx context.Context, configDir, stateDir, exe string, out io.Writer) {
-	o := c.auto(ctx, CommandCheckInterval, configDir, stateDir, exe, out)
-	switch {
-	case o.Err != nil:
-		fmt.Fprintf(out, "Automatic update failed: %v. Run `terma update` to retry.\n", o.Err)
-	case o.Installed != "":
-		fmt.Fprintf(out, "Updated terma to %s; the next invocation uses it.\n", o.Installed)
-	case o.Replaced:
-		fmt.Fprintln(out, "terma was updated while this command ran; the next invocation uses the new version.")
-	case o.Notice != "":
-		fmt.Fprintln(out, o.Notice)
-	}
 }

@@ -5,16 +5,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -199,24 +202,45 @@ func TestUpdateThatCannotCheckRefreshesNothing(t *testing.T) {
 	}
 }
 
-// Setup says how this installation gets new releases: through the package manager that
-// owns it, by itself, or not at all.
+// Setup says how this installation gets new releases: by itself, through the package
+// manager that owns it in the background, through that manager by hand when terma cannot
+// run it, or not at all.
 func TestUpdatesSummary(t *testing.T) {
-	home := t.TempDir()
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix package-manager layouts")
+	}
+	t.Setenv("PATH", "")
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	brew, npm := filepath.Join(home, "brew"), filepath.Join(home, "node")
+	for _, f := range []string{filepath.Join(brew, "bin", "brew"), filepath.Join(npm, "bin", "npm")} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, nil, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, tc := range []struct {
 		name, exe, version, goos string
 		auto                     bool
 		want                     string
 	}{
-		{"installer script", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "darwin", true, "automatically"},
+		{"installer script", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "darwin", true, "automatically: terma installs"},
 		{"turned off", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "linux", false, "`terma update --auto on`"},
-		{"homebrew", filepath.Join(home, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew: `brew upgrade terma`"},
-		{"npm", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install -g @miradorlabs/terma@latest`"},
+		{"homebrew", filepath.Join(brew, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "the local relay has Homebrew install each new release"},
+		{"homebrew, turned off", filepath.Join(brew, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", false, "`terma update --auto on`"},
+		{"homebrew not found", filepath.Join(home, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew: `brew upgrade terma`"},
+		{"npm", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "the local relay has npm install each new release"},
+		{"npm not found", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install -g @miradorlabs/terma@latest`"},
+		{"npm project", filepath.Join(home, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install @miradorlabs/terma@latest`"},
 		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
 		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := updatesSummary(tc.exe, tc.version, tc.goos, tc.auto); !strings.Contains(got, tc.want) {
+			if got := updatesSummary(selfupdate.InstallOn(tc.exe, tc.version, tc.goos), tc.auto); !strings.Contains(got, tc.want) {
 				t.Fatalf("updatesSummary = %q, want it to say %q", got, tc.want)
 			}
 		})
@@ -363,11 +387,11 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	if install.Method != semconv.TermaInstallMethodScript || release.updateAuto(install) != semconv.TermaUpdateAutoOn {
 		t.Fatalf("a release binary of its own is %s, auto %s", install.Method, release.updateAuto(install))
 	}
-	if release.relayUpdater(install) == nil {
+	if release.relayUpdater(install, io.Discard) == nil {
 		t.Fatal("a release relay does not update itself")
 	}
 	dev := testApp.installed()
-	if dev.Method != semconv.TermaInstallMethodSource || testApp.updateAuto(dev) != semconv.TermaUpdateAutoUnsupported || testApp.relayUpdater(dev) != nil {
+	if dev.Method != semconv.TermaInstallMethodSource || testApp.updateAuto(dev) != semconv.TermaUpdateAutoUnsupported || testApp.relayUpdater(dev, io.Discard) != nil {
 		t.Fatalf("a development build's relay updates itself: %s, auto %s", dev.Method, testApp.updateAuto(dev))
 	}
 	// A pass that looked would have recorded its check.
@@ -378,12 +402,12 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 			if got := release.updateAuto(install); got != semconv.TermaUpdateAutoOff {
 				t.Fatalf("under %s terma.update.auto = %q", env, got)
 			}
-			if v, err := release.relayUpdater(install).Update(t.Context()); v != "" || err != nil || looked() {
+			if v, err := release.relayUpdater(install, io.Discard).Update(t.Context()); v != "" || err != nil || looked() {
 				t.Fatalf("under %s the relay's pass = %q, %v, looked %v", env, v, err, looked())
 			}
 		})
 	}
-	updater := release.relayUpdater(install)
+	updater := release.relayUpdater(install, io.Discard)
 	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: false}); err != nil {
 		t.Fatal(err)
 	}
@@ -394,35 +418,96 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	if v, err := updater.Update(t.Context()); v != "" || err != nil || looked() {
 		t.Fatalf("turned off, the relay's pass = %q, %v, looked %v", v, err, looked())
 	}
+	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: true}); err != nil {
+		t.Fatal(err)
+	}
+	// A Homebrew install updates through the brew that owns it, and only where there is one.
+	prefix := t.TempDir()
+	cask := filepath.Join(prefix, "Caskroom", "terma", "1.2.0", "terma")
+	if brew := selfupdate.InstallOf(cask, "1.2.0"); release.relayUpdater(brew, io.Discard) != nil ||
+		release.updateAuto(brew) != semconv.TermaUpdateAutoUnsupported {
+		t.Fatalf("a Homebrew install without its brew updates itself: auto %s", release.updateAuto(brew))
+	}
+	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prefix, "bin", "brew"), nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if brew := selfupdate.InstallOf(cask, "1.2.0"); brew.Method != semconv.TermaInstallMethodHomebrew ||
+		release.updateAuto(brew) != semconv.TermaUpdateAutoOn || release.relayUpdater(brew, io.Discard) == nil {
+		t.Fatalf("a Homebrew install with its brew is %s, auto %s", brew.Method, release.updateAuto(brew))
+	}
 }
 
-// A hook-started relay that updated itself starts its successor, since no service will; a
-// service's relay is restarted by its service manager, and one that made way for a newer
-// hook's terma is started again by that hook.
+// A relay that updated itself has the new release refresh what terma installed, then, when
+// a hook started it, starts its successor, since no service will: both from where its
+// install's new release is found, a package manager's link rather than the versioned path
+// it ran from. A service's relay is restarted by its service manager, and one that made way
+// for a newer hook's terma is started again by that hook.
 func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
+	script := selfupdate.InstallOn("/home/d/.local/bin/terma", "1.3.0", "linux")
+	brew := selfupdate.InstallOn("/home/linuxbrew/.linuxbrew/Caskroom/terma/1.3.0/terma", "1.3.0", "linux")
 	for _, tc := range []struct {
-		name    string
-		res     daemon.Result
-		spawned bool
-		restart bool
+		name      string
+		res       daemon.Result
+		install   selfupdate.Install
+		from      string
+		spawned   bool
+		refreshed bool
+		restart   bool
 	}{
-		{"updated, hook-started", daemon.Result{Updated: true}, true, true},
-		{"updated, service", daemon.Result{Updated: true, Service: true}, false, true},
-		{"updated, then torn down", daemon.Result{Updated: true, SetupGone: true}, false, true},
-		{"replaced, hook-started", daemon.Result{Replaced: true}, false, true},
-		{"idle, hook-started", daemon.Result{}, false, false},
+		{"updated, hook-started", daemon.Result{Updated: true}, script, "/home/d/.local/bin/terma", true, true, true},
+		{"updated through Homebrew, hook-started", daemon.Result{Updated: true}, brew, "/home/linuxbrew/.linuxbrew/bin/terma", true, true, true},
+		{"updated, service", daemon.Result{Updated: true, Service: true}, brew, "/home/linuxbrew/.linuxbrew/bin/terma", false, true, true},
+		{"updated, then torn down", daemon.Result{Updated: true, SetupGone: true}, script, "", false, false, true},
+		{"replaced, hook-started", daemon.Result{Replaced: true}, script, "", false, false, true},
+		{"idle, hook-started", daemon.Result{}, script, "", false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app := New(builtin.Agents, "1.3.0")
 			app.stateDir = t.TempDir()
-			spawned := false
-			app.spawnRelay = func(stateDir, version string) {
-				spawned = stateDir == app.stateDir && version == "1.3.0"
+			spawned, refreshed := false, false
+			app.spawnRelay = func(exe, stateDir, version string) {
+				spawned = exe == tc.from && stateDir == app.stateDir && version == "1.3.0"
 			}
-			err := app.afterRelay(tc.res)
-			if spawned != tc.spawned || (err != nil) != tc.restart {
-				t.Fatalf("afterRelay(%+v): spawned %v, err %v; want spawned %v, restart %v", tc.res, spawned, err, tc.spawned, tc.restart)
+			app.backgroundStep = func(_ context.Context, _ io.Writer, argv ...string) error {
+				refreshed = slices.Equal(argv, []string{tc.from, "update", "--refresh"})
+				return nil
+			}
+			err := app.afterRelay(tc.res, tc.install, io.Discard)
+			if spawned != tc.spawned || refreshed != tc.refreshed || (err != nil) != tc.restart {
+				t.Fatalf("afterRelay(%+v): spawned %v, refreshed %v, err %v; want spawned %v, refreshed %v, restart %v",
+					tc.res, spawned, refreshed, err, tc.spawned, tc.refreshed, tc.restart)
 			}
 		})
+	}
+}
+
+// doctor says how this terma updates, what it last installed by itself, which a relay only
+// logs, and why its last automatic install of a newer release failed, until it is retried.
+func TestDoctorShowsTheLastAutomaticUpdate(t *testing.T) {
+	app := New(builtin.Agents, "1.2.0")
+	app.dir, app.stateDir = t.TempDir(), t.TempDir()
+	exe := filepath.Join(app.stateDir, "bin", "terma")
+	if rows := app.updateRows(exe); len(rows) != 1 || rows[0].Label != "Updates" || !strings.Contains(rows[0].Value, "automatically") {
+		t.Fatalf("rows before any update: %+v", rows)
+	}
+	updated := filepath.Join(app.stateDir, selfupdate.Dir, "updated.json")
+	if err := os.MkdirAll(filepath.Dir(updated), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 10, 22, 9, 30, 0, 0, time.Local)
+	if err := os.WriteFile(updated, fmt.Appendf(nil, `{"at":%q,"from":"1.1.9","to":"1.2.0","through":"Homebrew"}`, at.Format(time.RFC3339)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	selfupdate.SaveCache(app.stateDir, selfupdate.Cache{CheckedAt: time.Now(), Current: "1.2.0", Latest: "1.2.1",
+		AttemptAt: at, Attempted: "1.2.1", AttemptedBy: "1.2.0", Failure: "Homebrew could not upgrade terma to 1.2.1 (exit status 1)"})
+	rows := app.updateRows(exe)
+	if len(rows) != 3 || rows[1].Label != "Last update" || rows[1].Value != "1.1.9 → 1.2.0 automatically (Homebrew), 2026-10-22 09:30" {
+		t.Fatalf("rows: %+v", rows)
+	}
+	if want := "installing 1.2.1 failed 2026-10-22 09:30: Homebrew could not upgrade terma to 1.2.1 (exit status 1); tried again from 2026-10-23 09:30"; rows[2] != (doctor.Row{Value: want}) {
+		t.Fatalf("failure row %+v, want %q", rows[2], want)
 	}
 }

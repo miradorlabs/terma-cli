@@ -20,6 +20,8 @@ type Manager struct {
 	Terma string
 	// Project is set for a project dependency: Command runs there, never by terma.
 	Project string
+	// prefix is a global npm install's prefix, whose bin keeps the node that npm runs on.
+	prefix string
 }
 
 // ManagedBy reports the package manager that owns the binary at exe, from its path alone.
@@ -50,7 +52,7 @@ func managedBy(exe, goos string) (Manager, bool) {
 		return m, true
 	}
 	if before, _, ok := strings.Cut(path, "/node_modules/@miradorlabs/terma/"); ok {
-		m := Manager{Name: "npm", Command: "npm install -g @miradorlabs/terma@latest", Terma: exe}
+		m := Manager{Name: "npm", Command: "npm install -g " + npmPackage + "@latest", Terma: exe}
 		// On Windows terma neither runs npm nor tells the layouts apart.
 		if goos == "windows" {
 			return m, true
@@ -58,7 +60,7 @@ func managedBy(exe, goos string) (Manager, bool) {
 		// Outside <prefix>/lib/node_modules it is a project's dependency, and its lockfile is the project's.
 		prefix, global := strings.CutSuffix(before, "/lib")
 		if !global {
-			m.Command, m.Project = "npm install @miradorlabs/terma@latest", filepath.FromSlash(before)
+			m.Command, m.Project = "npm install "+npmPackage+"@latest", filepath.FromSlash(before)
 			return m, true
 		}
 		// An explicit prefix makes a PATH npm upgrade this copy, not another.
@@ -66,19 +68,17 @@ func managedBy(exe, goos string) (Manager, bool) {
 		if !isExecutable(npm) {
 			npm, _ = exec.LookPath("npm")
 		}
+		m.prefix = filepath.FromSlash(prefix)
 		if npm != "" {
-			m.Argv = []string{npm, "install", "--global", "--prefix", filepath.FromSlash(prefix), "@miradorlabs/terma@latest"}
+			m.Argv = []string{npm, "install", "--global", "--prefix", m.prefix, npmPackage + "@latest"}
 		}
 		return m, true
 	}
 	return Manager{}, false
 }
 
-// ManagedCommand returns the owning package manager's upgrade command, if any.
-func ManagedCommand(exe string) string {
-	m, _ := ManagedBy(exe)
-	return m.Command
-}
+// npmPackage is terma's npm package.
+const npmPackage = "@miradorlabs/terma"
 
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)

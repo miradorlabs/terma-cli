@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 func (app *App) newUpdateCommand() *cobra.Command {
@@ -38,7 +39,9 @@ terma checks for a newer release and installs it by itself, a patch at once and 
 or major version after it has been out for 24 hours. The local relay checks every few minutes
 in the background, so a patch reaches a machine within 10 minutes even if nobody runs terma
 on it; interactive commands also check, hourly. Never inside agent hooks, scripts, or CI.
-Use --auto off for notices only, and --auto on to go back to automatic updates. Homebrew and npm installations, and Windows,
+The relay upgrades a Homebrew or global npm installation through the package manager that
+owns it; the next command you run says what it installed. Use --auto off for notices only,
+and --auto on to go back to automatic updates. A project's npm dependency, and Windows,
 receive notices only.
 
 Updates compare the installed release version with the latest published release.
@@ -57,7 +60,7 @@ release.`,
 						return err
 					}
 					if automatic == "on" {
-						fmt.Fprintln(out, "Automatic updates enabled: terma installs each new release in the background. Package-managed installations receive notices only; unversioned development builds are skipped.")
+						fmt.Fprintln(out, "Automatic updates enabled: terma installs each new release in the background, through Homebrew or npm when one of them installed it. A project's npm dependency and Windows receive notices only; unversioned development builds are skipped.")
 					} else {
 						fmt.Fprintln(out, "Automatic updates disabled; update notices remain enabled.")
 					}
@@ -98,18 +101,23 @@ release.`,
 	return cmd
 }
 
-// updatesSummary is how the terma at exe, at version, gets new releases: what setup says.
-func updatesSummary(exe, version, goos string, auto bool) string {
-	if m, ok := selfupdate.ManagedBy(exe); ok {
-		return "through " + m.Name + ": `" + m.Command + "`"
-	}
+// updatesSummary is how the terma install describes gets new releases, with automatic
+// updates on or off (auto): what setup and doctor say. It follows the relay's own rule
+// (selfupdate.Install.Automatic), so it never promises an update the relay would not make.
+func updatesSummary(install selfupdate.Install, auto bool) string {
+	m := install.Manager
+	noEnv := func(string) string { return "" }
 	switch {
-	case !selfupdate.IsRelease(version):
+	case install.Method == semconv.TermaInstallMethodSource:
 		return "never for a development build: `terma update --force` installs the latest release"
-	case goos == "windows":
+	case install.Automatic(selfupdate.Preferences{Auto: true}, noEnv) == semconv.TermaUpdateAutoUnsupported && m.Name != "":
+		return "through " + m.Name + ": `" + m.Command + "`"
+	case install.Automatic(selfupdate.Preferences{Auto: true}, noEnv) == semconv.TermaUpdateAutoUnsupported:
 		return "by hand: download each new release from https://github.com/" + selfupdate.Repo + "/releases"
 	case !auto:
 		return "when you run `terma update` (automatic updates are off: `terma update --auto on`)"
+	case m.Name != "":
+		return "automatically: the local relay has " + m.Name + " install each new release in the background"
 	}
 	return "automatically: terma installs each new release in the background"
 }
@@ -117,7 +125,7 @@ func updatesSummary(exe, version, goos string, auto bool) string {
 // Update phase bounds; a package manager may update its taps first, which takes minutes.
 const (
 	downloadTimeout = 2 * time.Minute
-	upgradeTimeout  = 15 * time.Minute
+	upgradeTimeout  = selfupdate.UpgradeTimeout
 	refreshTimeout  = time.Minute
 )
 
@@ -229,6 +237,11 @@ func (app *App) finishUpdate(ctx context.Context, terma string, out io.Writer) {
 	if err := app.runUpdateStep(ctx, out, terma, "update", "--refresh"); err != nil {
 		fmt.Fprintf(out, "The new version is installed, but refreshing what terma installed failed (%v). Run `terma update` to retry.\n", err)
 	}
+}
+
+// runBackgroundStep runs one update program for the relay (selfupdate.RunDetached).
+func runBackgroundStep(ctx context.Context, out io.Writer, argv ...string) error {
+	return selfupdate.RunDetached(ctx, out, os.Environ(), argv...)
 }
 
 // runUpdateStep runs one update program attached to the terminal, so prompts reach the developer.
