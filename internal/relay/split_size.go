@@ -7,8 +7,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// recordFraming bounds the tag and length prefix protobuf puts before one nested message.
-const recordFraming = 6
+const (
+	// recordFraming bounds the tag and length prefix protobuf puts before one nested message.
+	recordFraming = 6
+	// maxRequestBytes is the largest body the OTLP host accepts; it refuses a larger one.
+	maxRequestBytes = 4 << 20
+)
 
 // within divides a part whose encoding is over limit into parts that each fit it, record by
 // record in order, each record under its own resource and scope. A record larger than limit
@@ -127,13 +131,19 @@ type run struct{ block, from, to int }
 // packRuns lays every block's records out in order into messages whose encoding stays within
 // limit, repeating a block's resource and scope in each message it spans. heads[b] is block b's
 // framed resource and scope, sizes[b] its framed records. A record over limit goes alone. A
-// block whose header is over half the limit packs to twice its header instead, so its records
-// outweigh each copy of the header and splitting never more than doubles the bytes.
+// block whose header is over half the limit packs to twice its header instead, so the header is
+// not copied once per record, though never past a merge short of maxRequestBytes while the
+// header fits there.
 func packRuns(limit int, heads []int, sizes [][]int) [][]run {
 	var msgs [][]run
 	size, records := 0, 0
+	// The ceiling leaves a merge's room under the host's limit for send-time withholding.
+	ceiling := maxRequestBytes - limit
 	for b, recs := range sizes {
 		fit := max(limit, 2*heads[b])
+		if heads[b] < ceiling {
+			fit = min(fit, ceiling)
+		}
 		open := false
 		for i, n := range recs {
 			need := n

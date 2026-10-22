@@ -20,12 +20,12 @@ import (
 
 const (
 	sendTimeout = 15 * time.Second
-	// maxMergeBytes bounds the entries enqueue writes and the merges the sender builds from
-	// them. A request the host cannot take in within sendTimeout is resent whole forever: 4 MiB
-	// merges of an agent's spans timed out on every attempt against a busy OTLP gateway;
-	// 512 KiB ones finished in a third of the timeout at the same throughput. Send-time
-	// withholding can add a few bytes per record, and an entry an older relay wrote over the
-	// bound is sent alone, as before.
+	// maxMergeBytes bounds the merges the sender builds and, but for a record or a resource
+	// too large to fit it, the entries enqueue writes. A request the host cannot take in within
+	// sendTimeout is resent whole forever: 4 MiB merges of an agent's spans timed out on every
+	// attempt against a busy OTLP gateway; 512 KiB ones finished in a third of the timeout at
+	// the same throughput. Send-time withholding can add a few bytes per record, and an entry
+	// an older relay wrote over the bound is sent alone, as before.
 	maxMergeBytes = 512 << 10
 	maxMergeFiles = 64
 	minBackoff    = time.Second
@@ -65,8 +65,8 @@ func (r *Relay) sender(rt route) *sender {
 }
 
 // enqueue writes a part to its route's outbox before the export is answered, so a crash
-// loses none, as files no larger than maxMergeBytes. It runs under deliverMu, so files are
-// named in arrival order.
+// loses none, split as part.within says to fit maxMergeBytes. It runs under deliverMu, so
+// files are named in arrival order.
 func (r *Relay) enqueue(c claim.Claim, p *part) {
 	rt := routeOf(c)
 	var s *sender

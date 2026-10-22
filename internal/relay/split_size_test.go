@@ -2,8 +2,12 @@ package relay
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -230,8 +234,8 @@ func TestRelaySendsALargeExportInBoundedRequests(t *testing.T) {
 	}
 }
 
-// A resource too big to fit the limit with any records is not copied once per record: its records
-// outweigh each copy, so splitting at most doubles the bytes and every record still arrives once, in order.
+// A resource too big to share the limit with records is not copied once per record: with small
+// spans the split stays under twice the export, and every record still arrives once, in order.
 func TestPartWithinBoundsAnOversizedHeader(t *testing.T) {
 	t.Parallel()
 	const limit = 16 << 10
@@ -257,5 +261,58 @@ func TestPartWithinBoundsAnOversizedHeader(t *testing.T) {
 		if !proto.Equal(got[i].span, want[i].span) || !proto.Equal(got[i].resource, want[i].resource) {
 			t.Fatalf("span %d changed or moved off its resource", i)
 		}
+	}
+}
+
+// A resource too big to share maxMergeBytes with spans still reaches a host that refuses bodies
+// over maxRequestBytes: the split stays under it, so every span arrives and none is refused.
+func TestRelayDeliversAnExportWithAHugeResource(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	spans, refused := map[string]int{}, 0
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		if len(body) > maxRequestBytes {
+			refused++
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var td tracepb.TracesData
+		if err := proto.Unmarshal(body, &td); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		for _, ps := range placedSpans(&td) {
+			spans[string(ps.span.GetSpanId())]++
+		}
+	}))
+	t.Cleanup(host.Close)
+	f := newFixture()
+	r, srv := f.relay(t, nil, map[string]Policy{"p1": {Endpoint: host.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true}})
+	// One resource of about 2.25 MiB and one scope with 3,000 spans: 5.3 MB in all.
+	var all []*tracepb.Span
+	for _, ps := range placedSpans(bigTraces(3000, 1000)) {
+		all = append(all, ps.span)
+	}
+	td := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
+		Resource:   &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "svc"), kv("huge", strings.Repeat("r", 2300<<10))}},
+		ScopeSpans: []*tracepb.ScopeSpans{{Scope: &commonpb.InstrumentationScope{Name: "scope"}, Spans: all}},
+	}}}
+	postProto(t, srv, "/v1/traces", td)
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.traces"] == 3000 })
+	mu.Lock()
+	defer mu.Unlock()
+	if refused != 0 || len(spans) != 3000 {
+		t.Fatalf("host refused %d requests and received %d distinct spans, want 0 and 3000", refused, len(spans))
+	}
+	for id, n := range spans {
+		if n != 1 {
+			t.Fatalf("span %s arrived %d times", id, n)
+		}
+	}
+	if c := r.Stats().Snapshot().Counters; sum(c, "dropped.") != 0 {
+		t.Fatalf("dropped records: %v", c)
 	}
 }
