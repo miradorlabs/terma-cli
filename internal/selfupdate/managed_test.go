@@ -26,6 +26,23 @@ func executable(t *testing.T, path string) {
 	}
 }
 
+// npmGlobal lays out npm's global install of terma in prefix, as `npm install -g` does: the
+// package, its launcher and vendor binary, and prefix's bin/terma linked to the launcher. It
+// returns the vendor binary.
+func npmGlobal(t *testing.T, prefix string) string {
+	t.Helper()
+	pkg := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma")
+	executable(t, filepath.Join(pkg, "bin", "terma.js"))
+	executable(t, filepath.Join(pkg, "vendor", "terma"))
+	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(pkg, "bin", "terma.js"), filepath.Join(prefix, "bin", "terma")); err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(pkg, "vendor", "terma")
+}
+
 func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 	unixLayouts(t)
 	t.Setenv("PATH", "")
@@ -37,6 +54,11 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 	executable(t, filepath.Join(brew, "bin", "brew"))
 	npm := filepath.Join(root, "node")
 	executable(t, filepath.Join(npm, "bin", "npm"))
+	global, custom := npmGlobal(t, npm), npmGlobal(t, filepath.Join(root, "custom"))
+	// A project's dependency in a folder named lib: its parent's bin/terma is no link to it.
+	libProject := filepath.Join(root, "src", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	executable(t, libProject)
+	executable(t, filepath.Join(root, "src", "bin", "terma"))
 
 	for _, tc := range []struct {
 		name, exe string
@@ -51,12 +73,13 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 		{"formula", filepath.Join(brew, "Cellar", "terma", "1.0.0", "bin", "terma"), "Homebrew",
 			[]string{filepath.Join(brew, "bin", "brew"), "upgrade", "terma"}, filepath.Join(brew, "bin", "terma"), "", ""},
 		{"brew not found", filepath.Join(root, "elsewhere", "Caskroom", "terma", "1.0.0", "terma"), "Homebrew", nil, filepath.Join(root, "elsewhere", "bin", "terma"), "", ""},
-		{"npm global", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm",
+		{"npm global", global, "npm",
 			[]string{filepath.Join(npm, "bin", "npm"), "install", "--global", "--prefix", npm, "@miradorlabs/terma@latest"},
-			filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "", ""},
+			global, "", ""},
 		// A custom prefix keeps no npm of its own, and PATH has none here either.
-		{"npm prefix without npm", filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
-			filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "", ""},
+		{"npm prefix without npm", custom, "npm", nil, custom, "", ""},
+		{"npm project in a folder named lib", libProject, "npm", nil, libProject,
+			"npm install @miradorlabs/terma@latest", filepath.Join(root, "src", "lib")},
 		// A project's own dependency is upgraded in that project.
 		{"npm project", filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
 			filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"),
@@ -91,7 +114,7 @@ func TestManagedByFallsBackToNpmOnPathForItsPrefix(t *testing.T) {
 	executable(t, filepath.Join(bin, "npm"))
 	t.Setenv("PATH", bin)
 	prefix := filepath.Join(root, "custom")
-	m, ok := ManagedBy(filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"))
+	m, ok := ManagedBy(npmGlobal(t, prefix))
 	want := []string{filepath.Join(bin, "npm"), "install", "--global", "--prefix", prefix, "@miradorlabs/terma@latest"}
 	if !ok || !slices.Equal(m.Argv, want) {
 		t.Fatalf("ManagedBy = %+v, %v", m, ok)

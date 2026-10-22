@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // Downloads the terma release that matches this package's version into
 // ./vendor/, verifying it against the release's checksums.txt. The package
-// version is set from the git tag by the release workflow, so the shim can never
-// drift from the binary it wraps. Nothing runs from the network: the archive is
-// verified before it is extracted, and only the single binary is kept.
+// version is set from the git tag by the release workflow, so a fresh install
+// gets the binary of its own version; after that, a global install's binary
+// updates itself in place, as the install script's does, and may be newer than
+// the package version npm records until npm installs the package again. Nothing
+// runs from the network: the archive is verified before it is extracted, and
+// only the single binary is kept.
 'use strict';
 
 const fs = require('node:fs');

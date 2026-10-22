@@ -94,11 +94,17 @@ func recordedPID(dir string) int {
 // running; of two racing hooks, the second's relay exits at its lock. A running relay of an
 // earlier release than version is asked to make way, as the next command of a daemon-backed
 // CLI restarts a daemon older than itself.
-func Spawn(stateDir, version string) {
+func Spawn(stateDir, version string) { SpawnFrom("", stateDir, version) }
+
+// SpawnFrom is Spawn running the terma at exe, this process's own when "", the follower
+// Supersede may start included: a relay whose package manager upgraded it starts its
+// successor from the link that manager moved to the new release, never the versioned path it
+// ran from, which the upgrade may have removed. version "" asks no relay to make way.
+func SpawnFrom(exe, stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
 	if flock.IsBusy(err) {
-		Supersede(stateDir, version)
+		supersede(exe, stateDir, version)
 	}
 	if err != nil {
 		return
@@ -108,7 +114,7 @@ func Spawn(stateDir, version string) {
 	if info, err := os.Stat(filepath.Join(dir, ErrorFile)); err == nil && time.Since(info.ModTime()) < RetryAfter {
 		return
 	}
-	if start(dir) != nil {
+	if start(dir, exe) != nil {
 		return
 	}
 	// Wait until it listens: an agent may export as soon as the hook returns, and never
@@ -134,7 +140,11 @@ func Spawn(stateDir, version string) {
 // holds ServiceWaitFile), or else the follower Supersede starts. The relay making way is the
 // earlier release and starts nothing itself, and an agent exporting before the next hook
 // would find nothing listening.
-func Supersede(stateDir, version string) {
+func Supersede(stateDir, version string) { supersede("", stateDir, version) }
+
+// supersede is Supersede with the follower running the terma at exe, this process's own
+// when "" (SpawnFrom).
+func supersede(exe, stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	running, ok := RunningRelay(dir)
 	if !ok || !selfupdate.Newer(running.Version, version) {
@@ -147,7 +157,7 @@ func Supersede(stateDir, version string) {
 	}
 	_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ReplaceFile), []byte(strconv.Itoa(running.PID)+"\n"), 0o600)
 	if !service && (!ours || !serviceWaiting(dir)) {
-		follow(dir)
+		follow(dir, exe)
 	}
 }
 
@@ -160,23 +170,28 @@ func serviceWaiting(dir string) bool {
 	return flock.IsBusy(err)
 }
 
-// follow starts the relay that waits to take over from the one asked to make way, unless
-// one waits already. It does not wait: the relay making way still listens.
-var follow = func(dir string) {
+// follow starts the relay that waits to take over from the one asked to make way, the terma
+// at exe (this process's own when ""), unless one waits already. It does not wait: the relay
+// making way still listens.
+var follow = func(dir, exe string) {
 	unlock, err := flock.TryLock(filepath.Join(dir, FollowLockFile))
 	if err != nil {
 		return
 	}
 	unlock()
-	_ = start(dir, "--follow")
+	_ = start(dir, exe, "--follow")
 }
 
 // serviceRunsThis reports whether the installed service starts this terma.
 var serviceRunsThis = func(stateDir string) bool { return CheckService(stateDir).Current }
 
-// start starts `terma relay run --quiet` detached with args, logging to the relay's log.
-func start(dir string, args ...string) error {
-	exe, err := os.Executable()
+// start starts `terma relay run --quiet` detached with args, logging to the relay's log: the
+// terma at exe, or this process's own when exe is "".
+func start(dir, exe string, args ...string) error {
+	var err error
+	if exe == "" {
+		exe, err = os.Executable()
+	}
 	// A test binary is no relay: started as one, it would run its package's tests detached,
 	// holding the relay's log open.
 	if err != nil || testing.Testing() {

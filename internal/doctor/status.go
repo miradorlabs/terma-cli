@@ -166,13 +166,15 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 }
 
 // Context is what `terma doctor` prints above its checks, which do not cover it: what this
-// machine collects, which backend it reports to, and the repository's work in progress.
+// machine collects, which backend it reports to, how it gets new releases (Env.Updates),
+// and the repository's work in progress.
 func Context(env Env) []Row {
 	if env.Config == nil {
 		return nil
 	}
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
 		machineRows(env.Config)...)
+	rows = append(rows, env.Updates...)
 	if env.RepoErr != nil {
 		return rows
 	}

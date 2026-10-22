@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -281,7 +280,7 @@ func (app *App) reportUpdates(ui *setupUI) {
 	if err != nil {
 		return
 	}
-	ui.Summary("Updates", updatesSummary(exe, app.version, runtime.GOOS, p.Auto))
+	ui.Summary("Updates", updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto))
 }
 
 // chooseHarnesses resolves the machine-level agent list: --harness, else a picker,

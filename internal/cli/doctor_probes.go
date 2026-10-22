@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ import (
 
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 	exe, _ := os.Executable()
-	env := doctor.Env{ConfigDir: app.dir, StateDir: app.stateDir, Agents: app.agents, Exe: exe, BinDirs: app.binDirs()}
+	env := doctor.Env{ConfigDir: app.dir, StateDir: app.stateDir, Agents: app.agents, Exe: exe, BinDirs: app.binDirs(), Updates: app.updateRows(exe)}
 	env.Config, env.ConfigErr = app.loadConfig()
 	env.Root, env.GitDir, env.RepoErr = workspaceHere(ctx)
 	if env.Config != nil {
@@ -124,4 +125,24 @@ func (app *App) storedKeys(agent, projectID string) string {
 		return ""
 	}
 	return keystore.Mask(key)
+}
+
+// updateRows are doctor's rows on updates: how this terma gets new releases, the last it
+// installed by itself, which the relay only logs, and why the last automatic install of a
+// newer release failed, until it is tried again.
+func (app *App) updateRows(exe string) []doctor.Row {
+	p, err := selfupdate.LoadPreferences(app.dir)
+	if err != nil {
+		return nil
+	}
+	const when = "2006-01-02 15:04"
+	rows := []doctor.Row{{Label: "Updates", Value: updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto)}}
+	if u, ok := selfupdate.LoadUpdated(app.stateDir); ok {
+		rows = append(rows, doctor.Row{Label: "Last update", Value: fmt.Sprintf("%s → %s automatically (%s), %s", u.From, u.To, u.How(), u.At.Local().Format(when))})
+	}
+	if c := selfupdate.LoadCache(app.stateDir); c.Failure != "" && c.Attempted == c.Latest && selfupdate.Newer(app.version, c.Attempted) {
+		rows = append(rows, doctor.Row{Value: fmt.Sprintf("installing %s failed %s: %s; tried again from %s",
+			c.Attempted, c.AttemptAt.Local().Format(when), c.Failure, c.Retry().Local().Format(when))})
+	}
+	return rows
 }

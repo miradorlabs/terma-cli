@@ -125,10 +125,14 @@ func (app *App) newVersionCommand() *cobra.Command {
 }
 
 // printUpdateNotice runs update maintenance after interactive commands, never from a
-// hook or a spool flush, which must stay silent and fast.
+// hook or a spool flush, which must stay silent and fast. It first says, once, what the
+// relay, which prints nothing, installed in the background since the last one.
 func (app *App) printUpdateNotice(cmd *cobra.Command) {
 	if !app.automaticUpdatesAllowed(cmd, canPrompt()) {
 		return
+	}
+	if line := selfupdate.TellUpdated(app.stateDir); line != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), line)
 	}
 	app.refreshAfterUpgrade(cmd.Context(), cmd.ErrOrStderr())
 	exe, err := os.Executable()
@@ -173,8 +177,12 @@ type App struct {
 	runUpdateStep        func(ctx context.Context, out io.Writer, argv ...string) error
 	nateBinaryCandidates func() []string
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
-	// spawnRelay starts a relay for a state directory, detached, as a hook does.
-	spawnRelay func(stateDir, version string)
+	// spawnRelay starts the terma at exe (this one when "") as a relay for a state
+	// directory, detached, as a hook does.
+	spawnRelay func(exe, stateDir, version string)
+	// backgroundStep runs one update program for the relay, with no terminal and detached,
+	// its output to out.
+	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
 	// binary is the executable as this process started from it, for the updater: a command
@@ -187,8 +195,9 @@ type App struct {
 // version.
 func New(agentsFor func(configDir string) *agents.Registry, version string) *App {
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
-		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.Spawn,
-		canAsk: canPrompt}
+		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
+		backgroundStep: runBackgroundStep,
+		canAsk:         canPrompt}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)

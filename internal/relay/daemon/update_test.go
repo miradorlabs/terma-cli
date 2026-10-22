@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -66,18 +68,18 @@ func TestTheUpdaterGoesOnAskingAfterItInstallsARelease(t *testing.T) {
 		},
 		Jitter: func(d time.Duration) time.Duration { return d / 4 },
 		Logf:   func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
-		Update: func(context.Context) (string, error) {
+		Update: func(context.Context) (Pass, error) {
 			a := answers[calls]
 			calls++
-			return a.version, a.err
+			return Pass{Installed: a.version}, a.err
 		},
 	}
-	installed := make(chan string, len(answers))
+	installed := make(chan Pass, len(answers))
 	u.Run(ctx, installed)
 	close(installed)
 	var got []string
-	for version := range installed {
-		got = append(got, version)
+	for pass := range installed {
+		got = append(got, pass.Installed)
 	}
 	if !slices.Equal(got, []string{"1.3.0", "1.3.1"}) || calls != 5 {
 		t.Fatalf("installed %q after %d attempts, want 1.3.0 then 1.3.1 after 5", got, calls)
@@ -97,12 +99,12 @@ func TestTheUpdaterNeverOutlivesTheRelayToSayWhatItInstalled(t *testing.T) {
 	ctx, stop := context.WithCancel(t.Context())
 	defer stop()
 	u := Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
-		Update: func(context.Context) (string, error) {
+		Update: func(context.Context) (Pass, error) {
 			stop()
-			return "1.3.0", nil
+			return Pass{Installed: "1.3.0"}, nil
 		}}
 	done := make(chan struct{})
-	go func() { u.Run(ctx, make(chan string)); close(done) }()
+	go func() { u.Run(ctx, make(chan Pass)); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -118,11 +120,11 @@ func TestAPassCutShortByTheRelayStoppingIsNoFailure(t *testing.T) {
 	var logged []string
 	u := Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
 		Logf: func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
-		Update: func(ctx context.Context) (string, error) {
+		Update: func(ctx context.Context) (Pass, error) {
 			stop()
-			return "", ctx.Err()
+			return Pass{}, ctx.Err()
 		}}
-	u.Run(ctx, make(chan string, 1))
+	u.Run(ctx, make(chan Pass, 1))
 	if len(logged) != 0 {
 		t.Fatalf("logged %q for a pass the relay cut short", logged)
 	}
@@ -133,28 +135,28 @@ func TestTheUpdaterStopsWithTheRelay(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	u := Updater{Every: time.Hour, Update: func(context.Context) (string, error) {
+	u := Updater{Every: time.Hour, Update: func(context.Context) (Pass, error) {
 		t.Error("asked for an update after the relay stopped")
-		return "", nil
+		return Pass{}, nil
 	}}
-	u.Run(ctx, make(chan string, 1))
+	u.Run(ctx, make(chan Pass, 1))
 }
 
 // An updater without a period asks nothing, rather than asking without pause.
 func TestAnUpdaterWithoutAPeriodAsksNothing(t *testing.T) {
 	t.Parallel()
-	u := Updater{Update: func(context.Context) (string, error) {
+	u := Updater{Update: func(context.Context) (Pass, error) {
 		t.Error("asked for an update with no period")
-		return "", nil
+		return Pass{}, nil
 	}}
-	u.Run(t.Context(), make(chan string, 1))
+	u.Run(t.Context(), make(chan Pass, 1))
 }
 
 // installsAtOnce is an updater that installs 1.3.0 on its first attempt; its next is an
 // hour away.
 func installsAtOnce() *Updater {
 	return &Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
-		Update: func(context.Context) (string, error) { return "1.3.0", nil }}
+		Update: func(context.Context) (Pass, error) { return Pass{Installed: "1.3.0"}, nil }}
 }
 
 // An idle relay that installed a newer terma stops as soon as no agent has exported for
@@ -173,8 +175,53 @@ func TestAnIdleRelayRestartsOnTheReleaseItInstalled(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the idle relay kept running the release it replaced")
 	}
-	if !r.res.Updated || !r.res.Restart() {
-		t.Fatalf("Run = %+v, want Updated and a restart", r.res)
+	if !r.res.Updated || !r.res.Restart() || r.res.Installed != "1.3.0" {
+		t.Fatalf("Run = %+v, want Updated to 1.3.0 and a restart", r.res)
+	}
+}
+
+// A relay whose terma another install replaced restarts on it as on one it installed, and
+// its log says which happened.
+func TestARelayReplacedByAnotherInstallSaysSoAsItStops(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Version, c.Service, c.Log = "1.2.0", true, NewLog(dir)
+	c.Updater = &Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
+		Update: func(context.Context) (Pass, error) { return Pass{Installed: "1.2.0", Replaced: true}, nil }}
+	var ahead atomic.Int64
+	c.Engine.Now = func() time.Time { return time.Now().Add(time.Duration(ahead.Load())) }
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	ahead.Store(int64(updateQuiet))
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running a binary another install replaced")
+	}
+	if !r.res.Updated || !r.res.Restart() || r.res.Installed != "1.2.0" {
+		t.Fatalf("Run = %+v, want Updated to 1.2.0 and a restart", r.res)
+	}
+	c.Log.Close()
+	data, _ := os.ReadFile(filepath.Join(dir, LogFile))
+	if !strings.Contains(string(data), "stopped (another install replaced its terma)") {
+		t.Fatalf("the log reads:\n%s", data)
+	}
+}
+
+// A release another install put in place restarts the relay as one it installed would, and
+// the log says whose it was.
+func TestAReleaseAnotherInstallPutInPlaceIsLoggedAsSuch(t *testing.T) {
+	t.Parallel()
+	var logged []string
+	u := Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
+		Logf:   func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
+		Update: func(context.Context) (Pass, error) { return Pass{Installed: "1.3.0", Replaced: true}, nil }}
+	ctx, cancel := context.WithCancel(t.Context())
+	installed := make(chan Pass, 1)
+	go func() { <-installed; cancel() }()
+	u.Run(ctx, installed)
+	if len(logged) != 1 || !strings.HasPrefix(logged[0], "replaced by terma 1.3.0") {
+		t.Fatalf("logged %q", logged)
 	}
 }
 
@@ -233,12 +280,12 @@ func TestAnUpdatedRelayRestartsWhileARouteKeepsFailing(t *testing.T) {
 	}
 	install := make(chan struct{})
 	c.Updater = &Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
-		Update: func(ctx context.Context) (string, error) {
+		Update: func(ctx context.Context) (Pass, error) {
 			select {
 			case <-install:
-				return "1.3.0", nil
+				return Pass{Installed: "1.3.0"}, nil
 			case <-ctx.Done():
-				return "", ctx.Err()
+				return Pass{}, ctx.Err()
 			}
 		}}
 	r := startRun(t, c)
@@ -256,8 +303,8 @@ func TestAnUpdatedRelayRestartsWhileARouteKeepsFailing(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the relay kept running the release it replaced while a route kept failing")
 	}
-	if !r.res.Updated || !r.res.Restart() {
-		t.Fatalf("Run = %+v, want Updated and a restart", r.res)
+	if !r.res.Updated || !r.res.Restart() || r.res.Installed != "1.3.0" {
+		t.Fatalf("Run = %+v, want Updated to 1.3.0 and a restart", r.res)
 	}
 }
 
@@ -307,7 +354,9 @@ func TestALaterInstallDoesNotStartTheWaitForAPauseAgain(t *testing.T) {
 	// end. The relay started moments ago, so nothing has paused for updateQuiet yet.
 	var installs atomic.Int64
 	c.Updater = &Updater{Every: 200 * time.Millisecond, Jitter: func(time.Duration) time.Duration { return 0 },
-		Update: func(context.Context) (string, error) { return fmt.Sprintf("1.3.%d", installs.Add(1)), nil }}
+		Update: func(context.Context) (Pass, error) {
+			return Pass{Installed: fmt.Sprintf("1.3.%d", installs.Add(1))}, nil
+		}}
 	r := startRun(t, c)
 	r.await(t, "the relay")
 	select {
