@@ -202,6 +202,29 @@ func TestUpdateThatCannotCheckRefreshesNothing(t *testing.T) {
 	}
 }
 
+// npmGlobalIn lays out npm's global install of terma in prefix, as `npm install -g` does: the
+// package, its launcher and vendor binary, and prefix's bin/terma linked to the launcher. It
+// returns the vendor binary.
+func npmGlobalIn(t *testing.T, prefix string) string {
+	t.Helper()
+	pkg := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma")
+	for _, f := range []string{filepath.Join(pkg, "bin", "terma.js"), filepath.Join(pkg, "vendor", "terma")} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(pkg, "bin", "terma.js"), filepath.Join(prefix, "bin", "terma")); err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(pkg, "vendor", "terma")
+}
+
 // Setup says how this installation gets new releases: by itself, through the package
 // manager that owns it in the background, through that manager by hand when terma cannot
 // run it, or not at all.
@@ -241,6 +264,7 @@ func TestUpdatesSummary(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	npmGlobal, homeGlobal := npmGlobalIn(t, npm), npmGlobalIn(t, home)
 	for _, tc := range []struct {
 		name, exe, version, goos string
 		auto                     bool
@@ -251,10 +275,10 @@ func TestUpdatesSummary(t *testing.T) {
 		{"homebrew", filepath.Join(brew, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "the local relay has Homebrew install each new release"},
 		{"homebrew, turned off", filepath.Join(brew, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", false, "`terma update --auto on`"},
 		{"homebrew not found", filepath.Join(home, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew: `brew upgrade terma`"},
-		{"npm", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "automatically, in place: terma updates the npm package's binary itself"},
+		{"npm", npmGlobal, "1.2.0", "linux", true, "automatically, in place: terma updates the npm package's binary itself"},
 		// Its binary is replaced in place: no npm is needed.
-		{"npm not found", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "npm's own record (`npm ls -g`) catches up"},
-		{"npm, turned off", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", false, "`terma update --auto on`"},
+		{"npm not found", homeGlobal, "1.2.0", "linux", true, "npm's own record (`npm ls -g`) catches up at your next `npm i -g`"},
+		{"npm, turned off", npmGlobal, "1.2.0", "linux", false, "`terma update --auto on`"},
 		{"npm project", filepath.Join(home, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install @miradorlabs/terma@latest`"},
 		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
 		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
@@ -427,8 +451,8 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 			if got := release.updateAuto(install); got != semconv.TermaUpdateAutoOff {
 				t.Fatalf("under %s terma.update.auto = %q", env, got)
 			}
-			if v, err := release.relayUpdater(install).Update(t.Context()); v != "" || err != nil || looked() {
-				t.Fatalf("under %s the relay's pass = %q, %v, looked %v", env, v, err, looked())
+			if p, err := release.relayUpdater(install).Update(t.Context()); p != (daemon.Pass{}) || err != nil || looked() {
+				t.Fatalf("under %s the relay's pass = %+v, %v, looked %v", env, p, err, looked())
 			}
 		})
 	}
@@ -440,8 +464,8 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 		t.Fatalf("turned off, terma.update.auto = %q", got)
 	}
 	// The relay already running reads the choice at each pass, as its heartbeat does.
-	if v, err := updater.Update(t.Context()); v != "" || err != nil || looked() {
-		t.Fatalf("turned off, the relay's pass = %q, %v, looked %v", v, err, looked())
+	if p, err := updater.Update(t.Context()); p != (daemon.Pass{}) || err != nil || looked() {
+		t.Fatalf("turned off, the relay's pass = %+v, %v, looked %v", p, err, looked())
 	}
 	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: true}); err != nil {
 		t.Fatal(err)
@@ -482,10 +506,10 @@ func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
 		refreshed bool
 		restart   bool
 	}{
-		{"updated, hook-started", daemon.Result{Updated: true}, script, "/home/d/.local/bin/terma", true, true, true},
-		{"updated through Homebrew, hook-started", daemon.Result{Updated: true}, brew, "/home/linuxbrew/.linuxbrew/bin/terma", true, true, true},
-		{"updated, service", daemon.Result{Updated: true, Service: true}, brew, "/home/linuxbrew/.linuxbrew/bin/terma", false, true, true},
-		{"updated, then torn down", daemon.Result{Updated: true, SetupGone: true}, script, "", false, false, true},
+		{"updated, hook-started", daemon.Result{Updated: true, Installed: "1.3.1"}, script, "/home/d/.local/bin/terma", true, true, true},
+		{"updated through Homebrew, hook-started", daemon.Result{Updated: true, Installed: "1.3.1"}, brew, "/home/linuxbrew/.linuxbrew/bin/terma", true, true, true},
+		{"updated, service", daemon.Result{Updated: true, Installed: "1.3.1", Service: true}, brew, "/home/linuxbrew/.linuxbrew/bin/terma", false, true, true},
+		{"updated, then torn down", daemon.Result{Updated: true, Installed: "1.3.1", SetupGone: true}, script, "", false, false, true},
 		{"replaced, hook-started", daemon.Result{Replaced: true}, script, "", false, false, true},
 		{"idle, hook-started", daemon.Result{}, script, "", false, false, false},
 	} {
@@ -494,7 +518,8 @@ func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
 			app.stateDir = t.TempDir()
 			spawned, refreshed := false, false
 			app.spawnRelay = func(exe, stateDir, version string) {
-				spawned = exe == tc.from && stateDir == app.stateDir && version == "1.3.0"
+				// As the release it now runs, not the relay's own.
+				spawned = exe == tc.from && stateDir == app.stateDir && version == "1.3.1"
 			}
 			app.backgroundStep = func(_ context.Context, _ io.Writer, argv ...string) error {
 				refreshed = slices.Equal(argv, []string{tc.from, "update", "--refresh"})
@@ -550,9 +575,9 @@ func TestAGlobalNpmInstallUpdatesTheSameUnderAnyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pkg := filepath.Join(root, ".npm-global", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	pkg := npmGlobalIn(t, filepath.Join(root, ".npm-global"))
 	shellNpm := filepath.Join(root, "opt", "homebrew", "bin", "npm")
-	for _, f := range []string{pkg, shellNpm} {
+	for _, f := range []string{shellNpm} {
 		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -608,10 +633,18 @@ func TestARelayWhoseBinaryWasReplacedRestartsOnIt(t *testing.T) {
 	// Newer (Homebrew left to finish), the same (`brew reinstall`, install.sh again) or older
 	// (`npm rebuild` of npm's recorded version): the relay restarts on what is installed, and
 	// its successor updates it if it is behind.
-	for _, tc := range []struct{ next, want string }{{"1.2.1", "1.2.1"}, {"1.2.0", "1.2.0"}, {"1.1.9", "1.1.9"}} {
-		t.Run(tc.next, func(t *testing.T) {
+	// So does a downgrade by hand with automatic updates off: the relay must not go on as a
+	// release the developer took off the machine.
+	for _, tc := range []struct {
+		next, want string
+		off        bool
+	}{{"1.2.1", "1.2.1", false}, {"1.2.0", "1.2.0", false}, {"1.1.9", "1.1.9", false}, {"1.1.8", "1.1.8", true}} {
+		t.Run(fmt.Sprintf("%s, off %v", tc.next, tc.off), func(t *testing.T) {
 			app := New(builtin.Agents, "1.2.0")
 			app.dir, app.stateDir = t.TempDir(), t.TempDir()
+			if err := selfupdate.SavePreferences(app.dir, selfupdate.Preferences{Auto: !tc.off}); err != nil {
+				t.Fatal(err)
+			}
 			if app.binary, err = os.Stat(link); err != nil {
 				t.Fatal(err)
 			}
@@ -627,8 +660,8 @@ func TestARelayWhoseBinaryWasReplacedRestartsOnIt(t *testing.T) {
 			if err := os.Symlink(terma(tc.next), link); err != nil {
 				t.Fatal(err)
 			}
-			if v, err := updater.Update(t.Context()); v != tc.want || err != nil {
-				t.Fatalf("the relay's pass = %q, %v; want %q", v, err, tc.want)
+			if p, err := updater.Update(t.Context()); p != (daemon.Pass{Installed: tc.want, Replaced: true}) || err != nil {
+				t.Fatalf("the relay's pass = %+v, %v; want %q in place", p, err, tc.want)
 			}
 		})
 	}

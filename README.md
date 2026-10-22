@@ -37,9 +37,9 @@ terma setup
 
 **npm**. terma keeps a global install up to date in place, as the installer script's,
 replacing the package's binary (see [Updates](#updates)); `npm ls -g` shows the version npm
-last installed until your next `npm i -g`, or `terma update`, which runs `npm install -g
-@miradorlabs/terma@latest` through the npm that owns it. A project's own dependency is
-upgraded in that project. The npm shim adds Node's startup time to every commit, so prefer
+last installed until your next `npm i -g`. When a newer release is out, `terma update` runs
+`npm install -g @miradorlabs/terma@latest` through the npm that owns it. A project's own
+dependency is upgraded in that project. The npm shim adds Node's startup time to every commit, so prefer
 the installer script or Homebrew where terma runs inside git hooks.
 
 ```bash

@@ -27,6 +27,7 @@ func TestInstallOfTellsHowTermaWasInstalled(t *testing.T) {
 	}
 	npm := filepath.Join(root, "node")
 	executable(t, filepath.Join(npm, "bin", "npm"))
+	global := npmGlobal(t, npm)
 
 	for _, tc := range []struct {
 		name, exe, version, goos, want string
@@ -34,13 +35,13 @@ func TestInstallOfTellsHowTermaWasInstalled(t *testing.T) {
 		{"cask", cask, "1.0.0", "darwin", semconv.TermaInstallMethodHomebrew},
 		{"cask, through Homebrew's link", filepath.Join(brew, "bin", "terma"), "1.0.0", "darwin", semconv.TermaInstallMethodHomebrew},
 		{"formula", filepath.Join(brew, "Cellar", "terma", "1.0.0", "bin", "terma"), "1.0.0", "linux", semconv.TermaInstallMethodHomebrew},
-		{"global npm", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "linux", semconv.TermaInstallMethodNpm},
+		{"global npm", global, "1.0.0", "linux", semconv.TermaInstallMethodNpm},
 		{"project npm", filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "darwin", semconv.TermaInstallMethodNpmProject},
 		{"install script", filepath.Join(root, "home", ".local", "bin", "terma"), "1.0.0", "darwin", semconv.TermaInstallMethodScript},
 		{"TERMA_INSTALL_DIR or by hand", filepath.Join(root, "opt", "tools", "terma"), "1.0.0-rc.1", "linux", semconv.TermaInstallMethodScript},
 		{"source build", filepath.Join(root, "go", "bin", "terma"), "v1.0.0-3-g401af35", "darwin", semconv.TermaInstallMethodSource},
 		{"source build in a package manager's place", cask, "dev", "darwin", semconv.TermaInstallMethodSource},
-		{"source build in npm's place", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0-dirty", "linux", semconv.TermaInstallMethodSource},
+		{"source build in npm's place", global, "1.0.0-dirty", "linux", semconv.TermaInstallMethodSource},
 		// Windows: any npm layout is npm, which terma does not tell apart there.
 		{"windows npm", "C:/Users/d/AppData/Roaming/npm/node_modules/@miradorlabs/terma/vendor/terma.exe", "1.0.0", "windows", semconv.TermaInstallMethodNpm},
 		{"windows npm project", "C:/src/app/node_modules/@miradorlabs/terma/vendor/terma.exe", "1.0.0", "windows", semconv.TermaInstallMethodNpm},
@@ -74,7 +75,7 @@ func TestAutomaticIsTheRelaysOneRule(t *testing.T) {
 	executable(t, filepath.Join(root, "node", "bin", "npm"))
 	script := InstallOn(filepath.Join(root, ".local", "bin", "terma"), "1.0.0", "darwin")
 	homebrew := InstallOn(filepath.Join(root, "brew", "Caskroom", "terma", "1.0.0", "terma"), "1.0.0", "darwin")
-	npm := InstallOn(filepath.Join(root, "node", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "linux")
+	npm := InstallOn(npmGlobal(t, filepath.Join(root, "node")), "1.0.0", "linux")
 	if len(homebrew.Manager.Argv) == 0 || len(npm.Manager.Argv) == 0 {
 		t.Fatalf("the package managers were not found: %+v, %+v", homebrew.Manager, npm.Manager)
 	}
@@ -101,7 +102,7 @@ func TestAutomaticIsTheRelaysOneRule(t *testing.T) {
 		{"global npm", npm, on, none, semconv.TermaUpdateAutoOn},
 		{"global npm, turned off", npm, off, none, semconv.TermaUpdateAutoOff},
 		// Its binary is replaced in place: npm itself is never needed.
-		{"global npm without npm", InstallOn(filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.0.0", "linux"), on, none, semconv.TermaUpdateAutoOn},
+		{"global npm without npm", InstallOn(npmGlobal(t, filepath.Join(root, "custom")), "1.0.0", "linux"), on, none, semconv.TermaUpdateAutoOn},
 		// terma runs the package manager that owns the install, never another: without it,
 		// the developer is told the command.
 		{"homebrew not found", InstallOn(filepath.Join(root, "elsewhere", "Caskroom", "terma", "1.0.0", "terma"), "1.0.0", "darwin"), on, none, semconv.TermaUpdateAutoUnsupported},
@@ -141,8 +142,7 @@ func TestAnInstallTermaMayNotWriteIsUnsupported(t *testing.T) {
 	executable(t, cask)
 	npm := filepath.Join(root, "node")
 	executable(t, filepath.Join(npm, "bin", "npm"))
-	pkg := filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
-	executable(t, pkg)
+	pkg := npmGlobal(t, npm)
 	script := filepath.Join(root, "usr", "local", "bin", "terma")
 	executable(t, script)
 	on := Preferences{Auto: true}

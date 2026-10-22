@@ -59,9 +59,10 @@ func managedBy(exe, goos string) (Manager, bool) {
 		if goos == "windows" {
 			return m, true
 		}
-		// Outside <prefix>/lib/node_modules it is a project's dependency, and its lockfile is the project's.
+		// Outside <prefix>/lib/node_modules it is a project's dependency, and its lockfile is
+		// the project's; so it is too in a project folder named lib (globalNpm).
 		prefix, global := strings.CutSuffix(before, "/lib")
-		if !global {
+		if !global || !globalNpm(prefix, before) {
 			m.Command, m.Project = "npm install "+npmPackage+"@latest", filepath.FromSlash(before)
 			return m, true
 		}
@@ -78,6 +79,18 @@ func managedBy(exe, goos string) (Manager, bool) {
 		return m, true
 	}
 	return Manager{}, false
+}
+
+// globalNpm reports whether the package under <lib>/node_modules is npm's global install
+// in prefix, lib's parent: npm links prefix's bin/terma to the package's launcher, which no
+// project dependency that sits in a folder named lib has.
+func globalNpm(prefix, lib string) bool {
+	link, err := filepath.EvalSymlinks(filepath.FromSlash(prefix + "/bin/terma"))
+	if err != nil {
+		return false
+	}
+	launcher, err := filepath.EvalSymlinks(filepath.FromSlash(lib + "/node_modules/" + npmPackage + "/bin/terma.js"))
+	return err == nil && link == launcher
 }
 
 // npmPackage is terma's npm package.

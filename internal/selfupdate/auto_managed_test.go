@@ -404,10 +404,7 @@ func TestAGlobalNpmInstallUpdatesInPlaceWithoutNpm(t *testing.T) {
 		t.Fatal(err)
 	}
 	prefix := filepath.Join(root, "node")
-	vendor := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
-	if err := os.MkdirAll(filepath.Dir(vendor), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	vendor := npmGlobal(t, prefix)
 	if err := os.WriteFile(vendor, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}

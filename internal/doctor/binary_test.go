@@ -54,8 +54,8 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	sum := sha256.Sum256(launcher)
-	if hex.EncodeToString(sum[:]) != npmLauncherDigest {
-		t.Fatal("the npm launcher changed; update the pinned digest only after reviewing its vendor-binary delegation")
+	if !npmLauncherDigests[hex.EncodeToString(sum[:])] {
+		t.Fatal("the npm launcher changed; add its digest, keeping the old ones, only after reviewing its vendor-binary delegation")
 	}
 	current := writeTerma(t, t.TempDir(), "same Go build")
 	pkg := filepath.Join(t.TempDir(), "lib", "node_modules", "@miradorlabs", "terma")
@@ -91,6 +91,39 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 	}
 	if check := BinaryCheck(current, nil); check.Status != Warn {
 		t.Fatalf("edited npm launcher must not be trusted: %+v", check)
+	}
+}
+
+// A launcher an earlier package installed is still trusted by a later binary, which updated
+// itself in place under it; one never published is not.
+func TestDoctorTrustsEveryPublishedNpmLauncher(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("npm's Windows command wrapper has a different layout")
+	}
+	earlier := []byte("#!/usr/bin/env node\n// an earlier launcher\n")
+	sum := sha256.Sum256(earlier)
+	npmLauncherDigests[hex.EncodeToString(sum[:])] = true
+	t.Cleanup(func() { delete(npmLauncherDigests, hex.EncodeToString(sum[:])) })
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := filepath.Join(root, "lib", "node_modules", "@miradorlabs", "terma")
+	vendor := writeTerma(t, filepath.Join(pkg, "vendor"), "a later Go build")
+	launcher := filepath.Join(pkg, "bin", "terma.js")
+	if err := os.MkdirAll(filepath.Dir(launcher), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		content []byte
+		want    string
+	}{{earlier, vendor}, {[]byte("#!/usr/bin/env node\n// never published\n"), launcher}} {
+		if err := os.WriteFile(launcher, tc.content, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if got := InstalledBinary(launcher); got != tc.want {
+			t.Errorf("InstalledBinary(%q) = %s, want %s", tc.content, got, tc.want)
+		}
 	}
 }
 

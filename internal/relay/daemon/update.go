@@ -23,11 +23,19 @@ const updateQuiet = 30 * time.Second
 // restarts while it holds anything: that lives in memory alone.
 var updatePauseWait = 12 * time.Hour
 
+// Pass is what one of the relay's update passes found.
+type Pass struct {
+	// Installed is the release now in place of the relay's terma, "" for none.
+	Installed string
+	// Replaced means another install put it there, not the relay.
+	Replaced bool
+}
+
 // Updater keeps the relay's own terma up to date, so an install nobody runs a command on
 // still takes each release: the relay is the one process that runs all day.
 type Updater struct {
-	// Update makes one attempt, returning the release it installed, "" when none.
-	Update func(ctx context.Context) (string, error)
+	// Update makes one attempt, returning the release it installed or found in place.
+	Update func(ctx context.Context) (Pass, error)
 	// Every is how often Update is asked, each wait jittered by up to as long again so
 	// machines that started together spread out.
 	Every time.Duration
@@ -64,17 +72,21 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 			return
 		case <-after(wait):
 		}
-		version, err := u.Update(ctx)
+		pass, err := u.Update(ctx)
 		switch {
 		case err != nil && ctx.Err() != nil:
 			// Cut short by the relay stopping, which is no failure to report.
 			return
 		case err != nil:
 			logf("automatic update failed: %v", err)
-		case version != "":
-			logf("installed terma %s; restarting on it once no agent is exporting", version)
+		case pass.Installed != "":
+			if pass.Replaced {
+				logf("replaced by terma %s, which another install put in place; restarting on it once no agent is exporting", pass.Installed)
+			} else {
+				logf("installed terma %s; restarting on it once no agent is exporting", pass.Installed)
+			}
 			select {
-			case installed <- version:
+			case installed <- pass.Installed:
 			case <-ctx.Done():
 				return
 			}

@@ -108,7 +108,9 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 // (selfupdate.SaveRefreshed), so the next relay does not run it again. The refresh and the
 // successor run the new release where install's is found after an update
 // (selfupdate.Install.Terma): a package manager's link, not the versioned path the relay
-// started from. out takes the refresh's output: the relay's log.
+// started from; the successor spawns as that release (Result.Installed), so a relay of it
+// started meanwhile is not asked to make way. out takes the refresh's output: the relay's
+// log.
 func (app *App) afterRelay(res daemon.Result, install selfupdate.Install, out io.Writer) error {
 	if res.Updated && !res.SetupGone {
 		signal.Reset(os.Interrupt, syscall.SIGTERM)
@@ -118,7 +120,9 @@ func (app *App) afterRelay(res daemon.Result, install selfupdate.Install, out io
 		}
 		cancel()
 		if !res.Service {
-			app.spawnRelay(install.Terma(), app.stateDir, app.version)
+			// As the release it runs now: its own version would have a relay of that release,
+			// started meanwhile, make way for nothing.
+			app.spawnRelay(install.Terma(), app.stateDir, res.Installed)
 		}
 	}
 	if res.LastBeatDue() {
@@ -131,15 +135,16 @@ func (app *App) afterRelay(res daemon.Result, install selfupdate.Install, out io
 }
 
 // relayUpdater has the relay install each new release by itself, as interactive commands
-// do, so a machine nobody runs terma on still updates: in place of its own binary, or
-// through the package manager that owns a Homebrew or global npm install
+// do, so a machine nobody runs terma on still updates: in place of its own binary, the
+// install script's or a global npm package's, or through Homebrew for a Homebrew install
 // (selfupdate.Client.RunsHomebrew), whose output goes to the update folder's upgrade.log. It
 // is nil where the relay could never install one (selfupdate.Install.CanUpdate): a
-// development build, a project's npm dependency, a Windows binary, a package manager terma
-// cannot find, or a binary this process could not find. Each pass asks updateAuto first and
-// installs only when it says on, so the relay does what its heartbeat reports: turned off
-// with `terma update --auto off`, in CI, or where it may not write now, it asks nothing,
-// not even GitHub.
+// development build, a project's npm dependency, a Windows binary, a Homebrew install without
+// its brew, or a binary this process could not find. Each pass first asks whether another
+// install replaced the relay's binary, whatever the developer chose, and restarts the relay
+// on it (replacedBy); then asks updateAuto, and installs only when it says on, so the relay
+// does what its heartbeat reports: turned off with `terma update --auto off`, in CI, or where
+// it may not write now, it asks nothing more, not even GitHub.
 func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
 	if !install.CanUpdate() {
 		return nil
@@ -148,31 +153,36 @@ func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
 	// is installed over that one (selfupdate.Client.Auto).
 	client := app.updateClient()
 	client.RunsHomebrew = true
-	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
+	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (daemon.Pass, error) {
+		// A downgrade by hand, or a reinstall, while updates are off restarts the relay too.
+		if client.Replaced(install.Exe) {
+			return app.replacedBy(ctx, install), nil
+		}
 		if app.updateAuto(install) != semconv.TermaUpdateAutoOn {
-			return "", nil
+			return daemon.Pass{}, nil
 		}
 		o := client.Auto(ctx, app.dir, app.stateDir, install.Exe, nil)
 		if o.Replaced {
-			return app.replacedBy(ctx, install)
+			// Replaced during the pass, under the update lock.
+			return app.replacedBy(ctx, install), nil
 		}
-		return o.Installed, o.Err
+		return daemon.Pass{Installed: o.Installed}, o.Err
 	}}
 }
 
-// replacedBy is the release another install put in place of the relay's terma, "" when its
-// stable link (install.Terma) runs none: Homebrew left to finish by an earlier relay after
-// this one started, `brew reinstall`, `npm i -g`, install.sh run again or `npm rebuild`. The
-// relay takes it for one it installed itself, and restarts on it from that link
-// (afterRelay): whatever its version, since a relay whose binary was replaced installs
-// nothing more (selfupdate.Client.Replaced), and may run one an upgrade removed. Its
-// successor starts afresh from the binary in place, and updates it if it is behind.
-func (app *App) replacedBy(ctx context.Context, install selfupdate.Install) (string, error) {
+// replacedBy is the release another install put in place of the relay's terma, none when
+// its stable link (install.Terma) runs none: Homebrew left to finish by an earlier relay
+// after this one started, `brew reinstall`, `npm i -g`, install.sh run again, `npm rebuild`
+// or a downgrade by hand. The relay restarts on it from that link (afterRelay), whatever its
+// version, since a relay whose binary was replaced installs nothing more
+// (selfupdate.Client.Replaced), and may run one an upgrade removed. Its successor starts
+// afresh from the binary in place, and updates it if it is behind and updates are on.
+func (app *App) replacedBy(ctx context.Context, install selfupdate.Install) daemon.Pass {
 	installed, err := selfupdate.InstalledVersion(ctx, install.Terma())
 	if err != nil {
-		return "", nil
+		return daemon.Pass{}
 	}
-	return installed, nil
+	return daemon.Pass{Installed: installed, Replaced: true}
 }
 
 // installed is how this terma was installed, as its relay reports it and updates it. A

@@ -125,7 +125,7 @@ func updatesSummary(install selfupdate.Install, auto bool) string {
 		return "when you run `terma update` (automatic updates are off: `terma update --auto on`)"
 	case install.Method == semconv.TermaInstallMethodNpm:
 		return "automatically, in place: terma updates the npm package's binary itself in the background; " +
-			"npm's own record (`npm ls -g`) catches up at your next `npm i -g` or `terma update`"
+			"npm's own record (`npm ls -g`) catches up at your next `npm i -g`"
 	case m.Name != "":
 		return "automatically: the local relay has " + m.Name + " install each new release in the background"
 	}

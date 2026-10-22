@@ -11,8 +11,7 @@ terma setup
 
 A global install keeps itself up to date: terma replaces the package's binary with each new
 release in place, as the install script's does, so `npm ls -g` shows the version npm last
-installed until your next `npm i -g` or `terma update`. A project's dependency is upgraded
-in that project.
+installed until your next `npm i -g`. A project's dependency is upgraded in that project.
 
 Prefer the native install (Homebrew or `install.sh`) on machines where terma runs inside
 git hooks: the shim adds Node's startup time to every commit.

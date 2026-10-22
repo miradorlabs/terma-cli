@@ -62,9 +62,10 @@ type Result struct {
 	Service        bool
 	// Replaced means a newer terma asked the relay to make way, and it stepped aside.
 	Replaced bool
-	// Updated means the relay installed a newer terma in place of its own, and stopped to
-	// run it.
-	Updated bool
+	// Updated means the relay installed a newer terma in place of its own, or found another
+	// install had put one there, and stopped to run it: Installed is its version.
+	Updated   bool
+	Installed string
 	// SetupGone means the relay's token was removed: nothing to relay for.
 	SetupGone bool
 	// exitBeat sends the relay's last heartbeat (ExitBeat); nil once setup is gone.
@@ -212,9 +213,12 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { u.Run(engineCtx, updated) })
 	}
 
-	why, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
+	why, installed, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
 	res.Replaced = why == stopReplaced
 	res.Updated = why == stopUpdated
+	if res.Updated {
+		res.Installed = installed
+	}
 	// A relay stopped once its token went (teardown) is done for good, however it was stopped.
 	res.SetupGone = why == stopSetupGone || !setUp(c.StateDir)
 	if why != stopServeFailed {
@@ -358,23 +362,25 @@ func listen(dir, addr string) (net.Listener, error) {
 // hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
 // on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
 // is answered by that same wait.
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
+func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, string, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
 	var upgraded time.Time  // when it installed one itself
+	installed := ""         // the release it installed last, or found in place
 	lastPrune := time.Now()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return stopAsked, nil
+			return stopAsked, installed, nil
 		case err := <-served:
 			if errors.Is(err, http.ErrServerClosed) {
 				err = nil
 			}
-			return stopServeFailed, err
-		case <-updated:
+			return stopServeFailed, installed, err
+		case v := <-updated:
+			installed = v
 			// From the first release it installed: one installed while it waits to restart is
 			// no reason to keep running the release they both replaced any longer.
 			if upgraded.IsZero() {
@@ -383,10 +389,10 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		case <-tick.C:
 		}
 		if !setUp(stateDir) {
-			return stopSetupGone, nil
+			return stopSetupGone, installed, nil
 		}
 		if requested(dir, StopFile) {
-			return stopAsked, nil
+			return stopAsked, installed, nil
 		}
 		if replacing.IsZero() && requested(dir, ReplaceFile) {
 			replacing = time.Now()
@@ -397,18 +403,18 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 				quiet = 0
 			}
 			if r.Quiesce(quiet) {
-				return stopUpdated, nil
+				return stopUpdated, installed, nil
 			}
 		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
 			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
-			return stopReplaced, nil
+			return stopReplaced, installed, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
 			claim.Prune(stateDir, time.Now())
 			lastPrune = time.Now()
 		}
 		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle {
-			return stopIdle, nil
+			return stopIdle, installed, nil
 		}
 	}
 }
