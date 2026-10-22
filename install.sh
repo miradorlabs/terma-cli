@@ -5,7 +5,8 @@
 #
 # The script is POSIX sh, so `| sh` works too. What it does, so you can read it
 # before you run it: pick the archive for this platform from GitHub Releases, verify
-# it against the release's checksums.txt, extract the single `terma` binary, and
+# it against the release's checksums.txt and, with OpenSSL 3, that file's signature by
+# the release key `terma update` checks too, extract the single `terma` binary, and
 # place it in ~/.local/bin; it never asks for sudo. When that directory is not on
 # PATH, it appends the one line that adds it to the startup files of your login shell,
 # and of the shell that ran it when that is another (zsh's .zshrc; bash's .bashrc and
@@ -21,8 +22,13 @@ set -eu
 
 REPO="miradorlabs/terma-cli"
 # TERMA_RELEASE_BASE exists for .github/workflows/ci.yml, which serves a snapshot
-# build over loopback. Only https is accepted unless the base is loopback.
+# build over loopback. Only https is accepted unless the base is loopback (loopback_http).
 BASE="${TERMA_RELEASE_BASE:-https://github.com/${REPO}/releases}"
+# The ed25519 public keys a release may be signed with, newest first, each the base64 of
+# its DER SubjectPublicKeyInfo, as openssl reads a key: internal/selfupdate's
+# releaseKeys, which `terma update` checks the same signature with
+# (TestInstallersPinTheReleaseKeys keeps the copies equal).
+RELEASE_KEYS='MCowBQYDK2VwAyEAy2ZGvw7JgSi8q2vVpLktDKSt4tnj8X4S4G4zclJAZns='
 
 say() { printf '%s\n' "$*" >&2; }
 die() { say "install.sh: $*"; exit 1; }
@@ -101,7 +107,20 @@ shown() {
   esac
 }
 
-# internal/shellrc's tests source this script for the functions above.
+# Whether URL $1 is cleartext http to this machine: its authority exactly 127.0.0.1,
+# localhost or [::1], with at most a port after it. Anything else there (user info,
+# another host) makes it not.
+loopback_http() {
+  case "$1" in http://*) ;; *) return 1 ;; esac
+  authority="${1#http://}"
+  authority="${authority%%/*}"
+  case "$authority" in 127.0.0.1|localhost|'[::1]') return 0 ;; esac
+  case "${authority%:*}" in 127.0.0.1|localhost|'[::1]') ;; *) return 1 ;; esac
+  case "${authority##*:}" in ''|*[!0-9]*) return 1 ;; esac
+}
+
+# internal/shellrc's tests and scripts/test-install.sh source this script for the
+# functions above.
 [ -z "${TERMA_INSTALL_FUNCTIONS_ONLY:-}" ] || return 0
 
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required"; }
@@ -119,6 +138,26 @@ case "$arch" in
   *) die "unsupported architecture: $arch" ;;
 esac
 
+# ed25519_ok <key> <file> <signature>: whether signature (base64, any whitespace in it
+# ignored) is key's (base64 SubjectPublicKeyInfo) over file.
+ed25519_ok() {
+  printf '%s\n' '-----BEGIN PUBLIC KEY-----' "$1" '-----END PUBLIC KEY-----' >"$tmp/key.pem" &&
+    printf '%s' "$3" | tr -d '[:space:]' | openssl base64 -d -A >"$tmp/sig.bin" 2>/dev/null &&
+    openssl pkeyutl -verify -pubin -inkey "$tmp/key.pem" -rawin -in "$2" -sigfile "$tmp/sig.bin" >/dev/null 2>&1
+}
+
+# Whether the openssl on PATH checks ed25519 signatures, as OpenSSL 3 does and neither
+# OpenSSL 1.1 nor the LibreSSL macOS ships can: it must accept RFC 8032's second test
+# vector, and refuse it for another message. What a release serves plays no part in it.
+can_verify() {
+  command -v openssl >/dev/null 2>&1 || return 1
+  printf r >"$tmp/probe"
+  printf s >"$tmp/probe.other"
+  set -- 'MCowBQYDK2VwAyEAPUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw=' \
+    'kqAJqfDUyrhyDoILX2QlQKKye1QWUD+Ps3YiI+vbadoIWsHkPhWZbkWPNhPQ8R2MOHsurrQwKu6wDSkWErsMAA=='
+  ed25519_ok "$1" "$tmp/probe" "$2" && ! ed25519_ok "$1" "$tmp/probe.other" "$2"
+}
+
 if command -v sha256sum >/dev/null 2>&1; then
   sha256() { sha256sum "$1" | awk '{print $1}'; }
 elif command -v shasum >/dev/null 2>&1; then
@@ -129,33 +168,82 @@ fi
 
 # Same naming as the Homebrew cask and `terma update` (internal/selfupdate.AssetName).
 asset="terma_${os}_${arch}.tar.gz"
-version="${TERMA_VERSION:-}"
-case "$version" in
-  ""|latest) release="${BASE}/latest/download" ;;
-  v*)        release="${BASE}/download/${version}" ;;
-  *)         release="${BASE}/download/v${version}" ;;
-esac
 
 # Cleartext is refused, including on a redirect, except from this machine.
 proto='=https'
-case "$BASE" in
-  http://127.0.0.1:*|http://127.0.0.1/*|http://localhost:*|http://localhost/*) proto='=http,https' ;;
+if loopback_http "$BASE"; then proto='=http,https'; fi
+
+# The release: TERMA_VERSION's, else the one GitHub's latest redirects to
+# (releases/latest -> releases/tag/<tag>), so every file comes from that one release and
+# its signature is checked for the tag it was made for.
+version="${TERMA_VERSION:-}"
+case "$version" in
+  ""|latest)
+    latest="$(curl -fsS --proto "$proto" --tlsv1.2 --retry 3 --connect-timeout 30 --max-time 60 \
+      -o /dev/null -w '%{redirect_url}' "${BASE}/latest")" ||
+      die "could not look up the latest release at ${BASE}/latest"
+    case "$latest" in
+      */tag/*) tag="${latest##*/tag/}" ;;
+      *) die "could not look up the latest release at ${BASE}/latest" ;;
+    esac ;;
+  v*) tag="$version" ;;
+  *)  tag="v${version}" ;;
 esac
+case "$tag" in v[0-9]*) ;; *) die "not a release: ${tag}" ;; esac
+case "$tag" in *[!A-Za-z0-9._-]*) die "not a release: ${tag}" ;; esac
+release="${BASE}/download/${tag}"
+
+# fetch <url> <file> <most bytes>: fails past that many bytes, however the server sends
+# them (curl before 8.4 ignores --max-filesize without a length; head reads one byte past
+# the bound, then stops reading, which stops curl), or when the download stalls for a
+# minute. A connection that fails, times out, is cut short or answers an HTTP error is
+# tried again from the start, four attempts in all: curl's own --retry cannot take back
+# what it has already written to a pipe.
 fetch() {
-  curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 -o "$2" "$1" \
-    || die "download failed: $1"
+  for attempt in 1 2 3 4; do
+    rm -f "$tmp/failed"
+    { curl -fsSL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --connect-timeout 30 \
+        --speed-limit 1 --speed-time 60 --max-filesize "$3" "$1" 2>"$tmp/curl.err" ||
+        echo "$?" >"$tmp/failed"; } | head -c "$(($3 + 1))" >"$2"
+    [ "$(($(wc -c <"$2")))" -le "$3" ] || die "download failed: $1 is larger than $3 bytes"
+    [ -e "$tmp/failed" ] || return 0
+    case "$(cat "$tmp/failed")" in
+      7|18|22|28|35|52|55|56) [ "$attempt" = 4 ] || sleep 1 ;;
+      63) die "download failed: $1 is larger than $3 bytes" ;;
+      *) break ;;
+    esac
+  done
+  cat "$tmp/curl.err" >&2
+  die "download failed: $1"
 }
 
 tmp="$(mktemp -d 2>/dev/null || mktemp -d -t terma)"
 trap 'rm -rf "$tmp"' EXIT
 
-say "Downloading ${asset}..."
-fetch "${release}/${asset}" "$tmp/$asset"
-fetch "${release}/checksums.txt" "$tmp/checksums.txt"
+say "Downloading ${asset} (${tag})..."
+fetch "${release}/checksums.txt" "$tmp/checksums.txt" 1048576
+fetch "${release}/checksums.txt.sig" "$tmp/checksums.txt.sig" 4096
 
-# Verify before extracting anything.
+# Verify before downloading the archive, and the archive before extracting anything.
+# checksums.txt names every archive's digest, and its signature, over the tag and then
+# the file, is what says the release is ours: any line of checksums.txt.sig by any key in
+# RELEASE_KEYS, as internal/selfupdate.Verify reads it. Without an openssl that can check
+# one, say so: the digest is still checked below.
+if can_verify; then
+  { printf 'terma release %s\n' "$tag"; cat "$tmp/checksums.txt"; } >"$tmp/signed"
+  signed=''
+  while IFS= read -r sig || [ -n "$sig" ]; do
+    for key in $RELEASE_KEYS; do
+      if ed25519_ok "$key" "$tmp/signed" "$sig"; then signed=1; break 2; fi
+    done
+  done <"$tmp/checksums.txt.sig"
+  [ -n "$signed" ] || die "${tag} is not signed by a key this installer trusts; refusing to install"
+else
+  say "Warning: ${tag}'s signature is not checked: that needs OpenSSL 3, and there is none on PATH here. ${asset} is checked against checksums.txt alone."
+fi
 expected="$(grep "  ${asset}\$" "$tmp/checksums.txt" | awk '{print $1}')"
 [ -n "$expected" ] || die "checksums.txt has no entry for ${asset}"
+fetch "${release}/${asset}" "$tmp/$asset" 268435456 # internal/selfupdate's maxDownload
 actual="$(sha256 "$tmp/$asset")"
 [ "$actual" = "$expected" ] || die "checksum mismatch for ${asset} (expected ${expected}, got ${actual})"
 

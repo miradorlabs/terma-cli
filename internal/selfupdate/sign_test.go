@@ -3,7 +3,14 @@ package selfupdate
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"os"
+	"regexp"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -113,5 +120,48 @@ func TestARotatingReleaseVerifiesOnOldAndNewBuilds(t *testing.T) {
 	// Once the old key's signature goes, the old build no longer verifies: it is reinstalled.
 	if err := Verify([]ed25519.PublicKey{oldPub}, "v1.4.0", data, Sign(newPriv, "v1.4.0", data)); !errors.Is(err, ErrUnsigned) {
 		t.Fatalf("old build verified a release signed by the new key alone: %v", err)
+	}
+}
+
+// install.sh and the npm shim check a release's signature as Verify does, with copies of
+// releaseKeys: install.sh as the base64 of each key's DER SubjectPublicKeyInfo, which
+// openssl reads, npm/install.js as hex. A key rotated here is rotated there too.
+func TestInstallersPinTheReleaseKeys(t *testing.T) {
+	t.Parallel()
+	var spki, hexes []string
+	for _, k := range builtinKeys {
+		der, err := x509.MarshalPKIXPublicKey(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		spki = append(spki, base64.StdEncoding.EncodeToString(der))
+		hexes = append(hexes, hex.EncodeToString(k))
+	}
+	read := func(name string) string {
+		b, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+
+	script := regexp.MustCompile(`(?m)^RELEASE_KEYS='([^']*)'`).FindStringSubmatch(read("../../install.sh"))
+	if script == nil {
+		t.Fatal("install.sh has no RELEASE_KEYS='…' line")
+	}
+	if got := strings.Fields(script[1]); !slices.Equal(got, spki) {
+		t.Errorf("install.sh: RELEASE_KEYS='%s', want '%s'", strings.Join(got, " "), strings.Join(spki, " "))
+	}
+
+	shim := regexp.MustCompile(`(?s)const RELEASE_KEYS = \[(.*?)\];`).FindStringSubmatch(read("../../npm/install.js"))
+	if shim == nil {
+		t.Fatal("npm/install.js has no `const RELEASE_KEYS = [...];`")
+	}
+	var got []string
+	for _, m := range regexp.MustCompile(`'([^']*)'`).FindAllStringSubmatch(shim[1], -1) {
+		got = append(got, m[1])
+	}
+	if !slices.Equal(got, hexes) {
+		t.Errorf("npm/install.js: RELEASE_KEYS = %q, want %q", got, hexes)
 	}
 }
