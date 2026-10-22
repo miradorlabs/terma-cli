@@ -754,11 +754,15 @@ attributes:
           stability: development
         - id: npm_project
           value: npm_project
-          brief: A project's npm dependency, which the project's own lockfile pins.
+          brief: >-
+            A project's npm dependency, which the project's own lockfile pins; also another package
+            manager's global install in npm's layout (yarn, pnpm or bun), which terma cannot tell apart.
           stability: development
         - id: source
           value: source
-          brief: A build that is not a numbered release, wherever it is installed (go build, make, go install).
+          brief: >-
+            A build that is not a numbered release, wherever it is installed: go build or go install, or
+            make on a commit that is not a release tag (make on a release tag builds that release).
           stability: development
     stability: development
     brief: How the relay's terma was installed, which says how it gets new releases.

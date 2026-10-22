@@ -373,9 +373,9 @@ const (
 	TermaInstallMethodHomebrew = "homebrew"
 	// TermaInstallMethodNpm is terma.install.method npm: The global npm package @miradorlabs/terma, or any npm install of it on Windows.
 	TermaInstallMethodNpm = "npm"
-	// TermaInstallMethodNpmProject is terma.install.method npm_project: A project's npm dependency, which the project's own lockfile pins.
+	// TermaInstallMethodNpmProject is terma.install.method npm_project: A project's npm dependency, which the project's own lockfile pins; also another package manager's global install in npm's layout (yarn, pnpm or bun), which terma cannot tell apart.
 	TermaInstallMethodNpmProject = "npm_project"
-	// TermaInstallMethodSource is terma.install.method source: A build that is not a numbered release, wherever it is installed (go build, make, go install).
+	// TermaInstallMethodSource is terma.install.method source: A build that is not a numbered release, wherever it is installed: go build or go install, or make on a commit that is not a release tag (make on a release tag builds that release).
 	TermaInstallMethodSource = "source"
 	// TermaOperationDurationStatusInvalid is terma.operation.duration_status invalid: The agent reported a duration that is not a non-negative integer.
 	TermaOperationDurationStatusInvalid = "invalid"

@@ -60,8 +60,14 @@ func (i Install) Automatic(p Preferences, getenv func(string) string) string {
 	switch {
 	case i.Exe == "" || i.Method != semconv.TermaInstallMethodScript || i.goos == "windows":
 		return semconv.TermaUpdateAutoUnsupported
-	case !p.Auto || getenv("CI") != "" || getenv("TERMA_NO_UPDATE_CHECK") == "1":
+	case !p.Auto || OptedOut(getenv):
 		return semconv.TermaUpdateAutoOff
 	}
 	return semconv.TermaUpdateAutoOn
+}
+
+// OptedOut reports whether the environment getenv reads keeps terma's own updates out of
+// automation: CI set, or TERMA_NO_UPDATE_CHECK=1.
+func OptedOut(getenv func(string) string) bool {
+	return getenv("CI") != "" || getenv("TERMA_NO_UPDATE_CHECK") == "1"
 }
