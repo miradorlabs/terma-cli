@@ -1,12 +1,12 @@
 package selfupdate
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -84,31 +84,45 @@ func (b brewed) manager(t *testing.T) Manager {
 	return m
 }
 
+// upgradeLog is a fresh log for one upgrade.
+func upgradeLog(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(t.TempDir(), "update", upgradeLogFile)
+}
+
 // Homebrew upgrades terma in the background with no terminal and no prompt, its taps updated
-// first, the developer's other packages left alone; success is the version the link it
-// moved now runs, never its exit status.
+// first when asked, the developer's other packages left alone, its output in the upgrade's
+// log; success is the version the link it moved now runs, never its exit status.
 func TestHomebrewUpgradesTermaInTheBackground(t *testing.T) {
+	notUpgrading := "echo 'Warning: Not upgrading terma, the latest version is already installed'"
 	for _, tc := range []struct {
-		name    string
-		then    func(b brewed) string
-		want    string
-		offered bool
+		name, to string
+		refresh  bool
+		then     func(b brewed) string
+		want     string
+		is       error
 	}{
-		{"upgraded", func(b brewed) string { return b.upgradeTo("1.0.1") }, "1.0.1", true},
-		{"upgraded, then failed", func(b brewed) string { return b.upgradeTo("1.0.1") + "; echo 'Error: completions' >&2; exit 1" }, "1.0.1", true},
+		{"upgraded", "1.0.1", true, func(b brewed) string { return b.upgradeTo("1.0.1") }, "1.0.1", nil},
+		{"upgraded, then failed", "1.0.1", true, func(b brewed) string { return b.upgradeTo("1.0.1") + "; echo 'Error: completions' >&2; exit 1" }, "1.0.1", nil},
+		// A tap a release behind still names one newer than what is installed.
+		{"a tap a release behind", "1.0.2", true, func(b brewed) string { return b.upgradeTo("1.0.1") }, "1.0.1", nil},
 		// Its tap was not updated: it says terma is up to date.
-		{"tap without it yet", func(brewed) string {
-			return "echo 'Warning: Not upgrading terma, the latest version is already installed'"
-		}, "", false},
-		{"untrusted tap", func(brewed) string { return "echo 'Error: Refusing to load untrusted tap miradorlabs/tap' >&2; exit 1" }, "", true},
+		{"tap without it yet", "1.0.1", false, func(brewed) string { return notUpgrading }, "", ErrNotOffered},
+		{"busy", "1.0.1", true, func(brewed) string {
+			return "echo 'Error: A `brew upgrade terma` process has already locked /opt/homebrew/var/homebrew/locks/terma.lock.' >&2; exit 1"
+		}, "", ErrBusy},
+		{"untrusted tap", "1.0.1", true, func(brewed) string { return "echo 'Error: Refusing to load untrusted tap miradorlabs/tap' >&2; exit 1" }, "", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			b := newBrewed(t)
 			b.brew(t, tc.then(b))
-			var out bytes.Buffer
-			got, err := b.manager(t).Upgrade(t.Context(), "1.0.1", &out)
-			if got != tc.want || (err == nil) != (tc.want != "") || errors.Is(err, ErrNotOffered) == tc.offered {
-				t.Fatalf("Upgrade = %q, %v; want %q, offered %v\n%s", got, err, tc.want, tc.offered, &out)
+			log := upgradeLog(t)
+			got, err := b.manager(t).Upgrade(t.Context(), UpgradeRequest{From: "1.0.0", To: tc.to, Log: log, RefreshTaps: tc.refresh})
+			switch {
+			case tc.want != "" && (got != tc.want || err != nil):
+				t.Fatalf("Upgrade = %q, %v; want %q installed", got, err, tc.want)
+			case tc.want == "" && (err == nil || tc.is != nil && !errors.Is(err, tc.is) || tc.is == nil && retrySoon(err)):
+				t.Fatalf("Upgrade = %q, %v; want it to fail as %v", got, err, tc.is)
 			}
 			if args := strings.TrimSpace(b.ran(t, "args")); args != "upgrade --cask terma" {
 				t.Errorf("brew ran with %q", args)
@@ -117,13 +131,19 @@ func TestHomebrewUpgradesTermaInTheBackground(t *testing.T) {
 				t.Errorf("brew's input was %q, want empty", stdin)
 			}
 			env := b.ran(t, "env")
-			for _, want := range []string{"HOMEBREW_NO_ASK=1", "HOMEBREW_AUTO_UPDATE_SECS=0", "HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1"} {
+			for _, want := range []string{"HOMEBREW_NO_ASK=1", "HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1"} {
 				if !strings.Contains(env, want+"\n") {
 					t.Errorf("brew ran without %s:\n%s", want, env)
 				}
 			}
+			if refreshed := strings.Contains(env, "HOMEBREW_AUTO_UPDATE_SECS=0\n"); refreshed != tc.refresh {
+				t.Errorf("brew updated its taps first: %v, want %v", refreshed, tc.refresh)
+			}
 			if strings.Contains(env, "GREEDY") {
 				t.Errorf("brew ran greedy:\n%s", env)
+			}
+			if data, _ := os.ReadFile(log); !strings.Contains(string(data), "upgrading 1.0.0 → "+tc.to+" with Homebrew") {
+				t.Errorf("the upgrade's log reads %q", data)
 			}
 		})
 	}
@@ -131,21 +151,28 @@ func TestHomebrewUpgradesTermaInTheBackground(t *testing.T) {
 
 // npm is asked first whether its registry has the release, which it publishes after GitHub;
 // then it installs exactly that version, finding node beside npm though a service's PATH
-// has none. A prefix it may not write is a failed install.
+// has none, and running the install script that downloads the binary whatever
+// ignore-scripts says. A prefix it may not write is a failed install.
 func TestNpmUpgradesTermaInTheBackground(t *testing.T) {
 	unixLayouts(t)
 	for _, tc := range []struct {
 		name, registry, install string
+		ignoreScripts           bool
 		want                    string
 		offered, installed      bool
 	}{
-		{"published", "1.0.1", "upgrade", "1.0.1", true, true},
-		{"not published yet", "", "upgrade", "", false, false},
-		{"root-owned prefix", "1.0.1", "echo 'npm error code EACCES' >&2; exit 243", "", true, true},
+		{"published", "1.0.1", "upgrade", false, "1.0.1", true, true},
+		// npm would install the package and skip the script that downloads the binary.
+		{"scripts ignored by the developer's npm config", "1.0.1", "upgrade", true, "1.0.1", true, true},
+		{"not published yet", "", "upgrade", false, "", false, false},
+		{"root-owned prefix", "1.0.1", "echo 'npm error code EACCES' >&2; exit 243", false, "", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// What a service's relay finds on PATH: no node.
 			t.Setenv("PATH", "/usr/bin:/bin")
+			if tc.ignoreScripts {
+				t.Setenv("npm_config_ignore_scripts", "true")
+			}
 			root, err := filepath.EvalSymlinks(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
@@ -159,22 +186,25 @@ func TestNpmUpgradesTermaInTheBackground(t *testing.T) {
 				install = fmt.Sprintf("printf '#!/bin/sh\\necho \"terma 1.0.1\"\\n' > %s", exe)
 			}
 			ran := filepath.Join(root, "ran")
+			// Like npm, it skips the package's install script when ignore-scripts is set and
+			// the command line does not say otherwise: the package lands without its binary.
 			script(t, filepath.Join(prefix, "bin", "npm"), fmt.Sprintf(`command -v node >/dev/null || { echo 'env: node: No such file or directory' >&2; exit 127; }
 case "$1" in
 view) [ -n '%[2]s' ] && echo '%[2]s' ;;
-install) echo "$@" > %[1]s.args; %[3]s ;;
-esac`, ran, tc.registry, install))
+install) echo "$@" > %[1]s.args
+  case " $* " in *" --ignore-scripts=false "*) ;; *) [ "$npm_config_ignore_scripts" = true ] && { rm -f %[4]s; exit 0; } ;; esac
+  %[3]s ;;
+esac`, ran, tc.registry, install, exe))
 			m, ok := ManagedBy(exe)
 			if !ok || len(m.Argv) == 0 {
 				t.Fatalf("ManagedBy = %+v, %v", m, ok)
 			}
-			var out bytes.Buffer
-			got, err := m.Upgrade(t.Context(), "1.0.1", &out)
+			got, err := m.Upgrade(t.Context(), UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)})
 			if got != tc.want || (err == nil) != (tc.want != "") || errors.Is(err, ErrNotOffered) == tc.offered {
-				t.Fatalf("Upgrade = %q, %v; want %q, offered %v\n%s", got, err, tc.want, tc.offered, &out)
+				t.Fatalf("Upgrade = %q, %v; want %q, offered %v", got, err, tc.want, tc.offered)
 			}
 			args, _ := os.ReadFile(ran + ".args")
-			if want := "install --global --prefix " + prefix + " @miradorlabs/terma@1.0.1\n"; tc.installed != (string(args) == want) {
+			if want := "install --global --prefix " + prefix + " --ignore-scripts=false @miradorlabs/terma@1.0.1\n"; tc.installed != (string(args) == want) {
 				t.Fatalf("npm install ran with %q; want it run %v, as %q", args, tc.installed, want)
 			}
 		})
@@ -182,32 +212,98 @@ esac`, ran, tc.registry, install))
 }
 
 // A relay stopping while its package manager runs leaves it to finish by itself, since
-// stopping it halfway can leave terma uninstalled; one that runs past its time is stopped.
+// stopping it halfway can leave terma uninstalled, and says what it installed should the
+// release be in place already; one that runs past its time is stopped, with every process
+// it started.
 func TestAnUpgradeOutlivesTheRelayButNotItsTime(t *testing.T) {
+	t.Parallel()
 	b := newBrewed(t)
 	done := filepath.Join(b.prefix, "done")
-	b.brew(t, "sleep 1; touch "+done)
+	b.brew(t, "sleep 4; touch "+done)
 	m := b.manager(t)
+	r := UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)}
 
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(100*time.Millisecond, cancel)
 	start := time.Now()
-	if _, err := m.Upgrade(ctx, "1.0.1", &bytes.Buffer{}); !errors.Is(err, context.Canceled) || time.Since(start) > 900*time.Millisecond {
+	if _, err := m.Upgrade(ctx, r); !errors.Is(err, context.Canceled) || time.Since(start) > 3*time.Second {
 		t.Fatalf("Upgrade = %v after %s, want it to stop waiting at once", err, time.Since(start))
 	}
-	if !eventually(func() bool { _, err := os.Stat(done); return err == nil }, 5*time.Second) {
+	if !eventually(func() bool { _, err := os.Stat(done); return err == nil }, 10*time.Second) {
 		t.Fatal("the upgrade was stopped with the relay")
 	}
 
-	_ = os.Remove(done)
-	ctx, cancel = context.WithTimeout(t.Context(), 100*time.Millisecond)
+	// Stopped once the release is in place, as a hook of the new release asks the relay to.
+	b.brew(t, b.upgradeTo("1.0.1")+"; sleep 2")
+	ctx, cancel = context.WithCancel(t.Context())
+	go func() {
+		eventually(func() bool { dest, _ := os.Readlink(b.link); return strings.Contains(dest, "1.0.1") }, 10*time.Second)
+		cancel()
+	}()
+	if got, err := m.Upgrade(ctx, r); got != "1.0.1" || err != nil {
+		t.Fatalf("Upgrade stopped after the swap = %q, %v; want 1.0.1 installed", got, err)
+	}
+
+	b = newBrewed(t)
+	left := filepath.Join(b.prefix, "left")
+	b.brew(t, "(sleep 2; touch "+left+") & sleep 10")
+	m = b.manager(t)
+	// Long enough for macOS to let a script just written run.
+	ctx, cancel = context.WithTimeout(t.Context(), 1500*time.Millisecond)
 	defer cancel()
-	if _, err := m.Upgrade(ctx, "1.0.1", &bytes.Buffer{}); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := m.Upgrade(ctx, r); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Upgrade = %v, want its time up", err)
 	}
-	time.Sleep(1500 * time.Millisecond)
-	if _, err := os.Stat(done); err == nil {
-		t.Fatal("an upgrade past its time went on")
+	if b.ran(t, "args") == "" {
+		t.Fatal("brew had not started by its deadline")
+	}
+	time.Sleep(2500 * time.Millisecond)
+	if _, err := os.Stat(left); err == nil {
+		t.Fatal("what an upgrade past its time started went on")
+	}
+}
+
+// Under systemd the package manager runs in a scope of its own, which the relay's unit
+// stopping does not stop; anywhere else, or where the user's systemd makes none, in a
+// session of its own alone.
+func TestScopedLeavesTheRelaysSystemdUnit(t *testing.T) {
+	t.Parallel()
+	argv := []string{"/opt/homebrew/bin/brew", "upgrade", "--cask", "terma"}
+	scope := []string{"/usr/bin/systemd-run", "--user", "--scope", "--quiet", "--collect", "--"}
+	for _, tc := range []struct {
+		name, goos, invocation string
+		found, works           bool
+		want                   []string
+	}{
+		{"systemd unit", "linux", "0123abcd", true, true, append(slices.Clone(scope), argv...)},
+		{"no systemd unit", "linux", "", true, true, argv},
+		{"no systemd-run", "linux", "0123abcd", false, true, argv},
+		{"no user systemd", "linux", "0123abcd", true, false, argv},
+		{"macOS", "darwin", "0123abcd", true, true, argv},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var asked []string
+			got := scoped(tc.goos, func(k string) string {
+				if k == "INVOCATION_ID" {
+					return tc.invocation
+				}
+				return ""
+			}, func(string) (string, error) {
+				if !tc.found {
+					return "", errors.New("not found")
+				}
+				return scope[0], nil
+			}, func(argv ...string) bool {
+				asked = argv
+				return tc.works
+			}, argv)
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("scoped = %q, want %q", got, tc.want)
+			}
+			if asked != nil && !slices.Equal(asked, append(slices.Clone(scope), "true")) {
+				t.Fatalf("asked systemd-run %q", asked)
+			}
+		})
 	}
 }
 

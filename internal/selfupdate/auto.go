@@ -55,7 +55,7 @@ type Outcome struct {
 	// did nothing: the next command runs that release.
 	Replaced bool
 	// Err is a failed install; the next attempt waits AttemptInterval, or retryAfter for a
-	// release its package manager does not offer yet (ErrNotOffered).
+	// release its package manager does not offer yet, or found busy (Attempt.Retries).
 	Err error
 }
 
@@ -64,22 +64,31 @@ type Outcome struct {
 // patch release, which installs without a soak, reaches a machine within one of the relay's
 // waits; a failed look still backs off (retryAfter). It installs the release for the terma
 // at exe, unless the developer turned automatic updates off in configDir: in place of a
-// release binary that updates itself, and through its package manager (Upgrade) for a
-// Homebrew or global npm install, when this client runs package managers; the check's
+// release binary that updates itself, and through its package manager for a Homebrew or
+// global npm install, when this client runs package managers (RunsManagers); the check's
 // records go in stateDir. A new minor or major version waits out SoakTime first, and is
-// looked up again before it is installed, so a release pulled since the check is not. Each
-// release is attempted once per AttemptInterval at most, so a failing install is not retried
-// at every pass; a release still being built and signed (ErrNotReady) is no attempt, and
-// each look asks after its files again (look), and one a package manager does not offer yet
-// (ErrNotOffered) is tried again after retryAfter. A process that installed a release goes
-// on as it (current), so its later passes install the releases after it. progress, when
-// set, is told of the download.
+// looked up again before it is installed in place, so a release pulled since the check is
+// not; a package manager needs no more than this pass's look. Each release is attempted once
+// per AttemptInterval at most, so a failing install is not retried at every pass; a release
+// still being built and signed (ErrNotReady) is no attempt, and each look asks after its
+// files again (look), and one a package manager does not offer yet, or that found it busy,
+// is tried again after retryAfter (Attempt). A process that installed a release goes on as
+// it (current), so its later passes install the releases after it. progress, when set, is
+// told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	return c.auto(ctx, 0, configDir, stateDir, exe, progress)
 }
 
-// installTimeout bounds an install in place, which is one download.
-const installTimeout = 2 * time.Minute
+const (
+	// installTimeout bounds an install in place, which is one download.
+	installTimeout = 2 * time.Minute
+	// tapRefreshes is how many tries at a release have Homebrew update its taps first
+	// (UpgradeRequest.RefreshTaps): the tap is published minutes after the release, and one
+	// whose publishing failed is left to Homebrew's own daily update, not one each hour.
+	tapRefreshes = 3
+	// upgradeLogFile, in the update folder, holds the last package manager upgrade's output.
+	upgradeLogFile = "upgrade.log"
+)
 
 // auto is Auto with every as the least time between looks.
 func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
@@ -103,71 +112,81 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
 	install := InstallOf(exe, current)
-	if !p.Auto || c.Binary == nil || cache.Unbuilt || !Newer(current, cache.Latest) || !c.installs(install) || cache.held(c.Version) ||
-		Soaking(current, cache.Latest, cache.Published, time.Now()) {
+	if cache.landed(current) {
+		// An earlier relay stopped while its package manager installed this release, which it
+		// was left to finish: an update like any other, said once.
+		cache.end(nil, false)
+		SaveCache(stateDir, cache)
+		saveUpdated(stateDir, Updated{At: time.Now(), From: cache.AttemptedBy, To: current, Through: install.Manager.Name})
+	}
+	if !p.Auto || c.Binary == nil || cache.Unbuilt || !Newer(current, cache.Latest) || !c.installs(install) ||
+		cache.held(cache.Latest, c.Version, time.Now()) || Soaking(current, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, current)}
 	}
+	managed := install.Method != semconv.TermaInstallMethodScript
 	timeout := installTimeout
-	if install.Method != semconv.TermaInstallMethodScript {
+	if managed {
 		timeout = UpgradeTimeout
 	}
 	updateCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if rel == nil {
-		// A check that failed waits out its backoff before any lookup, this one included.
-		if cache.Failed {
+		switch {
+		case cache.Failed:
+			// A check that failed waits out its backoff before any lookup, this one included.
 			return Outcome{Notice: notice(cache, current)}
-		}
-		if rel, err = c.Latest(updateCtx); err != nil {
-			// A failed lookup, retried as a failed check is, not held back a day as an install;
-			// one its process was stopped during is neither.
-			if ctx.Err() == nil {
-				cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
-				SaveCache(stateDir, cache)
+		case managed:
+			// This pass's look found the tag unmoved (latestTag), and a package manager needs
+			// none of the release's files: the API, which limits how often it is asked, is not
+			// asked again, on a retry least of all.
+			rel = &Release{TagName: "v" + cache.Latest, PublishedAt: cache.Published}
+		default:
+			if rel, err = c.Latest(updateCtx); err != nil {
+				// A failed lookup, retried as a failed check is, not held back a day as an
+				// install; one its process was stopped during is neither.
+				if ctx.Err() == nil {
+					cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
+					SaveCache(stateDir, cache)
+				}
+				return Outcome{Err: err}
 			}
-			return Outcome{Err: err}
+			// The release may have been pulled, or followed by another, since the check.
+			cache.Found(rel)
 		}
-		// The release may have been pulled, or followed by another, since the check.
-		cache.Found(rel)
 	}
 	// One that followed may be without its files still, or not be one to install by itself.
 	if cache.Unbuilt || !Newer(current, rel.TagName) || Soaking(current, rel.Version(), rel.PublishedAt, time.Now()) {
 		SaveCache(stateDir, cache)
 		return Outcome{Notice: notice(cache, current)}
 	}
-	unoffered := 0
-	if cache.Attempted == rel.Version() {
-		unoffered = cache.Unoffered
-	}
-	cache.AttemptAt, cache.Attempted, cache.AttemptedBy, cache.Unoffered, cache.Failure = time.Now(), rel.Version(), c.Version, 0, ""
+	target := rel.Version()
+	cache.begin(target, c.Version, time.Now())
 	SaveCache(stateDir, cache)
 	if progress != nil {
-		fmt.Fprintf(progress, "Updating terma %s → %s…\n", current, rel.Version())
+		fmt.Fprintf(progress, "Updating terma %s → %s…\n", current, target)
 	}
-	installed, err := c.install(updateCtx, install, rel, progress)
-	replaced := errors.Is(err, ErrReplaced)
-	switch {
-	case replaced || err != nil && ctx.Err() != nil:
-		// Not the release's failure, so it is not held back: another install's binary is in
-		// place, whose own process may try at once, or this process was stopped during the
-		// install, as a relay is that restarts on the release before.
-		cache.AttemptAt, cache.Attempted, cache.AttemptedBy, cache.Unoffered = time.Time{}, "", "", 0
-		SaveCache(stateDir, cache)
-	case errors.Is(err, ErrNotOffered):
-		cache.Unoffered, cache.Failure = unoffered+1, err.Error()
-		SaveCache(stateDir, cache)
-	case err != nil:
-		cache.Failure = err.Error()
-		SaveCache(stateDir, cache)
+	installed, err := c.install(updateCtx, install, rel, UpgradeRequest{From: current, To: target,
+		Log: statePath(stateDir, upgradeLogFile), RefreshTaps: cache.Retries < tapRefreshes}, progress)
+	if err == nil && installed != target {
+		// A tap a release or more behind installed one between: it is in place, and the
+		// release asked for is tried again soon.
+		cache.end(fmt.Errorf("%s installed terma %s, not %s yet: %w", install.Manager.Name, installed, target, ErrNotOffered), false)
+	} else {
+		cache.end(err, err != nil && ctx.Err() != nil)
 	}
-	if replaced {
+	SaveCache(stateDir, cache)
+	if errors.Is(err, ErrReplaced) {
 		return Outcome{Replaced: true}
 	}
 	if err != nil {
 		return Outcome{Err: err}
 	}
-	// Recorded as the new version's check, so its first pass does not look again.
-	cache.Latest, cache.Published, cache.Current, cache.CheckedAt = installed, rel.PublishedAt, installed, time.Now()
+	// Recorded as the new version's check, so its first pass does not look again; one a
+	// lagging tap installed in place of the latest still names the latest.
+	cache.Current, cache.CheckedAt = installed, time.Now()
+	if installed == target {
+		cache.Latest, cache.Published = installed, rel.PublishedAt
+	}
 	SaveCache(stateDir, cache)
 	// A pass that reports its progress has said so already.
 	saveUpdated(stateDir, Updated{At: time.Now(), From: current, To: installed, Through: install.Manager.Name, Told: progress != nil})
@@ -176,23 +195,25 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 
 // installs reports whether this client installs new releases for install by itself: one
 // terma can update (Install.Automatic does not say unsupported), and for a package manager's
-// install only a client that runs package managers (Upgrade), as the relay's does. An
-// interactive command leaves those to the relay: the manager may take minutes, and the
-// terminal is the developer's.
+// install only a client that runs package managers (RunsManagers), as the relay's does.
 func (c *Client) installs(i Install) bool {
-	return i.updatable() && (i.Method == semconv.TermaInstallMethodScript || c.Upgrade != nil)
+	return i.updatable() && (i.Method == semconv.TermaInstallMethodScript || c.RunsManagers)
 }
 
-// install puts rel in place for i: through its package manager, or in place of its binary.
-func (c *Client) install(ctx context.Context, i Install, rel *Release, progress io.Writer) (string, error) {
+// install puts rel in place for i: in place of its binary, or through its package manager
+// as r asks, the process going on as the release at the link the manager moved to it.
+func (c *Client) install(ctx context.Context, i Install, rel *Release, r UpgradeRequest, progress io.Writer) (string, error) {
 	if i.Method == semconv.TermaInstallMethodScript {
 		return c.Apply(ctx, rel, i.Exe, progress)
 	}
-	installed, err := c.Upgrade(ctx, i.Manager, rel.Version())
+	upgrade := c.upgrade
+	if upgrade == nil {
+		upgrade = func(ctx context.Context, m Manager, r UpgradeRequest) (string, error) { return m.Upgrade(ctx, r) }
+	}
+	installed, err := upgrade(ctx, i.Manager, r)
 	if err != nil {
 		return "", err
 	}
-	// The process goes on as the release at the link the manager moved to it.
 	c.adopt(installed, i.Manager.Terma)
 	return installed, nil
 }

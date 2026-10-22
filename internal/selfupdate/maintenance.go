@@ -53,22 +53,10 @@ type Cache struct {
 	Published time.Time `json:"published,omitzero"`
 	// Unbuilt means Latest was last seen without its files (ErrNotReady): each look asks
 	// after them again, and until they are there it is neither installed nor announced.
-	Unbuilt   bool      `json:"unbuilt,omitempty"`
-	Current   string    `json:"current,omitempty"`
-	AttemptAt time.Time `json:"attempt_at"`
-	// Attempted is the release AttemptAt tried to install: another may be tried at once.
-	Attempted string `json:"attempted,omitempty"`
-	// AttemptedBy is the build that tried it, "" for one from before this was recorded. A
-	// later build is not held back by it (held): the failure may have been the earlier
-	// build's own, such as a release key it lacks or a fault since fixed.
-	AttemptedBy string `json:"attempted_by,omitempty"`
-	// Unoffered counts the attempts in a row whose package manager ran but did not have
-	// Attempted yet (ErrNotOffered): its tap or registry is published after the release, so
-	// it is tried again after retryAfter rather than AttemptInterval.
-	Unoffered int `json:"unoffered,omitempty"`
-	// Failure is why the install of Attempted failed, or its package manager did not offer
-	// it, for doctor; "" when neither.
-	Failure string `json:"failure,omitempty"`
+	Unbuilt bool   `json:"unbuilt,omitempty"`
+	Current string `json:"current,omitempty"`
+	// Attempt is the last install tried, which outlives what a look found.
+	Attempt
 }
 
 // Found records rel as the latest release, with whether its files are there yet (Unbuilt):
@@ -80,7 +68,7 @@ func (c *Cache) Found(rel *Release) {
 
 // attempt is the record of the last install tried alone, which outlives what a look found.
 func (c Cache) attempt() Cache {
-	return Cache{AttemptAt: c.AttemptAt, Attempted: c.Attempted, AttemptedBy: c.AttemptedBy, Unoffered: c.Unoffered, Failure: c.Failure}
+	return Cache{Attempt: c.Attempt}
 }
 
 // Checked records in dir a look that `terma update` made for itself, which found rel for a
@@ -92,21 +80,6 @@ func Checked(dir, current string, rel *Release) Cache {
 	cache.Found(rel)
 	SaveCache(dir, cache)
 	return cache
-}
-
-// held reports whether latest is a release whose install failed less than AttemptInterval
-// ago, tried by this build (running) or a later one, so that it is not tried again yet. One
-// its package manager did not offer yet waits only retryAfter its count of such attempts.
-func (c Cache) held(running string) bool {
-	return c.Attempted == c.Latest && time.Now().Before(c.Retry()) && !Newer(c.AttemptedBy, running)
-}
-
-// Retry is when the release last attempted may be tried again after it failed.
-func (c Cache) Retry() time.Time {
-	if c.Unoffered > 0 {
-		return c.AttemptAt.Add(retryAfter(c.Unoffered))
-	}
-	return c.AttemptAt.Add(AttemptInterval)
 }
 
 // maxRetryWait caps retryAfter: the window GitHub's rate limit resets in, so a machine back

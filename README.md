@@ -173,16 +173,21 @@ terma update --auto status  # show the current choice
 
 A Homebrew or global npm installation updates the same way, on the same schedule, through
 the package manager that owns it — that one, never whichever is first on PATH — which the
-relay runs with no terminal, its output in the relay's log. Homebrew updates its taps
-before an upgrade only once a day, so the relay has it update them first; it upgrades terma
-alone, and leaves your other packages, and Homebrew's cleanup of them, alone. npm is asked
-first whether its registry has the release, then installs exactly that version. The tap
-and the registry are published a little after the release itself: when the package
-manager does not have the release yet, the relay asks again in 15 minutes, then less
-often, up to hourly, rather than waiting a day as it does after a failed install, such as
-a tap Homebrew does not trust or a global prefix npm may not write. A relay that installed
-a release has it refresh what terma installed (see below), then restarts on the link the
-package manager moved to it.
+relay runs with no terminal, its output in `upgrade.log` in terma's state folder, `update/`.
+It runs apart from the relay, and from the relay's service under systemd, so a relay that
+stops meanwhile leaves it to finish rather than leave terma half installed; after 15
+minutes it is stopped. Homebrew updates its taps before an upgrade only once a day, so on
+its first tries at a release the relay has it update them first; it upgrades terma alone,
+and leaves your other packages, and Homebrew's cleanup of them, alone. npm is asked first
+whether its registry has the release, then installs exactly that version, with the install
+script that downloads the binary even where npm is set to ignore scripts. The tap and the
+registry are published a little after the release itself: when the package manager does
+not have the release yet, or another of its processes is running, the relay asks again in
+15 minutes, then less often, up to hourly, rather than waiting a day as it does after a
+failed install, such as a tap Homebrew does not trust or a global prefix npm may not write;
+a tap that is behind installs the release it has. A relay that installed a release has it
+refresh what terma installed (see below), then restarts on the link the package manager
+moved to it.
 
 The relay prints nothing, so the next terma command you run in a terminal says what it
 installed, once, and `terma doctor` shows how yours updates, the last release terma

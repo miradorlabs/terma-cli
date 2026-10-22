@@ -387,11 +387,11 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	if install.Method != semconv.TermaInstallMethodScript || release.updateAuto(install) != semconv.TermaUpdateAutoOn {
 		t.Fatalf("a release binary of its own is %s, auto %s", install.Method, release.updateAuto(install))
 	}
-	if release.relayUpdater(install, io.Discard) == nil {
+	if release.relayUpdater(install) == nil {
 		t.Fatal("a release relay does not update itself")
 	}
 	dev := testApp.installed()
-	if dev.Method != semconv.TermaInstallMethodSource || testApp.updateAuto(dev) != semconv.TermaUpdateAutoUnsupported || testApp.relayUpdater(dev, io.Discard) != nil {
+	if dev.Method != semconv.TermaInstallMethodSource || testApp.updateAuto(dev) != semconv.TermaUpdateAutoUnsupported || testApp.relayUpdater(dev) != nil {
 		t.Fatalf("a development build's relay updates itself: %s, auto %s", dev.Method, testApp.updateAuto(dev))
 	}
 	// A pass that looked would have recorded its check.
@@ -402,12 +402,12 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 			if got := release.updateAuto(install); got != semconv.TermaUpdateAutoOff {
 				t.Fatalf("under %s terma.update.auto = %q", env, got)
 			}
-			if v, err := release.relayUpdater(install, io.Discard).Update(t.Context()); v != "" || err != nil || looked() {
+			if v, err := release.relayUpdater(install).Update(t.Context()); v != "" || err != nil || looked() {
 				t.Fatalf("under %s the relay's pass = %q, %v, looked %v", env, v, err, looked())
 			}
 		})
 	}
-	updater := release.relayUpdater(install, io.Discard)
+	updater := release.relayUpdater(install)
 	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: false}); err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +424,7 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	// A Homebrew install updates through the brew that owns it, and only where there is one.
 	prefix := t.TempDir()
 	cask := filepath.Join(prefix, "Caskroom", "terma", "1.2.0", "terma")
-	if brew := selfupdate.InstallOf(cask, "1.2.0"); release.relayUpdater(brew, io.Discard) != nil ||
+	if brew := selfupdate.InstallOf(cask, "1.2.0"); release.relayUpdater(brew) != nil ||
 		release.updateAuto(brew) != semconv.TermaUpdateAutoUnsupported {
 		t.Fatalf("a Homebrew install without its brew updates itself: auto %s", release.updateAuto(brew))
 	}
@@ -435,7 +435,7 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 		t.Fatal(err)
 	}
 	if brew := selfupdate.InstallOf(cask, "1.2.0"); brew.Method != semconv.TermaInstallMethodHomebrew ||
-		release.updateAuto(brew) != semconv.TermaUpdateAutoOn || release.relayUpdater(brew, io.Discard) == nil {
+		release.updateAuto(brew) != semconv.TermaUpdateAutoOn || release.relayUpdater(brew) == nil {
 		t.Fatalf("a Homebrew install with its brew is %s, auto %s", brew.Method, release.updateAuto(brew))
 	}
 }

@@ -5,52 +5,74 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
-// upgrades is a stand-in for the package managers the relay runs (Client.Upgrade): each
-// call answers with the next of answers, an error or a version it then installs at the
-// brewed link.
+// upgrades stands in for the package managers the relay runs (Client.upgrade): each call
+// answers with the next of answers, an error or a version it then installs as Homebrew would,
+// in a keg of its own with the brewed link moved to it.
 type upgrades struct {
-	b       brewed
-	t       *testing.T
-	asked   []string
+	b     brewed
+	t     *testing.T
+	asked []UpgradeRequest
+	// answers are what each call does in turn: a version installs it, an error fails, a func
+	// runs and its answer stands.
 	answers []any
+	// removeOld has an install remove the keg the relay started from, as a cask upgrade does.
+	removeOld bool
 }
 
-func (u *upgrades) upgrade(_ context.Context, m Manager, version string) (string, error) {
-	u.asked = append(u.asked, m.Name+" "+version)
+func (u *upgrades) upgrade(ctx context.Context, m Manager, r UpgradeRequest) (string, error) {
+	u.asked = append(u.asked, r)
+	if m.Name != "Homebrew" || m.Terma != u.b.link {
+		u.t.Fatalf("upgraded through %+v", m)
+	}
 	if len(u.answers) == 0 {
 		u.t.Fatalf("upgraded %d times, more than answered", len(u.asked))
 	}
 	answer := u.answers[0]
 	u.answers = u.answers[1:]
+	if f, ok := answer.(func(context.Context) (string, error)); ok {
+		return f(ctx)
+	}
 	if err, ok := answer.(error); ok {
 		return "", err
 	}
-	termaScript(u.t, u.b.exe+"-"+answer.(string), answer.(string))
-	if err := os.Remove(u.b.link); err != nil {
-		u.t.Fatal(err)
-	}
-	if err := os.Symlink(u.b.exe+"-"+answer.(string), u.b.link); err != nil {
-		u.t.Fatal(err)
-	}
+	u.install(answer.(string))
 	return answer.(string), nil
 }
 
-// relayOf is the relay's client for the brewed terma, running from its link, as launchd
-// starts it, and looking at github.
-func relayOf(t *testing.T, b brewed, github string, u *upgrades) *Client {
+// install puts version in a keg of its own and moves the link to it.
+func (u *upgrades) install(version string) {
+	keg := filepath.Join(u.b.prefix, "Caskroom", "terma", version, "terma")
+	termaScript(u.t, keg, version)
+	if u.removeOld {
+		if err := os.RemoveAll(filepath.Dir(u.b.exe)); err != nil {
+			u.t.Fatal(err)
+		}
+	}
+	if err := os.Remove(u.b.link); err != nil {
+		u.t.Fatal(err)
+	}
+	if err := os.Symlink(keg, u.b.link); err != nil {
+		u.t.Fatal(err)
+	}
+}
+
+// relayAt is the relay's client at version, started from path, as launchd starts it from
+// the brewed link and Linux names its keg, looking at github.
+func relayAt(t *testing.T, version, path, github string, u *upgrades) *Client {
 	t.Helper()
-	started, err := os.Stat(b.link)
+	started, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := &Client{ReleaseKeys: testKeys(), BaseURL: github, Version: "1.0.0", Binary: started}
+	c := &Client{ReleaseKeys: testKeys(), BaseURL: github, Version: version, Binary: started, RunsManagers: u != nil}
 	if u != nil {
-		c.Upgrade = u.upgrade
+		c.upgrade = u.upgrade
 	}
 	return c
 }
@@ -65,18 +87,18 @@ func TestTheRelayUpgradesAPackageManagersInstallThroughIt(t *testing.T) {
 	srv := github.serve(t, "v1.0.1", true)
 	configDir, stateDir := t.TempDir(), t.TempDir()
 
-	command := relayOf(t, b, srv.URL, nil)
+	command := relayAt(t, "1.0.0", b.link, srv.URL, nil)
 	if o := command.Auto(context.Background(), configDir, stateDir, b.link, nil); o.Installed != "" || !strings.Contains(o.Notice, "1.0.1") {
 		t.Fatalf("a command's pass = %+v, want only the notice", o)
 	}
 
 	u := &upgrades{b: b, t: t, answers: []any{"1.0.1"}}
-	relay := relayOf(t, b, srv.URL, u)
+	relay := relayAt(t, "1.0.0", b.link, srv.URL, u)
 	if o := relay.Auto(context.Background(), configDir, stateDir, b.link, nil); o.Installed != "1.0.1" || o.Err != nil {
 		t.Fatalf("the relay's pass = %+v, want 1.0.1 installed", o)
 	}
-	if fmt.Sprint(u.asked) != "[Homebrew 1.0.1]" {
-		t.Fatalf("asked %v", u.asked)
+	if len(u.asked) != 1 || u.asked[0] != (UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: statePath(stateDir, upgradeLogFile), RefreshTaps: true}) {
+		t.Fatalf("asked %+v", u.asked)
 	}
 	if cache := LoadCache(stateDir); cache.Current != "1.0.1" || cache.Latest != "1.0.1" {
 		t.Fatalf("the check records %+v", cache)
@@ -95,9 +117,10 @@ func TestTheRelayUpgradesAPackageManagersInstallThroughIt(t *testing.T) {
 	}
 }
 
-// A release Homebrew's tap or npm's registry does not have yet is asked for again soon,
-// backing off, not held back a day as a failed install is; a failure is held a day, and kept
-// for doctor.
+// A release Homebrew's tap or npm's registry does not have yet, or that found Homebrew busy,
+// is asked for again soon, backing off, not held back a day as a failed install is, and
+// without asking GitHub's API again: the pass's look of the latest tag is enough. Only the
+// first tries have Homebrew update its taps. A failure is held a day, and kept for doctor.
 func TestAReleaseItsPackageManagerDoesNotOfferYetIsTriedAgainSoon(t *testing.T) {
 	b := newBrewed(t)
 	b.brew(t, "exit 0")
@@ -105,9 +128,10 @@ func TestAReleaseItsPackageManagerDoesNotOfferYetIsTriedAgainSoon(t *testing.T) 
 	srv := github.serve(t, "v1.0.1", true)
 	configDir, stateDir := t.TempDir(), t.TempDir()
 	notYet := fmt.Errorf("Homebrew left terma at 1.0.0: %w", ErrNotOffered)
+	locked := fmt.Errorf("Homebrew could not upgrade terma to 1.0.1: %w", ErrBusy)
 	failed := errors.New("Homebrew could not upgrade terma to 1.0.1 (exit status 1)")
-	u := &upgrades{b: b, t: t, answers: []any{notYet, notYet, failed}}
-	relay := relayOf(t, b, srv.URL, u)
+	u := &upgrades{b: b, t: t, answers: []any{notYet, locked, notYet, failed}}
+	relay := relayAt(t, "1.0.0", b.link, srv.URL, u)
 	pass := func() Outcome { return relay.Auto(context.Background(), configDir, stateDir, b.link, nil) }
 	ago := func(d time.Duration) {
 		cache := LoadCache(stateDir)
@@ -115,34 +139,129 @@ func TestAReleaseItsPackageManagerDoesNotOfferYetIsTriedAgainSoon(t *testing.T) 
 		SaveCache(stateDir, cache)
 	}
 
-	if o := pass(); !errors.Is(o.Err, ErrNotOffered) || LoadCache(stateDir).Unoffered != 1 {
+	if o := pass(); !errors.Is(o.Err, ErrNotOffered) || LoadCache(stateDir).Retries != 1 {
 		t.Fatalf("first pass = %+v, cache %+v", o, LoadCache(stateDir))
 	}
 	if pass(); len(u.asked) != 1 {
 		t.Fatal("asked again at once")
 	}
-	ago(RetryInterval + time.Minute)
-	if o := pass(); len(u.asked) != 2 || LoadCache(stateDir).Unoffered != 2 {
-		t.Fatalf("after %s: %+v, asked %d times, cache %+v", RetryInterval, o, len(u.asked), LoadCache(stateDir))
+	for i, wait := range []time.Duration{RetryInterval, 2 * RetryInterval} {
+		// Not yet: the wait doubles with each.
+		ago(wait - time.Minute)
+		if pass(); len(u.asked) != i+1 {
+			t.Fatalf("retry %d came before %s", i+1, wait)
+		}
+		ago(wait + time.Minute)
+		if o := pass(); len(u.asked) != i+2 || !retrySoon(o.Err) || LoadCache(stateDir).Retries != i+2 {
+			t.Fatalf("retry %d after %s: %+v, asked %d times, cache %+v", i+1, wait, o, len(u.asked), LoadCache(stateDir))
+		}
 	}
-	// The second time it waits twice as long.
-	ago(RetryInterval + time.Minute)
-	if pass(); len(u.asked) != 2 {
-		t.Fatal("did not back off")
+	ago(4*RetryInterval + time.Minute)
+	if o := pass(); o.Err != failed || len(u.asked) != 4 {
+		t.Fatalf("fourth try = %+v, asked %d times", o, len(u.asked))
 	}
-	ago(2*RetryInterval + time.Minute)
-	if o := pass(); o.Err != failed || len(u.asked) != 3 {
-		t.Fatalf("third pass = %+v, asked %d times", o, len(u.asked))
+	for i, r := range u.asked {
+		if r.RefreshTaps != (i < tapRefreshes) {
+			t.Errorf("try %d updated Homebrew's taps: %v", i+1, r.RefreshTaps)
+		}
 	}
-	if cache := LoadCache(stateDir); cache.Unoffered != 0 || cache.Failure != failed.Error() {
+	if cache := LoadCache(stateDir); cache.Retries != 0 || cache.Failure != failed.Error() {
 		t.Fatalf("after a failure the cache is %+v", cache)
 	}
 	ago(2 * time.Hour)
-	if pass(); len(u.asked) != 3 {
+	if pass(); len(u.asked) != 4 {
 		t.Fatal("a failed install was tried again within the day")
+	}
+	if lookups, _ := github.asked(); lookups != 1 {
+		t.Fatalf("%d API lookups for one release tried four times, want the first look's only", lookups)
 	}
 	if _, ok := LoadUpdated(stateDir); ok {
 		t.Fatal("an update that never happened was recorded")
+	}
+}
+
+// A tap a release or more behind installs the release it names, between the one running and
+// the latest: it is installed and said, and the latest is asked for again soon.
+func TestALaggingTapInstallsTheReleaseBetween(t *testing.T) {
+	b := newBrewed(t)
+	b.brew(t, "exit 0")
+	var github publishing
+	srv := github.serve(t, "v1.0.2", true)
+	configDir, stateDir := t.TempDir(), t.TempDir()
+	u := &upgrades{b: b, t: t, answers: []any{"1.0.1"}}
+	relay := relayAt(t, "1.0.0", b.link, srv.URL, u)
+	if o := relay.Auto(context.Background(), configDir, stateDir, b.link, nil); o.Installed != "1.0.1" || o.Err != nil {
+		t.Fatalf("the relay's pass = %+v, want 1.0.1 installed", o)
+	}
+	cache := LoadCache(stateDir)
+	if cache.Current != "1.0.1" || cache.Latest != "1.0.2" || cache.Attempted != "1.0.2" || cache.Retries != 1 {
+		t.Fatalf("the check records %+v", cache)
+	}
+	if u, ok := LoadUpdated(stateDir); !ok || u.From != "1.0.0" || u.To != "1.0.1" {
+		t.Fatalf("recorded %+v, %v", u, ok)
+	}
+}
+
+// On Linux the relay's executable is its keg, the link resolved, which a cask upgrade
+// removes and a formula's leaves behind: either way the relay that upgraded goes on to
+// restart from the link, and takes the keg it ran from for another install's.
+func TestTheRelayRunningFromItsKegUpgradesThroughTheLink(t *testing.T) {
+	for _, removeOld := range []bool{true, false} {
+		t.Run(fmt.Sprintf("old keg removed %v", removeOld), func(t *testing.T) {
+			b := newBrewed(t)
+			b.brew(t, "exit 0")
+			var github publishing
+			srv := github.serve(t, "v1.0.1", true)
+			configDir, stateDir := t.TempDir(), t.TempDir()
+			if i := InstallOf(b.exe, "1.0.0"); i.Terma() != b.link {
+				t.Fatalf("the keg's install restarts from %s, not the link", i.Terma())
+			}
+			u := &upgrades{b: b, t: t, answers: []any{"1.0.1"}, removeOld: removeOld}
+			relay := relayAt(t, "1.0.0", b.exe, srv.URL, u)
+			if o := relay.Auto(context.Background(), configDir, stateDir, b.exe, nil); o.Installed != "1.0.1" {
+				t.Fatalf("the relay's pass = %+v, want 1.0.1 installed", o)
+			}
+			if o := relay.Auto(context.Background(), configDir, stateDir, b.exe, nil); !o.Replaced {
+				t.Fatalf("the pass after = %+v, want the keg it ran from taken for replaced", o)
+			}
+			if got, err := InstalledVersion(t.Context(), b.link); got != "1.0.1" || err != nil {
+				t.Fatalf("the link runs %q, %v", got, err)
+			}
+		})
+	}
+}
+
+// A relay stopped while its package manager ran leaves the release free to try at once,
+// and when the manager, left to finish, installed it, the next relay, on that release, says
+// so once, as for any other update.
+func TestAnUpgradeTheRelayWasStoppedDuringIsSaidByTheNext(t *testing.T) {
+	b := newBrewed(t)
+	b.brew(t, "exit 0")
+	var github publishing
+	srv := github.serve(t, "v1.0.1", true)
+	configDir, stateDir := t.TempDir(), t.TempDir()
+	ctx, stop := context.WithCancel(context.Background())
+	u := &upgrades{b: b, t: t}
+	u.answers = []any{func(context.Context) (string, error) {
+		stop()
+		return "", context.Canceled
+	}}
+	if o := relayAt(t, "1.0.0", b.link, srv.URL, u).Auto(ctx, configDir, stateDir, b.link, nil); o.Installed != "" {
+		t.Fatalf("the stopped relay's pass = %+v", o)
+	}
+	if cache := LoadCache(stateDir); !cache.Interrupted || cache.held(cache.Latest, "1.0.0", time.Now()) {
+		t.Fatalf("after the stop the attempt is %+v", cache.Attempt)
+	}
+	u.install("1.0.1") // the manager finishes by itself
+	next := relayAt(t, "1.0.1", b.link, srv.URL, &upgrades{b: b, t: t})
+	if o := next.Auto(context.Background(), configDir, stateDir, b.link, nil); o != (Outcome{}) {
+		t.Fatalf("the next relay's pass = %+v", o)
+	}
+	if line := TellUpdated(stateDir); line != "terma updated itself in the background: 1.0.0 → 1.0.1 (Homebrew)." {
+		t.Fatalf("the next command says %q", line)
+	}
+	if cache := LoadCache(stateDir); cache.Interrupted {
+		t.Fatalf("the attempt is still interrupted: %+v", cache.Attempt)
 	}
 }
 
