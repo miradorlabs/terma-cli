@@ -389,7 +389,7 @@ func TestAnInstallCutShortByItsProcessStoppingIsNoAttempt(t *testing.T) {
 	if o := c.Auto(ctx, configDir, stateDir, exe, nil); !errors.Is(o.Err, context.Canceled) || o.Installed != "" {
 		t.Fatalf("Auto = %+v, want the install cut short", o)
 	}
-	if cache := LoadCache(stateDir); !cache.Interrupted || cache.held(cache.Latest, "1.0.0", time.Now()) {
+	if cache := LoadCache(stateDir); !cache.Stopped || cache.held(cache.Latest, "1.0.0", time.Now()) {
 		t.Fatalf("an install its process was stopped during holds its release back: %+v", cache)
 	}
 	github.change(func(p *publishing) { p.duringArchive = nil })

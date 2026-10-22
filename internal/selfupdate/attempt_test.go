@@ -1,7 +1,6 @@
 package selfupdate
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -20,32 +19,51 @@ func TestAnAttemptsEndDecidesItsRetry(t *testing.T) {
 		name    string
 		before  Attempt
 		release string
-		err     error
-		stopped bool
-		// retries, failure and interrupted are the attempt after; retry is how long after
-		// it its release is held, 0 for not at all.
+		end     func(a *Attempt)
+		// after is the attempt's retries, failure, stopped and interrupted after it ends;
+		// retry is how long after it its release is held, 0 for not at all.
 		retries     int
 		failure     string
+		stopped     bool
 		interrupted bool
 		retry       time.Duration
 	}{
 		// Held as any attempt is, which no pass asks of a release no longer newer.
-		{"installed", Attempt{Attempted: "1.0.1", Retries: 2, Failure: "x"}, "1.0.1", nil, false, 0, "", false, AttemptInterval},
-		{"failed", Attempt{}, "1.0.1", errors.New("exit status 1"), false, 0, "exit status 1", false, AttemptInterval},
-		{"not offered yet", Attempt{}, "1.0.1", notYet, false, 1, notYet.Error(), false, RetryInterval},
-		{"busy, again", Attempt{Attempted: "1.0.1", Retries: 1}, "1.0.1", busy, false, 2, busy.Error(), false, 2 * RetryInterval},
-		{"not offered, many times", Attempt{Attempted: "1.0.1", Retries: 9}, "1.0.1", notYet, false, 10, notYet.Error(), false, maxRetryWait},
-		{"failed after retries", Attempt{Attempted: "1.0.1", Retries: 3}, "1.0.1", errors.New("EACCES"), false, 0, "EACCES", false, AttemptInterval},
-		{"another release starts its own count", Attempt{Attempted: "1.0.1", Retries: 3}, "1.0.2", notYet, false, 1, notYet.Error(), false, RetryInterval},
-		{"stopped", Attempt{Attempted: "1.0.1", Retries: 1}, "1.0.1", context.Canceled, true, 1, "", true, 0},
-		{"another install's", Attempt{}, "1.0.1", ErrReplaced, true, 0, "", false, 0},
+		{"installed", Attempt{Attempted: "1.0.1", Retries: 2, Failure: "x", Interrupted: true}, "1.0.1",
+			(*Attempt).installed, 0, "", false, false, AttemptInterval},
+		{"failed", Attempt{}, "1.0.1", func(a *Attempt) { a.failed(errors.New("exit status 1")) },
+			0, "exit status 1", false, false, AttemptInterval},
+		{"not offered yet", Attempt{}, "1.0.1", func(a *Attempt) { a.failed(notYet) },
+			1, notYet.Error(), false, false, RetryInterval},
+		{"busy, again", Attempt{Attempted: "1.0.1", Retries: 1}, "1.0.1", func(a *Attempt) { a.failed(busy) },
+			2, busy.Error(), false, false, 2 * RetryInterval},
+		{"not offered, many times", Attempt{Attempted: "1.0.1", Retries: 9}, "1.0.1", func(a *Attempt) { a.failed(notYet) },
+			10, notYet.Error(), false, false, maxRetryWait},
+		{"failed after retries", Attempt{Attempted: "1.0.1", Retries: 3}, "1.0.1", func(a *Attempt) { a.failed(errors.New("EACCES")) },
+			0, "EACCES", false, false, AttemptInterval},
+		{"another release starts its own count", Attempt{Attempted: "1.0.1", Retries: 3, Interrupted: true}, "1.0.2", func(a *Attempt) { a.failed(notYet) },
+			1, notYet.Error(), false, false, RetryInterval},
+		{"a tap behind", Attempt{}, "1.0.2", func(a *Attempt) { a.behind("Homebrew", "1.0.1") },
+			1, "Homebrew installed terma 1.0.1, not 1.0.2 yet", false, false, RetryInterval},
+		{"stopped", Attempt{Attempted: "1.0.1", Retries: 1}, "1.0.1", func(a *Attempt) { a.stopped(false) },
+			1, "", true, false, 0},
+		{"stopped, its package manager left running", Attempt{}, "1.0.1", func(a *Attempt) { a.stopped(true) },
+			0, "", true, true, 0},
+		// The retry meets the package manager the stopped attempt left still running, busy:
+		// what that one installs is still the background update's.
+		{"busy after an interrupted attempt", Attempt{Attempted: "1.0.1", Interrupted: true, Stopped: true}, "1.0.1", func(a *Attempt) { a.failed(busy) },
+			1, busy.Error(), false, true, RetryInterval},
+		{"another install's", Attempt{Interrupted: true}, "1.0.1", func(a *Attempt) { a.failed(ErrReplaced) },
+			0, "", false, false, 0},
+		{"updated by hand", Attempt{Attempted: "1.0.1", Interrupted: true}, "1.0.1", func(a *Attempt) { a.stopped(false); a.byHand() },
+			0, "", true, false, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := tc.before
 			a.begin(tc.release, "1.0.0", now)
-			a.end(tc.err, tc.stopped)
-			if a.Retries != tc.retries || a.Failure != tc.failure || a.Interrupted != tc.interrupted {
-				t.Fatalf("after %v: %+v", tc.err, a)
+			tc.end(&a)
+			if a.Retries != tc.retries || a.Failure != tc.failure || a.Stopped != tc.stopped || a.Interrupted != tc.interrupted {
+				t.Fatalf("after it: %+v", a)
 			}
 			for _, at := range []time.Duration{0, tc.retry - time.Second, tc.retry + time.Second} {
 				want := tc.retry > 0 && at < tc.retry
@@ -61,18 +79,28 @@ func TestAnAttemptsEndDecidesItsRetry(t *testing.T) {
 	}
 }
 
-// A release an attempt was stopped installing has landed when the terma running is it,
-// and an earlier build made the attempt.
+// A release an attempt left a package manager installing has landed when the terma running
+// is it, an earlier build made the attempt, and it is soon after: later, the developer may
+// have installed it by hand.
 func TestAnInterruptedAttemptLandsOnItsRelease(t *testing.T) {
 	t.Parallel()
-	a := Attempt{Attempted: "1.0.1", AttemptedBy: "1.0.0", Interrupted: true}
+	now := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
+	a := Attempt{AttemptAt: now, Attempted: "1.0.1", AttemptedBy: "1.0.0", Interrupted: true}
 	for current, want := range map[string]bool{"1.0.1": true, "1.0.0": false, "1.0.2": false} {
-		if got := a.landed(current); got != want {
+		if got := a.landed(current, now.Add(time.Minute)); got != want {
 			t.Errorf("landed(%s) = %v, want %v", current, got, want)
 		}
 	}
-	a.end(nil, false)
-	if a.landed("1.0.1") {
+	if a.landed("1.0.1", now.Add(landWindow+time.Minute)) {
+		t.Error("a release that landed long after the attempt is taken for its own")
+	}
+	b := a
+	b.byHand()
+	if b.landed("1.0.1", now.Add(time.Minute)) {
+		t.Error("an update by hand is taken for the background's")
+	}
+	a.installed()
+	if a.landed("1.0.1", now.Add(time.Minute)) {
 		t.Error("an attempt recorded as installed lands again")
 	}
 }

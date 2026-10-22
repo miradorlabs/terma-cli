@@ -134,13 +134,14 @@ func (app *App) afterRelay(res daemon.Result, install selfupdate.Install, out io
 // do, so a machine nobody runs terma on still updates: in place of its own binary, or
 // through the package manager that owns a Homebrew or global npm install
 // (selfupdate.Client.RunsManagers), whose output goes to the update folder's upgrade.log. It
-// is nil where the relay could never install one (updateAuto says unsupported): a
+// is nil where the relay could never install one (selfupdate.Install.CanUpdate): a
 // development build, a project's npm dependency, a Windows binary, a package manager terma
 // cannot find, or a binary this process could not find. Each pass asks updateAuto first and
 // installs only when it says on, so the relay does what its heartbeat reports: turned off
-// with `terma update --auto off`, or in CI, it asks nothing, not even GitHub.
+// with `terma update --auto off`, in CI, or where it may not write now, it asks nothing,
+// not even GitHub.
 func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
-	if app.updateAuto(install) == semconv.TermaUpdateAutoUnsupported {
+	if !install.CanUpdate() {
 		return nil
 	}
 	// One client for the relay's life: it goes on as each release it installs, so the next

@@ -263,6 +263,71 @@ func TestAnUpgradeOutlivesTheRelayButNotItsTime(t *testing.T) {
 	}
 }
 
+// A relay told to stop starts no package manager, nor anything else RunDetached would run:
+// it would outlive the relay, or be stopped with it halfway.
+func TestAStoppingRelayStartsNoPackageManager(t *testing.T) {
+	t.Parallel()
+	b := newBrewed(t)
+	started := filepath.Join(b.prefix, "started")
+	b.brew(t, "touch "+started)
+	ctx, stop := context.WithCancel(t.Context())
+	stop()
+	if _, err := b.manager(t).Upgrade(ctx, UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Upgrade = %v, want it refused", err)
+	}
+	if err := RunDetached(ctx, nil, os.Environ(), filepath.Join(b.prefix, "bin", "brew")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunDetached = %v, want it refused", err)
+	}
+	if eventually(func() bool { _, err := os.Stat(started); return err == nil }, 2*time.Second) {
+		t.Fatal("brew started for a relay told to stop")
+	}
+}
+
+// The probe of systemd-run runs to its end though the relay is told to stop meanwhile: cut
+// short, it would read as no scope, and the package manager would run in the relay's unit.
+func TestTheScopeProbeOutlivesAStoppingRelay(t *testing.T) {
+	t.Parallel()
+	unixLayouts(t)
+	dir := t.TempDir()
+	works, fails := filepath.Join(dir, "works"), filepath.Join(dir, "fails")
+	script(t, works, "sleep 0.2; exit 0")
+	script(t, fails, "exit 1")
+	ctx, stop := context.WithCancel(t.Context())
+	stop()
+	if !scopeWorks(ctx, os.Environ())(works) {
+		t.Fatal("a probe that succeeds read as failed once the relay was told to stop")
+	}
+	if scopeWorks(ctx, os.Environ())(fails) {
+		t.Fatal("a probe that fails read as succeeded")
+	}
+}
+
+// Busy is read from this upgrade's own output: an earlier upgrade left to finish goes on
+// writing to its own file, now the previous log, never into this one's.
+func TestAnUpgradesLogIsItsOwn(t *testing.T) {
+	t.Parallel()
+	path := upgradeLog(t)
+	earlier := openLog(path)
+	if earlier == nil {
+		t.Fatal("no log")
+	}
+	defer func() { _ = earlier.Close() }()
+	this := openLog(path)
+	if this == nil {
+		t.Fatal("no second log")
+	}
+	defer func() { _ = this.Close() }()
+	if _, err := earlier.WriteString("Error: A `brew upgrade` process has already locked it.\n"); err != nil {
+		t.Fatal(err)
+	}
+	if busy(this) || !busy(earlier) {
+		t.Fatalf("busy: this %v, earlier %v; want only the earlier", busy(this), busy(earlier))
+	}
+	if data, _ := os.ReadFile(path + ".1"); !strings.Contains(string(data), "has already locked") {
+		t.Fatalf("the previous log reads %q", data)
+	}
+}
+
 // Under systemd the package manager runs in a scope of its own, which the relay's unit
 // stopping does not stop; anywhere else, or where the user's systemd makes none, in a
 // session of its own alone.

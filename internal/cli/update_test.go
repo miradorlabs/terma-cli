@@ -215,6 +215,10 @@ func TestUpdatesSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	brew, npm := filepath.Join(home, "brew"), filepath.Join(home, "node")
+	if err := os.Mkdir(filepath.Join(home, "locked"), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(home, "locked"), 0o755) })
 	for _, f := range []string{filepath.Join(brew, "bin", "brew"), filepath.Join(npm, "bin", "npm")} {
 		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 			t.Fatal(err)
@@ -238,8 +242,12 @@ func TestUpdatesSummary(t *testing.T) {
 		{"npm project", filepath.Join(home, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install @miradorlabs/terma@latest`"},
 		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
 		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
+		{"installed where it may not write", filepath.Join(home, "locked", "terma"), "1.2.0", "linux", true, "`terma update` as a user who may write in " + filepath.Join(home, "locked")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if strings.Contains(tc.exe, "locked") && os.Geteuid() == 0 {
+				t.Skip("root may write anywhere")
+			}
 			if got := updatesSummary(selfupdate.InstallOn(tc.exe, tc.version, tc.goos), tc.auto); !strings.Contains(got, tc.want) {
 				t.Fatalf("updatesSummary = %q, want it to say %q", got, tc.want)
 			}

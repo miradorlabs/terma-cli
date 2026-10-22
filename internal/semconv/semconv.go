@@ -421,7 +421,7 @@ const (
 	TermaUpdateAutoOn = "on"
 	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).
 	TermaUpdateAutoOff = "off"
-	// TermaUpdateAutoUnsupported is terma.update.auto unsupported: It never can, whatever the developer chooses; update notices only.
+	// TermaUpdateAutoUnsupported is terma.update.auto unsupported: It cannot, whatever the developer chooses; update notices only.
 	TermaUpdateAutoUnsupported = "unsupported"
 	// TermaUsageScopeParentTurn is terma.usage.scope parent_turn: The parent conversation's turn, subagents excluded.
 	TermaUsageScopeParentTurn = "parent_turn"

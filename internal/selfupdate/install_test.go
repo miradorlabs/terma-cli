@@ -120,3 +120,56 @@ func TestAutomaticIsTheRelaysOneRule(t *testing.T) {
 		})
 	}
 }
+
+// An install terma may not write, a root-owned npm prefix, another user's Homebrew or a
+// binary installed with sudo, never updates by itself, however often it tried: unsupported,
+// until its permissions are put right.
+func TestAnInstallTermaMayNotWriteIsUnsupported(t *testing.T) {
+	unixLayouts(t)
+	if os.Geteuid() == 0 {
+		t.Skip("root may write anywhere")
+	}
+	t.Setenv("PATH", "")
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	brew := filepath.Join(root, "brew")
+	executable(t, filepath.Join(brew, "bin", "brew"))
+	cask := filepath.Join(brew, "Caskroom", "terma", "1.0.0", "terma")
+	executable(t, cask)
+	npm := filepath.Join(root, "node")
+	executable(t, filepath.Join(npm, "bin", "npm"))
+	pkg := filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	executable(t, pkg)
+	script := filepath.Join(root, "usr", "local", "bin", "terma")
+	executable(t, script)
+	on := Preferences{Auto: true}
+	none := func(string) string { return "" }
+	for _, tc := range []struct{ name, exe, locked, goos string }{
+		{"homebrew", cask, filepath.Join(brew, "Caskroom", "terma"), "darwin"},
+		{"homebrew's bin", cask, filepath.Join(brew, "bin"), "darwin"},
+		{"global npm", pkg, filepath.Join(npm, "lib", "node_modules", "@miradorlabs"), "linux"},
+		{"install script", script, filepath.Dir(script), "linux"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			i := InstallOn(tc.exe, "1.0.0", tc.goos)
+			if got := i.Automatic(on, none); got != semconv.TermaUpdateAutoOn {
+				t.Fatalf("writable: %q", got)
+			}
+			if err := os.Chmod(tc.locked, 0o555); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(tc.locked, 0o755) })
+			if got := i.Automatic(on, none); got != semconv.TermaUpdateAutoUnsupported || !i.CanUpdate() {
+				t.Fatalf("with %s read-only: %q, CanUpdate %v", tc.locked, got, i.CanUpdate())
+			}
+			if err := os.Chmod(tc.locked, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if got := i.Automatic(on, none); got != semconv.TermaUpdateAutoOn {
+				t.Fatalf("put right: %q", got)
+			}
+		})
+	}
+}

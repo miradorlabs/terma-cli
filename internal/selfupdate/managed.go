@@ -22,6 +22,9 @@ type Manager struct {
 	Project string
 	// prefix is a global npm install's prefix, whose bin keeps the node that npm runs on.
 	prefix string
+	// writes are the directories an upgrade through the manager writes in: where it keeps
+	// terma's versions or package, and the bin its link is in.
+	writes []string
 }
 
 // ManagedBy reports the package manager that owns the binary at exe, from its path alone.
@@ -41,7 +44,8 @@ func managedBy(exe, goos string) (Manager, bool) {
 			continue
 		}
 		// The prefix's bin/terma is the link that moves to each new version.
-		m := Manager{Name: "Homebrew", Command: "brew upgrade terma", Terma: filepath.FromSlash(prefix + "/bin/terma")}
+		m := Manager{Name: "Homebrew", Command: "brew upgrade terma", Terma: filepath.FromSlash(prefix + "/bin/terma"),
+			writes: []string{filepath.FromSlash(prefix + strings.TrimSuffix(kind.dir, "/")), filepath.FromSlash(prefix + "/bin")}}
 		if brew := filepath.FromSlash(prefix + "/bin/brew"); isExecutable(brew) {
 			m.Argv = []string{brew, "upgrade"}
 			if kind.cask != "" {
@@ -69,6 +73,7 @@ func managedBy(exe, goos string) (Manager, bool) {
 			npm, _ = exec.LookPath("npm")
 		}
 		m.prefix = filepath.FromSlash(prefix)
+		m.writes = []string{filepath.FromSlash(before + "/node_modules/@miradorlabs"), filepath.FromSlash(prefix + "/bin")}
 		if npm != "" {
 			m.Argv = []string{npm, "install", "--global", "--prefix", m.prefix, npmPackage + "@latest"}
 		}

@@ -112,10 +112,10 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
 	install := InstallOf(exe, current)
-	if cache.landed(current) {
+	if cache.landed(current, time.Now()) {
 		// An earlier relay stopped while its package manager installed this release, which it
 		// was left to finish: an update like any other, said once.
-		cache.end(nil, false)
+		cache.installed()
 		SaveCache(stateDir, cache)
 		saveUpdated(stateDir, Updated{At: time.Now(), From: cache.AttemptedBy, To: current, Through: install.Manager.Name})
 	}
@@ -159,6 +159,11 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 		SaveCache(stateDir, cache)
 		return Outcome{Notice: notice(cache, current)}
 	}
+	// A process told to stop, as the relay is during its look, starts no install: the
+	// package manager would outlive it, or be stopped halfway with it.
+	if ctx.Err() != nil {
+		return Outcome{Notice: notice(cache, current)}
+	}
 	target := rel.Version()
 	cache.begin(target, c.Version, time.Now())
 	SaveCache(stateDir, cache)
@@ -167,12 +172,19 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	}
 	installed, err := c.install(updateCtx, install, rel, UpgradeRequest{From: current, To: target,
 		Log: statePath(stateDir, upgradeLogFile), RefreshTaps: cache.Retries < tapRefreshes}, progress)
-	if err == nil && installed != target {
+	switch {
+	case err == nil && installed == target:
+		cache.installed()
+	case err == nil:
 		// A tap a release or more behind installed one between: it is in place, and the
 		// release asked for is tried again soon.
-		cache.end(fmt.Errorf("%s installed terma %s, not %s yet: %w", install.Manager.Name, installed, target, ErrNotOffered), false)
-	} else {
-		cache.end(err, err != nil && ctx.Err() != nil)
+		cache.behind(install.Manager.Name, installed)
+	case errors.Is(err, ErrReplaced):
+		cache.failed(err)
+	case ctx.Err() != nil:
+		cache.stopped(managed)
+	default:
+		cache.failed(err)
 	}
 	SaveCache(stateDir, cache)
 	if errors.Is(err, ErrReplaced) {

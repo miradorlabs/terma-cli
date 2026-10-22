@@ -38,8 +38,9 @@ var ErrBusy = errors.New("another of its package manager's processes is running;
 type UpgradeRequest struct {
 	// From is the release installed now, and To the one to install.
 	From, To string
-	// Log is the file the manager's output goes to, rewritten for each upgrade: a file, which
-	// the manager goes on writing to should the relay stop first.
+	// Log is the file the manager's output goes to, a new one for each upgrade, the last
+	// one's kept as <Log>.1 (openLog): a file, which the manager goes on writing to should
+	// the relay stop first.
 	Log string
 	// RefreshTaps has Homebrew update its taps before the upgrade, which it otherwise does
 	// once a day: the first few tries at a release ask for it, not every retry.
@@ -68,6 +69,10 @@ type UpgradeRequest struct {
 // the binary, run whatever ignore-scripts says: a lagging registry never has npm install the
 // same release again, and the package never lands without its binary.
 func (m Manager) Upgrade(ctx context.Context, r UpgradeRequest) (string, error) {
+	// A relay told to stop starts nothing that would outlive it.
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if len(m.Argv) == 0 || m.Project != "" {
 		return "", fmt.Errorf("terma cannot run %s for this installation; run `%s`", m.Name, m.Command)
 	}
@@ -101,7 +106,7 @@ func (m Manager) Upgrade(ctx context.Context, r UpgradeRequest) (string, error) 
 		return "", ctx.Err()
 	case ctx.Err() != nil:
 		return "", fmt.Errorf("%s did not finish upgrading terma to %s in time (%w); its output is in %s", m.Name, r.To, ctx.Err(), r.Log)
-	case ran != nil && busy(r.Log):
+	case ran != nil && busy(log):
 		return "", fmt.Errorf("%s could not upgrade terma to %s (%w): %w", m.Name, r.To, ran, ErrBusy)
 	case ran != nil:
 		return "", fmt.Errorf("%s could not upgrade terma to %s (%w); its output is in %s", m.Name, r.To, ran, r.Log)
@@ -150,12 +155,16 @@ func envValue(environ []string, key string) string {
 	return value
 }
 
-// openLog rewrites the upgrade's log at path for this upgrade; nil when it cannot.
+// openLog is a new log at path for this upgrade, the last one's moved to <path>.1; nil when
+// it cannot be made. It is this upgrade's alone, never the file of an earlier one its relay
+// left to finish, which goes on writing to the file it was given: so what this one printed
+// is all it holds (busy), and the log stays two upgrades long.
 func openLog(path string) *os.File {
 	if path == "" || os.MkdirAll(filepath.Dir(path), 0o700) != nil {
 		return nil
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	_ = os.Rename(path, path+".1")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil
 	}
@@ -173,14 +182,23 @@ func logWriter(f *os.File) io.Writer {
 // busyMarks are what Homebrew prints when another of its processes holds a lock it needs.
 var busyMarks = []string{"has already locked", "process is already running"}
 
-// busy reports whether the upgrade's log says the manager found another of its processes
-// holding its lock.
-func busy(path string) bool {
-	data, err := os.ReadFile(path)
+// busyTail bounds how much of the end of an upgrade's output busy reads.
+const busyTail = 64 << 10
+
+// busy reports whether this upgrade's log, its own (openLog), says the manager found another
+// of its processes holding its lock.
+func busy(log *os.File) bool {
+	if log == nil {
+		return false
+	}
+	info, err := log.Stat()
 	if err != nil {
 		return false
 	}
-	return slices.ContainsFunc(busyMarks, func(mark string) bool { return bytes.Contains(data, []byte(mark)) })
+	from := max(info.Size()-busyTail, 0)
+	tail := make([]byte, info.Size()-from)
+	n, _ := log.ReadAt(tail, from)
+	return slices.ContainsFunc(busyMarks, func(mark string) bool { return bytes.Contains(tail[:n], []byte(mark)) })
 }
 
 // RunDetached runs argv with environment env, its input empty and its output to out, so
@@ -189,11 +207,15 @@ func busy(path string) bool {
 // killed with every process it started; when ctx is cancelled it is left to finish by
 // itself, and out should be a file it can go on writing to.
 func RunDetached(ctx context.Context, out io.Writer, env []string, argv ...string) error {
-	argv = scoped(runtime.GOOS, func(k string) string { return envValue(env, k) }, exec.LookPath,
-		func(argv ...string) bool {
-			_, err := probe(ctx, env, argv...)
-			return err == nil
-		}, argv)
+	// A done ctx starts nothing: what it would start would outlive a stopping relay.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	argv = scoped(runtime.GOOS, func(k string) string { return envValue(env, k) }, exec.LookPath, scopeWorks(ctx, env), argv)
+	// The probe takes a moment, in which the relay may have been told to stop.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	c := exec.Command(argv[0], argv[1:]...)
 	c.Env, c.Stdout, c.Stderr = env, out, out
 	// Through a pipe, which out is when it is no file, what it started may hold it open.
@@ -213,6 +235,16 @@ func RunDetached(ctx context.Context, out io.Writer, env []string, argv ...strin
 			<-done
 		}
 		return ctx.Err()
+	}
+}
+
+// scopeWorks is scoped's probe of systemd-run, run with environment env within probeTimeout,
+// whatever becomes of ctx: a probe that a stopping relay cut short would read as no scope,
+// and the program would run in the relay's unit, to be stopped with it.
+func scopeWorks(ctx context.Context, env []string) func(argv ...string) bool {
+	return func(argv ...string) bool {
+		_, err := probe(context.WithoutCancel(ctx), env, argv...)
+		return err == nil
 	}
 }
 

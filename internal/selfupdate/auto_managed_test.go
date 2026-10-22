@@ -286,3 +286,78 @@ func TestAnUpdateACommandMadeIsToldOnce(t *testing.T) {
 		t.Fatalf("the next command says %q again", line)
 	}
 }
+
+// A relay told to stop during its pass's look, which then answers from the last record,
+// starts no install: neither the package manager, which would outlive it or be stopped
+// halfway with it, nor an attempt on record.
+func TestARelayStoppingDuringItsLookStartsNoInstall(t *testing.T) {
+	b := newBrewed(t)
+	b.brew(t, "exit 0")
+	var github publishing
+	srv := github.serve(t, "v1.0.1", true)
+	configDir, stateDir := t.TempDir(), t.TempDir()
+	u := &upgrades{b: b, t: t, answers: []any{fmt.Errorf("Homebrew left terma at 1.0.0: %w", ErrNotOffered)}}
+	relay := relayAt(t, "1.0.0", b.link, srv.URL, u)
+	relay.Auto(context.Background(), configDir, stateDir, b.link, nil)
+	// Due for its retry.
+	cache := LoadCache(stateDir)
+	cache.AttemptAt = time.Now().Add(-RetryInterval - time.Minute)
+	SaveCache(stateDir, cache)
+	before := LoadCache(stateDir).Attempt
+
+	ctx, stop := context.WithCancel(context.Background())
+	stop()
+	if o := relay.Auto(ctx, configDir, stateDir, b.link, nil); o.Installed != "" || o.Err != nil {
+		t.Fatalf("the stopping relay's pass = %+v", o)
+	}
+	if len(u.asked) != 1 {
+		t.Fatalf("the package manager ran %d times, the second as the relay stopped", len(u.asked))
+	}
+	if after := LoadCache(stateDir).Attempt; after != before {
+		t.Fatalf("the stopping relay recorded an attempt: %+v, was %+v", after, before)
+	}
+}
+
+// A relay back on the release before, whose retry meets the package manager the stopped
+// attempt left still running, busy, keeps the attempt interrupted: what that manager goes on
+// to install is the background update's, said once by the relay on it.
+func TestARetryThatFindsTheLeftUpgradeBusyStillClaimsIt(t *testing.T) {
+	b := newBrewed(t)
+	b.brew(t, "exit 0")
+	var github publishing
+	srv := github.serve(t, "v1.0.1", true)
+	configDir, stateDir := t.TempDir(), t.TempDir()
+	ctx, stop := context.WithCancel(context.Background())
+	u := &upgrades{b: b, t: t}
+	u.answers = []any{
+		func(context.Context) (string, error) { stop(); return "", context.Canceled },
+		fmt.Errorf("Homebrew could not upgrade terma to 1.0.1: %w", ErrBusy),
+	}
+	relayAt(t, "1.0.0", b.link, srv.URL, u).Auto(ctx, configDir, stateDir, b.link, nil)
+	// The service starts the relay again, still on 1.0.0: Homebrew has not moved the link yet.
+	again := relayAt(t, "1.0.0", b.link, srv.URL, u)
+	if o := again.Auto(context.Background(), configDir, stateDir, b.link, nil); !errors.Is(o.Err, ErrBusy) {
+		t.Fatalf("the retry = %+v, want Homebrew busy", o)
+	}
+	if cache := LoadCache(stateDir); !cache.Interrupted || cache.Retries != 1 {
+		t.Fatalf("after the busy retry the attempt is %+v", cache.Attempt)
+	}
+	u.install("1.0.1") // the left manager finishes
+	next := relayAt(t, "1.0.1", b.link, srv.URL, &upgrades{b: b, t: t})
+	next.Auto(context.Background(), configDir, stateDir, b.link, nil)
+	if line := TellUpdated(stateDir); line != "terma updated itself in the background: 1.0.0 → 1.0.1 (Homebrew)." {
+		t.Fatalf("the next command says %q", line)
+	}
+}
+
+// `terma update`'s own look takes an interrupted attempt off the background's account: what
+// the developer installs by hand is not said to be terma's own doing.
+func TestAnUpdateByHandIsNotClaimed(t *testing.T) {
+	stateDir := t.TempDir()
+	SaveCache(stateDir, Cache{Current: "1.0.0", Latest: "1.0.1",
+		Attempt: Attempt{AttemptAt: time.Now(), Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: true}})
+	Checked(stateDir, "1.0.0", &Release{TagName: "v1.0.1", PublishedAt: time.Now()})
+	if cache := LoadCache(stateDir); cache.landed("1.0.1", time.Now()) {
+		t.Fatalf("after terma update's look the attempt still lands: %+v", cache.Attempt)
+	}
+}

@@ -784,7 +784,7 @@ attributes:
           stability: development
         - id: unsupported
           value: unsupported
-          brief: It never can, whatever the developer chooses; update notices only.
+          brief: It cannot, whatever the developer chooses; update notices only.
           stability: development
     stability: development
     brief: Whether the relay installs new releases of its terma by itself.
@@ -795,7 +795,9 @@ attributes:
       would not update. A Homebrew or global npm install is on or off like the install
       script's, the relay upgrading it through the package manager that owns it. A source
       build, a project's npm dependency, a Windows binary, a binary the relay cannot find, and
-      a Homebrew or npm install whose package manager terma cannot find are unsupported.
+      a Homebrew or npm install whose package manager terma cannot find are unsupported; so is
+      an install whose directories the relay may not write (a root-owned npm prefix, another
+      user's Homebrew, a binary installed with sudo), until that is put right.
   - key: terma.relay.exit.reason
     type:
       members:

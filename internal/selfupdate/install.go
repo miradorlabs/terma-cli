@@ -1,8 +1,11 @@
 package selfupdate
 
 import (
+	"path/filepath"
 	"runtime"
+	"slices"
 
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -18,6 +21,9 @@ type Install struct {
 	// Manager is the package manager that owns a Homebrew or npm install.
 	Manager Manager
 	goos    string
+	// writes are the directories an update writes in: the binary's own, for one terma
+	// replaces in place, or its package manager's (Manager.writes).
+	writes []string
 }
 
 // InstallOf tells how the terma at exe, at version, was installed, from its path and version
@@ -37,13 +43,18 @@ func InstallOn(exe, version, goos string) Install {
 		i.Method = semconv.TermaInstallMethodSource
 	case exe == "":
 	case !managed:
-		i.Method = semconv.TermaInstallMethodScript
+		// The new binary is written beside the one it replaces, its link resolved.
+		resolved := exe
+		if r, err := filepath.EvalSymlinks(exe); err == nil {
+			resolved = r
+		}
+		i.Method, i.writes = semconv.TermaInstallMethodScript, []string{filepath.Dir(resolved)}
 	case m.Name == "Homebrew":
-		i.Method, i.Manager = semconv.TermaInstallMethodHomebrew, m
+		i.Method, i.Manager, i.writes = semconv.TermaInstallMethodHomebrew, m, m.writes
 	case m.Project != "":
 		i.Method, i.Manager = semconv.TermaInstallMethodNpmProject, m
 	default:
-		i.Method, i.Manager = semconv.TermaInstallMethodNpm, m
+		i.Method, i.Manager, i.writes = semconv.TermaInstallMethodNpm, m, m.writes
 	}
 	return i
 }
@@ -51,10 +62,11 @@ func InstallOn(exe, version, goos string) Install {
 // Automatic is terma.update.auto for this install, under the developer's choice p and the
 // environment getenv reads: whether the relay installs each new release by itself
 // (semconv.TermaUpdateAutoOn), could but is told not to (Off: `terma update --auto off`, or
-// CI or TERMA_NO_UPDATE_CHECK=1, which keep terma's updates out of automation), or never
-// can, whatever the developer chooses (Unsupported). It is the one rule: the relay's
-// updater installs releases exactly when it says on, so what the heartbeat reports is what
-// the relay does.
+// CI or TERMA_NO_UPDATE_CHECK=1, which keep terma's updates out of automation), or cannot,
+// whatever the developer chooses (Unsupported): ever (CanUpdate), or now, where this process
+// may not write where an update writes (updatable). It is the one rule: the relay's updater
+// installs releases exactly when it says on, so what the heartbeat reports is what the
+// relay does.
 func (i Install) Automatic(p Preferences, getenv func(string) string) string {
 	switch {
 	case !i.updatable():
@@ -65,13 +77,14 @@ func (i Install) Automatic(p Preferences, getenv func(string) string) string {
 	return semconv.TermaUpdateAutoOn
 }
 
-// updatable reports whether terma can install new releases here by itself, whatever the
-// developer chose: in place of a release binary it replaces itself, or through the package
-// manager of a Homebrew or global npm install, which it must be able to run (Manager.Argv).
-// Not a source build, which has no release to follow, nor a project's npm dependency, whose
-// lockfile is the project's, nor on Windows, where a running binary cannot be swapped yet
-// and terma runs no package manager; nor a binary the process could not find.
-func (i Install) updatable() bool {
+// CanUpdate reports whether terma could ever install new releases here by itself, whatever
+// the developer chose: in place of a release binary it replaces itself, or through the
+// package manager of a Homebrew or global npm install, which it must be able to run
+// (Manager.Argv). Not a source build, which has no release to follow, nor a project's npm
+// dependency, whose lockfile is the project's, nor on Windows, where a running binary cannot
+// be swapped yet and terma runs no package manager; nor a binary the process could not find.
+// Nothing changes it while a process runs; whether it may write there now can (updatable).
+func (i Install) CanUpdate() bool {
 	if i.Exe == "" || i.goos == "windows" {
 		return false
 	}
@@ -82,6 +95,14 @@ func (i Install) updatable() bool {
 		return len(i.Manager.Argv) > 0
 	}
 	return false
+}
+
+// updatable reports whether terma can install new releases here by itself now: it could
+// (CanUpdate), and this process may write where an update writes, which a root-owned npm
+// prefix, another user's Homebrew, or a binary installed with sudo refuses. Asked at every
+// heartbeat and pass, so permissions put right take effect at the next.
+func (i Install) updatable() bool {
+	return i.CanUpdate() && !slices.ContainsFunc(i.writes, procinfo.WriteDenied)
 }
 
 // Terma is where this install's terma is found after an update: the link its package

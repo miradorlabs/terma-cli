@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -106,13 +107,16 @@ release.`,
 // (selfupdate.Install.Automatic), so it never promises an update the relay would not make.
 func updatesSummary(install selfupdate.Install, auto bool) string {
 	m := install.Manager
-	noEnv := func(string) string { return "" }
+	unsupported := install.Automatic(selfupdate.Preferences{Auto: true}, func(string) string { return "" }) == semconv.TermaUpdateAutoUnsupported
 	switch {
 	case install.Method == semconv.TermaInstallMethodSource:
 		return "never for a development build: `terma update --force` installs the latest release"
-	case install.Automatic(selfupdate.Preferences{Auto: true}, noEnv) == semconv.TermaUpdateAutoUnsupported && m.Name != "":
+	case unsupported && m.Name != "":
 		return "through " + m.Name + ": `" + m.Command + "`"
-	case install.Automatic(selfupdate.Preferences{Auto: true}, noEnv) == semconv.TermaUpdateAutoUnsupported:
+	case unsupported && install.CanUpdate():
+		// It may not write where it is installed, as when installed with sudo.
+		return "when you run `terma update` as a user who may write in " + filepath.Dir(install.Exe)
+	case unsupported:
 		return "by hand: download each new release from https://github.com/" + selfupdate.Repo + "/releases"
 	case !auto:
 		return "when you run `terma update` (automatic updates are off: `terma update --auto on`)"
