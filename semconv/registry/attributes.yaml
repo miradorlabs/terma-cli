@@ -737,6 +737,64 @@ attributes:
     stability: development
     brief: What started the relay.
     note: A resource attribute, so the platform tells a hook-started relay's bursts from a service relay's continuous heartbeat.
+  - key: terma.install.method
+    type:
+      members:
+        - id: script
+          value: script
+          brief: A release binary terma replaces itself, from the install script or a release archive downloaded by hand.
+          stability: development
+        - id: homebrew
+          value: homebrew
+          brief: Homebrew's, as a cask or a formula.
+          stability: development
+        - id: npm
+          value: npm
+          brief: The global npm package @miradorlabs/terma, or any npm install of it on Windows.
+          stability: development
+        - id: npm_project
+          value: npm_project
+          brief: >-
+            A project's npm dependency, which the project's own lockfile pins; also another package
+            manager's global install in npm's layout (yarn, pnpm or bun), which terma cannot tell apart.
+          stability: development
+        - id: source
+          value: source
+          brief: >-
+            A build that is not a numbered release, wherever it is installed: go build or go install, or
+            make on a commit that is not a release tag (make on a release tag builds that release).
+          stability: development
+    stability: development
+    brief: How the relay's terma was installed, which says how it gets new releases.
+    note: >-
+      A resource attribute on the relay heartbeat, read once as the relay starts: an upgrade
+      restarts the relay. Told from the binary's resolved path and terma's version alone, the
+      version first: a build that is not a release is source wherever it is. Left off when
+      the relay cannot find its own binary.
+  - key: terma.update.auto
+    type:
+      members:
+        - id: "on"
+          value: "on"
+          brief: The relay installs each new release by itself.
+          stability: development
+        - id: "off"
+          value: "off"
+          brief: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).
+          stability: development
+        - id: unsupported
+          value: unsupported
+          brief: It never can, whatever the developer chooses; update notices only.
+          stability: development
+    stability: development
+    brief: Whether the relay installs new releases of its terma by itself.
+    note: >-
+      A record attribute on the relay heartbeat, read as each beat is sent, since the developer
+      can turn automatic updates on or off while the relay runs. It is the relay's own
+      decision, from the one rule its updater follows, so it never says on for a relay that
+      would not update. A source build, a project's npm dependency, a Windows binary, and a
+      binary the relay cannot find are unsupported, and so is a Homebrew or npm install,
+      whose package manager upgrades it.
   - key: terma.relay.exit.reason
     type:
       members:

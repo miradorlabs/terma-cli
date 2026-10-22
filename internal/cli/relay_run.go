@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 func (app *App) newRelayRunCommand() *cobra.Command {
@@ -44,11 +45,15 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			defer log.Close()
 			engine := deps.Engine(ctx, app.stateDir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr())
 			engine.Warnf = log.Printf
+			// Read once: an upgrade restarts the relay.
+			install := app.installed()
+			engine.InstallMethod = install.Method
+			engine.UpdateAuto = func() string { return app.updateAuto(install) }
 			res, err := daemon.Run(ctx, daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
-				Updater: app.relayUpdater(),
+				Updater: app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -106,25 +111,48 @@ func (app *App) afterRelay(res daemon.Result) error {
 
 // relayUpdater has the relay install each new release in place of its own binary, as
 // interactive commands do, so a machine nobody runs terma on still updates. It is nil where
-// the relay could never install one: a development build, a package manager's or a Windows
-// binary, or a process with updates turned off, as in CI. Turned off with `terma update
-// --auto off`, it asks nothing, not even GitHub.
-func (app *App) relayUpdater() *daemon.Updater {
-	exe, err := os.Executable()
-	if err != nil || app.binary == nil || !selfupdate.IsRelease(app.version) || !selfupdate.UpdatesItself(exe) ||
-		os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+// the relay could never install one (updateAuto says unsupported): a development build, a
+// package manager's or a Windows binary, or one this process could not find. Each pass asks
+// updateAuto first and installs only when it says on, so the relay does what its heartbeat
+// reports: turned off with `terma update --auto off`, or in CI, it asks nothing, not even
+// GitHub.
+func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
+	if app.updateAuto(install) == semconv.TermaUpdateAutoUnsupported {
 		return nil
 	}
 	// One client for the relay's life: it goes on as each release it installs, so the next
 	// is installed over that one (selfupdate.Client.Auto).
 	client := app.updateClient()
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
-		if p, err := selfupdate.LoadPreferences(app.dir); err != nil || !p.Auto {
+		if app.updateAuto(install) != semconv.TermaUpdateAutoOn {
 			return "", nil
 		}
-		o := client.Auto(ctx, app.dir, app.stateDir, exe, nil)
+		o := client.Auto(ctx, app.dir, app.stateDir, install.Exe, nil)
 		return o.Installed, o.Err
 	}}
+}
+
+// installed is how this terma was installed, as its relay reports it and updates it. A
+// binary this process could not find, or could not tell as it started (App.binary), is
+// one it never updates; one it found is still reported by its path.
+func (app *App) installed() selfupdate.Install {
+	exe, err := os.Executable()
+	if err != nil {
+		exe = ""
+	}
+	install := selfupdate.InstallOf(exe, app.version)
+	if app.binary == nil {
+		install.Exe = ""
+	}
+	return install
+}
+
+// updateAuto is terma.update.auto for install as the developer's choice is now, read
+// from config.json each time, since it can change while the relay runs. A choice terma
+// cannot read is no choice to update: Client.Auto installs nothing then either.
+func (app *App) updateAuto(install selfupdate.Install) string {
+	p, _ := selfupdate.LoadPreferences(app.dir)
+	return install.Automatic(p, os.Getenv)
 }
 
 // sweepHookState ages out the hooks' state now and hourly while the relay runs, so state

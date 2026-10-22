@@ -129,6 +129,8 @@ const (
 	TermaFundingStatusKey = "terma.funding.status"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
+	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.
+	TermaInstallMethodKey = "terma.install.method"
 	// TermaInvocationInitialStepsKey is terma.invocation.initial_steps: How many steps the conversation held when the invocation began.
 	TermaInvocationInitialStepsKey = "terma.invocation.initial_steps"
 	// TermaInvocationNumberKey is terma.invocation.number: The agent's invocation counter.
@@ -261,6 +263,8 @@ const (
 	TermaToolCallCountKey = "terma.tool_call.count"
 	// TermaTurnIDKey is terma.turn.id: The turn the event belongs to, in the agent's own id.
 	TermaTurnIDKey = "terma.turn.id"
+	// TermaUpdateAutoKey is terma.update.auto: Whether the relay installs new releases of its terma by itself.
+	TermaUpdateAutoKey = "terma.update.auto"
 	// TermaUsageCacheReadTokensKey is terma.usage.cache_read_tokens: Cache-read input tokens as the agent reported them, in a snapshot rather than per call.
 	TermaUsageCacheReadTokensKey = "terma.usage.cache_read_tokens"
 	// TermaUsageCacheWriteTokensKey is terma.usage.cache_write_tokens: Cache-write input tokens as the agent reported them, in a snapshot rather than per call.
@@ -363,6 +367,16 @@ const (
 	TermaCompactionTriggerAuto = "auto"
 	// TermaCompactionTriggerManual is terma.compaction.trigger manual: The developer asked for it.
 	TermaCompactionTriggerManual = "manual"
+	// TermaInstallMethodScript is terma.install.method script: A release binary terma replaces itself, from the install script or a release archive downloaded by hand.
+	TermaInstallMethodScript = "script"
+	// TermaInstallMethodHomebrew is terma.install.method homebrew: Homebrew's, as a cask or a formula.
+	TermaInstallMethodHomebrew = "homebrew"
+	// TermaInstallMethodNpm is terma.install.method npm: The global npm package @miradorlabs/terma, or any npm install of it on Windows.
+	TermaInstallMethodNpm = "npm"
+	// TermaInstallMethodNpmProject is terma.install.method npm_project: A project's npm dependency, which the project's own lockfile pins; also another package manager's global install in npm's layout (yarn, pnpm or bun), which terma cannot tell apart.
+	TermaInstallMethodNpmProject = "npm_project"
+	// TermaInstallMethodSource is terma.install.method source: A build that is not a numbered release, wherever it is installed: go build or go install, or make on a commit that is not a release tag (make on a release tag builds that release).
+	TermaInstallMethodSource = "source"
 	// TermaOperationDurationStatusInvalid is terma.operation.duration_status invalid: The agent reported a duration that is not a non-negative integer.
 	TermaOperationDurationStatusInvalid = "invalid"
 	// TermaPushRangeUpdate is terma.push.range update: The commits in the new revision and not the old one, exactly.
@@ -403,6 +417,12 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
+	TermaUpdateAutoOn = "on"
+	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).
+	TermaUpdateAutoOff = "off"
+	// TermaUpdateAutoUnsupported is terma.update.auto unsupported: It never can, whatever the developer chooses; update notices only.
+	TermaUpdateAutoUnsupported = "unsupported"
 	// TermaUsageScopeParentTurn is terma.usage.scope parent_turn: The parent conversation's turn, subagents excluded.
 	TermaUsageScopeParentTurn = "parent_turn"
 	// TermaUsageSemanticsSnapshot is terma.usage.semantics snapshot: A repeated snapshot, never an additive delta.

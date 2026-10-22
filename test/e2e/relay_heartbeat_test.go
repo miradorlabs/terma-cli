@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"net/http/httptest"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -35,6 +36,14 @@ func TestRelayHeartbeat(t *testing.T) {
 			if beat.Attrs[k] == "" {
 				t.Errorf("heartbeat has no %s: %v", k, beat.Attrs)
 			}
+		}
+		// How terma was installed is the resource's, read as the relay started; whether it
+		// updates itself is each record's.
+		if !slices.Contains([]string{"script", "homebrew", "npm", "npm_project", "source"}, beat.Resource["terma.install.method"]) {
+			t.Errorf("heartbeat resource terma.install.method = %q: %v", beat.Resource["terma.install.method"], beat.Resource)
+		}
+		if !slices.Contains([]string{"on", "off", "unsupported"}, beat.Attrs["terma.update.auto"]) {
+			t.Errorf("heartbeat terma.update.auto = %q: %v", beat.Attrs["terma.update.auto"], beat.Attrs)
 		}
 		if beat.Attrs["terma.user.id"] != accountUser {
 			t.Errorf("heartbeat terma.user.id = %q, want the signed-in %s: %v", beat.Attrs["terma.user.id"], accountUser, beat.Attrs)
