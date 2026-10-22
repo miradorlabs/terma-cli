@@ -23,7 +23,7 @@ var pinnedCounterNames = []string{
 	"dropped.outbox_unreadable.", "dropped.outbox_write_failed.", "dropped.policy_repository.",
 	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_widened.",
 	"dropped.policy_widened_at_exit.", "dropped.process_running.",
-	"dropped.process_running_at_exit.", "dropped.unclaimed_evicted.",
+	"dropped.process_running_at_exit.", "dropped.too_large.", "dropped.unclaimed_evicted.",
 	"dropped.unclaimed_expired.", "dropped.unclaimed_expired_at_exit.",
 	"dropped.unclaimed_overflow.", "dropped.uncovered_process.",
 	"dropped.uncovered_process_at_exit.", "dropped.upstream_", "forwarded.", "heartbeats_failed",
