@@ -226,8 +226,8 @@ func TestAnUpgradeOutlivesTheRelayButNotItsTime(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(100*time.Millisecond, cancel)
 	start := time.Now()
-	if _, err := m.Upgrade(ctx, r); !errors.Is(err, context.Canceled) || time.Since(start) > 3*time.Second {
-		t.Fatalf("Upgrade = %v after %s, want it to stop waiting at once", err, time.Since(start))
+	if _, err := m.Upgrade(ctx, r); !errors.Is(err, context.Canceled) || !errors.Is(err, errLeftRunning) || time.Since(start) > 3*time.Second {
+		t.Fatalf("Upgrade = %v after %s, want it to stop waiting at once, brew left running", err, time.Since(start))
 	}
 	if !eventually(func() bool { _, err := os.Stat(done); return err == nil }, 10*time.Second) {
 		t.Fatal("the upgrade was stopped with the relay")
@@ -272,14 +272,38 @@ func TestAStoppingRelayStartsNoPackageManager(t *testing.T) {
 	b.brew(t, "touch "+started)
 	ctx, stop := context.WithCancel(t.Context())
 	stop()
-	if _, err := b.manager(t).Upgrade(ctx, UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("Upgrade = %v, want it refused", err)
+	if _, err := b.manager(t).Upgrade(ctx, UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)}); !errors.Is(err, context.Canceled) || errors.Is(err, errLeftRunning) {
+		t.Fatalf("Upgrade = %v, want it refused, nothing left running", err)
 	}
-	if err := RunDetached(ctx, nil, os.Environ(), filepath.Join(b.prefix, "bin", "brew")); !errors.Is(err, context.Canceled) {
-		t.Fatalf("RunDetached = %v, want it refused", err)
+	if err := RunDetached(ctx, nil, os.Environ(), filepath.Join(b.prefix, "bin", "brew")); !errors.Is(err, context.Canceled) || errors.Is(err, errLeftRunning) {
+		t.Fatalf("RunDetached = %v, want it refused, nothing left running", err)
 	}
 	if eventually(func() bool { _, err := os.Stat(started); return err == nil }, 2*time.Second) {
 		t.Fatal("brew started for a relay told to stop")
+	}
+}
+
+// A relay stopped while it asks npm's registry, before npm installs anything, leaves nothing
+// running: what lands later is not its doing.
+func TestAStopDuringNpmViewLeavesNothingRunning(t *testing.T) {
+	unixLayouts(t)
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := filepath.Join(root, "node")
+	exe := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	termaScript(t, exe, "1.0.0")
+	installed := filepath.Join(root, "installed")
+	script(t, filepath.Join(prefix, "bin", "npm"), `case "$1" in view) sleep 5; echo 1.0.1 ;; install) touch `+installed+` ;; esac`)
+	m, _ := ManagedBy(exe)
+	ctx, stop := context.WithCancel(t.Context())
+	time.AfterFunc(300*time.Millisecond, stop)
+	if _, err := m.Upgrade(ctx, UpgradeRequest{From: "1.0.0", To: "1.0.1", Log: upgradeLog(t)}); err == nil || errors.Is(err, errLeftRunning) {
+		t.Fatalf("Upgrade = %v, want it stopped with nothing left running", err)
+	}
+	if _, err := os.Stat(installed); err == nil {
+		t.Fatal("npm install ran for a relay told to stop")
 	}
 }
 

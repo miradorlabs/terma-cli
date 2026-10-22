@@ -794,8 +794,9 @@ attributes:
       decision, from the one rule its updater follows, so it never says on for a relay that
       would not update. A Homebrew or global npm install is on or off like the install
       script's, the relay upgrading it through the package manager that owns it. A source
-      build, a project's npm dependency, a Windows binary, a binary the relay cannot find, and
-      a Homebrew or npm install whose package manager terma cannot find are unsupported; so is
+      build, a project's npm dependency, a Windows binary, a binary the relay cannot find, a
+      Homebrew install without its brew, and a global npm install whose prefix keeps no npm of
+      its own (the relay's service does not search the developer's PATH) are unsupported; so is
       an install whose directories the relay may not write (a root-owned npm prefix, another
       user's Homebrew, a binary installed with sudo), until that is put right.
   - key: terma.relay.exit.reason

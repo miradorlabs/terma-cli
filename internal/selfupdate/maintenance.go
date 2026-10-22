@@ -73,16 +73,22 @@ func (c Cache) attempt() Cache {
 
 // Checked records in dir a look that `terma update` made for itself, which found rel for a
 // terma at current, and returns the record. It keeps the last install tried, as every look
-// does: a release held back after a failed install stays so. The developer is updating by
-// hand, so a release an interrupted background attempt left installing is not claimed for
-// it (Attempt.byHand).
+// does: a release held back after a failed install stays so.
 func Checked(dir, current string, rel *Release) Cache {
 	cache := LoadCache(dir).attempt()
-	cache.byHand()
 	cache.CheckedAt, cache.Current = time.Now(), current
 	cache.Found(rel)
 	SaveCache(dir, cache)
 	return cache
+}
+
+// InstalledByHand records in dir that `terma update` installed a release through its package
+// manager: one an interrupted background attempt left installing is not that attempt's to
+// claim (Attempt.byHand). An install in place records a check of its own, with no attempt.
+func InstalledByHand(dir string) {
+	cache := LoadCache(dir)
+	cache.byHand()
+	SaveCache(dir, cache)
 }
 
 // maxRetryWait caps retryAfter: the window GitHub's rate limit resets in, so a machine back

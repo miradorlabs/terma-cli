@@ -34,6 +34,16 @@ var ErrNotOffered = errors.New("its package manager does not offer it yet; terma
 // own `brew upgrade` does while it runs: tried again soon too.
 var ErrBusy = errors.New("another of its package manager's processes is running; terma asks again later")
 
+// errLeftRunning means a program RunDetached started was left to finish when its ctx was
+// cancelled: a package manager that may go on to install the release (Attempt.stopped).
+var errLeftRunning = errors.New("left to finish by itself")
+
+// logNote says where an upgrade's output is: the log at path, kept as <path>.1 once the next
+// upgrade begins (openLog), so what doctor shows of a failure stays true.
+func logNote(path string) string {
+	return "its output is in " + path + " (" + filepath.Base(path) + ".1 once terma tries again)"
+}
+
 // UpgradeRequest is one upgrade of terma through the package manager that owns it.
 type UpgradeRequest struct {
 	// From is the release installed now, and To the one to install.
@@ -102,16 +112,18 @@ func (m Manager) Upgrade(ctx context.Context, r UpgradeRequest) (string, error) 
 	switch {
 	case err == nil && Newer(r.From, got):
 		return got, nil
+	case errors.Is(ctx.Err(), context.Canceled) && errors.Is(ran, errLeftRunning):
+		return "", ran
 	case errors.Is(ctx.Err(), context.Canceled):
 		return "", ctx.Err()
 	case ctx.Err() != nil:
-		return "", fmt.Errorf("%s did not finish upgrading terma to %s in time (%w); its output is in %s", m.Name, r.To, ctx.Err(), r.Log)
+		return "", fmt.Errorf("%s did not finish upgrading terma to %s in time (%w); %s", m.Name, r.To, ctx.Err(), logNote(r.Log))
 	case ran != nil && busy(log):
 		return "", fmt.Errorf("%s could not upgrade terma to %s (%w): %w", m.Name, r.To, ran, ErrBusy)
 	case ran != nil:
-		return "", fmt.Errorf("%s could not upgrade terma to %s (%w); its output is in %s", m.Name, r.To, ran, r.Log)
+		return "", fmt.Errorf("%s could not upgrade terma to %s (%w); %s", m.Name, r.To, ran, logNote(r.Log))
 	case err != nil:
-		return "", fmt.Errorf("%s upgraded terma, but %s does not run (%w); its output is in %s", m.Name, m.Terma, err, r.Log)
+		return "", fmt.Errorf("%s upgraded terma, but %s does not run (%w); %s", m.Name, m.Terma, err, logNote(r.Log))
 	}
 	return "", fmt.Errorf("%s left terma at %s, not %s: %w", m.Name, got, r.To, ErrNotOffered)
 }
@@ -205,7 +217,7 @@ func busy(log *os.File) bool {
 // that the relay's service manager stopping the relay does not stop it too: in a session of
 // its own, and, under systemd, in a scope of its own (scoped). At ctx's deadline it is
 // killed with every process it started; when ctx is cancelled it is left to finish by
-// itself, and out should be a file it can go on writing to.
+// itself (errLeftRunning), and out should be a file it can go on writing to.
 func RunDetached(ctx context.Context, out io.Writer, env []string, argv ...string) error {
 	// A done ctx starts nothing: what it would start would outlive a stopping relay.
 	if err := ctx.Err(); err != nil {
@@ -233,8 +245,9 @@ func RunDetached(ctx context.Context, out io.Writer, env []string, argv ...strin
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			_ = procinfo.KillGroup(c.Process)
 			<-done
+			return ctx.Err()
 		}
-		return ctx.Err()
+		return fmt.Errorf("%w: %w", ctx.Err(), errLeftRunning)
 	}
 }
 

@@ -233,35 +233,56 @@ func TestTheRelayRunningFromItsKegUpgradesThroughTheLink(t *testing.T) {
 
 // A relay stopped while its package manager ran leaves the release free to try at once,
 // and when the manager, left to finish, installed it, the next relay, on that release, says
-// so once, as for any other update.
+// so once, as for any other update: only when the release's keg is from the time the manager
+// could have been running, and only when a manager was left running at all.
 func TestAnUpgradeTheRelayWasStoppedDuringIsSaidByTheNext(t *testing.T) {
-	b := newBrewed(t)
-	b.brew(t, "exit 0")
-	var github publishing
-	srv := github.serve(t, "v1.0.1", true)
-	configDir, stateDir := t.TempDir(), t.TempDir()
-	ctx, stop := context.WithCancel(context.Background())
-	u := &upgrades{b: b, t: t}
-	u.answers = []any{func(context.Context) (string, error) {
-		stop()
-		return "", context.Canceled
-	}}
-	if o := relayAt(t, "1.0.0", b.link, srv.URL, u).Auto(ctx, configDir, stateDir, b.link, nil); o.Installed != "" {
-		t.Fatalf("the stopped relay's pass = %+v", o)
-	}
-	if cache := LoadCache(stateDir); !cache.Interrupted || cache.held(cache.Latest, "1.0.0", time.Now()) {
-		t.Fatalf("after the stop the attempt is %+v", cache.Attempt)
-	}
-	u.install("1.0.1") // the manager finishes by itself
-	next := relayAt(t, "1.0.1", b.link, srv.URL, &upgrades{b: b, t: t})
-	if o := next.Auto(context.Background(), configDir, stateDir, b.link, nil); o != (Outcome{}) {
-		t.Fatalf("the next relay's pass = %+v", o)
-	}
-	if line := TellUpdated(stateDir); line != "terma updated itself in the background: 1.0.0 → 1.0.1 (Homebrew)." {
-		t.Fatalf("the next command says %q", line)
-	}
-	if cache := LoadCache(stateDir); cache.Interrupted {
-		t.Fatalf("the attempt is still interrupted: %+v", cache.Attempt)
+	said := "terma updated itself in the background: 1.0.0 → 1.0.1 (Homebrew)."
+	for _, tc := range []struct {
+		name string
+		stop error
+		// installed is when the release's keg was put in place, after the attempt began.
+		installed time.Duration
+		want      string
+	}{
+		{"left running, installed meanwhile", fmt.Errorf("%w: %w", context.Canceled, errLeftRunning), 2 * time.Minute, said},
+		// Installed long after: by hand, not by the manager the relay left.
+		{"left running, installed long after", fmt.Errorf("%w: %w", context.Canceled, errLeftRunning), 2 * time.Hour, ""},
+		// Stopped before any manager started (during npm view, or refused to start).
+		{"nothing left running", context.Canceled, 2 * time.Minute, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := newBrewed(t)
+			b.brew(t, "exit 0")
+			var github publishing
+			srv := github.serve(t, "v1.0.1", true)
+			configDir, stateDir := t.TempDir(), t.TempDir()
+			ctx, stop := context.WithCancel(context.Background())
+			u := &upgrades{b: b, t: t}
+			u.answers = []any{func(context.Context) (string, error) {
+				stop()
+				return "", tc.stop
+			}}
+			if o := relayAt(t, "1.0.0", b.link, srv.URL, u).Auto(ctx, configDir, stateDir, b.link, nil); o.Installed != "" {
+				t.Fatalf("the stopped relay's pass = %+v", o)
+			}
+			cache := LoadCache(stateDir)
+			if cache.Interrupted.IsZero() != (tc.stop == context.Canceled) || !cache.Stopped || cache.held(cache.Latest, "1.0.0", time.Now()) {
+				t.Fatalf("after the stop the attempt is %+v", cache.Attempt)
+			}
+			u.install("1.0.1") // the manager finishes, or someone installs it
+			keg := filepath.Join(b.prefix, "Caskroom", "terma", "1.0.1")
+			at := cache.AttemptAt.Add(tc.installed)
+			if err := os.Chtimes(keg, at, at); err != nil {
+				t.Fatal(err)
+			}
+			next := relayAt(t, "1.0.1", b.link, srv.URL, &upgrades{b: b, t: t})
+			if o := next.Auto(context.Background(), configDir, stateDir, b.link, nil); o != (Outcome{}) {
+				t.Fatalf("the next relay's pass = %+v", o)
+			}
+			if line := TellUpdated(stateDir); line != tc.want {
+				t.Fatalf("the next command says %q, want %q", line, tc.want)
+			}
+		})
 	}
 }
 
@@ -330,7 +351,10 @@ func TestARetryThatFindsTheLeftUpgradeBusyStillClaimsIt(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	u := &upgrades{b: b, t: t}
 	u.answers = []any{
-		func(context.Context) (string, error) { stop(); return "", context.Canceled },
+		func(context.Context) (string, error) {
+			stop()
+			return "", fmt.Errorf("%w: %w", context.Canceled, errLeftRunning)
+		},
 		fmt.Errorf("Homebrew could not upgrade terma to 1.0.1: %w", ErrBusy),
 	}
 	relayAt(t, "1.0.0", b.link, srv.URL, u).Auto(ctx, configDir, stateDir, b.link, nil)
@@ -339,7 +363,7 @@ func TestARetryThatFindsTheLeftUpgradeBusyStillClaimsIt(t *testing.T) {
 	if o := again.Auto(context.Background(), configDir, stateDir, b.link, nil); !errors.Is(o.Err, ErrBusy) {
 		t.Fatalf("the retry = %+v, want Homebrew busy", o)
 	}
-	if cache := LoadCache(stateDir); !cache.Interrupted || cache.Retries != 1 {
+	if cache := LoadCache(stateDir); cache.Interrupted.IsZero() || cache.Retries != 1 {
 		t.Fatalf("after the busy retry the attempt is %+v", cache.Attempt)
 	}
 	u.install("1.0.1") // the left manager finishes
@@ -350,14 +374,19 @@ func TestARetryThatFindsTheLeftUpgradeBusyStillClaimsIt(t *testing.T) {
 	}
 }
 
-// `terma update`'s own look takes an interrupted attempt off the background's account: what
-// the developer installs by hand is not said to be terma's own doing.
-func TestAnUpdateByHandIsNotClaimed(t *testing.T) {
+// Only an install by `terma update` takes an interrupted attempt off the background's
+// account; its look alone (`terma update --check`) leaves the claim.
+func TestOnlyAnInstallByHandUnclaims(t *testing.T) {
 	stateDir := t.TempDir()
+	began := time.Now()
 	SaveCache(stateDir, Cache{Current: "1.0.0", Latest: "1.0.1",
-		Attempt: Attempt{AttemptAt: time.Now(), Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: true}})
+		Attempt: Attempt{AttemptAt: began, Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: began}})
 	Checked(stateDir, "1.0.0", &Release{TagName: "v1.0.1", PublishedAt: time.Now()})
-	if cache := LoadCache(stateDir); cache.landed("1.0.1", time.Now()) {
-		t.Fatalf("after terma update's look the attempt still lands: %+v", cache.Attempt)
+	if cache := LoadCache(stateDir); !cache.landed("1.0.1", began.Add(time.Minute)) {
+		t.Fatalf("terma update --check took the claim off: %+v", cache.Attempt)
+	}
+	InstalledByHand(stateDir)
+	if cache := LoadCache(stateDir); cache.landed("1.0.1", began.Add(time.Minute)) {
+		t.Fatalf("an install by hand is still claimed: %+v", cache.Attempt)
 	}
 }

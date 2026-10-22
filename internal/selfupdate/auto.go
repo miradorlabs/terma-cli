@@ -112,7 +112,7 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
 	install := InstallOf(exe, current)
-	if cache.landed(current, time.Now()) {
+	if cache.landed(current, install.installedAt()) {
 		// An earlier relay stopped while its package manager installed this release, which it
 		// was left to finish: an update like any other, said once.
 		cache.installed()
@@ -182,7 +182,7 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	case errors.Is(err, ErrReplaced):
 		cache.failed(err)
 	case ctx.Err() != nil:
-		cache.stopped(managed)
+		cache.stopped(errors.Is(err, errLeftRunning))
 	default:
 		cache.failed(err)
 	}

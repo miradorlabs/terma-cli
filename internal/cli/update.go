@@ -111,6 +111,9 @@ func updatesSummary(install selfupdate.Install, auto bool) string {
 	switch {
 	case install.Method == semconv.TermaInstallMethodSource:
 		return "never for a development build: `terma update --force` installs the latest release"
+	case unsupported && install.CanUpdate() && m.Name != "":
+		// Another user's Homebrew, or a root-owned npm prefix.
+		return "through " + m.Name + ", run by a user who may write where it installed terma: `" + m.Command + "`"
 	case unsupported && m.Name != "":
 		return "through " + m.Name + ": `" + m.Command + "`"
 	case unsupported && install.CanUpdate():
@@ -229,6 +232,8 @@ func (app *App) upgradeManaged(ctx context.Context, m selfupdate.Manager, curren
 	if err := app.runUpdateStep(ctx, out, m.Argv...); err != nil {
 		return fmt.Errorf("%s could not upgrade terma (%w); run `%s` yourself", m.Name, err, m.Command)
 	}
+	// Installed by hand, not by a background attempt the relay left running.
+	selfupdate.InstalledByHand(app.stateDir)
 	app.finishUpdate(ctx, m.Terma, out)
 	return nil
 }

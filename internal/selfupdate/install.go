@@ -1,9 +1,11 @@
 package selfupdate
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -79,8 +81,10 @@ func (i Install) Automatic(p Preferences, getenv func(string) string) string {
 
 // CanUpdate reports whether terma could ever install new releases here by itself, whatever
 // the developer chose: in place of a release binary it replaces itself, or through the
-// package manager of a Homebrew or global npm install, which it must be able to run
-// (Manager.Argv). Not a source build, which has no release to follow, nor a project's npm
+// package manager of a Homebrew or global npm install, which must be the one the install's
+// own prefix keeps: the relay's service runs with the system's PATH, so an npm found on the
+// developer's PATH is not one it would find, and setup's word, read in that shell, must not
+// promise what the service does not do. Not a source build, which has no release to follow, nor a project's npm
 // dependency, whose lockfile is the project's, nor on Windows, where a running binary cannot
 // be swapped yet and terma runs no package manager; nor a binary the process could not find.
 // Nothing changes it while a process runs; whether it may write there now can (updatable).
@@ -92,7 +96,7 @@ func (i Install) CanUpdate() bool {
 	case semconv.TermaInstallMethodScript:
 		return true
 	case semconv.TermaInstallMethodHomebrew, semconv.TermaInstallMethodNpm:
-		return len(i.Manager.Argv) > 0
+		return len(i.Manager.Argv) > 0 && i.Manager.own
 	}
 	return false
 }
@@ -119,4 +123,23 @@ func (i Install) Terma() string {
 // automation: CI set, or TERMA_NO_UPDATE_CHECK=1.
 func OptedOut(getenv func(string) string) bool {
 	return getenv("CI") != "" || getenv("TERMA_NO_UPDATE_CHECK") == "1"
+}
+
+// installedAt is when the release in place here was put there, as the file system has it:
+// the directory its package manager installed it in, which each version gets anew
+// (Caskroom|Cellar/terma/<version>, the npm package's vendor folder), or the binary terma
+// wrote in place; zero when it cannot be told.
+func (i Install) installedAt() time.Time {
+	path := i.Terma()
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
+	if i.Manager.Name != "" {
+		path = filepath.Dir(path)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
 }

@@ -192,9 +192,10 @@ moved to it.
 The relay prints nothing, so the next terma command you run in a terminal says what it
 installed, once, and `terma doctor` shows how yours updates, the last release terma
 installed by itself, and why the last attempt failed, if it did. `terma setup` says how
-yours updates too. A project's npm dependency, a Homebrew or npm installation whose
-package manager terma cannot find, and an installation terma may not write (a root-owned
-npm prefix, another user's Homebrew, a binary installed with sudo) only get the notice;
+yours updates too. A project's npm dependency, a Homebrew installation without its brew or
+a global npm one whose prefix keeps no npm of its own (the relay's service does not search
+your PATH), and an installation terma may not write (a root-owned npm prefix, another
+user's Homebrew, a binary installed with sudo) only get the notice;
 `terma update` runs the package manager's upgrade at once, and when it cannot find that
 package manager it names the command to run. A Windows binary only gets the notice, and is replaced by hand, as Get
 started says. A build between release tags is never updated and gets no notice.

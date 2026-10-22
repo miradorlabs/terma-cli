@@ -26,17 +26,16 @@ type Attempt struct {
 	// Stopped means the last attempt's process stopped during it, which is not the
 	// release's failure: it holds nothing back.
 	Stopped bool `json:"stopped,omitempty"`
-	// Interrupted means a package manager was left to finish an attempt at Attempted when
-	// its process stopped, and may have installed it since (landed). It holds until that
-	// release is installed and said, an attempt at another release begins, or the developer
-	// updates by hand (byHand).
-	Interrupted bool `json:"interrupted,omitempty"`
+	// Interrupted is when the attempt began whose package manager was left to finish
+	// Attempted as its process stopped, and may have installed it since (landed); zero when
+	// none was. It holds until that release is installed and said, an attempt at another
+	// release begins, or the developer installs one by hand (byHand).
+	Interrupted time.Time `json:"interrupted,omitzero"`
 }
 
-// landWindow is how long after an attempt a release it left installing is taken for its
-// own (landed): a package manager left to finish takes minutes, and the relay is back on the
-// new release soon after. Later, the developer may have installed it themselves.
-const landWindow = time.Hour
+// landSlack is how far the file system's clock may stray from the attempt's, either side of
+// the time a package manager left to finish could have installed its release (landed).
+const landSlack = time.Minute
 
 // begin records an attempt at release by the build running, at now. Its Retries carry on
 // from the attempts at the same release before it, and so does Interrupted, since the
@@ -44,7 +43,7 @@ const landWindow = time.Hour
 func (a *Attempt) begin(release, running string, now time.Time) {
 	retries, interrupted := a.Retries, a.Interrupted
 	if a.Attempted != release {
-		retries, interrupted = 0, false
+		retries, interrupted = 0, time.Time{}
 	}
 	*a = Attempt{AttemptAt: now, Attempted: release, AttemptedBy: running, Retries: retries, Interrupted: interrupted}
 }
@@ -52,7 +51,7 @@ func (a *Attempt) begin(release, running string, now time.Time) {
 // installed records that the attempt, or the package manager an earlier one left to
 // finish, installed Attempted.
 func (a *Attempt) installed() {
-	a.Retries, a.Failure, a.Stopped, a.Interrupted = 0, "", false, false
+	a.Retries, a.Failure, a.Stopped, a.Interrupted = 0, "", false, time.Time{}
 }
 
 // behind records that a package manager a release or more behind installed one before
@@ -61,11 +60,14 @@ func (a *Attempt) behind(manager, installed string) {
 	a.Retries, a.Failure = a.Retries+1, fmt.Sprintf("%s installed terma %s, not %s yet", manager, installed, a.Attempted)
 }
 
-// stopped records that the attempt's process stopped during it, leaving a package manager to
-// finish it when leftRunning: not the release's failure, so it is not held back.
+// stopped records that the attempt's process stopped during it, leaving a package manager it
+// had started to finish it when leftRunning: not the release's failure, so it is not held
+// back. The first attempt that left one running is the one whose release may land.
 func (a *Attempt) stopped(leftRunning bool) {
 	a.Stopped = true
-	a.Interrupted = a.Interrupted || leftRunning
+	if leftRunning && a.Interrupted.IsZero() {
+		a.Interrupted = a.AttemptAt
+	}
 }
 
 // failed records the attempt's failure, err. ErrReplaced, another install's binary put in
@@ -82,10 +84,10 @@ func (a *Attempt) failed(err error) {
 	}
 }
 
-// byHand records that the developer is updating terma by hand (`terma update`): a release an
-// interrupted attempt left installing is no longer the background update's to claim.
+// byHand records that the developer installed a release by hand (`terma update`): a release
+// an interrupted attempt left installing is no longer the background update's to claim.
 func (a *Attempt) byHand() {
-	a.Interrupted = false
+	a.Interrupted = time.Time{}
 }
 
 // held reports whether latest is the release last attempted, whose install failed less
@@ -104,10 +106,14 @@ func (a Attempt) Retry() time.Time {
 	return a.AttemptAt.Add(AttemptInterval)
 }
 
-// landed reports whether the terma running, at current, at now, is the release an earlier
-// build's attempt left a package manager installing, within landWindow of the attempt.
-func (a Attempt) landed(current string, now time.Time) bool {
-	return a.Interrupted && a.Attempted == current && Newer(a.AttemptedBy, current) && now.Sub(a.AttemptAt) < landWindow
+// landed reports whether the terma running, at current, put in place at installedAt (as the
+// file system has it: Install.installedAt), is the release an earlier build's attempt left a
+// package manager installing: put there while that manager could still be running, from
+// the attempt's start to UpgradeTimeout after it. Before then, or after, someone else
+// installed it, by hand perhaps, and it is not claimed.
+func (a Attempt) landed(current string, installedAt time.Time) bool {
+	return !a.Interrupted.IsZero() && a.Attempted == current && Newer(a.AttemptedBy, current) &&
+		!installedAt.Before(a.Interrupted.Add(-landSlack)) && installedAt.Before(a.Interrupted.Add(UpgradeTimeout+landSlack))
 }
 
 // retrySoon reports whether err is an attempt to try again soon rather than a day later:

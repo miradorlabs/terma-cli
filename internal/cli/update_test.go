@@ -219,6 +219,20 @@ func TestUpdatesSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(filepath.Join(home, "locked"), 0o755) })
+	lockedBrew := filepath.Join(home, "lockedbrew")
+	if err := os.MkdirAll(filepath.Join(lockedBrew, "Caskroom", "terma"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(lockedBrew, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lockedBrew, "bin", "brew"), nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(lockedBrew, "Caskroom", "terma"), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(lockedBrew, "Caskroom", "terma"), 0o755) })
 	for _, f := range []string{filepath.Join(brew, "bin", "brew"), filepath.Join(npm, "bin", "npm")} {
 		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 			t.Fatal(err)
@@ -243,6 +257,7 @@ func TestUpdatesSummary(t *testing.T) {
 		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
 		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
 		{"installed where it may not write", filepath.Join(home, "locked", "terma"), "1.2.0", "linux", true, "`terma update` as a user who may write in " + filepath.Join(home, "locked")},
+		{"another user's homebrew", filepath.Join(home, "lockedbrew", "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew, run by a user who may write where it installed terma: `brew upgrade terma`"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if strings.Contains(tc.exe, "locked") && os.Geteuid() == 0 {
@@ -517,5 +532,119 @@ func TestDoctorShowsTheLastAutomaticUpdate(t *testing.T) {
 	}
 	if want := "installing 1.2.1 failed 2026-10-22 09:30: Homebrew could not upgrade terma to 1.2.1 (exit status 1); tried again from 2026-10-23 09:30"; rows[2] != (doctor.Row{Value: want}) {
 		t.Fatalf("failure row %+v, want %q", rows[2], want)
+	}
+}
+
+// Setup and doctor run in the developer's shell, the relay's service with the system's PATH:
+// for a global npm install under a prefix of its own (`npm config set prefix ~/.npm-global`)
+// whose npm is elsewhere on the shell's PATH, both say what the service does, from the one
+// rule, whichever PATH asks. With the prefix's own npm, both say it updates in the
+// background.
+func TestSetupPromisesOnlyNpmUpdatesTheServiceMakes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix npm layouts")
+	}
+	t.Setenv("CI", "")
+	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := filepath.Join(root, ".npm-global")
+	pkg := filepath.Join(prefix, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	shellNpm := filepath.Join(root, "opt", "homebrew", "bin", "npm")
+	for _, f := range []string{pkg, shellNpm} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app := New(builtin.Agents, "1.2.0")
+	app.dir, app.stateDir = t.TempDir(), t.TempDir()
+	says := func(path string) (summary, auto string, updater bool) {
+		t.Setenv("PATH", path)
+		install := selfupdate.InstallOf(pkg, "1.2.0")
+		return updatesSummary(install, true), app.updateAuto(install), app.relayUpdater(install) != nil
+	}
+	shellPath, servicePath := filepath.Dir(shellNpm)+":/usr/bin:/bin", "/usr/bin:/bin:/usr/sbin:/sbin"
+	for _, path := range []string{shellPath, servicePath} {
+		summary, auto, updater := says(path)
+		if !strings.Contains(summary, "through npm: `npm install -g @miradorlabs/terma@latest`") || auto != semconv.TermaUpdateAutoUnsupported || updater {
+			t.Errorf("PATH %s: setup says %q, the heartbeat %s, the relay updates: %v", path, summary, auto, updater)
+		}
+	}
+	// The npm the install's own prefix keeps is the service's too.
+	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prefix, "bin", "npm"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{shellPath, servicePath} {
+		summary, auto, updater := says(path)
+		if !strings.Contains(summary, "automatically") || auto != semconv.TermaUpdateAutoOn || !updater {
+			t.Errorf("own npm, PATH %s: setup says %q, the heartbeat %s, the relay updates: %v", path, summary, auto, updater)
+		}
+	}
+}
+
+// A relay whose binary another install replaced with a newer release, as Homebrew left to
+// finish by an earlier relay does, takes it for one it installed itself, and so restarts on
+// it from the stable link, rather than run a binary the upgrade removed.
+func TestARelayReplacedByANewerReleaseRestartsOnIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix Homebrew layout")
+	}
+	t.Setenv("CI", "")
+	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
+	prefix, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	terma := func(version string) string {
+		keg := filepath.Join(prefix, "Caskroom", "terma", version, "terma")
+		if err := os.MkdirAll(filepath.Dir(keg), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(keg, []byte("#!/bin/sh\necho 'terma "+version+"'\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return keg
+	}
+	link := filepath.Join(prefix, "bin", "terma")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prefix, "bin", "brew"), nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(terma("1.2.0"), link); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ next, want string }{{"1.2.1", "1.2.1"}, {"1.1.9", ""}} {
+		t.Run(tc.next, func(t *testing.T) {
+			app := New(builtin.Agents, "1.2.0")
+			app.dir, app.stateDir = t.TempDir(), t.TempDir()
+			if app.binary, err = os.Stat(link); err != nil {
+				t.Fatal(err)
+			}
+			install := selfupdate.InstallOf(link, "1.2.0")
+			updater := app.relayUpdater(install)
+			if updater == nil {
+				t.Fatal("no updater for a Homebrew install with its brew")
+			}
+			// Homebrew moves the link while the relay runs.
+			if err := os.Remove(link); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(terma(tc.next), link); err != nil {
+				t.Fatal(err)
+			}
+			if v, err := updater.Update(t.Context()); v != tc.want || err != nil {
+				t.Fatalf("the relay's pass = %q, %v; want %q", v, err, tc.want)
+			}
+		})
 	}
 }

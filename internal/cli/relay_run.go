@@ -153,8 +153,24 @@ func (app *App) relayUpdater(install selfupdate.Install) *daemon.Updater {
 			return "", nil
 		}
 		o := client.Auto(ctx, app.dir, app.stateDir, install.Exe, nil)
+		if o.Replaced {
+			return app.replacedBy(ctx, install)
+		}
 		return o.Installed, o.Err
 	}}
+}
+
+// replacedBy is the release another install put in place of the relay's terma, "" when it
+// is no newer: what Homebrew left to finish by an earlier relay installs after this one
+// started, whose binary it may remove. The relay takes it for one it installed itself, and
+// restarts on it from install's stable link (afterRelay), rather than run a removed binary
+// that updates nothing until a hook supersedes it.
+func (app *App) replacedBy(ctx context.Context, install selfupdate.Install) (string, error) {
+	installed, err := selfupdate.InstalledVersion(ctx, install.Terma())
+	if err != nil || !selfupdate.Newer(app.version, installed) {
+		return "", nil
+	}
+	return installed, nil
 }
 
 // installed is how this terma was installed, as its relay reports it and updates it. A
