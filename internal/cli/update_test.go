@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 func TestAutomaticUpdatePreference(t *testing.T) {
@@ -348,8 +349,8 @@ func TestUpdateKeepsTheLastInstallTried(t *testing.T) {
 	}
 }
 
-// The relay updates itself only as a release it could replace, outside CI and the opt-out;
-// turned off with --auto off, it asks GitHub nothing.
+// The relay updates itself only as a release it could replace, outside CI and the opt-out,
+// exactly when its heartbeat says terma.update.auto on; otherwise it asks GitHub nothing.
 func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("a Windows relay never replaces itself")
@@ -358,29 +359,40 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
 	release := New(builtin.Agents, "1.2.0")
 	release.dir, release.stateDir = t.TempDir(), t.TempDir()
-	if release.relayUpdater() == nil {
+	install := release.installed()
+	if install.Method != semconv.TermaInstallMethodScript || release.updateAuto(install) != semconv.TermaUpdateAutoOn {
+		t.Fatalf("a release binary of its own is %s, auto %s", install.Method, release.updateAuto(install))
+	}
+	if release.relayUpdater(install) == nil {
 		t.Fatal("a release relay does not update itself")
 	}
-	if testApp.relayUpdater() != nil {
-		t.Fatal("a development build's relay updates itself")
+	dev := testApp.installed()
+	if dev.Method != semconv.TermaInstallMethodSource || testApp.updateAuto(dev) != semconv.TermaUpdateAutoUnsupported || testApp.relayUpdater(dev) != nil {
+		t.Fatalf("a development build's relay updates itself: %s, auto %s", dev.Method, testApp.updateAuto(dev))
 	}
+	// A pass that looked would have recorded its check.
+	looked := func() bool { return !selfupdate.LoadCache(release.stateDir).CheckedAt.IsZero() }
 	for _, env := range []string{"CI", "TERMA_NO_UPDATE_CHECK"} {
 		t.Run(env, func(t *testing.T) {
 			t.Setenv(env, "1")
-			if release.relayUpdater() != nil {
-				t.Fatalf("the relay updates itself under %s", env)
+			if got := release.updateAuto(install); got != semconv.TermaUpdateAutoOff {
+				t.Fatalf("under %s terma.update.auto = %q", env, got)
+			}
+			if v, err := release.relayUpdater(install).Update(t.Context()); v != "" || err != nil || looked() {
+				t.Fatalf("under %s the relay's pass = %q, %v, looked %v", env, v, err, looked())
 			}
 		})
 	}
+	updater := release.relayUpdater(install)
 	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: false}); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := release.relayUpdater().Update(t.Context()); v != "" || err != nil {
-		t.Fatalf("turned off, the relay's pass = %q, %v", v, err)
+	if got := release.updateAuto(install); got != semconv.TermaUpdateAutoOff {
+		t.Fatalf("turned off, terma.update.auto = %q", got)
 	}
-	// A pass that looked would have recorded its check.
-	if checked := !selfupdate.LoadCache(release.stateDir).CheckedAt.IsZero(); checked {
-		t.Fatal("turned off, the relay still looked for a release")
+	// The relay already running reads the choice at each pass, as its heartbeat does.
+	if v, err := updater.Update(t.Context()); v != "" || err != nil || looked() {
+		t.Fatalf("turned off, the relay's pass = %q, %v, looked %v", v, err, looked())
 	}
 }
 

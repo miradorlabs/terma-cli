@@ -68,6 +68,24 @@ attribute_groups:
     brief: What the relay adds to an agent's record whose user.email the team's policy withholds.
     attributes:
       - ref: terma.account.seat.id
+  - id: terma.relay.heartbeat.resource
+    visibility: public
+    stability: development
+    brief: The resource of the relay heartbeat (terma.relay.heartbeat), read as the relay starts.
+    attributes:
+      - ref: service.name
+        requirement_level: required
+        note: terma-relay.
+      - ref: service.version
+        requirement_level: required
+      - ref: host.name
+        requirement_level: required
+      - ref: terma.schema.version
+        requirement_level: required
+      - ref: terma.relay.launch
+        requirement_level: required
+      - ref: terma.install.method
+        requirement_level: required
 
 events:
   - name: terma.session.start
@@ -594,6 +612,8 @@ events:
         requirement_level: recommended
       - ref: terma.relay.heartbeat.counter
         requirement_level: recommended
+      - ref: terma.update.auto
+        requirement_level: required
       - ref: terma.user.id
         requirement_level:
           conditionally_required: >-

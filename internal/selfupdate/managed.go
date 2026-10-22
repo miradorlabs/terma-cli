@@ -24,6 +24,11 @@ type Manager struct {
 
 // ManagedBy reports the package manager that owns the binary at exe, from its path alone.
 func ManagedBy(exe string) (Manager, bool) {
+	return managedBy(exe, runtime.GOOS)
+}
+
+// managedBy is ManagedBy on goos.
+func managedBy(exe, goos string) (Manager, bool) {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
@@ -47,7 +52,7 @@ func ManagedBy(exe string) (Manager, bool) {
 	if before, _, ok := strings.Cut(path, "/node_modules/@miradorlabs/terma/"); ok {
 		m := Manager{Name: "npm", Command: "npm install -g @miradorlabs/terma@latest", Terma: exe}
 		// On Windows terma neither runs npm nor tells the layouts apart.
-		if runtime.GOOS == "windows" {
+		if goos == "windows" {
 			return m, true
 		}
 		// Outside <prefix>/lib/node_modules it is a project's dependency, and its lockfile is the project's.
