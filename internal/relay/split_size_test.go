@@ -374,7 +374,9 @@ func TestPartWithinSplitsLogsAndMetrics(t *testing.T) {
 			for _, rm := range d.GetResourceMetrics() {
 				for _, sm := range rm.GetScopeMetrics() {
 					for _, mt := range sm.GetMetrics() {
-						out = append(out, placed{mt, rm.GetResource(), sm.GetScope(), rm.GetSchemaUrl(), sm.GetSchemaUrl()})
+						for _, one := range onePointMetrics(mt) {
+							out = append(out, placed{one, rm.GetResource(), sm.GetScope(), rm.GetSchemaUrl(), sm.GetSchemaUrl()})
+						}
 					}
 				}
 			}
@@ -387,6 +389,7 @@ func TestPartWithinSplitsLogsAndMetrics(t *testing.T) {
 	}{
 		{&part{signal: Logs, msg: logs, records: 300}, 300},
 		{&part{signal: Metrics, msg: metrics, records: points}, points},
+		{&part{signal: Metrics, msg: oneMetric(16000, 300), records: 16000}, 16000}, // one metric over the host's limit
 	} {
 		parts, rejected := c.p.within(limit)
 		var got []placed
@@ -409,6 +412,42 @@ func TestPartWithinSplitsLogsAndMetrics(t *testing.T) {
 			}
 		}
 	}
+}
+
+// onePointMetrics is m as metrics of one data point each, in order: what a request carries of m
+// is checked point by point, wherever its points were cut.
+func onePointMetrics(m *metricspb.Metric) []*metricspb.Metric {
+	var out []*metricspb.Metric
+	switch d := m.GetData().(type) {
+	case *metricspb.Metric_Sum:
+		for _, p := range d.Sum.GetDataPoints() {
+			out = append(out, &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata(),
+				Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: []*metricspb.NumberDataPoint{p}, AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}})
+		}
+	case *metricspb.Metric_Gauge:
+		for _, p := range d.Gauge.GetDataPoints() {
+			out = append(out, &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata(),
+				Data: &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: []*metricspb.NumberDataPoint{p}}}})
+		}
+	case *metricspb.Metric_Histogram:
+		for _, p := range d.Histogram.GetDataPoints() {
+			out = append(out, &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata(),
+				Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{p}, AggregationTemporality: d.Histogram.GetAggregationTemporality()}}})
+		}
+	case *metricspb.Metric_ExponentialHistogram:
+		for _, p := range d.ExponentialHistogram.GetDataPoints() {
+			out = append(out, &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata(),
+				Data: &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: []*metricspb.ExponentialHistogramDataPoint{p}, AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}})
+		}
+	case *metricspb.Metric_Summary:
+		for _, p := range d.Summary.GetDataPoints() {
+			out = append(out, &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata(),
+				Data: &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: []*metricspb.SummaryDataPoint{p}}}})
+		}
+	default:
+		out = append(out, m)
+	}
+	return out
 }
 
 // One large export reaches the host as requests no larger than maxMergeBytes that together carry every span once.

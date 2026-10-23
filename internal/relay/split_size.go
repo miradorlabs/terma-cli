@@ -35,15 +35,12 @@ func (l layout) alone(b, i int) int {
 	return proto.Size(l.build([]run{{block: b, from: i, to: i + 1}}))
 }
 
-// headSplit is a queued body cut for sending: the filtered request to send now, what of the
-// stored body stays queued after it, and the records no request the host accepts can carry.
-type headSplit struct {
-	body        []byte // the filtered piece to send; nil when no piece of the part fits the host
-	stored      []byte // the same piece as queued, for the policy to be applied to it alone
-	sent        int
-	rest        []byte
-	restRecords int
-	tooLarge    int
+// cutPlan is a queued part laid out for the host: its pieces as queued, in order, with their
+// records, and the records no request the host accepts can carry.
+type cutPlan struct {
+	bodies   [][]byte
+	records  []int
+	tooLarge int
 }
 
 // within divides a part whose encoding is over prefer into parts for the host, in order, as
@@ -66,23 +63,18 @@ func (p *part) within(prefer int) (parts []*part, rejected int) {
 	return parts, l.count(out)
 }
 
-// splitHead cuts a queued body whose filtered form is over prefer: the first message packRuns
-// lays out of the filtered body is the request, and the stored body's records after it stay
-// queued. Withholding changes records in place and never drops or reorders them, so the stored
-// and filtered bodies share their blocks; when they do not, the rest is kept filtered, which
-// sends nothing a stricter policy would withhold.
-//
-// Accepted risk: each piece decodes and re-encodes what is left of the part, so a part of n
-// bytes costs about n²/(2·prefer) bytes of work, some 40 MiB for a 6.5 MiB one. Only parts an
-// older relay or a stricter policy left over the bound take this path. Upgrade path: keep the
-// decoded part across its pieces.
-func splitHead(sig Signal, stored, filtered []byte, prefer int) (headSplit, error) {
+// planCut lays a queued part whose filtered form is over prefer out as packRuns does, on its
+// filtered sizes, and cuts the part as queued along the same lines. Withholding changes records
+// in place and never drops or reorders them, so the queued and filtered bodies share their
+// blocks; when they do not, the pieces are kept filtered, which sends nothing a stricter policy
+// would withhold.
+func planCut(sig Signal, stored, filtered []byte, prefer int) (cutPlan, error) {
 	sm, fm := newSignalMessage(sig), newSignalMessage(sig)
 	if err := proto.Unmarshal(stored, sm); err != nil {
-		return headSplit{}, fmt.Errorf("decode queued %s: %w", sig, err)
+		return cutPlan{}, fmt.Errorf("decode queued %s: %w", sig, err)
 	}
 	if err := proto.Unmarshal(filtered, fm); err != nil {
-		return headSplit{}, fmt.Errorf("decode filtered %s: %w", sig, err)
+		return cutPlan{}, fmt.Errorf("decode filtered %s: %w", sig, err)
 	}
 	lf, _ := layoutOf(fm)
 	ls, _ := layoutOf(sm)
@@ -96,41 +88,15 @@ func splitHead(sig Signal, stored, filtered []byte, prefer int) (headSplit, erro
 		}
 	}
 	msgs, out := packRuns(prefer, maxRequestBytes, lf.heads, lf.sizes, lf.alone)
-	h := headSplit{tooLarge: lf.count(out)}
-	if len(msgs) == 0 {
-		return h, nil
-	}
-	body, err := proto.Marshal(lf.build(msgs[0]))
-	if err != nil {
-		return headSplit{}, err
-	}
-	h.body, h.sent = body, lf.count(msgs[0])
-	if h.stored, err = proto.Marshal(ls.build(msgs[0])); err != nil {
-		return headSplit{}, err
-	}
-	if rest := coalesce(msgs[1:]); len(rest) > 0 {
-		if h.rest, err = proto.Marshal(ls.build(rest)); err != nil {
-			return headSplit{}, err
-		}
-		h.restRecords = ls.count(rest)
-	}
-	return h, nil
-}
-
-// coalesce joins messages' runs into one list, merging each run with the one before it when
-// they are consecutive records of the same block, so a block's records keep a single header.
-func coalesce(msgs [][]run) []run {
-	var out []run
+	p := cutPlan{tooLarge: lf.count(out)}
 	for _, runs := range msgs {
-		for _, r := range runs {
-			if n := len(out); n > 0 && out[n-1].block == r.block && out[n-1].to == r.from {
-				out[n-1].to = r.to
-				continue
-			}
-			out = append(out, r)
+		body, err := proto.Marshal(ls.build(runs))
+		if err != nil {
+			return cutPlan{}, err
 		}
+		p.bodies, p.records = append(p.bodies, body), append(p.records, ls.count(runs))
 	}
-	return out
+	return p, nil
 }
 
 func newSignalMessage(sig Signal) proto.Message {
@@ -201,34 +167,77 @@ func layoutOf(msg proto.Message) (layout, bool) {
 		}
 		l.count = countRecords
 	case *metricspb.MetricsData:
+		// A metric's data points are its records, so one metric of many points is cut like a
+		// scope of many spans. Each run of a metric's points goes under a copy of the metric
+		// without them; the block's header counts the largest such copy once a run, as a run
+		// can open mid-metric, and a metric's first point counts its own.
+		type item struct{ metric, point int } // point -1: a metric with no data points
 		type block struct {
-			rm *metricspb.ResourceMetrics
-			sm *metricspb.ScopeMetrics
+			rm    *metricspb.ResourceMetrics
+			sm    *metricspb.ScopeMetrics
+			items []item
+			subs  []func(from, to int) *metricspb.Metric
+			sizes [][]int
 		}
-		var blocks []block
+		var blocks []*block
 		for _, rm := range m.GetResourceMetrics() {
 			for _, sm := range rm.GetScopeMetrics() {
-				blocks = append(blocks, block{rm, sm})
-				l.heads = append(l.heads, framedHead(rm.GetResource(), rm.GetSchemaUrl(), sm.GetScope(), sm.GetSchemaUrl()))
-				l.sizes = append(l.sizes, framedSizes(sm.GetMetrics()))
+				b := &block{rm: rm, sm: sm}
+				var sizes []int
+				shells := 0
+				for mi, mt := range sm.GetMetrics() {
+					pts, sub := pointsOf(mt)
+					b.subs, b.sizes = append(b.subs, sub), append(b.sizes, pts)
+					shell := proto.Size(sub(0, 0)) + 2*recordFraming
+					shells = max(shells, shell)
+					if len(pts) == 0 {
+						b.items, sizes = append(b.items, item{mi, -1}), append(sizes, shell)
+						continue
+					}
+					for j, n := range pts {
+						if j == 0 {
+							n += shell
+						}
+						b.items, sizes = append(b.items, item{mi, j}), append(sizes, n)
+					}
+				}
+				blocks = append(blocks, b)
+				l.heads = append(l.heads, framedHead(rm.GetResource(), rm.GetSchemaUrl(), sm.GetScope(), sm.GetSchemaUrl())+shells)
+				l.sizes = append(l.sizes, sizes)
 			}
 		}
 		l.build = func(runs []run) proto.Message {
 			md := &metricspb.MetricsData{}
 			for _, r := range runs {
 				b := blocks[r.block]
+				var metrics []*metricspb.Metric
+				for i := r.from; i < r.to; {
+					it, j := b.items[i], i+1
+					for j < r.to && b.items[j].metric == it.metric {
+						j++
+					}
+					from, to := it.point, b.items[j-1].point+1
+					if it.point < 0 || from == 0 && to == len(b.sizes[it.metric]) {
+						metrics = append(metrics, b.sm.GetMetrics()[it.metric])
+					} else {
+						metrics = append(metrics, b.subs[it.metric](from, to))
+					}
+					i = j
+				}
 				md.ResourceMetrics = append(md.ResourceMetrics, &metricspb.ResourceMetrics{
 					Resource:     cloneResource(b.rm.GetResource()),
 					SchemaUrl:    b.rm.GetSchemaUrl(),
-					ScopeMetrics: []*metricspb.ScopeMetrics{{Scope: b.sm.GetScope(), SchemaUrl: b.sm.GetSchemaUrl(), Metrics: b.sm.GetMetrics()[r.from:r.to]}},
+					ScopeMetrics: []*metricspb.ScopeMetrics{{Scope: b.sm.GetScope(), SchemaUrl: b.sm.GetSchemaUrl(), Metrics: metrics}},
 				})
 			}
 			return md
 		}
 		l.count = func(runs []run) (n int) {
 			for _, r := range runs {
-				for _, mt := range blocks[r.block].sm.GetMetrics()[r.from:r.to] {
-					eachPointTime(mt, func(uint64) { n++ })
+				for _, it := range blocks[r.block].items[r.from:r.to] {
+					if it.point >= 0 {
+						n++
+					}
 				}
 			}
 			return n
@@ -316,6 +325,52 @@ func packAlone(b, hard, h int, recs []int, alone func(b, i int) int) (msgs [][]r
 		return nil, []run{{block: b, from: 0, to: len(recs)}}
 	}
 	return msgs, rejected
+}
+
+// pointsOf is a metric's framed data point sizes, and sub the metric holding only points
+// [from, to). A metric of a kind it does not know has no points, and sub is the metric whole.
+func pointsOf(m *metricspb.Metric) (sizes []int, sub func(from, to int) *metricspb.Metric) {
+	shell := func() *metricspb.Metric {
+		return &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata()}
+	}
+	switch d := m.GetData().(type) {
+	case *metricspb.Metric_Sum:
+		pts := d.Sum.GetDataPoints()
+		return framedSizes(pts), func(from, to int) *metricspb.Metric {
+			c := shell()
+			c.Data = &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: pts[from:to], AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}
+			return c
+		}
+	case *metricspb.Metric_Gauge:
+		pts := d.Gauge.GetDataPoints()
+		return framedSizes(pts), func(from, to int) *metricspb.Metric {
+			c := shell()
+			c.Data = &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: pts[from:to]}}
+			return c
+		}
+	case *metricspb.Metric_Histogram:
+		pts := d.Histogram.GetDataPoints()
+		return framedSizes(pts), func(from, to int) *metricspb.Metric {
+			c := shell()
+			c.Data = &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: pts[from:to], AggregationTemporality: d.Histogram.GetAggregationTemporality()}}
+			return c
+		}
+	case *metricspb.Metric_ExponentialHistogram:
+		pts := d.ExponentialHistogram.GetDataPoints()
+		return framedSizes(pts), func(from, to int) *metricspb.Metric {
+			c := shell()
+			c.Data = &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: pts[from:to], AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}
+			return c
+		}
+	case *metricspb.Metric_Summary:
+		pts := d.Summary.GetDataPoints()
+		return framedSizes(pts), func(from, to int) *metricspb.Metric {
+			c := shell()
+			c.Data = &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: pts[from:to]}}
+			return c
+		}
+	}
+	return nil, func(int, int) *metricspb.Metric { return m }
 }
 
 func framedHead(resource proto.Message, resourceURL string, scope proto.Message, scopeURL string) int {

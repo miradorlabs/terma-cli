@@ -129,12 +129,45 @@ func identities(t *testing.T, sig Signal, body []byte) []string {
 		for _, rm := range d.GetResourceMetrics() {
 			for _, sm := range rm.GetScopeMetrics() {
 				for _, mt := range sm.GetMetrics() {
-					out = append(out, mt.GetName())
+					for _, attrs := range pointAttributes(mt) {
+						out = append(out, mt.GetName()+"/"+attrString(attrs, "n"))
+					}
 				}
 			}
 		}
 	}
 	return out
+}
+
+func pointAttributes(mt *metricspb.Metric) (out [][]*commonpb.KeyValue) {
+	switch d := mt.GetData().(type) {
+	case *metricspb.Metric_Gauge:
+		for _, p := range d.Gauge.GetDataPoints() {
+			out = append(out, p.GetAttributes())
+		}
+	case *metricspb.Metric_Sum:
+		for _, p := range d.Sum.GetDataPoints() {
+			out = append(out, p.GetAttributes())
+		}
+	case *metricspb.Metric_Histogram:
+		for _, p := range d.Histogram.GetDataPoints() {
+			out = append(out, p.GetAttributes())
+		}
+	}
+	return out
+}
+
+// oneMetric is a single gauge of n data points, each carrying size bytes beside its "n".
+func oneMetric(n, size int) *metricspb.MetricsData {
+	g := &metricspb.Gauge{}
+	for i := range n {
+		g.DataPoints = append(g.DataPoints, &metricspb.NumberDataPoint{TimeUnixNano: uint64(i + 1), Value: &metricspb.NumberDataPoint_AsInt{AsInt: int64(i)},
+			Attributes: []*commonpb.KeyValue{kv("session.id", "A"), kv("n", fmt.Sprint(i)), kv("k", strings.Repeat("p", size))}})
+	}
+	return &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{
+		Resource:     &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "agent")}},
+		ScopeMetrics: []*metricspb.ScopeMetrics{{Scope: &commonpb.InstrumentationScope{Name: "metrics"}, Metrics: []*metricspb.Metric{{Name: "batched", Unit: "1", Data: &metricspb.Metric_Gauge{Gauge: g}}}}},
+	}}}
 }
 
 func manyLogs(n, size int) *logspb.LogsData {
@@ -202,8 +235,9 @@ func TestRelaySendsALegacyOversizedEntryInBoundedRequests(t *testing.T) {
 		{Traces, bigTraces(6000, 1000), 6000},   // about 6.5 MiB, over the host's limit
 		{Logs, manyLogs(6000, 500), 6000},       // about 3.2 MiB
 		{Metrics, manyMetrics(4000, 300), 8000}, // 8,000 data points, about 2.6 MiB
+		{Metrics, oneMetric(20000, 300), 20000}, // one metric of 20,000 points, about 6.4 MiB
 	} {
-		t.Run(string(c.sig), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s %d", c.sig, c.records), func(t *testing.T) {
 			t.Parallel()
 			h, host := newRecordingHost(t)
 			dir := t.TempDir()
@@ -411,7 +445,7 @@ func TestRelayRetriesAndRefusalsWithinACutPart(t *testing.T) {
 			c.check(t, h, r)
 			if c.name == "refused piece" {
 				des, _ := os.ReadDir(filepath.Join(dir, deadDir))
-				if len(des) != 1 || !strings.Contains(des[0].Name(), "-head-") {
+				if len(des) != 1 || !strings.Contains(des[0].Name(), ".000") {
 					t.Fatalf("dead directory holds %v, want the refused piece alone", des)
 				}
 			}
@@ -419,51 +453,71 @@ func TestRelayRetriesAndRefusalsWithinACutPart(t *testing.T) {
 	}
 }
 
-// A crash between replace's two steps leaves the part whole beside its shortened form: the next
-// relay keeps the shortened one, sends what is left of it, merged with the part after it, and
-// counts only those records, never the piece already delivered.
-func TestRelayResumesACutPartAfterACrashMidReplace(t *testing.T) {
+// A crash while a part is cut leaves it whole, its pieces set aside and removed; one after the
+// cut, with the first piece delivered, leaves the rest, which goes merged with the part after
+// it. Either way every record arrives once, in order, and only what is left is counted.
+func TestRelayResumesACutPartAfterACrash(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	td := bigTraces(700, 1000) // about 760 KiB: one piece, then a rest under maxMergeBytes
-	stored, _ := proto.Marshal(td)
-	e := putLegacy(t, dir, Traces, td, 700)
-	h0, err := splitHead(Traces, stored, stored, maxMergeBytes)
-	if err != nil || h0.rest == nil || len(h0.rest) > maxMergeBytes {
-		t.Fatalf("split: %v", err)
-	}
-	ob := outbox{dir: dir}
-	short := e.withRecords(h0.restRecords)
-	if err := config.WriteFileAtomicNoSync(filepath.Join(ob.routeDir(routeOf(claimA)), short.name), h0.rest, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	next := bigTraces(20, 100)
-	for _, rs := range next.ResourceSpans {
-		for _, ss := range rs.ScopeSpans {
-			for _, sp := range ss.Spans {
-				sp.SpanId = append([]byte("n"), sp.SpanId...)
+	for _, c := range []struct {
+		name      string
+		committed bool // the part was removed, and its first piece delivered
+	}{{"mid-cut", false}, {"after the first piece", true}} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			td := bigTraces(700, 1000) // about 760 KiB: two pieces
+			stored, _ := proto.Marshal(td)
+			e := putLegacy(t, dir, Traces, td, 700)
+			p, err := planCut(Traces, stored, stored, maxMergeBytes)
+			if err != nil || len(p.bodies) != 2 {
+				t.Fatalf("plan: %d pieces, %v", len(p.bodies), err)
 			}
-		}
-	}
-	putLegacy(t, dir, Traces, next, 20)
-	nextBody, _ := proto.Marshal(next)
-	want := append(identities(t, Traces, h0.rest), identities(t, Traces, nextBody)...)
+			ob, rt := outbox{dir: dir}, routeOf(claimA)
+			want := identities(t, Traces, stored)
+			if c.committed {
+				pieces, err := ob.split(rt, e, p.bodies, p.records)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ob.remove(rt, pieces[:1])
+				want = identities(t, Traces, p.bodies[1])
+			} else {
+				ts, seq := e.stem()
+				// Only the first piece was written when the relay stopped.
+				name := fmt.Sprintf("%s-%s.%06d-%s-%d%s", ts, seq, 0, Traces, p.records[0], pbSuffix)
+				if err := config.WriteFileAtomicNoSync(filepath.Join(ob.routeDir(rt), name), p.bodies[0], 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			next := bigTraces(20, 100)
+			for _, rs := range next.ResourceSpans {
+				for _, ss := range rs.ScopeSpans {
+					for _, sp := range ss.Spans {
+						sp.SpanId = append([]byte("n"), sp.SpanId...)
+					}
+				}
+			}
+			putLegacy(t, dir, Traces, next, 20)
+			nextBody, _ := proto.Marshal(next)
+			want = append(want, identities(t, Traces, nextBody)...)
 
-	h, host := newRecordingHost(t)
-	r := hostRelay(t, dir, newFixture(), host, true)
-	waitForCounters(t, r, func(m map[string]int) bool { return m["forwarded.traces"] >= len(want) })
-	checkDelivered(t, h, dir, Traces, want, maxMergeBytes)
-	if n := len(h.taken(Traces)); n != 1 {
-		t.Fatalf("%d requests, want the rest merged with the next part", n)
-	}
-	if m := r.Stats().Snapshot().Counters; m["recovered_from_outbox"] != len(want) || m["forwarded.traces"] != len(want) || sum(m, "dropped.") != 0 {
-		t.Fatalf("counters: %v, want %d recovered and forwarded", m, len(want))
+			h, host := newRecordingHost(t)
+			r := hostRelay(t, dir, newFixture(), host, true)
+			waitForCounters(t, r, func(m map[string]int) bool { return m["forwarded.traces"] >= len(want) })
+			checkDelivered(t, h, dir, Traces, want, maxMergeBytes)
+			if c.committed && len(h.taken(Traces)) != 1 {
+				t.Fatalf("%d requests, want the rest merged with the next part", len(h.taken(Traces)))
+			}
+			if m := r.Stats().Snapshot().Counters; m["recovered_from_outbox"] != len(want) || m["forwarded.traces"] != len(want) || sum(m, "dropped.") != 0 {
+				t.Fatalf("counters: %v, want %d recovered and forwarded", m, len(want))
+			}
+		})
 	}
 }
 
-// A part the janitor drops while its first piece is in flight stays dropped once the piece is
-// delivered: nothing of it is written back, sent or counted again.
-func TestRelayKeepsAPartTheJanitorDroppedMidHead(t *testing.T) {
+// Pieces of a cut part the janitor drops while the first is in flight stay dropped once it is
+// delivered: nothing of them is written back, sent or counted again.
+func TestRelayKeepsACutPartTheJanitorDropped(t *testing.T) {
 	t.Parallel()
 	h, host := newRecordingHost(t)
 	inFlight, release := make(chan struct{}), make(chan struct{})
@@ -478,7 +532,7 @@ func TestRelayKeepsAPartTheJanitorDroppedMidHead(t *testing.T) {
 	putLegacy(t, dir, Traces, bigTraces(2000, 1000), 2000)
 	r := hostRelay(t, dir, newFixture(), host, true)
 	<-inFlight
-	if removed := r.sweepOutbox(time.Now().Add(maxOutboxAge + time.Hour)); len(removed[routeOf(claimA)]) != 1 {
+	if removed := r.sweepOutbox(time.Now().Add(maxOutboxAge + time.Hour)); len(removed[routeOf(claimA)]) < 2 {
 		t.Fatalf("the janitor removed %v", removed)
 	}
 	// As a part put meanwhile would, recreate the route directory the janitor removed with it.
@@ -493,6 +547,36 @@ func TestRelayKeepsAPartTheJanitorDroppedMidHead(t *testing.T) {
 	}
 	if m := r.Stats().Snapshot().Counters; m["dropped.outbox_expired.traces"] != 2000 || sum(m, "dropped.") != 2000 {
 		t.Fatalf("counters: %v", m)
+	}
+}
+
+// A part the janitor dropped between being read and being cut is not cut: no piece of it is
+// written, and its queue stays as the janitor left it.
+func TestCutLeavesAPartTheJanitorDropped(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	td := bigTraces(700, 1000)
+	stored, _ := proto.Marshal(td)
+	e := putLegacy(t, dir, Traces, td, 700)
+	r := newRelay(Options{Dir: dir, Token: token})
+	s := &sender{r: r, route: routeOf(claimA), wake: make(chan struct{}, 1), queue: map[Signal][]entry{}}
+	p, err := planCut(Traces, stored, stored, maxMergeBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.push(e)
+	if removed := r.sweepOutbox(time.Now().Add(maxOutboxAge + time.Hour)); len(removed[s.route]) != 1 {
+		t.Fatalf("the janitor removed %v", removed)
+	}
+	s.forget([]entry{e}) // as sweepOutbox does for a sender it knows
+	if err := os.MkdirAll((outbox{dir: dir}).routeDir(s.route), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.cut(e, p); err == nil {
+		t.Fatal("a dropped part was cut")
+	}
+	if n := pendingParts(t, dir); n != 0 || len(s.next(maxMergeFiles)) != 0 {
+		t.Fatalf("%d parts on disk after cutting a dropped part", n)
 	}
 }
 

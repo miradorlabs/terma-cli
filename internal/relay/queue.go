@@ -58,13 +58,13 @@ func (s *sender) queued(e entry) bool {
 	return slices.ContainsFunc(s.queue[e.signal], func(q entry) bool { return q.name == e.name })
 }
 
-// swap puts ne in old's place: the part, shortened after its head was delivered, keeps its turn.
-func (s *sender) swap(old, ne entry) {
+// replace puts pieces in old's place: the part, cut, keeps its turn.
+func (s *sender) replace(old entry, pieces []entry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	q := s.queue[old.signal]
 	if i := slices.IndexFunc(q, func(e entry) bool { return e.name == old.name }); i >= 0 {
-		q[i] = ne
+		s.queue[old.signal] = slices.Replace(q, i, i+1, pieces...)
 	}
 }
 

@@ -1,21 +1,30 @@
 package relay
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
+)
+
+// errCut reports that take cut the oldest part into pieces in its place: the pieces are next.
+var errCut = errors.New("the oldest part was cut")
 
 // request is the next request a route sends: the parts it delivers, their body as the policy
-// now lets it leave, and what the policy took. head is set when the first part alone is over
-// maxMergeBytes once filtered, as an entry an older relay wrote or one a stricter policy grew
-// can be: body is then the part's first piece, and the rest of the part stays queued.
+// now lets it leave, and what the policy took.
 type request struct {
 	batch []entry
-	body  []byte // nil: the policy withholds all of the first part, or no piece of it fits the host
+	body  []byte // nil: the policy withholds all of the first part
 	tally sendTally
-	head  *headSplit
 }
 
 // take reads the oldest parts, applies the policy as it stands now to each, and merges them
 // while their filtered bodies fit maxMergeBytes, so the bound holds on what is sent. A part
-// over the bound once filtered is cut, as splitHead says, rather than sent whole.
+// over the bound once filtered, as an older relay wrote or a stricter policy grew, is cut into
+// parts that fit it, in its place (errCut), unless it is one message the host takes whole.
 func (s *sender) take(entries []entry, pol Policy) (request, error) {
 	first := entries[0]
 	stored, err := s.r.outbox.read(s.route, first)
@@ -30,19 +39,18 @@ func (s *sender) take(entries []entry, pol Policy) (request, error) {
 		return req, nil
 	}
 	if len(body) > maxMergeBytes {
-		h, err := splitHead(first.signal, stored, body, maxMergeBytes)
+		p, err := planCut(first.signal, stored, body, maxMergeBytes)
 		if err != nil {
 			s.unreadable(first)
 			return request{}, err
 		}
-		if h.body != nil {
-			// The piece alone, so what the policy took is counted once per record sent, not per piece.
-			if h.body, req.tally = s.r.withholdQueued(first.signal, h.stored, pol); h.body == nil {
-				return request{}, fmt.Errorf("queued %s piece no longer decodes", first.signal)
-			}
+		if len(p.bodies) == 1 && p.tooLarge == 0 {
+			return req, nil // one record, or one resource, too large for maxMergeBytes: within maxRequestBytes
 		}
-		req.body, req.head = h.body, &h
-		return req, nil
+		if err := s.cut(first, p); err != nil {
+			return request{}, err
+		}
+		return request{}, errCut
 	}
 	bodies, size := [][]byte{body}, len(body)
 	for _, e := range entries[1:] {
@@ -71,33 +79,26 @@ func (s *sender) take(entries []entry, pol Policy) (request, error) {
 	return req, nil
 }
 
-// settleHead ends a head that was delivered, refused, or too large for any request: its
-// records no request can carry are dropped, and the part keeps only what is left of it, in its
-// place, or leaves the outbox when nothing is. Should the shortened part not be written, the
-// part stays whole and its head is sent again, as when a delivered part's removal fails. It
-// runs under deliverMu, as the janitor's drops do, so a part the janitor dropped while its head
-// was in flight stays dropped.
-func (s *sender) settleHead(e entry, h *headSplit) {
-	if h.tooLarge > 0 {
-		s.r.stats.dropped(e.signal, "too_large", h.tooLarge)
-		s.r.warnf("outbox %s: %d %s cannot fit a %d-byte request beside their resource; dropped", s.route, h.tooLarge, e.signal, maxRequestBytes)
-	}
+// cut puts p's pieces in e's place, on disk and on the queue, and drops the records no request
+// can carry. It runs under deliverMu, as the janitor's drops do, and only while e is still
+// queued, so a part the janitor dropped meanwhile stays dropped.
+func (s *sender) cut(e entry, p cutPlan) error {
 	s.r.deliverMu.Lock()
 	defer s.r.deliverMu.Unlock()
 	if !s.queued(e) {
-		return
+		return fmt.Errorf("outbox %s: %s left the queue before it was cut", s.route, e.name)
 	}
-	if h.rest == nil {
-		s.r.outbox.remove(s.route, []entry{e})
-		s.forget([]entry{e})
-		return
-	}
-	ne, err := s.r.outbox.replace(s.route, e, h.rest, h.restRecords)
+	pieces, err := s.r.outbox.split(s.route, e, p.bodies, p.records)
 	if err != nil {
-		s.r.warnf("outbox %s: %v; its part will be sent again from its start", s.route, err)
-		return
+		s.r.warnf("outbox %s: %v; its part will be cut again", s.route, err)
+		return err
 	}
-	s.swap(e, ne)
+	if p.tooLarge > 0 {
+		s.r.stats.dropped(e.signal, "too_large", p.tooLarge)
+		s.r.warnf("outbox %s: %d %s cannot fit a %d-byte request beside their resource; dropped", s.route, p.tooLarge, e.signal, maxRequestBytes)
+	}
+	s.replace(e, pieces)
+	return nil
 }
 
 func (s *sender) unreadable(e entry) {
@@ -105,3 +106,41 @@ func (s *sender) unreadable(e entry) {
 	s.r.outbox.bury(s.route, e)
 	s.forget([]entry{e})
 }
+
+func mergeBodies(sig Signal, bodies [][]byte) ([]byte, error) {
+	switch sig {
+	case Logs:
+		var out logspb.LogsData
+		for _, b := range bodies {
+			var m logspb.LogsData
+			if err := proto.Unmarshal(b, &m); err != nil {
+				return nil, err
+			}
+			out.ResourceLogs = append(out.ResourceLogs, m.ResourceLogs...)
+		}
+		return proto.Marshal(&out)
+	case Traces:
+		var out tracepb.TracesData
+		for _, b := range bodies {
+			var m tracepb.TracesData
+			if err := proto.Unmarshal(b, &m); err != nil {
+				return nil, err
+			}
+			out.ResourceSpans = append(out.ResourceSpans, m.ResourceSpans...)
+		}
+		return proto.Marshal(&out)
+	default:
+		var out metricspb.MetricsData
+		for _, b := range bodies {
+			var m metricspb.MetricsData
+			if err := proto.Unmarshal(b, &m); err != nil {
+				return nil, err
+			}
+			out.ResourceMetrics = append(out.ResourceMetrics, m.ResourceMetrics...)
+		}
+		return proto.Marshal(&out)
+	}
+}
+
+// OutboxDir is the outbox's directory name under the relay directory.
+const OutboxDir = "outbox"

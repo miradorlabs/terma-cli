@@ -3,6 +3,7 @@ package relay
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -22,8 +23,8 @@ const (
 	sendTimeout = 15 * time.Second
 	// maxMergeBytes bounds every request as it is sent, after send-time withholding: merges
 	// stop short of it, and a part over it, as an older relay wrote or a stricter policy grew,
-	// is sent a piece at a time (request.go). Only a record or a resource too large to fit it
-	// (packRuns) makes a request larger, never past maxRequestBytes. A request the host cannot
+	// is cut into parts that fit it, in its place (request.go). Only a record or a resource
+	// too large to fit it (packRuns) makes a request larger, never past maxRequestBytes. A request the host cannot
 	// take in within sendTimeout is resent whole forever: 4 MiB merges of an agent's spans
 	// timed out on every attempt against a busy OTLP gateway; 512 KiB ones finished in a third
 	// of the timeout at the same throughput.
@@ -199,6 +200,9 @@ func (s *sender) loop() {
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		// Counted only once the batch leaves the outbox: a retry filters it again.
 		req, err := s.take(entries, pol)
+		if errors.Is(err, errCut) {
+			continue
+		}
 		if err != nil {
 			if !sleep(minBackoff) {
 				return
@@ -206,7 +210,7 @@ func (s *sender) loop() {
 			continue
 		}
 		batch, sig := req.batch, req.batch[0].signal
-		if pol.Signals != nil && !contains(pol.Signals, string(sig)) || req.body == nil && req.head == nil {
+		if pol.Signals != nil && !contains(pol.Signals, string(sig)) || req.body == nil {
 			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {
 				records += e.records
@@ -216,26 +220,17 @@ func (s *sender) loop() {
 			s.forget(batch)
 			continue
 		}
-		if req.head != nil && req.head.body == nil {
-			s.settleHead(batch[0], req.head) // every record is too large for the host
-			continue
-		}
 		out, wait, detail, rejected := s.send(ctx, pol, sig, req.body)
 		switch out {
 		case sent:
 			s.r.count(sig, req.tally)
-			if req.head != nil {
-				s.r.stats.forwarded(sig, req.head.sent)
-				s.settleHead(batch[0], req.head)
-			} else {
-				records := 0
-				for _, e := range batch {
-					records += e.records
-				}
-				s.r.stats.forwarded(sig, records)
-				s.r.outbox.remove(s.route, batch)
-				s.forget(batch)
+			records := 0
+			for _, e := range batch {
+				records += e.records
 			}
+			s.r.stats.forwarded(sig, records)
+			s.r.outbox.remove(s.route, batch)
+			s.forget(batch)
 			if rejected > 0 {
 				// Resending a partial success would only duplicate what was kept.
 				s.r.stats.add("upstream_rejected."+string(sig), int(rejected))
@@ -247,14 +242,6 @@ func (s *sender) loop() {
 				continue
 			}
 			single = false
-			if h := req.head; h != nil {
-				// Only the piece sent is refused; what is left of the part is still the host's to judge.
-				s.r.stats.dropped(sig, "upstream_"+detail, h.sent)
-				s.r.warnf("upstream %s refused %d %s: %s", s.route, h.sent, sig, detail)
-				s.r.outbox.buryBody(s.route, batch[0], req.body)
-				s.settleHead(batch[0], h)
-				continue
-			}
 			s.r.stats.dropped(sig, "upstream_"+detail, batch[0].records)
 			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, sig, detail)
 			s.r.outbox.bury(s.route, batch[0])
@@ -402,7 +389,9 @@ func (r *Relay) recoverOutbox() {
 func (r *Relay) recoverRoute(rt route) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	entries, err := r.outbox.list(rt)
+	entries, stale, err := r.outbox.scan(rt)
+	// Pieces of a part a crashed cut left whole: the part is cut again when its turn comes.
+	r.outbox.remove(rt, stale)
 	if err != nil || len(entries) == 0 {
 		return
 	}
