@@ -15,7 +15,7 @@ import (
 // platform together. A prefix ends in "." or "_" and is completed with a signal or a reason.
 var pinnedCounterNames = []string{
 	"attributed_by_", "caught_by_default.", "dropped.ambiguous_process.",
-	"dropped.ambiguous_process_at_exit.", "dropped.claimed_at_exit.", "dropped.encode_failed.",
+	"dropped.ambiguous_process_at_exit.", "dropped.claimed_at_exit.", "dropped.encode_failed.", "dropped.header_repeated.",
 	"dropped.no_key.", "dropped.no_key_at_exit.", "dropped.no_session_id.",
 	"dropped.no_session_process.", "dropped.no_session_process_at_exit.",
 	"dropped.no_session_trace.", "dropped.no_session_trace_at_exit.", "dropped.not_collected.",
@@ -23,7 +23,7 @@ var pinnedCounterNames = []string{
 	"dropped.outbox_unreadable.", "dropped.outbox_write_failed.", "dropped.policy_repository.",
 	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_widened.",
 	"dropped.policy_widened_at_exit.", "dropped.process_running.",
-	"dropped.process_running_at_exit.", "dropped.unclaimed_evicted.",
+	"dropped.process_running_at_exit.", "dropped.too_large.", "dropped.unclaimed_evicted.",
 	"dropped.unclaimed_expired.", "dropped.unclaimed_expired_at_exit.",
 	"dropped.unclaimed_overflow.", "dropped.uncovered_process.",
 	"dropped.uncovered_process_at_exit.", "dropped.upstream_", "forwarded.", "heartbeats_failed",

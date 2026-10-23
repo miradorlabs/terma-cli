@@ -51,6 +51,23 @@ func (s *sender) next(limit int) []entry {
 	return slices.Clone(head[:min(limit, len(head))])
 }
 
+// queued reports whether e is still on its queue: the janitor has not dropped it.
+func (s *sender) queued(e entry) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.ContainsFunc(s.queue[e.signal], func(q entry) bool { return q.name == e.name })
+}
+
+// replace puts pieces in old's place: the part, cut, keeps its turn.
+func (s *sender) replace(old entry, pieces []entry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	q := s.queue[old.signal]
+	if i := slices.IndexFunc(q, func(e entry) bool { return e.name == old.name }); i >= 0 {
+		s.queue[old.signal] = slices.Replace(q, i, i+1, pieces...)
+	}
+}
+
 // forget takes parts that left the outbox, delivered, dropped or buried, off the queue.
 func (s *sender) forget(batch []entry) {
 	if len(batch) == 0 {

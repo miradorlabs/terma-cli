@@ -13,7 +13,7 @@ func (r *Relay) Run(ctx context.Context) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	// The janitor weighs files by modification time, so it keeps the wall clock, never Options.Now.
-	r.janitor(time.Now())
+	r.sweepOutbox(time.Now())
 	r.recoverOutbox()
 	lastJanitor := time.Now()
 	// The first beat comes a minute after start, so a restarted relay says so soon.
@@ -40,7 +40,7 @@ func (r *Relay) Run(ctx context.Context) {
 		case <-tick.C:
 			r.sweep()
 			if now := time.Now(); now.Sub(lastJanitor) >= time.Minute {
-				r.janitor(now)
+				r.sweepOutbox(now)
 				lastJanitor = now
 			}
 			if now := r.opts.Now(); now.Sub(lastBeat) >= r.opts.HeartbeatEvery {
@@ -53,17 +53,6 @@ func (r *Relay) Run(ctx context.Context) {
 				r.wg.Go(func() { _ = r.heartbeat(ctx, reason, "") })
 				lastBeat = now
 			}
-		}
-	}
-}
-
-func (r *Relay) janitor(now time.Time) {
-	for rt, gone := range r.sweepOutbox(now) {
-		r.mu.Lock()
-		s := r.senders[rt]
-		r.mu.Unlock()
-		if s != nil {
-			s.forget(gone)
 		}
 	}
 }

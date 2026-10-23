@@ -15,11 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -27,11 +22,14 @@ import (
 
 // The outbox is plain files, one part each, renamed into place so a crash leaves a whole file or none:
 //
-//	<dir>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
-//	<dir>/<project>/<tool>/<repo>/identity.json                            the repository <repo> hashes
-//	<dir>/.dead/<project>-<tool>-<repo>-<name>                             refused by the host
+//	<dir>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb       accepted, not yet delivered
+//	<dir>/<project>/<tool>/<repo>/<received>-<seq>.<k>-<signal>-<records>.pb   piece k of a part cut to fit the host
+//	<dir>/<project>/<tool>/<repo>/identity.json                                the repository <repo> hashes
+//	<dir>/.dead/<project>-<tool>-<repo>-<name>                                 refused by the host
 //
-// <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
+// <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. A piece's
+// sequence extends its part's (<k> is zero-padded, and a piece cut again extends it once more),
+// so its pieces sort right after it and before the next part. Only claimed
 // parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
 // <repo> keeps the claim's repository so the sender rechecks it against the policy then.
 
@@ -121,6 +119,12 @@ func parseEntry(name string) (entry, bool) {
 	return entry{name: name, signal: sig, records: n}, true
 }
 
+// stem is the name's time and sequence; a piece split cut from a part extends its sequence.
+func (e entry) stem() (ts, seq string) {
+	f := strings.SplitN(e.name, "-", 3)
+	return f[0], f[1]
+}
+
 type outbox struct{ dir string }
 
 func (o outbox) routeDir(rt route) string { return filepath.Join(o.dir, rt.project, rt.tool, rt.repo) }
@@ -164,24 +168,50 @@ func (o outbox) put(rt route, repo config.Repository, e entry, body []byte) erro
 }
 
 func (o outbox) list(rt route) ([]entry, error) {
+	live, _, err := o.scan(rt)
+	return live, err
+}
+
+// scan lists a route's parts in order, and apart from them the pieces split wrote of a part
+// that is still there: split had not finished, and the part is still whole.
+func (o outbox) scan(rt route) (live, stale []entry, err error) {
 	des, err := os.ReadDir(o.routeDir(rt))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var out []entry
+	var all []entry
 	for _, de := range des {
 		if !de.Type().IsRegular() {
 			continue
 		}
 		if e, ok := parseEntry(de.Name()); ok {
-			out = append(out, e)
+			all = append(all, e)
 		}
 	}
-	slices.SortFunc(out, func(a, b entry) int { return strings.Compare(a.name, b.name) })
-	return out, nil
+	slices.SortFunc(all, func(a, b entry) int { return strings.Compare(a.name, b.name) })
+	present := map[string]bool{}
+	for _, e := range all {
+		ts, seq := e.stem()
+		present[ts+"-"+seq+"-"+string(e.signal)] = true
+	}
+	for _, e := range all {
+		ts, seq := e.stem()
+		whole := false
+		for i, c := range seq {
+			if c == '.' && present[ts+"-"+seq[:i]+"-"+string(e.signal)] {
+				whole = true
+			}
+		}
+		if whole {
+			stale = append(stale, e)
+		} else {
+			live = append(live, e)
+		}
+	}
+	return live, stale, nil
 }
 
 // identity is the repository a route's parts were claimed in; the zero one for noRepo, or
@@ -208,6 +238,45 @@ func (o outbox) remove(rt route, batch []entry) {
 	for _, e := range batch {
 		_ = config.Remove(filepath.Join(o.routeDir(rt), e.name))
 	}
+}
+
+// split puts bodies, each with its records, in e's place: parts named for e's time and
+// sequence, extended, so they keep its turn. They are all written before e is removed, and scan
+// sets them aside while e is there, so a crash leaves e whole or cut, never both; the janitor
+// deletes pieces so set aside before it may drop e.
+func (o outbox) split(rt route, e entry, bodies [][]byte, records []int) ([]entry, error) {
+	ts, seq := e.stem()
+	// Pieces an earlier, interrupted cut of e left go first: this cut may lay e out differently,
+	// and once e is gone they would read as parts of their own.
+	_, stale, err := o.scan(rt)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range stale {
+		if pts, pseq := p.stem(); pts == ts && p.signal == e.signal && strings.HasPrefix(pseq, seq+".") {
+			if err := config.Remove(filepath.Join(o.routeDir(rt), p.name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+		}
+	}
+	pieces := make([]entry, len(bodies))
+	undo := func(n int) {
+		for _, p := range pieces[:n] {
+			_ = config.Remove(filepath.Join(o.routeDir(rt), p.name))
+		}
+	}
+	for i, body := range bodies {
+		pieces[i] = entry{name: fmt.Sprintf("%s-%s.%06d-%s-%d%s", ts, seq, i, e.signal, records[i], pbSuffix), signal: e.signal, records: records[i]}
+		if err := config.WriteFileAtomicNoSync(filepath.Join(o.routeDir(rt), pieces[i].name), body, 0o600); err != nil {
+			undo(i)
+			return nil, err
+		}
+	}
+	if err := config.Remove(filepath.Join(o.routeDir(rt), e.name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		undo(len(pieces))
+		return nil, err
+	}
+	return pieces, nil
 }
 
 func (o outbox) bury(rt route, e entry) {
@@ -262,8 +331,8 @@ type queued struct {
 	mtime time.Time
 }
 
-// sweepOutbox enforces the bounds, oldest first, and returns the parts it removed per route
-// so their senders stop queueing them.
+// sweepOutbox enforces the bounds, oldest first, takes the parts it removes off their queues,
+// and returns them per route.
 func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	o := r.outbox
 	routes, _ := o.routes()
@@ -280,6 +349,18 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		}
 	}
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
+	// Under deliverMu, a part is dropped and taken off its queue in one step a cut (sender.cut)
+	// cannot fall between: a part listed above and cut since fails to remove.
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
+	// Pieces a crashed cut wrote of a part still there go first, read again under the lock so a
+	// cut in progress is never mistaken for one: once the part is dropped below, they would
+	// otherwise be listed as parts of their own and sent, a fraction of a dropped part.
+	for _, rt := range routes {
+		if _, stale, err := o.scan(rt); err == nil {
+			o.remove(rt, stale)
+		}
+	}
 	removed := map[route][]entry{}
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
@@ -325,15 +406,21 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		deadTotal -= q.size
 	}
 	r.removeEmptyRoutes(routes)
+	for rt, gone := range removed {
+		r.mu.Lock()
+		snd := r.senders[rt]
+		r.mu.Unlock()
+		if snd != nil {
+			snd.forget(gone)
+		}
+	}
 	return removed
 }
 
-// removeEmptyRoutes removes each route directory holding nothing but its identity, under deliverMu so no
-// put is between creating one and writing its part; the next part recreates it. Under it,
-// a temporary file is one a crashed put left.
+// removeEmptyRoutes removes each route directory holding nothing but its identity. It runs under
+// deliverMu, so no put or split is between creating a file and naming it; the next part
+// recreates the directory. Under it, a temporary file is one a crashed put or split left.
 func (r *Relay) removeEmptyRoutes(routes []route) {
-	r.deliverMu.Lock()
-	defer r.deliverMu.Unlock()
 	o := r.outbox
 	for _, rt := range routes {
 		dir := o.routeDir(rt)
@@ -351,41 +438,3 @@ func (r *Relay) removeEmptyRoutes(routes []route) {
 		_ = os.Remove(filepath.Dir(filepath.Dir(dir)))
 	}
 }
-
-func mergeBodies(sig Signal, bodies [][]byte) ([]byte, error) {
-	switch sig {
-	case Logs:
-		var out logspb.LogsData
-		for _, b := range bodies {
-			var m logspb.LogsData
-			if err := proto.Unmarshal(b, &m); err != nil {
-				return nil, err
-			}
-			out.ResourceLogs = append(out.ResourceLogs, m.ResourceLogs...)
-		}
-		return proto.Marshal(&out)
-	case Traces:
-		var out tracepb.TracesData
-		for _, b := range bodies {
-			var m tracepb.TracesData
-			if err := proto.Unmarshal(b, &m); err != nil {
-				return nil, err
-			}
-			out.ResourceSpans = append(out.ResourceSpans, m.ResourceSpans...)
-		}
-		return proto.Marshal(&out)
-	default:
-		var out metricspb.MetricsData
-		for _, b := range bodies {
-			var m metricspb.MetricsData
-			if err := proto.Unmarshal(b, &m); err != nil {
-				return nil, err
-			}
-			out.ResourceMetrics = append(out.ResourceMetrics, m.ResourceMetrics...)
-		}
-		return proto.Marshal(&out)
-	}
-}
-
-// OutboxDir is the outbox's directory name under the relay directory.
-const OutboxDir = "outbox"
