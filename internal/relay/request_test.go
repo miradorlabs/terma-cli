@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -633,4 +634,109 @@ func pendingParts(t *testing.T, dir string) int {
 		return nil
 	})
 	return n
+}
+
+// A legacy entry whose resource takes most of the host's limit reaches the host whole, though
+// every request repeats the resource: each request is within the host's limit, every span arrives
+// once and in order, and none is dropped.
+func TestRelaySendsEveryRecordUnderAResourceNearTheHostLimit(t *testing.T) {
+	t.Parallel()
+	h, host := newRecordingHost(t)
+	dir := t.TempDir()
+	td := headerTraces(maxRequestBytes-100<<10, repeat(500, 1000)...)
+	body, _ := proto.Marshal(td)
+	putLegacy(t, dir, Traces, td, 500)
+	r := hostRelay(t, dir, newFixture(), host, true)
+	waitForCounters(t, r, func(m map[string]int) bool { return m["forwarded.traces"] == 500 })
+	checkDelivered(t, h, dir, Traces, identities(t, Traces, body), maxRequestBytes)
+	if m := r.Stats().Snapshot().Counters; sum(m, "dropped.") != 0 {
+		t.Fatalf("counters: %v", m)
+	}
+	sent := 0
+	for _, b := range h.taken(Traces) {
+		sent += len(b)
+	}
+	t.Logf("%d requests, %d bytes for a %d-byte entry", len(h.taken(Traces)), sent, len(body))
+}
+
+// A relay that stopped while cutting a part leaves the part and the pieces it wrote. When the part
+// is past its age, or the outbox over its size, the next relay drops the part and its pieces
+// together: no piece of it is sent, and only the part is counted.
+func TestRelayDropsAnInterruptedCutWithItsPart(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, why string
+		evicted   bool
+	}{{"expired", "outbox_expired", false}, {"evicted", "outbox_full", true}} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			td := bigTraces(700, 1000)
+			stored, _ := proto.Marshal(td)
+			e := putLegacy(t, dir, Traces, td, 700)
+			p, err := planCut(Traces, stored, stored, maxMergeBytes)
+			if err != nil || len(p.bodies) != 2 {
+				t.Fatalf("plan: %d pieces, %v", len(p.bodies), err)
+			}
+			ob, rt := outbox{dir: dir}, routeOf(claimA)
+			ts, seq := e.stem()
+			piece := fmt.Sprintf("%s-%s.%06d-%s-%d%s", ts, seq, 0, Traces, p.records[0], pbSuffix)
+			if err := config.WriteFileAtomicNoSync(filepath.Join(ob.routeDir(rt), piece), p.bodies[0], 0o600); err != nil {
+				t.Fatal(err)
+			}
+			dropped := 700
+			if c.evicted {
+				// A newer part as large as the outbox's bound; its size, not its bytes, matters.
+				filler := newEntry(time.Now().Add(time.Second), Traces, 1)
+				f, err := os.Create(filepath.Join(ob.routeDir(rt), filler.name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := f.Truncate(maxOutboxBytes + 1); err != nil {
+					t.Fatal(err)
+				}
+				_ = f.Close()
+				dropped++
+			} else {
+				past := time.Now().Add(-maxOutboxAge - time.Hour)
+				_ = os.Chtimes(filepath.Join(ob.routeDir(rt), e.name), past, past)
+			}
+			h, host := newRecordingHost(t)
+			r := hostRelay(t, dir, newFixture(), host, true)
+			waitForCounters(t, r, func(m map[string]int) bool { return m["dropped."+c.why+".traces"] == dropped })
+			time.Sleep(300 * time.Millisecond)
+			if n := len(h.taken(Traces)); n != 0 || pendingParts(t, dir) != 0 {
+				t.Fatalf("%d requests and %d parts left: a piece of the dropped part survived", n, pendingParts(t, dir))
+			}
+			if m := r.Stats().Snapshot().Counters; m["forwarded.traces"] != 0 || sum(m, "dropped.") != dropped {
+				t.Fatalf("counters: %v", m)
+			}
+		})
+	}
+}
+
+// A part of a signal the policy no longer allows is dropped as it is, never cut: an oversized
+// legacy entry of a disabled signal leaves no pieces and sends nothing.
+func TestRelayDropsADisabledSignalsPartWithoutCuttingIt(t *testing.T) {
+	t.Parallel()
+	h, host := newRecordingHost(t)
+	dir := t.TempDir()
+	putLegacy(t, dir, Traces, bigTraces(2000, 1000), 2000)
+	var pieces atomic.Int32
+	r := newRelay(Options{Dir: dir, Token: token, Lookup: newFixture().lookup, Grace: 50 * time.Millisecond,
+		Resolve: func(claim.Claim) (Policy, error) {
+			_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+				if err == nil && strings.Contains(d.Name(), ".000") {
+					pieces.Add(1)
+				}
+				return nil
+			})
+			return Policy{Endpoint: host.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true, Signals: []string{"logs"}}, nil
+		}})
+	runRelay(t, r)
+	waitForCounters(t, r, func(m map[string]int) bool { return m["dropped.policy_signal_or_content.traces"] == 2000 })
+	waitFor(t, func() bool { return pendingParts(t, dir) == 0 })
+	if n := len(h.taken(Traces)); n != 0 || pieces.Load() != 0 {
+		t.Fatalf("%d requests, %d pieces seen: the part was cut or sent", n, pieces.Load())
+	}
 }

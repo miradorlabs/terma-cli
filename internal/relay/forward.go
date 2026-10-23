@@ -197,6 +197,18 @@ func (s *sender) loop() {
 			s.forget(entries)
 			continue
 		}
+		// The signals the policy allows now, checked before reading: a part of a signal turned off
+		// since is dropped, never cut.
+		if sig := entries[0].signal; pol.Signals != nil && !contains(pol.Signals, string(sig)) {
+			records := 0
+			for _, e := range entries {
+				records += e.records
+			}
+			s.r.stats.dropped(sig, "policy_signal_or_content", records)
+			s.r.outbox.remove(s.route, entries)
+			s.forget(entries)
+			continue
+		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		// Counted only once the batch leaves the outbox: a retry filters it again.
 		req, err := s.take(entries, pol)
@@ -210,7 +222,7 @@ func (s *sender) loop() {
 			continue
 		}
 		batch, sig := req.batch, req.batch[0].signal
-		if pol.Signals != nil && !contains(pol.Signals, string(sig)) || req.body == nil {
+		if req.body == nil {
 			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {
 				records += e.records
@@ -389,9 +401,7 @@ func (r *Relay) recoverOutbox() {
 func (r *Relay) recoverRoute(rt route) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	entries, stale, err := r.outbox.scan(rt)
-	// Pieces of a part a crashed cut left whole: the part is cut again when its turn comes.
-	r.outbox.remove(rt, stale)
+	entries, err := r.outbox.list(rt)
 	if err != nil || len(entries) == 0 {
 		return
 	}

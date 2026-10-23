@@ -3,9 +3,12 @@ package relay
 import (
 	"fmt"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,17 +26,24 @@ type run struct{ block, from, to int }
 // heads[b] is block b's framed resource and scope and sizes[b] its framed records. build
 // reassembles runs of records, each run under a copy of its block's resource and its scope and
 // schema URLs; count is their records (spans, log records or metric data points). heads and
-// sizes bound the encoding from above; alone is the exact size of one record's message.
+// sizes bound the encoding from above. frames[b] and record give the exact size of one record's
+// request (alone) without building it, so a huge resource is never copied to size a record.
 type layout struct {
-	heads []int
-	sizes [][]int
-	build func(runs []run) proto.Message
-	count func(runs []run) int
+	heads  []int
+	sizes  [][]int
+	frames []frame
+	record func(b, i int) int // record i of block b, encoded
+	build  func(runs []run) proto.Message
+	count  func(runs []run) int
 }
 
-func (l layout) alone(b, i int) int {
-	return proto.Size(l.build([]run{{block: b, from: i, to: i + 1}}))
+// frame is a block's resource and scope as a request carries them.
+type frame struct {
+	res, scope       int // encoded sizes; scope is -1 when the block has none
+	resURL, scopeURL string
 }
+
+func (l layout) alone(b, i int) int { return l.frames[b].sole(l.record(b, i)) }
 
 // cutPlan is a queued part laid out for the host: its pieces as queued, in order, with their
 // records, and the records no request the host accepts can carry.
@@ -124,6 +134,7 @@ func layoutOf(msg proto.Message) (layout, bool) {
 			for _, ss := range rs.GetScopeSpans() {
 				blocks = append(blocks, block{rs, ss})
 				l.heads = append(l.heads, framedHead(rs.GetResource(), rs.GetSchemaUrl(), ss.GetScope(), ss.GetSchemaUrl()))
+				l.frames = append(l.frames, frameOf(rs.GetResource(), rs.GetSchemaUrl(), ss.GetScope(), ss.GetSchemaUrl()))
 				l.sizes = append(l.sizes, framedSizes(ss.GetSpans()))
 			}
 		}
@@ -150,6 +161,7 @@ func layoutOf(msg proto.Message) (layout, bool) {
 			for _, sl := range rl.GetScopeLogs() {
 				blocks = append(blocks, block{rl, sl})
 				l.heads = append(l.heads, framedHead(rl.GetResource(), rl.GetSchemaUrl(), sl.GetScope(), sl.GetSchemaUrl()))
+				l.frames = append(l.frames, frameOf(rl.GetResource(), rl.GetSchemaUrl(), sl.GetScope(), sl.GetSchemaUrl()))
 				l.sizes = append(l.sizes, framedSizes(sl.GetLogRecords()))
 			}
 		}
@@ -203,6 +215,7 @@ func layoutOf(msg proto.Message) (layout, bool) {
 				}
 				blocks = append(blocks, b)
 				l.heads = append(l.heads, framedHead(rm.GetResource(), rm.GetSchemaUrl(), sm.GetScope(), sm.GetSchemaUrl())+shells)
+				l.frames = append(l.frames, frameOf(rm.GetResource(), rm.GetSchemaUrl(), sm.GetScope(), sm.GetSchemaUrl()))
 				l.sizes = append(l.sizes, sizes)
 			}
 		}
@@ -232,6 +245,13 @@ func layoutOf(msg proto.Message) (layout, bool) {
 			}
 			return md
 		}
+		l.record = func(b, i int) int {
+			it := blocks[b].items[i]
+			if it.point < 0 || len(blocks[b].sizes[it.metric]) == 1 { // build sends the metric itself
+				return proto.Size(blocks[b].sm.GetMetrics()[it.metric])
+			}
+			return proto.Size(blocks[b].subs[it.metric](it.point, it.point+1))
+		}
 		l.count = func(runs []run) (n int) {
 			for _, r := range runs {
 				for _, it := range blocks[r.block].items[r.from:r.to] {
@@ -244,6 +264,10 @@ func layoutOf(msg proto.Message) (layout, bool) {
 		}
 	default:
 		return layout{}, false
+	}
+	if l.record == nil {
+		sizes := l.sizes
+		l.record = func(b, i int) int { return sizes[b][i] - recordFraming }
 	}
 	return l, true
 }
@@ -262,9 +286,11 @@ func countRecords(runs []run) (n int) {
 //   - A block whose header is at most half of prefer packs to prefer, sharing messages with its
 //     neighbours. Two consecutive messages of the block then carry more of its record bytes than
 //     one header, so its share of the messages is at most three times its own size.
-//   - A block with a larger header packs alone to hard, and is rejected whole when that would
-//     still copy its header past three times its size.
-//   - A record too large to share a message goes alone; one whose message alone, exactly as
+//   - A block with a larger header packs alone, each message filled to hard before the next
+//     opens, so it repeats the header as few times as an in-order cut can. That is not bounded
+//     by its size: a header near hard leaves room for few records per message, and a record is
+//     never dropped to save the copies (TestPartWithinHeaderHeavyExports measures it).
+//   - A record too large to share a message goes alone; only one whose message alone, exactly as
 //     encoded (alone), is over hard is rejected.
 func packRuns(prefer, hard int, heads []int, sizes [][]int, alone func(b, i int) int) (msgs [][]run, rejected []run) {
 	size, sealed := 0, true // sealed: the next record opens a message
@@ -303,11 +329,10 @@ func packRuns(prefer, hard int, heads []int, sizes [][]int, alone func(b, i int)
 	return msgs, rejected
 }
 
-// packAlone packs a header-heavy block b in messages of its own up to hard, rejecting each
-// record that cannot fit beside the header, or every record when the messages would total over
-// three times the block.
+// packAlone packs a header-heavy block b in messages of its own, each filled up to hard,
+// rejecting only a record that cannot fit hard beside the header.
 func packAlone(b, hard, h int, recs []int, alone func(b, i int) int) (msgs [][]run, rejected []run) {
-	kept, total, size := 0, 0, 0
+	size := 0
 	for i, n := range recs {
 		if h+n > hard && alone(b, i) > hard {
 			rejected = append(rejected, run{block: b, from: i, to: i + 1})
@@ -316,13 +341,10 @@ func packAlone(b, hard, h int, recs []int, alone func(b, i int) int) (msgs [][]r
 		}
 		if size == 0 || size+n > hard {
 			msgs = append(msgs, []run{{block: b, from: i}})
-			size, total = h, total+h
+			size = h
 		}
 		msgs[len(msgs)-1][0].to = i + 1
-		size, total, kept = size+n, total+n, kept+n
-	}
-	if total > 3*(h+kept) {
-		return nil, []run{{block: b, from: 0, to: len(recs)}}
+		size += n
 	}
 	return msgs, rejected
 }
@@ -371,6 +393,32 @@ func pointsOf(m *metricspb.Metric) (sizes []int, sub func(from, to int) *metrics
 		}
 	}
 	return nil, func(int, int) *metricspb.Metric { return m }
+}
+
+func frameOf(resource *resourcepb.Resource, resURL string, scope *commonpb.InstrumentationScope, scopeURL string) frame {
+	f := frame{res: proto.Size(resource), scope: -1, resURL: resURL, scopeURL: scopeURL}
+	if scope != nil {
+		f.scope = proto.Size(scope)
+	}
+	return f
+}
+
+// sole is the exact size of a request carrying one record of rec bytes under f, as build lays it
+// out: the resource (always set, a copy), its schema URL, and one scope holding the record. Every
+// signal's request nests the same field numbers.
+func (f frame) sole(rec int) int {
+	scope := protowire.SizeTag(2) + protowire.SizeBytes(rec)
+	if f.scope >= 0 {
+		scope += protowire.SizeTag(1) + protowire.SizeBytes(f.scope)
+	}
+	if f.scopeURL != "" {
+		scope += protowire.SizeTag(3) + protowire.SizeBytes(len(f.scopeURL))
+	}
+	res := protowire.SizeTag(1) + protowire.SizeBytes(f.res) + protowire.SizeTag(2) + protowire.SizeBytes(scope)
+	if f.resURL != "" {
+		res += protowire.SizeTag(3) + protowire.SizeBytes(len(f.resURL))
+	}
+	return protowire.SizeTag(1) + protowire.SizeBytes(res)
 }
 
 func framedHead(resource proto.Message, resourceURL string, scope proto.Message, scopeURL string) int {

@@ -22,11 +22,14 @@ import (
 
 // The outbox is plain files, one part each, renamed into place so a crash leaves a whole file or none:
 //
-//	<dir>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
-//	<dir>/<project>/<tool>/<repo>/identity.json                            the repository <repo> hashes
-//	<dir>/.dead/<project>-<tool>-<repo>-<name>                             refused by the host
+//	<dir>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb       accepted, not yet delivered
+//	<dir>/<project>/<tool>/<repo>/<received>-<seq>.<k>-<signal>-<records>.pb   piece k of a part cut to fit the host
+//	<dir>/<project>/<tool>/<repo>/identity.json                                the repository <repo> hashes
+//	<dir>/.dead/<project>-<tool>-<repo>-<name>                                 refused by the host
 //
-// <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
+// <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. A piece's
+// sequence extends its part's (<k> is zero-padded, and a piece cut again extends it once more),
+// so its pieces sort right after it and before the next part. Only claimed
 // parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
 // <repo> keeps the claim's repository so the sender rechecks it against the policy then.
 
@@ -239,7 +242,8 @@ func (o outbox) remove(rt route, batch []entry) {
 
 // split puts bodies, each with its records, in e's place: parts named for e's time and
 // sequence, extended, so they keep its turn. They are all written before e is removed, and scan
-// sets them aside while e is there, so a crash leaves e whole or cut, never both.
+// sets them aside while e is there, so a crash leaves e whole or cut, never both; the janitor
+// deletes pieces so set aside before it may drop e.
 func (o outbox) split(rt route, e entry, bodies [][]byte, records []int) ([]entry, error) {
 	ts, seq := e.stem()
 	pieces := make([]entry, len(bodies))
@@ -336,6 +340,14 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	// cannot fall between: a part listed above and cut since fails to remove.
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
+	// Pieces a crashed cut wrote of a part still there go first, read again under the lock so a
+	// cut in progress is never mistaken for one: once the part is dropped below, they would
+	// otherwise be listed as parts of their own and sent, a fraction of a dropped part.
+	for _, rt := range routes {
+		if _, stale, err := o.scan(rt); err == nil {
+			o.remove(rt, stale)
+		}
+	}
 	removed := map[route][]entry{}
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {

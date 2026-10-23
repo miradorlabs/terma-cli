@@ -89,7 +89,8 @@ func placedSpans(td *tracepb.TracesData) []placedSpan {
 
 // checkTraceSplit asserts that parts are the export minus the rejected spans: every kept span
 // once, in order, unchanged, under its own resource, scope and schema URLs, each part within the
-// host's limit, records counted per part, and the parts at most three times the export.
+// host's limit, records counted per part, and, unless a resource and scope are over half the
+// relay's 512 KiB preference, the parts at most three times the export.
 func checkTraceSplit(t *testing.T, td *tracepb.TracesData, parts []*part, rejected int) {
 	t.Helper()
 	var got []placedSpan
@@ -106,7 +107,8 @@ func checkTraceSplit(t *testing.T, td *tracepb.TracesData, parts []*part, reject
 		}
 		got = append(got, spans...)
 	}
-	if total > 3*proto.Size(td) {
+	l, _ := layoutOf(td)
+	if total > 3*proto.Size(td) && slices.Max(l.heads) <= maxMergeBytes/2 {
 		t.Errorf("parts total %d bytes, over three times the %d-byte export", total, proto.Size(td))
 	}
 	want := placedSpans(td)
@@ -188,7 +190,9 @@ func TestPartWithinSendsAnOversizedRecordAloneAndRejectsAnUnsendableOne(t *testi
 }
 
 // The reviewers' header-heavy exports at the relay's real limits: every span the host could take
-// within three times the export's bytes arrives, in parts the host accepts; the rest is rejected.
+// arrives, in parts the host accepts; only a span that cannot fit beside its resource within the
+// host's limit is rejected. A resource near the limit is repeated in every part, which the parts'
+// total over the export's size shows.
 func TestPartWithinHeaderHeavyExports(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -204,7 +208,7 @@ func TestPartWithinHeaderHeavyExports(t *testing.T) {
 		{"3.49 MiB resource, 74 3 KB spans", maxMergeBytes, headerTraces(3490<<10, repeat(74, 3000)...), 1, 0},
 		{"3.6 MiB resource, 800 small spans", maxMergeBytes, headerTraces(3600<<10, repeat(800, 1000)...), 0, 0},
 		{"300 KiB resource, twelve 200 KiB spans", maxMergeBytes, headerTraces(300<<10, repeat(12, 200<<10)...), 0, 0},
-		{"4 MiB less 100 KB resource, 500 1 KiB spans", maxMergeBytes, headerTraces(maxRequestBytes-100<<10, repeat(500, 1000)...), 0, 500},
+		{"4 MiB less 100 KB resource, 500 1 KiB spans", maxMergeBytes, headerTraces(maxRequestBytes-100<<10, repeat(500, 1000)...), 6, 0},
 		{"resource over the host's limit", maxMergeBytes, headerTraces(maxRequestBytes, 10, 10), 0, 2},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -218,16 +222,23 @@ func TestPartWithinHeaderHeavyExports(t *testing.T) {
 				t.Errorf("%d parts, want %d", len(parts), c.parts)
 			}
 			checkTraceSplit(t, c.td, parts, rejected)
+			total := 0
+			for _, q := range parts {
+				total += proto.Size(q.msg)
+			}
+			t.Logf("%d parts, %d bytes for a %d-byte export (%.1f×)", len(parts), total, proto.Size(c.td), float64(total)/float64(proto.Size(c.td)))
 		})
 	}
 }
 
 // packRuns on random layouts: every record lands once, in order, in a message or among the
 // rejected; no message passes hard; a message passes prefer only for one record alone or a
-// header-heavy block; a block's share of the messages stays within three times its size; and a
-// record is rejected only when its message alone, exactly as encoded, is over hard, or its
-// header-heavy block would pass that bound. Sizes bound the encoding from above, by up to the
-// framing they assume, so a record whose estimate passes hard can still fit it exactly.
+// header-heavy block; a block whose header is at most half of prefer takes at most three times
+// its size in messages; a header-heavy block's message closes only when its next record would
+// pass hard, so it repeats its header as few times as an in-order cut can; and a record is
+// rejected only when its message alone, exactly as encoded, is over hard. Sizes bound the
+// encoding from above, by up to the framing they assume, so a record whose estimate passes hard
+// can still fit it exactly.
 func TestPackRunsProperties(t *testing.T) {
 	t.Parallel()
 	const prefer, hard = 1000, 8000
@@ -249,6 +260,27 @@ func TestPackRunsProperties(t *testing.T) {
 			}
 		}
 		msgs, rejected := packRuns(prefer, hard, heads, sizes, func(b, i int) int { return exact[b][i] })
+		isRejected := map[[2]int]bool{}
+		for _, r := range rejected {
+			for i := r.from; i < r.to; i++ {
+				isRejected[[2]int{r.block, i}] = true
+			}
+		}
+		for mi := 1; mi < len(msgs); mi++ {
+			prev, next := msgs[mi-1], msgs[mi]
+			last, first := prev[len(prev)-1], next[0]
+			b := first.block
+			if 2*heads[b] <= prefer || last.block != b || last.to != first.from || isRejected[[2]int{b, last.to}] {
+				continue
+			}
+			size := heads[b]
+			for i := last.from; i < last.to; i++ {
+				size += sizes[b][i]
+			}
+			if size+sizes[b][first.from] <= hard {
+				t.Fatalf("trial %d: message %d of header-heavy block %d closed at %d with room for its next record of %d", trial, mi-1, b, size, sizes[b][first.from])
+			}
+		}
 		seen := map[[2]int]int{}
 		var order [][2]int
 		share := make([]int, nb)
@@ -289,10 +321,9 @@ func TestPackRunsProperties(t *testing.T) {
 			t.Fatalf("trial %d: records out of order", trial)
 		}
 		for _, r := range rejected {
-			whole := r.from == 0 && r.to == len(sizes[r.block]) && 2*heads[r.block] > prefer
 			for i := r.from; i < r.to; i++ {
 				seen[[2]int{r.block, i}]++
-				if !whole && exact[r.block][i] <= hard {
+				if exact[r.block][i] <= hard {
 					t.Fatalf("trial %d: record %d of block %d rejected though its message alone fits hard", trial, i, r.block)
 				}
 			}
@@ -305,7 +336,7 @@ func TestPackRunsProperties(t *testing.T) {
 				}
 				own += n
 			}
-			if share[b] > 3*own {
+			if 2*heads[b] <= prefer && share[b] > 3*own {
 				t.Fatalf("trial %d: block %d takes %d bytes of messages for %d of its own", trial, b, share[b], own)
 			}
 		}
@@ -564,5 +595,77 @@ func TestRelayDropsASpanTooLargeForTheHost(t *testing.T) {
 	defer h.mu.Unlock()
 	if h.refused != 0 || len(h.spans) != 9 {
 		t.Fatalf("host refused %d requests and received %d spans, want 0 and 9", h.refused, len(h.spans))
+	}
+}
+
+// alone is the exact size of the request build makes of one record, for every signal and shape:
+// a scope present or absent, schema URLs set or empty, resources around varint boundaries, and a
+// metric of one point, sent whole, or of many, sent a point at a time.
+func TestLayoutAloneIsTheExactRequestSize(t *testing.T) {
+	t.Parallel()
+	rng := rand.New(rand.NewPCG(3, 4))
+	str := func(n int) string { return strings.Repeat("a", n) }
+	pick := func(xs ...int) int { return xs[rng.IntN(len(xs))] }
+	for trial := range 300 {
+		res := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("r", str(pick(0, 100, 120, 16370, 16390, 2_097_140)))}}
+		var scope *commonpb.InstrumentationScope
+		if rng.IntN(2) == 0 {
+			scope = &commonpb.InstrumentationScope{Name: str(pick(0, 5, 130))}
+		}
+		resURL, scopeURL := str(pick(0, 30, 200)), str(pick(0, 30, 200))
+		var msgs []proto.Message
+		var spans []*tracepb.Span
+		var logs []*logspb.LogRecord
+		var metrics []*metricspb.Metric
+		for i := range 1 + rng.IntN(4) {
+			spans = append(spans, testSpan(i, pick(0, 100, 130, 16380)))
+			logs = append(logs, &logspb.LogRecord{Attributes: []*commonpb.KeyValue{kv("n", str(pick(0, 100, 16380)))}})
+			points := []*metricspb.NumberDataPoint{{Attributes: []*commonpb.KeyValue{kv("p", str(pick(1, 120)))}}}
+			if rng.IntN(2) == 0 {
+				points = append(points, &metricspb.NumberDataPoint{Attributes: []*commonpb.KeyValue{kv("q", str(pick(1, 16380)))}})
+			}
+			metrics = append(metrics, &metricspb.Metric{Name: str(pick(1, 140)), Unit: "1", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: points, IsMonotonic: true}}})
+		}
+		metrics = append(metrics, &metricspb.Metric{Name: "no points"})
+		msgs = append(msgs,
+			&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: res, SchemaUrl: resURL, ScopeSpans: []*tracepb.ScopeSpans{{Scope: scope, SchemaUrl: scopeURL, Spans: spans}}}}},
+			&logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: res, SchemaUrl: resURL, ScopeLogs: []*logspb.ScopeLogs{{Scope: scope, SchemaUrl: scopeURL, LogRecords: logs}}}}},
+			&metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: res, SchemaUrl: resURL, ScopeMetrics: []*metricspb.ScopeMetrics{{Scope: scope, SchemaUrl: scopeURL, Metrics: metrics}}}}},
+			&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: spans}}}}}, // no resource
+		)
+		for _, m := range msgs {
+			l, _ := layoutOf(m)
+			for b := range l.sizes {
+				for i := range l.sizes[b] {
+					if got, want := l.alone(b, i), proto.Size(l.build([]run{{block: b, from: i, to: i + 1}})); got != want {
+						t.Fatalf("trial %d, %T record %d: alone %d, request %d", trial, m, i, got, want)
+					}
+				}
+			}
+		}
+	}
+}
+
+// Sizing the records under a resource larger than the host's limit costs a few allocations each,
+// not a copy of the resource each: one with 40,000 attributes and 200 small spans, all of which
+// must be rejected, is laid out with the resource copied for none of them.
+func TestPartWithinAHugeResourceDoesNotCopyItPerRecord(t *testing.T) { // not parallel: AllocsPerRun
+	res := &resourcepb.Resource{}
+	for i := range 40_000 {
+		res.Attributes = append(res.Attributes, kv(fmt.Sprintf("attribute.%05d", i), strings.Repeat("v", 100)))
+	}
+	td := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: res, ScopeSpans: []*tracepb.ScopeSpans{{}}}}}
+	for i := range 200 {
+		td.ResourceSpans[0].ScopeSpans[0].Spans = append(td.ResourceSpans[0].ScopeSpans[0].Spans, testSpan(i, 10))
+	}
+	if proto.Size(res) <= maxRequestBytes {
+		t.Fatalf("the resource is %d bytes, within the host's limit", proto.Size(res))
+	}
+	var rejected int
+	allocs := testing.AllocsPerRun(1, func() {
+		_, rejected = (&part{signal: Traces, msg: td, records: 200}).within(maxMergeBytes)
+	})
+	if rejected != 200 || allocs > 10_000 {
+		t.Fatalf("%d of 200 spans rejected in %.0f allocations; a copy of the resource is about 120,000", rejected, allocs)
 	}
 }
