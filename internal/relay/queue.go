@@ -51,6 +51,16 @@ func (s *sender) next(limit int) []entry {
 	return slices.Clone(head[:min(limit, len(head))])
 }
 
+// swap puts ne in old's place: the part, shortened after its head was delivered, keeps its turn.
+func (s *sender) swap(old, ne entry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	q := s.queue[old.signal]
+	if i := slices.IndexFunc(q, func(e entry) bool { return e.name == old.name }); i >= 0 {
+		q[i] = ne
+	}
+}
+
 // forget takes parts that left the outbox, delivered, dropped or buried, off the queue.
 func (s *sender) forget(batch []entry) {
 	if len(batch) == 0 {

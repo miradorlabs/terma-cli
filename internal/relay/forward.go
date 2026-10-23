@@ -20,13 +20,13 @@ import (
 
 const (
 	sendTimeout = 15 * time.Second
-	// maxMergeBytes bounds the merges the sender builds and, but for a record or a resource
-	// too large to fit it (packRuns), the entries enqueue writes. A request the host cannot
+	// maxMergeBytes bounds every request as it is sent, after send-time withholding: merges
+	// stop short of it, and a part over it, as an older relay wrote or a stricter policy grew,
+	// is sent a piece at a time (request.go). Only a record or a resource too large to fit it
+	// (packRuns) makes a request larger, never past maxRequestBytes. A request the host cannot
 	// take in within sendTimeout is resent whole forever: 4 MiB merges of an agent's spans
 	// timed out on every attempt against a busy OTLP gateway; 512 KiB ones finished in a third
-	// of the timeout at the same throughput. Send-time withholding can add a few bytes per
-	// record when the policy tightened after enqueue, and an entry an older relay wrote over
-	// the bound is sent alone, as before; a host refusing either is counted like any refusal.
+	// of the timeout at the same throughput.
 	maxMergeBytes = 512 << 10
 	maxMergeFiles = 64
 	minBackoff    = time.Second
@@ -196,41 +196,50 @@ func (s *sender) loop() {
 			s.forget(entries)
 			continue
 		}
-		batch, body, err := s.take(entries)
+		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
+		// Counted only once the batch leaves the outbox: a retry filters it again.
+		req, err := s.take(entries, pol)
 		if err != nil {
 			if !sleep(minBackoff) {
 				return
 			}
 			continue
 		}
-		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
-		// Counted only once the batch leaves the outbox: a retry filters it again.
-		body, tl := s.r.withholdQueued(batch[0].signal, body, pol)
-		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
+		batch, sig := req.batch, req.batch[0].signal
+		if pol.Signals != nil && !contains(pol.Signals, string(sig)) || req.body == nil && req.head == nil {
 			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {
 				records += e.records
 			}
-			s.r.stats.dropped(batch[0].signal, reason, records)
+			s.r.stats.dropped(sig, reason, records)
 			s.r.outbox.remove(s.route, batch)
 			s.forget(batch)
 			continue
 		}
-		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
+		if req.head != nil && req.head.body == nil {
+			s.settleHead(batch[0], req.head) // every record is too large for the host
+			continue
+		}
+		out, wait, detail, rejected := s.send(ctx, pol, sig, req.body)
 		switch out {
 		case sent:
-			s.r.count(batch[0].signal, tl)
-			records := 0
-			for _, e := range batch {
-				records += e.records
+			s.r.count(sig, req.tally)
+			if req.head != nil {
+				s.r.stats.forwarded(sig, req.head.sent)
+				s.settleHead(batch[0], req.head)
+			} else {
+				records := 0
+				for _, e := range batch {
+					records += e.records
+				}
+				s.r.stats.forwarded(sig, records)
+				s.r.outbox.remove(s.route, batch)
+				s.forget(batch)
 			}
-			s.r.stats.forwarded(batch[0].signal, records)
 			if rejected > 0 {
 				// Resending a partial success would only duplicate what was kept.
-				s.r.stats.add("upstream_rejected."+string(batch[0].signal), int(rejected))
+				s.r.stats.add("upstream_rejected."+string(sig), int(rejected))
 			}
-			s.r.outbox.remove(s.route, batch)
-			s.forget(batch)
 			single, backoff = false, 0
 		case refused:
 			if len(batch) > 1 {
@@ -238,8 +247,16 @@ func (s *sender) loop() {
 				continue
 			}
 			single = false
-			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
-			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
+			if h := req.head; h != nil {
+				// Only the piece sent is refused; what is left of the part is still the host's to judge.
+				s.r.stats.dropped(sig, "upstream_"+detail, h.sent)
+				s.r.warnf("upstream %s refused %d %s: %s", s.route, h.sent, sig, detail)
+				s.r.outbox.buryBody(s.route, batch[0], req.body)
+				s.settleHead(batch[0], h)
+				continue
+			}
+			s.r.stats.dropped(sig, "upstream_"+detail, batch[0].records)
+			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, sig, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.forget(batch[:1])
 		case retry:
@@ -254,41 +271,6 @@ func (s *sender) loop() {
 			}
 		}
 	}
-}
-
-func (s *sender) take(entries []entry) ([]entry, []byte, error) {
-	first := entries[0]
-	body, err := s.r.outbox.read(s.route, first)
-	if err != nil {
-		// A file that cannot be read never will be; it must not hold the rest back.
-		s.r.stats.dropped(first.signal, "outbox_unreadable", first.records)
-		s.r.outbox.bury(s.route, first)
-		s.forget([]entry{first})
-		return nil, nil, err
-	}
-	batch := []entry{first}
-	bodies := [][]byte{body}
-	size := len(body)
-	for _, e := range entries[1:] {
-		if len(batch) >= maxMergeFiles || e.signal != first.signal {
-			break
-		}
-		b, err := s.r.outbox.read(s.route, e)
-		if err != nil || size+len(b) > maxMergeBytes {
-			break
-		}
-		batch = append(batch, e)
-		bodies = append(bodies, b)
-		size += len(b)
-	}
-	if len(batch) == 1 {
-		return batch, body, nil
-	}
-	merged, err := mergeBodies(first.signal, bodies)
-	if err != nil {
-		return batch[:1], body, nil
-	}
-	return batch, merged, nil
 }
 
 type outcome int

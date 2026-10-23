@@ -121,6 +121,13 @@ func parseEntry(name string) (entry, bool) {
 	return entry{name: name, signal: sig, records: n}, true
 }
 
+// withRecords is the entry renamed for a new record count, keeping its time and sequence.
+func (e entry) withRecords(records int) entry {
+	stem := strings.TrimSuffix(e.name, pbSuffix)
+	stem = stem[:strings.LastIndexByte(stem, '-')]
+	return entry{name: fmt.Sprintf("%s-%d%s", stem, records, pbSuffix), signal: e.signal, records: records}
+}
+
 type outbox struct{ dir string }
 
 func (o outbox) routeDir(rt route) string { return filepath.Join(o.dir, rt.project, rt.tool, rt.repo) }
@@ -207,6 +214,31 @@ func (o outbox) read(rt route, e entry) ([]byte, error) {
 func (o outbox) remove(rt route, batch []entry) {
 	for _, e := range batch {
 		_ = config.Remove(filepath.Join(o.routeDir(rt), e.name))
+	}
+}
+
+// replace leaves a part holding only body, its records not yet delivered, in its place in the
+// queue. The body lands under the part's name in one atomic step, so a crash leaves the part
+// whole or shortened, never both; the rename that then gives the name its new count keeps the
+// name's time and sequence, and with them the order. Should that rename fail, the part keeps
+// its old name, which overstates the records it still holds.
+func (o outbox) replace(rt route, e entry, body []byte, records int) (entry, error) {
+	path := filepath.Join(o.routeDir(rt), e.name)
+	if err := config.WriteFileAtomicNoSync(path, body, 0o600); err != nil {
+		return e, err
+	}
+	ne := e.withRecords(records)
+	if config.Rename(path, filepath.Join(o.routeDir(rt), ne.name)) != nil {
+		return entry{name: e.name, signal: e.signal, records: records}, nil
+	}
+	return ne, nil
+}
+
+// buryBody sets a refused request aside in the dead directory, beside the part it was cut from.
+func (o outbox) buryBody(rt route, e entry, body []byte) {
+	dead := filepath.Join(o.dir, deadDir)
+	if os.MkdirAll(dead, 0o700) == nil {
+		_ = config.WriteFileAtomicNoSync(filepath.Join(dead, rt.project+"-"+rt.tool+"-"+rt.repo+"-head-"+e.name), body, 0o600)
 	}
 }
 

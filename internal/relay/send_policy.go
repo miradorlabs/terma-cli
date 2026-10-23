@@ -57,3 +57,17 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sen
 	}
 	return out, tl
 }
+
+// plus is both tallies together.
+func (tl sendTally) plus(o sendTally) sendTally {
+	out := sendTally{withheld: tl.withheld + o.withheld}
+	for _, m := range []map[string]int{tl.unclassified, o.unclassified} {
+		for k, n := range m {
+			if out.unclassified == nil {
+				out.unclassified = map[string]int{}
+			}
+			out.unclassified[k] += n
+		}
+	}
+	return out
+}
