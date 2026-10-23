@@ -51,6 +51,13 @@ func (s *sender) next(limit int) []entry {
 	return slices.Clone(head[:min(limit, len(head))])
 }
 
+// queued reports whether e is still on its queue: the janitor has not dropped it.
+func (s *sender) queued(e entry) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.ContainsFunc(s.queue[e.signal], func(q entry) bool { return q.name == e.name })
+}
+
 // swap puts ne in old's place: the part, shortened after its head was delivered, keeps its turn.
 func (s *sender) swap(old, ne entry) {
 	s.mu.Lock()

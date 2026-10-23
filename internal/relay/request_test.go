@@ -419,32 +419,117 @@ func TestRelayRetriesAndRefusalsWithinACutPart(t *testing.T) {
 	}
 }
 
-// A crash between replace's two steps leaves the shortened body under the old name: the next
-// relay sends what is left, never the piece already delivered.
+// A crash between replace's two steps leaves the part whole beside its shortened form: the next
+// relay keeps the shortened one, sends what is left of it, merged with the part after it, and
+// counts only those records, never the piece already delivered.
 func TestRelayResumesACutPartAfterACrashMidReplace(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	td := bigTraces(2000, 1000)
+	td := bigTraces(700, 1000) // about 760 KiB: one piece, then a rest under maxMergeBytes
 	stored, _ := proto.Marshal(td)
-	e := putLegacy(t, dir, Traces, td, 2000)
+	e := putLegacy(t, dir, Traces, td, 700)
 	h0, err := splitHead(Traces, stored, stored, maxMergeBytes)
-	if err != nil || h0.rest == nil {
+	if err != nil || h0.rest == nil || len(h0.rest) > maxMergeBytes {
 		t.Fatalf("split: %v", err)
 	}
 	ob := outbox{dir: dir}
-	if err := config.WriteFileAtomicNoSync(filepath.Join(ob.routeDir(routeOf(claimA)), e.name), h0.rest, 0o600); err != nil {
+	short := e.withRecords(h0.restRecords)
+	if err := config.WriteFileAtomicNoSync(filepath.Join(ob.routeDir(routeOf(claimA)), short.name), h0.rest, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	h, host := newRecordingHost(t)
-	hostRelay(t, dir, newFixture(), host, true)
-	want := identities(t, Traces, h0.rest)
-	waitFor(t, func() bool { return pendingParts(t, dir) == 0 })
-	checkDelivered(t, h, dir, Traces, want, maxMergeBytes)
-	for _, id := range identities(t, Traces, h0.body) {
-		if slices.Contains(want, id) {
-			t.Fatal("the delivered piece is still queued")
+	next := bigTraces(20, 100)
+	for _, rs := range next.ResourceSpans {
+		for _, ss := range rs.ScopeSpans {
+			for _, sp := range ss.Spans {
+				sp.SpanId = append([]byte("n"), sp.SpanId...)
+			}
 		}
 	}
+	putLegacy(t, dir, Traces, next, 20)
+	nextBody, _ := proto.Marshal(next)
+	want := append(identities(t, Traces, h0.rest), identities(t, Traces, nextBody)...)
+
+	h, host := newRecordingHost(t)
+	r := hostRelay(t, dir, newFixture(), host, true)
+	waitForCounters(t, r, func(m map[string]int) bool { return m["forwarded.traces"] >= len(want) })
+	checkDelivered(t, h, dir, Traces, want, maxMergeBytes)
+	if n := len(h.taken(Traces)); n != 1 {
+		t.Fatalf("%d requests, want the rest merged with the next part", n)
+	}
+	if m := r.Stats().Snapshot().Counters; m["recovered_from_outbox"] != len(want) || m["forwarded.traces"] != len(want) || sum(m, "dropped.") != 0 {
+		t.Fatalf("counters: %v, want %d recovered and forwarded", m, len(want))
+	}
+}
+
+// A part the janitor drops while its first piece is in flight stays dropped once the piece is
+// delivered: nothing of it is written back, sent or counted again.
+func TestRelayKeepsAPartTheJanitorDroppedMidHead(t *testing.T) {
+	t.Parallel()
+	h, host := newRecordingHost(t)
+	inFlight, release := make(chan struct{}), make(chan struct{})
+	h.respond = func(n int, _ []byte) int {
+		if n == 0 {
+			close(inFlight)
+			<-release
+		}
+		return 0
+	}
+	dir := t.TempDir()
+	putLegacy(t, dir, Traces, bigTraces(2000, 1000), 2000)
+	r := hostRelay(t, dir, newFixture(), host, true)
+	<-inFlight
+	if removed := r.sweepOutbox(time.Now().Add(maxOutboxAge + time.Hour)); len(removed[routeOf(claimA)]) != 1 {
+		t.Fatalf("the janitor removed %v", removed)
+	}
+	// As a part put meanwhile would, recreate the route directory the janitor removed with it.
+	if err := os.MkdirAll((outbox{dir: dir}).routeDir(routeOf(claimA)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	waitForCounters(t, r, func(m map[string]int) bool { return m["forwarded.traces"] > 0 })
+	time.Sleep(200 * time.Millisecond)
+	if n := len(h.taken(Traces)); n != 1 || pendingParts(t, dir) != 0 {
+		t.Fatalf("%d requests and %d parts left after the drop, want the piece in flight alone and none", n, pendingParts(t, dir))
+	}
+	if m := r.Stats().Snapshot().Counters; m["dropped.outbox_expired.traces"] != 2000 || sum(m, "dropped.") != 2000 {
+		t.Fatalf("counters: %v", m)
+	}
+}
+
+// A record whose request alone encodes to exactly the host's limit is sent, though the framing
+// the packer assumes puts it over: only the exact size rejects a record.
+func TestRelaySendsARecordOfExactlyTheHostLimit(t *testing.T) {
+	t.Parallel()
+	td := bigTraces(10, 100)
+	edge := td.ResourceSpans[1].ScopeSpans[1].Spans[0]
+	edge.Attributes = append(edge.Attributes, kv("edge", ""))
+	pad := edge.Attributes[len(edge.Attributes)-1].Value.GetValue().(*commonpb.AnyValue_StringValue)
+	n := maxRequestBytes - 200
+	for range 5 {
+		pad.StringValue = strings.Repeat("e", n)
+		n += maxRequestBytes - layoutOfTraces(td).alone(3, 0)
+	}
+	if l := layoutOfTraces(td); l.alone(3, 0) != maxRequestBytes || l.heads[3]+l.sizes[3][0] <= maxRequestBytes {
+		t.Fatalf("the record's request is %d, its estimate %d", l.alone(3, 0), l.heads[3]+l.sizes[3][0])
+	}
+	body, _ := proto.Marshal(td)
+	h, host := newRecordingHost(t)
+	dir := t.TempDir()
+	putLegacy(t, dir, Traces, td, 10)
+	r := hostRelay(t, dir, newFixture(), host, true)
+	waitForCounters(t, r, func(m map[string]int) bool { return m["forwarded.traces"] == 10 })
+	checkDelivered(t, h, dir, Traces, identities(t, Traces, body), maxRequestBytes)
+	if !slices.ContainsFunc(h.taken(Traces), func(b []byte) bool { return len(b) == maxRequestBytes }) {
+		t.Fatal("no request carried the record alone at the host's limit")
+	}
+	if m := r.Stats().Snapshot().Counters; sum(m, "dropped.") != 0 {
+		t.Fatalf("counters: %v", m)
+	}
+}
+
+func layoutOfTraces(td *tracepb.TracesData) layout {
+	l, _ := layoutOf(td)
+	return l
 }
 
 // pendingParts counts the parts left in dir's outbox, not those set aside in its dead directory.

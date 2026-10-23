@@ -121,11 +121,12 @@ func parseEntry(name string) (entry, bool) {
 	return entry{name: name, signal: sig, records: n}, true
 }
 
+// turn is the entry's name without its count: its time, sequence and signal, which order the queue.
+func (e entry) turn() string { return e.name[:strings.LastIndexByte(e.name, '-')] }
+
 // withRecords is the entry renamed for a new record count, keeping its time and sequence.
 func (e entry) withRecords(records int) entry {
-	stem := strings.TrimSuffix(e.name, pbSuffix)
-	stem = stem[:strings.LastIndexByte(stem, '-')]
-	return entry{name: fmt.Sprintf("%s-%d%s", stem, records, pbSuffix), signal: e.signal, records: records}
+	return entry{name: fmt.Sprintf("%s-%d%s", e.turn(), records, pbSuffix), signal: e.signal, records: records}
 }
 
 type outbox struct{ dir string }
@@ -188,7 +189,22 @@ func (o outbox) list(rt route) ([]entry, error) {
 		}
 	}
 	slices.SortFunc(out, func(a, b entry) int { return strings.Compare(a.name, b.name) })
-	return out, nil
+	// Two parts of one time and sequence are a part and its shortened form, which replace wrote
+	// before it could remove the part; sorted by name, they are neighbours. The one holding
+	// fewer records is current.
+	kept := out[:0]
+	for _, e := range out {
+		if n := len(kept); n > 0 && kept[n-1].turn() == e.turn() {
+			stale := e
+			if e.records < kept[n-1].records {
+				stale, kept[n-1] = kept[n-1], e
+			}
+			_ = config.Remove(filepath.Join(o.routeDir(rt), stale.name))
+			continue
+		}
+		kept = append(kept, e)
+	}
+	return kept, nil
 }
 
 // identity is the repository a route's parts were claimed in; the zero one for noRepo, or
@@ -218,18 +234,16 @@ func (o outbox) remove(rt route, batch []entry) {
 }
 
 // replace leaves a part holding only body, its records not yet delivered, in its place in the
-// queue. The body lands under the part's name in one atomic step, so a crash leaves the part
-// whole or shortened, never both; the rename that then gives the name its new count keeps the
-// name's time and sequence, and with them the order. Should that rename fail, the part keeps
-// its old name, which overstates the records it still holds.
+// queue: under a name with the same time and sequence, and so the same turn, and the new count.
+// The new file is written whole before the old one is removed, so a crash between them leaves
+// both, which list resolves to the shorter one.
 func (o outbox) replace(rt route, e entry, body []byte, records int) (entry, error) {
-	path := filepath.Join(o.routeDir(rt), e.name)
-	if err := config.WriteFileAtomicNoSync(path, body, 0o600); err != nil {
+	ne := e.withRecords(records)
+	if err := config.WriteFileAtomicNoSync(filepath.Join(o.routeDir(rt), ne.name), body, 0o600); err != nil {
 		return e, err
 	}
-	ne := e.withRecords(records)
-	if config.Rename(path, filepath.Join(o.routeDir(rt), ne.name)) != nil {
-		return entry{name: e.name, signal: e.signal, records: records}, nil
+	if ne.name != e.name {
+		_ = config.Remove(filepath.Join(o.routeDir(rt), e.name))
 	}
 	return ne, nil
 }
@@ -294,8 +308,8 @@ type queued struct {
 	mtime time.Time
 }
 
-// sweepOutbox enforces the bounds, oldest first, and returns the parts it removed per route
-// so their senders stop queueing them.
+// sweepOutbox enforces the bounds, oldest first, takes the parts it removes off their queues,
+// and returns them per route.
 func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	o := r.outbox
 	routes, _ := o.routes()
@@ -312,6 +326,10 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		}
 	}
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
+	// Under deliverMu, a part is dropped and taken off its queue in one step a shortened head
+	// (settleHead) cannot fall between: a part listed above and replaced since fails to remove.
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
 	removed := map[route][]entry{}
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
@@ -357,15 +375,21 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		deadTotal -= q.size
 	}
 	r.removeEmptyRoutes(routes)
+	for rt, gone := range removed {
+		r.mu.Lock()
+		snd := r.senders[rt]
+		r.mu.Unlock()
+		if snd != nil {
+			snd.forget(gone)
+		}
+	}
 	return removed
 }
 
-// removeEmptyRoutes removes each route directory holding nothing but its identity, under deliverMu so no
-// put is between creating one and writing its part; the next part recreates it. Under it,
-// a temporary file is one a crashed put left.
+// removeEmptyRoutes removes each route directory holding nothing but its identity. It runs under
+// deliverMu, so no put or replace is between creating a file and naming it; the next part
+// recreates the directory. Under it, a temporary file is one a crashed put or replace left.
 func (r *Relay) removeEmptyRoutes(routes []route) {
-	r.deliverMu.Lock()
-	defer r.deliverMu.Unlock()
 	o := r.outbox
 	for _, rt := range routes {
 		dir := o.routeDir(rt)

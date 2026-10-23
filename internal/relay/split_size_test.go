@@ -225,8 +225,9 @@ func TestPartWithinHeaderHeavyExports(t *testing.T) {
 // packRuns on random layouts: every record lands once, in order, in a message or among the
 // rejected; no message passes hard; a message passes prefer only for one record alone or a
 // header-heavy block; a block's share of the messages stays within three times its size; and a
-// record is rejected only when it cannot fit hard beside its header or its header-heavy block
-// would pass that bound.
+// record is rejected only when its message alone, exactly as encoded, is over hard, or its
+// header-heavy block would pass that bound. Sizes bound the encoding from above, by up to the
+// framing they assume, so a record whose estimate passes hard can still fit it exactly.
 func TestPackRunsProperties(t *testing.T) {
 	t.Parallel()
 	const prefer, hard = 1000, 8000
@@ -241,7 +242,13 @@ func TestPackRunsProperties(t *testing.T) {
 				sizes[b] = append(sizes[b], []int{1 + rng.IntN(50), 1 + rng.IntN(prefer), 1 + rng.IntN(hard)}[rng.IntN(3)])
 			}
 		}
-		msgs, rejected := packRuns(prefer, hard, heads, sizes)
+		exact := make([][]int, nb)
+		for b := range nb {
+			for _, n := range sizes[b] {
+				exact[b] = append(exact[b], heads[b]+n-rng.IntN(7*recordFraming))
+			}
+		}
+		msgs, rejected := packRuns(prefer, hard, heads, sizes, func(b, i int) int { return exact[b][i] })
 		seen := map[[2]int]int{}
 		var order [][2]int
 		share := make([]int, nb)
@@ -263,6 +270,9 @@ func TestPackRunsProperties(t *testing.T) {
 			if records == 0 {
 				t.Fatalf("trial %d: message %d is empty", trial, mi)
 			}
+			if records == 1 {
+				size = exact[runs[0].block][runs[0].from]
+			}
 			if size > hard {
 				t.Fatalf("trial %d: message %d is %d, over hard %d", trial, mi, size, hard)
 			}
@@ -282,8 +292,8 @@ func TestPackRunsProperties(t *testing.T) {
 			whole := r.from == 0 && r.to == len(sizes[r.block]) && 2*heads[r.block] > prefer
 			for i := r.from; i < r.to; i++ {
 				seen[[2]int{r.block, i}]++
-				if !whole && heads[r.block]+sizes[r.block][i] <= hard {
-					t.Fatalf("trial %d: record %d of block %d rejected though it fits hard beside its header", trial, i, r.block)
+				if !whole && exact[r.block][i] <= hard {
+					t.Fatalf("trial %d: record %d of block %d rejected though its message alone fits hard", trial, i, r.block)
 				}
 			}
 		}

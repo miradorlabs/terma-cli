@@ -74,13 +74,18 @@ func (s *sender) take(entries []entry, pol Policy) (request, error) {
 // settleHead ends a head that was delivered, refused, or too large for any request: its
 // records no request can carry are dropped, and the part keeps only what is left of it, in its
 // place, or leaves the outbox when nothing is. Should the shortened part not be written, the
-// part stays whole and its head is sent again, as when a delivered part's removal fails; should
-// the janitor drop the part while its head is in flight, the shortened part is written back and
-// delivered after all, which overcounts the drop, never loses a record.
+// part stays whole and its head is sent again, as when a delivered part's removal fails. It
+// runs under deliverMu, as the janitor's drops do, so a part the janitor dropped while its head
+// was in flight stays dropped.
 func (s *sender) settleHead(e entry, h *headSplit) {
 	if h.tooLarge > 0 {
 		s.r.stats.dropped(e.signal, "too_large", h.tooLarge)
 		s.r.warnf("outbox %s: %d %s cannot fit a %d-byte request beside their resource; dropped", s.route, h.tooLarge, e.signal, maxRequestBytes)
+	}
+	s.r.deliverMu.Lock()
+	defer s.r.deliverMu.Unlock()
+	if !s.queued(e) {
+		return
 	}
 	if h.rest == nil {
 		s.r.outbox.remove(s.route, []entry{e})

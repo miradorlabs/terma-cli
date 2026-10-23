@@ -22,12 +22,17 @@ type run struct{ block, from, to int }
 // layout is an export cut into blocks, one per resource and scope, for packRuns to lay out:
 // heads[b] is block b's framed resource and scope and sizes[b] its framed records. build
 // reassembles runs of records, each run under a copy of its block's resource and its scope and
-// schema URLs; count is their records (spans, log records or metric data points).
+// schema URLs; count is their records (spans, log records or metric data points). heads and
+// sizes bound the encoding from above; alone is the exact size of one record's message.
 type layout struct {
 	heads []int
 	sizes [][]int
 	build func(runs []run) proto.Message
 	count func(runs []run) int
+}
+
+func (l layout) alone(b, i int) int {
+	return proto.Size(l.build([]run{{block: b, from: i, to: i + 1}}))
 }
 
 // headSplit is a queued body cut for sending: the filtered request to send now, what of the
@@ -52,7 +57,7 @@ func (p *part) within(prefer int) (parts []*part, rejected int) {
 	if !ok {
 		return []*part{p}, 0
 	}
-	msgs, out := packRuns(prefer, maxRequestBytes, l.heads, l.sizes)
+	msgs, out := packRuns(prefer, maxRequestBytes, l.heads, l.sizes, l.alone)
 	for _, runs := range msgs {
 		q := *p
 		q.msg, q.records = l.build(runs), l.count(runs)
@@ -66,6 +71,11 @@ func (p *part) within(prefer int) (parts []*part, rejected int) {
 // queued. Withholding changes records in place and never drops or reorders them, so the stored
 // and filtered bodies share their blocks; when they do not, the rest is kept filtered, which
 // sends nothing a stricter policy would withhold.
+//
+// Accepted risk: each piece decodes and re-encodes what is left of the part, so a part of n
+// bytes costs about n²/(2·prefer) bytes of work, some 40 MiB for a 6.5 MiB one. Only parts an
+// older relay or a stricter policy left over the bound take this path. Upgrade path: keep the
+// decoded part across its pieces.
 func splitHead(sig Signal, stored, filtered []byte, prefer int) (headSplit, error) {
 	sm, fm := newSignalMessage(sig), newSignalMessage(sig)
 	if err := proto.Unmarshal(stored, sm); err != nil {
@@ -85,7 +95,7 @@ func splitHead(sig Signal, stored, filtered []byte, prefer int) (headSplit, erro
 			break
 		}
 	}
-	msgs, out := packRuns(prefer, maxRequestBytes, lf.heads, lf.sizes)
+	msgs, out := packRuns(prefer, maxRequestBytes, lf.heads, lf.sizes, lf.alone)
 	h := headSplit{tooLarge: lf.count(out)}
 	if len(msgs) == 0 {
 		return h, nil
@@ -245,21 +255,21 @@ func countRecords(runs []run) (n int) {
 //     one header, so its share of the messages is at most three times its own size.
 //   - A block with a larger header packs alone to hard, and is rejected whole when that would
 //     still copy its header past three times its size.
-//   - A record too large to share a message goes alone; one that cannot fit hard beside its
-//     header is rejected.
-func packRuns(prefer, hard int, heads []int, sizes [][]int) (msgs [][]run, rejected []run) {
+//   - A record too large to share a message goes alone; one whose message alone, exactly as
+//     encoded (alone), is over hard is rejected.
+func packRuns(prefer, hard int, heads []int, sizes [][]int, alone func(b, i int) int) (msgs [][]run, rejected []run) {
 	size, sealed := 0, true // sealed: the next record opens a message
 	for b, recs := range sizes {
 		h := heads[b]
 		if 2*h > prefer {
-			own, out := packAlone(b, hard, h, recs)
+			own, out := packAlone(b, hard, h, recs, alone)
 			msgs, rejected = append(msgs, own...), append(rejected, out...)
 			sealed = true
 			continue
 		}
 		open := false
 		for i, n := range recs {
-			if h+n > hard {
+			if h+n > hard && alone(b, i) > hard {
 				rejected = append(rejected, run{block: b, from: i, to: i + 1})
 				open = false
 				continue
@@ -287,10 +297,10 @@ func packRuns(prefer, hard int, heads []int, sizes [][]int) (msgs [][]run, rejec
 // packAlone packs a header-heavy block b in messages of its own up to hard, rejecting each
 // record that cannot fit beside the header, or every record when the messages would total over
 // three times the block.
-func packAlone(b, hard, h int, recs []int) (msgs [][]run, rejected []run) {
+func packAlone(b, hard, h int, recs []int, alone func(b, i int) int) (msgs [][]run, rejected []run) {
 	kept, total, size := 0, 0, 0
 	for i, n := range recs {
-		if h+n > hard {
+		if h+n > hard && alone(b, i) > hard {
 			rejected = append(rejected, run{block: b, from: i, to: i + 1})
 			size = 0
 			continue
