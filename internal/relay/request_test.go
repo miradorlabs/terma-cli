@@ -740,3 +740,60 @@ func TestRelayDropsADisabledSignalsPartWithoutCuttingIt(t *testing.T) {
 		t.Fatalf("%d requests, %d pieces seen: the part was cut or sent", n, pieces.Load())
 	}
 }
+
+// A cut replaces whatever an earlier, interrupted cut of the same part left: once the part is
+// gone, only this cut's pieces are left to send, though the earlier one laid the part out in more
+// pieces of other sizes.
+func TestCutReplacesTheLeftoversOfAnInterruptedOne(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	td := bigTraces(700, 1000)
+	stored, _ := proto.Marshal(td)
+	e := putLegacy(t, dir, Traces, td, 700)
+	ob, rt := outbox{dir: dir}, routeOf(claimA)
+	ts, seq := e.stem()
+	for k := range 5 { // as a cut under another policy laid it out
+		name := fmt.Sprintf("%s-%s.%06d-%s-%d%s", ts, seq, k, Traces, 140, pbSuffix)
+		if err := config.WriteFileAtomicNoSync(filepath.Join(ob.routeDir(rt), name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p, err := planCut(Traces, stored, stored, maxMergeBytes)
+	if err != nil || len(p.bodies) != 2 {
+		t.Fatalf("plan: %d pieces, %v", len(p.bodies), err)
+	}
+	pieces, err := ob.split(rt, e, p.bodies, p.records)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, stale, err := ob.scan(rt)
+	if err != nil || len(stale) != 0 || !slices.Equal(live, pieces) {
+		t.Fatalf("after the cut: live %v, stale %v, want only %v", live, stale, pieces)
+	}
+}
+
+// An entry that would repeat its resource, near the host's limit, in a request per span past the
+// 64 MiB bound is dropped as one, counted and warned about without content, never written out as
+// copies or sent; the spans around it under other resources still go.
+func TestRelayDropsAnEntryThatWouldRepeatItsResourcePastTheBound(t *testing.T) {
+	t.Parallel()
+	h, host := newRecordingHost(t)
+	dir := t.TempDir()
+	td := headerTraces(maxRequestBytes-1200, repeat(40, 600)...) // one span a request: 160 MiB
+	putLegacy(t, dir, Traces, td, 40)
+	f := newFixture()
+	r := hostRelay(t, dir, f, host, true)
+	waitForCounters(t, r, func(m map[string]int) bool { return m["dropped.header_repeated.traces"] == 40 })
+	waitFor(t, func() bool { return pendingParts(t, dir) == 0 })
+	if n := len(h.taken(Traces)); n != 0 {
+		t.Fatalf("%d requests sent", n)
+	}
+	if m := r.Stats().Snapshot().Counters; sum(m, "dropped.") != 40 {
+		t.Fatalf("counters: %v", m)
+	}
+	if !slices.ContainsFunc(f.warned(), func(w string) bool {
+		return strings.Contains(w, "would repeat their resource") && !strings.Contains(w, "rrrr")
+	}) {
+		t.Fatalf("no warning, or one quoting the resource: %v", f.warned())
+	}
+}

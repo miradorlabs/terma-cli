@@ -72,11 +72,8 @@ func (r *Relay) sender(rt route) *sender {
 // in arrival order.
 func (r *Relay) enqueue(c claim.Claim, p *part) {
 	rt := routeOf(c)
-	parts, tooLarge := p.within(maxMergeBytes)
-	if tooLarge > 0 {
-		r.stats.dropped(p.signal, "too_large", tooLarge)
-		r.warnf("export %s: %d %s cannot fit a %d-byte request beside their resource; dropped", rt, tooLarge, p.signal, maxRequestBytes)
-	}
+	parts, dropped := p.within(maxMergeBytes)
+	r.dropUnsendable("export "+rt.String(), p.signal, dropped)
 	var s *sender
 	for _, q := range parts {
 		body, err := proto.Marshal(q.msg)
@@ -97,6 +94,19 @@ func (r *Relay) enqueue(c claim.Claim, p *part) {
 	}
 	if s != nil {
 		s.poke()
+	}
+}
+
+// dropUnsendable counts and warns about the records packRuns dropped from what at; the warnings
+// name counts only, never content.
+func (r *Relay) dropUnsendable(at string, sig Signal, d unsendable) {
+	if d.tooLarge > 0 {
+		r.stats.dropped(sig, "too_large", d.tooLarge)
+		r.warnf("%s: %d %s cannot fit a %d-byte request beside their resource; dropped", at, d.tooLarge, sig, maxRequestBytes)
+	}
+	if d.repeated > 0 {
+		r.stats.dropped(sig, "header_repeated", d.repeated)
+		r.warnf("%s: %d %s would repeat their resource over %d bytes of requests; dropped", at, d.repeated, sig, maxRepeatedBytes)
 	}
 }
 

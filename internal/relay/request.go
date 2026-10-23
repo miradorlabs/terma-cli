@@ -44,7 +44,7 @@ func (s *sender) take(entries []entry, pol Policy) (request, error) {
 			s.unreadable(first)
 			return request{}, err
 		}
-		if len(p.bodies) == 1 && p.tooLarge == 0 {
+		if len(p.bodies) == 1 && p.dropped == (unsendable{}) {
 			return req, nil // one record, or one resource, too large for maxMergeBytes: within maxRequestBytes
 		}
 		if err := s.cut(first, p); err != nil {
@@ -93,10 +93,7 @@ func (s *sender) cut(e entry, p cutPlan) error {
 		s.r.warnf("outbox %s: %v; its part will be cut again", s.route, err)
 		return err
 	}
-	if p.tooLarge > 0 {
-		s.r.stats.dropped(e.signal, "too_large", p.tooLarge)
-		s.r.warnf("outbox %s: %d %s cannot fit a %d-byte request beside their resource; dropped", s.route, p.tooLarge, e.signal, maxRequestBytes)
-	}
+	s.r.dropUnsendable("outbox "+s.route.String(), e.signal, p.dropped)
 	s.replace(e, pieces)
 	return nil
 }

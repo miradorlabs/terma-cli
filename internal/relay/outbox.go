@@ -246,6 +246,19 @@ func (o outbox) remove(rt route, batch []entry) {
 // deletes pieces so set aside before it may drop e.
 func (o outbox) split(rt route, e entry, bodies [][]byte, records []int) ([]entry, error) {
 	ts, seq := e.stem()
+	// Pieces an earlier, interrupted cut of e left go first: this cut may lay e out differently,
+	// and once e is gone they would read as parts of their own.
+	_, stale, err := o.scan(rt)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range stale {
+		if pts, pseq := p.stem(); pts == ts && p.signal == e.signal && strings.HasPrefix(pseq, seq+".") {
+			if err := config.Remove(filepath.Join(o.routeDir(rt), p.name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+		}
+	}
 	pieces := make([]entry, len(bodies))
 	undo := func(n int) {
 		for _, p := range pieces[:n] {

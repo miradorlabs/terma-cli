@@ -139,8 +139,8 @@ func TestPartWithinSplitsTracesRecordByRecord(t *testing.T) {
 	td := bigTraces(600, 900)
 	p := &part{signal: Traces, session: "A", msg: td, records: 600, pid: 42, claimed: true}
 	parts, rejected := p.within(limit)
-	if len(parts) < 2 || rejected != 0 {
-		t.Fatalf("a %d-byte export over a %d-byte limit gave %d parts, %d rejected", proto.Size(td), limit, len(parts), rejected)
+	if len(parts) < 2 || rejected != (unsendable{}) {
+		t.Fatalf("a %d-byte export over a %d-byte limit gave %d parts, %+v dropped", proto.Size(td), limit, len(parts), rejected)
 	}
 	for i, q := range parts {
 		if n := proto.Size(q.msg); n > limit {
@@ -156,8 +156,8 @@ func TestPartWithinSplitsTracesRecordByRecord(t *testing.T) {
 func TestPartWithinLeavesASmallPartAlone(t *testing.T) {
 	t.Parallel()
 	p := &part{signal: Traces, msg: bigTraces(4, 10), records: 4}
-	if got, rejected := p.within(64 << 10); len(got) != 1 || got[0] != p || rejected != 0 {
-		t.Fatalf("a part under the limit was split: %d parts, %d rejected", len(got), rejected)
+	if got, rejected := p.within(64 << 10); len(got) != 1 || got[0] != p || rejected != (unsendable{}) {
+		t.Fatalf("a part under the limit was split: %d parts, %+v dropped", len(got), rejected)
 	}
 }
 
@@ -171,8 +171,8 @@ func TestPartWithinSendsAnOversizedRecordAloneAndRejectsAnUnsendableOne(t *testi
 	spans[3].Attributes = append(spans[3].Attributes, kv("big", strings.Repeat("y", 3*limit)))
 	spans[5].Attributes = append(spans[5].Attributes, kv("huge", strings.Repeat("z", maxRequestBytes)))
 	parts, rejected := (&part{signal: Traces, msg: td, records: 40}).within(limit)
-	if rejected != 1 {
-		t.Fatalf("rejected %d spans, want only the one over the host's limit", rejected)
+	if rejected != (unsendable{tooLarge: 1}) {
+		t.Fatalf("dropped %+v spans, want only the one over the host's limit", rejected)
 	}
 	alone := 0
 	for _, q := range parts {
@@ -186,7 +186,7 @@ func TestPartWithinSendsAnOversizedRecordAloneAndRejectsAnUnsendableOne(t *testi
 	if alone != 1 {
 		t.Fatalf("%d over-limit parts, want 1", alone)
 	}
-	checkTraceSplit(t, td, parts, rejected)
+	checkTraceSplit(t, td, parts, rejected.tooLarge)
 }
 
 // The reviewers' header-heavy exports at the relay's real limits: every span the host could take
@@ -200,28 +200,30 @@ func TestPartWithinHeaderHeavyExports(t *testing.T) {
 		limit    int
 		td       *tracepb.TracesData
 		parts    int // 0: any number
-		rejected int
+		rejected unsendable
 	}{
-		{"16 KB resource, 400 small spans, 16 KB limit", 16 << 10, headerTraces(16<<10, repeat(400, 60)...), 1, 0},
-		{"512 KiB resource, 64 small spans", maxMergeBytes, headerTraces(512<<10, repeat(64, 100)...), 1, 0},
-		{"2.25 MiB resource, 3,000 1 KiB spans", maxMergeBytes, headerTraces(2300<<10, repeat(3000, 1000)...), 0, 0},
-		{"3.49 MiB resource, 74 3 KB spans", maxMergeBytes, headerTraces(3490<<10, repeat(74, 3000)...), 1, 0},
-		{"3.6 MiB resource, 800 small spans", maxMergeBytes, headerTraces(3600<<10, repeat(800, 1000)...), 0, 0},
-		{"300 KiB resource, twelve 200 KiB spans", maxMergeBytes, headerTraces(300<<10, repeat(12, 200<<10)...), 0, 0},
-		{"4 MiB less 100 KB resource, 500 1 KiB spans", maxMergeBytes, headerTraces(maxRequestBytes-100<<10, repeat(500, 1000)...), 6, 0},
-		{"resource over the host's limit", maxMergeBytes, headerTraces(maxRequestBytes, 10, 10), 0, 2},
+		{"16 KB resource, 400 small spans, 16 KB limit", 16 << 10, headerTraces(16<<10, repeat(400, 60)...), 1, unsendable{}},
+		{"512 KiB resource, 64 small spans", maxMergeBytes, headerTraces(512<<10, repeat(64, 100)...), 1, unsendable{}},
+		{"2.25 MiB resource, 3,000 1 KiB spans", maxMergeBytes, headerTraces(2300<<10, repeat(3000, 1000)...), 0, unsendable{}},
+		{"3.49 MiB resource, 74 3 KB spans", maxMergeBytes, headerTraces(3490<<10, repeat(74, 3000)...), 1, unsendable{}},
+		{"3.6 MiB resource, 800 small spans", maxMergeBytes, headerTraces(3600<<10, repeat(800, 1000)...), 0, unsendable{}},
+		{"300 KiB resource, twelve 200 KiB spans", maxMergeBytes, headerTraces(300<<10, repeat(12, 200<<10)...), 0, unsendable{}},
+		{"4 MiB less 100 KB resource, 500 1 KiB spans: 5.4x, kept", maxMergeBytes, headerTraces(maxRequestBytes-100<<10, repeat(500, 1000)...), 6, unsendable{}},
+		{"4 MiB less 1,200 B resource, 10 spans one a request: 40 MiB, kept", maxMergeBytes, headerTraces(maxRequestBytes-1200, repeat(10, 600)...), 10, unsendable{}},
+		{"4 MiB less 1,200 B resource, 40 spans one a request: 160 MiB, dropped", maxMergeBytes, headerTraces(maxRequestBytes-1200, repeat(40, 600)...), 0, unsendable{repeated: 40}},
+		{"resource over the host's limit", maxMergeBytes, headerTraces(maxRequestBytes, 10, 10), 0, unsendable{tooLarge: 2}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			n := len(placedSpans(c.td))
 			parts, rejected := (&part{signal: Traces, msg: c.td, records: n}).within(c.limit)
 			if rejected != c.rejected {
-				t.Fatalf("rejected %d spans, want %d", rejected, c.rejected)
+				t.Fatalf("dropped %+v spans, want %+v", rejected, c.rejected)
 			}
 			if c.parts > 0 && len(parts) != c.parts {
 				t.Errorf("%d parts, want %d", len(parts), c.parts)
 			}
-			checkTraceSplit(t, c.td, parts, rejected)
+			checkTraceSplit(t, c.td, parts, rejected.tooLarge+rejected.repeated)
 			total := 0
 			for _, q := range parts {
 				total += proto.Size(q.msg)
@@ -259,7 +261,11 @@ func TestPackRunsProperties(t *testing.T) {
 				exact[b] = append(exact[b], heads[b]+n-rng.IntN(7*recordFraming))
 			}
 		}
-		msgs, rejected := packRuns(prefer, hard, heads, sizes, func(b, i int) int { return exact[b][i] })
+		msgs, out := packRuns(prefer, hard, heads, sizes, func(b, i int) int { return exact[b][i] })
+		if len(out.repeated) != 0 {
+			t.Fatalf("trial %d: a block dropped for repeating its header, under maxRepeatedBytes", trial)
+		}
+		rejected := out.tooLarge
 		isRejected := map[[2]int]bool{}
 		for _, r := range rejected {
 			for i := r.from; i < r.to; i++ {
@@ -422,7 +428,8 @@ func TestPartWithinSplitsLogsAndMetrics(t *testing.T) {
 		{&part{signal: Metrics, msg: metrics, records: points}, points},
 		{&part{signal: Metrics, msg: oneMetric(16000, 300), records: 16000}, 16000}, // one metric over the host's limit
 	} {
-		parts, rejected := c.p.within(limit)
+		parts, dropped := c.p.within(limit)
+		rejected := dropped.tooLarge + dropped.repeated
 		var got []placed
 		records := 0
 		for _, q := range parts {
@@ -661,11 +668,11 @@ func TestPartWithinAHugeResourceDoesNotCopyItPerRecord(t *testing.T) { // not pa
 	if proto.Size(res) <= maxRequestBytes {
 		t.Fatalf("the resource is %d bytes, within the host's limit", proto.Size(res))
 	}
-	var rejected int
+	var rejected unsendable
 	allocs := testing.AllocsPerRun(1, func() {
 		_, rejected = (&part{signal: Traces, msg: td, records: 200}).within(maxMergeBytes)
 	})
-	if rejected != 200 || allocs > 10_000 {
-		t.Fatalf("%d of 200 spans rejected in %.0f allocations; a copy of the resource is about 120,000", rejected, allocs)
+	if rejected.tooLarge != 200 || allocs > 10_000 {
+		t.Fatalf("%+v of 200 spans dropped in %.0f allocations; a copy of the resource is about 120,000", rejected, allocs)
 	}
 }
