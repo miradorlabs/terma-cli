@@ -3,6 +3,7 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"runtime"
 
@@ -72,9 +73,13 @@ func (Agent) ManagedDeploy() string {
 // Harness is how terma configures the agent's exporter.
 func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 
-// RefreshMachine rewrites the status-line wrap.
+// RefreshMachine rewrites the status-line wrap, and moves the relay's token an earlier
+// terma put in the settings' env block into the relay's headers helper.
 func (a Agent) RefreshMachine() (string, bool, error) {
-	return exporter{dir: a.ConfigDir}.RefreshStatusLine()
+	c := exporter{dir: a.ConfigDir}
+	path, changed, err := c.RefreshStatusLine()
+	moved, moveErr := c.moveRelayToken()
+	return path, changed || moved, errors.Join(err, moveErr)
 }
 
 // Renders is the wrapped statusLine command; the renderer has its own deadline.
