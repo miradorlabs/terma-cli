@@ -140,3 +140,6 @@ never on disk, and a stopping relay drops it.
   out): like a hook entry it only calls terma, and holds no endpoint or token. What a developer collects is the
   team policy's repository list, read through `config.Policy.Admits` alone.
 - Help text never mentions the hidden `dev` and `local` environments.
+- `TERMA_POLICY_STUB`, the offline policy tests and the hook bench use, is read only by a
+  build without the `release` build tag; goreleaser builds every release with it, which
+  `internal/boundary` checks.
