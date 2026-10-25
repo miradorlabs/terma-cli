@@ -165,10 +165,14 @@ def _reap(proc):
 
 def _terma_hook(event, payload):
     """Hands an event to `terma hook`, detached from the agent's thread. The hook runs
-    as this process's child, which is what lets its claim name this process."""
+    as this process's child, which is what lets its claim name this process. terma is
+    run by the absolute path CONFIG names, never looked up on the PATH."""
+    command = (CONFIG or {}).get("hookCommand") or []
+    if not command or not os.path.isabs(str(command[0])):
+        return
     try:
         proc = subprocess.Popen(
-            [*CONFIG["hookCommand"], event],
+            [*command, event],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

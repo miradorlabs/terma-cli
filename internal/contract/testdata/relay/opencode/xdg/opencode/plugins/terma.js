@@ -16,7 +16,7 @@
 // anything for them, so this file uses only what Bun ships: fetch, node:crypto,
 // node:fs and node:child_process.
 
-const CONFIG = {"version":1,"endpoint":"http://127.0.0.1:43180","headers":{"Authorization":"Bearer relay-token"},"signals":["traces","logs","metrics"],"includePrompts":true,"includeToolContent":true,"hookCommand":["terma","hook"]}
+const CONFIG = {"version":1,"endpoint":"http://127.0.0.1:43180","headers":{"Authorization":"Bearer relay-token"},"signals":["traces","logs","metrics"],"includePrompts":true,"includeToolContent":true,"hookCommand":["/usr/local/bin/terma","hook"]}
 
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
@@ -314,11 +314,12 @@ class Exporter {
 // --- attribution hooks --------------------------------------------------------------
 
 // hookRunner hands session and file events to `terma hook <event>`, fire and forget.
-// A terma binary that is not on PATH is noticed once and then left alone: the
-// telemetry export does not depend on it, and a spawn error per event would be noise.
+// terma is run by the absolute path CONFIG names, never looked up on the PATH: with
+// none, no hook runs. A terma binary that has gone is noticed once and then left alone:
+// the telemetry export does not depend on it, and a spawn error per event would be noise.
 function hookRunner(cfg) {
-  const argv = Array.isArray(cfg.hookCommand) && cfg.hookCommand.length > 0 ? cfg.hookCommand : ["terma", "hook"]
-  let missing = false
+  const argv = Array.isArray(cfg.hookCommand) ? cfg.hookCommand : []
+  let missing = argv.length === 0 || !isAbsolute(String(argv[0]))
   return function run(event, payload) {
     if (missing) return
     try {

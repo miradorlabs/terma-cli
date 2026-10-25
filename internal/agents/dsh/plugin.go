@@ -43,9 +43,6 @@ func home() (string, error) {
 
 func renderPlugin(cfg pluginConfig) (string, error) {
 	cfg.Version = 1
-	if len(cfg.HookCommand) == 0 {
-		cfg.HookCommand = []string{"terma", "hook"}
-	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return "", err
