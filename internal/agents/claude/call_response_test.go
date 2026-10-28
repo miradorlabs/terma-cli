@@ -224,3 +224,21 @@ func TestClaudeSubagentStopSpoolsItsResponses(t *testing.T) {
 		t.Fatalf("got %+v, want req_sub in the parent session", got)
 	}
 }
+
+// A call still streaming at one stop is sent, with its final count, at the next.
+func TestClaudeStopSendsAStreamingCallOnceItIsFinal(t *testing.T) {
+	env := titleEnv(t)
+	path := transcript(t, t.TempDir(),
+		`{"type":"assistant","requestId":"req_a","timestamp":"2026-10-28T03:31:44Z","message":{"model":"claude-opus-5-5","stop_reason":null,"usage":{"output_tokens":243,"output_tokens_details":{"thinking_tokens":40}}}}`,
+	)
+	stopClaude(t, env, path)
+	if got := spooledResponses(t, env.Spool); len(got) != 0 {
+		t.Fatalf("a streaming call was sent: %+v", got)
+	}
+	appendTranscript(t, path, assistantRecord("req_a", "2026-10-28T03:31:45Z", 76)+"\n")
+	stopClaude(t, env, path)
+	got := spooledResponses(t, env.Spool)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
+		t.Fatalf("got %+v, want req_a with its final count", got)
+	}
+}
