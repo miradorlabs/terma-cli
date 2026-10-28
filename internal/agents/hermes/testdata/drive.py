@@ -1,4 +1,4 @@
-# Drives the rendered plugin (termaplug.py in argv[1]) with a successful and a failed API call,
+# Drives the rendered plugin (termaplug.py in argv[1]) with a successful and two failed API calls,
 # and prints each span it would export as a JSON line: {name, error, attrs}, then whether any
 # export held the failure's private text. The export is captured, never sent.
 import json
@@ -19,6 +19,9 @@ hooks["api_request_error"](session_id="s1", model="m", provider="openai", starte
                            api_request_id="t1:api:2", turn_id="t1", status_code=429, reason="rate_limit",
                            error={"type": "RateLimitError", "message": "PRIVATE prompt text"},
                            request={"messages": ["PRIVATE"]})
+hooks["api_request_error"](session_id="s1", model="m", provider="openai", started_at=5.0, ended_at=6.0,
+                           api_request_id="t1:api:3", turn_id="t1", status_code=None, reason="",
+                           error={"type": "APIConnectionError", "message": "PRIVATE"}, request={})
 plugin._flush()
 
 for body in sent:

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -44,9 +45,14 @@ func TestExtensionReadsPiAndOmpResponses(t *testing.T) {
 	if err != nil {
 		t.Skip("no node")
 	}
-	// TypeScript runs under Node's type stripping, from 22.6.
-	if out, err := exec.Command(node, "--experimental-strip-types", "--no-warnings", "-e", "").CombinedOutput(); err != nil {
-		t.Skipf("node cannot strip types: %v %s", err, out)
+	// TypeScript runs under Node's type stripping, from 22.6; an older Node skips, a newer one
+	// that cannot run the driver fails.
+	version, err := exec.Command(node, "-p", `process.versions.node.split(".").map(Number).reduce((a, n, i) => i < 2 ? a * 1000 + n : a, 0)`).Output()
+	if err != nil {
+		t.Fatalf("node: %v", err)
+	}
+	if v, _ := strconv.Atoi(strings.TrimSpace(string(version))); v < 22006 {
+		t.Skipf("node %s strips no types", strings.TrimSpace(string(version)))
 	}
 	text, err := Render(Config{Agent: "omp", Endpoint: "http://127.0.0.1:1", HookCommand: []string{"true"}})
 	if err != nil {
@@ -56,7 +62,12 @@ func TestExtensionReadsPiAndOmpResponses(t *testing.T) {
 	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	driver, err := filepath.Abs(filepath.Join("testdata", "drive.mjs"))
+	// Read here, not only by node, so the test cache sees a changed driver.
+	driver := filepath.Join(filepath.Dir(path), "drive.mjs")
+	src, err := os.ReadFile(filepath.Join("testdata", "drive.mjs"))
+	if err == nil {
+		err = os.WriteFile(driver, src, 0o600)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -103,7 +103,12 @@ func TestPluginSpansEachModelCall(t *testing.T) {
 	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	driver, err := filepath.Abs(filepath.Join("testdata", "drive.mjs"))
+	// Read here, not only by node, so the test cache sees a changed driver.
+	driver := filepath.Join(filepath.Dir(path), "drive.mjs")
+	src, err := os.ReadFile(filepath.Join("testdata", "drive.mjs"))
+	if err == nil {
+		err = os.WriteFile(driver, src, 0o600)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +139,9 @@ func TestPluginSpansEachModelCall(t *testing.T) {
 	}
 	for i, w := range want {
 		s := spans[i]
+		model := strings.TrimPrefix(w.name, "chat ")
 		if s.Name != w.name || s.Error != w.error || s.Attrs["gen_ai.response.finish_reasons"] != w.finish ||
+			s.Attrs["gen_ai.request.model"] != model || s.Attrs["gen_ai.provider.name"] != "deepseek" ||
 			s.Attrs["gen_ai.usage.reasoning.output_tokens"] != w.reasoning || s.Attrs["gen_ai.usage.input_tokens"] != w.input {
 			t.Errorf("span %d = %+v, want %+v", i, s, w)
 		}

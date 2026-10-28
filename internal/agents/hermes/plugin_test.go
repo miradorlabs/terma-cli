@@ -45,8 +45,9 @@ func TestRenderHermesPluginIsValidPython(t *testing.T) {
 	}
 }
 
-// A failed call is a chat span of its own, with its failure's category and status code; the
-// error's message and the request beside it never leave.
+// A failed call is a chat span of its own, with its failure's category (Hermes's failover
+// reason, else the exception's class name) and status code; the error's message and the
+// request beside it never leave.
 func TestPluginSpansAFailedCall(t *testing.T) {
 	t.Parallel()
 	python, err := exec.LookPath("python3")
@@ -61,7 +62,16 @@ func TestPluginSpansAFailedCall(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "termaplug.py"), []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.Command(python, "-I", filepath.Join("testdata", "drive.py"), dir).Output()
+	// Read here, not only by python, so the test cache sees a changed driver.
+	driver := filepath.Join(dir, "drive.py")
+	src, err := os.ReadFile(filepath.Join("testdata", "drive.py"))
+	if err == nil {
+		err = os.WriteFile(driver, src, 0o600)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(python, "-I", driver, dir).Output()
 	if err != nil {
 		t.Fatalf("python: %v\n%s", err, out)
 	}
@@ -79,10 +89,10 @@ func TestPluginSpansAFailedCall(t *testing.T) {
 		}
 		spans = append(spans, s)
 	}
-	if len(spans) != 3 || spans[2].Private == nil {
-		t.Fatalf("got %+v, want two spans and the private-text verdict", spans)
+	if len(spans) != 4 || spans[3].Private == nil {
+		t.Fatalf("got %+v, want three spans and the private-text verdict", spans)
 	}
-	if *spans[2].Private {
+	if *spans[3].Private {
 		t.Fatal("the export holds the failure's message or request")
 	}
 	ok, failed := spans[0], spans[1]
@@ -92,5 +102,11 @@ func TestPluginSpansAFailedCall(t *testing.T) {
 	if !failed.Error || failed.Name != "chat m" || failed.Attrs["error.type"] != "rate_limit" ||
 		failed.Attrs["http.response.status_code"] != "429" || failed.Attrs["gen_ai.response.id"] != "t1:api:2" {
 		t.Errorf("failed call: %+v", failed)
+	}
+	// Without a failover reason, the exception's class name is the category; no status, none sent.
+	if unclassified := spans[2]; !unclassified.Error || unclassified.Attrs["error.type"] != "APIConnectionError" {
+		t.Errorf("failed call without a reason: %+v", unclassified)
+	} else if _, ok := unclassified.Attrs["http.response.status_code"]; ok {
+		t.Errorf("failed call without a status sent one: %+v", unclassified)
 	}
 }

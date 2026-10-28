@@ -18,16 +18,22 @@ async function stream(options, chunks) {
   for await (const _ of on["llm/stream"](options, next)) { /* drain */ }
 }
 
-// The agent loop's call, then its message, a failed retry and a cancelled one.
-await stream({ sessionId: "session-1", model: "deepseek-v4", provider: "deepseek" }, [])
+// Each of the agent loop's calls streams, then settles: a message, a failed retry and a
+// cancelled one.
+const loop = { sessionId: "session-1", model: "deepseek-v4", provider: "deepseek" }
 event("step/start", {}, 1000)
+await stream(loop, [])
 event("assistant/message", {
   turn: 1, message: { id: "m1", source: { model: "deepseek-v4", provider: "deepseek" }, content: [] },
   stream: [finish("tool-calls")], usage: { inputTokens: 5, outputTokens: 9, reasoningTokens: 4 },
 }, 2000)
+await stream(loop, [])
 event("assistant/attempt", { turn: 1, stream: [usage({ inputTokens: 5, outputTokens: 2 }), finish("error")] }, 2500)
+await stream(loop, [])
 event("assistant/attempt", { turn: 1, stream: [finish("aborted")] }, 2600)
-// An auxiliary call: its own span, and not the model an attempt is charged to.
+// An auxiliary call streaming beside the agent loop's: its own span, and not the model the
+// loop's failed call is charged to.
+await stream(loop, [])
 await stream({ sessionId: "session-1", purpose: "title", model: "deepseek-title", provider: "deepseek" },
   [{ type: "usage", usage: { inputTokens: 1, outputTokens: 1 } }, { type: "finish", reason: { kind: "stop" } }])
 event("assistant/attempt", { turn: 2, stream: [finish("error")] }, 2700)

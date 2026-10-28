@@ -15,7 +15,8 @@ const message = (m) => on["message_end"]({ message: { role: "assistant", model: 
 message({ responseModel: "pi-served", responseId: "r-pi", usage: { input: 1, output: 9, reasoning: 4 } })
 message({ upstreamModel: "omp-served", responseId: "r-omp", usage: { input: 1, output: 9, reasoningTokens: 0 } })
 message({ responseId: "r-none", usage: { input: 1, output: 9 } })
-await new Promise((resolve) => setTimeout(resolve, 1300))
+on["agent_end"]()
+await new Promise((resolve) => setTimeout(resolve, 50))
 
 for (const body of sent) for (const rs of body.resourceSpans || []) for (const ss of rs.scopeSpans) for (const sp of ss.spans) {
   const attrs = Object.fromEntries(sp.attributes.map((a) => [a.key, Object.values(a.value)[0]]))

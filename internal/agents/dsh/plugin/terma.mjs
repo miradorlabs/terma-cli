@@ -169,7 +169,7 @@ const EDIT_TOOLS = new Set(["write", "edit", "multi_edit"])
 
 const cwds = new Map() // session → workspace
 const stepStart = new Map() // session → when its model step began
-const lastCall = new Map() // session → the model and provider of its agent loop's latest call
+const lastCall = new Map() // session → its agent loop's call in flight: model, provider, start
 const calls = new Map() // callId → { name, args, start }
 const ended = new Set()
 
@@ -241,11 +241,12 @@ export function apply(ctx) {
         break
       }
       // A model call that committed no message: failed, retried or cancelled. Its usage, when
-      // the provider billed any, is in its stream; its model is the one the call streamed from.
+      // the provider billed any, is in its stream; its model and start are its llm/stream call's.
       case "assistant/attempt": {
         const { finish, usage } = settlement(d.stream)
         const call = lastCall.get(s) || {}
-        span(s, "chat " + (call.model || ""), stepStart.get(s) || at, at, {
+        lastCall.delete(s)
+        span(s, "chat " + (call.model || ""), call.start || stepStart.get(s) || at, at, {
           "gen_ai.operation.name": "chat",
           "gen_ai.provider.name": call.provider,
           "gen_ai.request.model": call.model,
@@ -277,6 +278,8 @@ export function apply(ctx) {
         break
       }
       case "turn/end":
+        stepStart.delete(s)
+        lastCall.delete(s)
         void flush()
         break
     }
@@ -288,7 +291,7 @@ export function apply(ctx) {
     const start = Date.now()
     const s = String((options && options.sessionId) || "")
     // An attempt is the agent loop's own call; an auxiliary one (the title) can run beside it.
-    if (s && options.model && !options.purpose) lastCall.set(s, { model: options.model, provider: options.provider })
+    if (s && options.model && !options.purpose) lastCall.set(s, { model: options.model, provider: options.provider, start })
     let usage, finish
     for await (const chunk of next()) {
       if (chunk && chunk.type === "usage") usage = chunk.usage
