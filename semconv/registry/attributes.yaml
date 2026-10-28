@@ -52,6 +52,22 @@ attributes:
     type: string
     stability: development
     brief: The turn the event belongs to, in the agent's own id.
+  - key: terma.model_call.id
+    type: string
+    stability: development
+    brief: The model call the event is about, in the agent's own id.
+    note: Claude Code's is the API request id its telemetry reports as request_id.
+    examples: ["req_011CgSuPsrmoVLyK2MFya1S9"]
+  - key: terma.response.service_tier
+    type: string
+    stability: development
+    brief: The service tier the provider says served the call, in its own spelling.
+    examples: ["standard", "priority"]
+  - key: terma.response.inference_geo
+    type: string
+    stability: development
+    brief: Where the provider says it ran the call, in its own spelling.
+    examples: ["global", "us"]
 
   # Operations.
   - key: terma.operation.status

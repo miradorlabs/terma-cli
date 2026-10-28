@@ -136,7 +136,8 @@ func loggedInSince(transcript, sessionID string, since time.Time) bool {
 var claudeLimitStateDir = hookrun.AgentStateDir(name, "limits")
 
 // stopFailure spools the documented error category as error.type, never error_details or
-// last_assistant_message: either can hold private text.
+// last_assistant_message: either can hold private text. A failed turn has no Stop, so it also
+// spools the responses of the calls the turn completed before the error.
 func stopFailure(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) {
@@ -150,6 +151,7 @@ func stopFailure(ctx context.Context, env hookrun.Env) error {
 	if spoolLimit(env, r, in, in.Error, sourceClaudeStopFailure) {
 		markLimit(env, in.SessionID)
 	}
+	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	return nil
 }
 
