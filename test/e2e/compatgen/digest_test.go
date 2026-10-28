@@ -310,3 +310,41 @@ func TestAPartialFirstCensusSaysSo(t *testing.T) {
 		t.Errorf("headline %q", got)
 	}
 }
+
+// A span event the new build sends on another span, with the same keys, moved: Codex 0.165.0
+// emits user_prompt inside run_hooks_and_record_inputs, not codex.turn_input. It is said once,
+// not as a surface gone and another new. One whose keys changed stays both.
+func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
+	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
+	const event = "event otel/src/events/session_telemetry.rs"
+	rows := func(version, span string, at time.Time, keys ...string) []e2e.FieldRow {
+		out := []e2e.FieldRow{field(version, "logs/codex.api_request", "model", "safe", at)}
+		for _, k := range keys {
+			out = append(out, field(version, "traces/"+span+"/events/"+event, k, "safe", at))
+		}
+		return out
+	}
+	var cat Catalog
+	mergeFields(&cat, rows("0.164.0", "codex.turn_input", day, "prompt_length", "slug"), nil)
+	tonight := day.Add(24 * time.Hour)
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}})
+
+	_, _, hs := fieldDrift(cat, rows("0.165.0", "run_hooks_and_record_inputs", tonight, "slug", "prompt_length"), ran, tonight)
+	h := hs[0]
+	want := MovedEvent{Event: event, From: "codex.turn_input", To: "run_hooks_and_record_inputs", Keys: 2}
+	if len(h.Moved) != 1 || h.Moved[0] != want || len(h.Unseen)+len(h.NewSurfaces) != 0 {
+		t.Fatalf("moved %+v, unseen %+v, new %+v", h.Moved, h.Unseen, h.NewSurfaces)
+	}
+	if got := h.headline(); !strings.HasSuffix(got, "): 1 span event moved") {
+		t.Errorf("headline %q", got)
+	}
+	md := (Drift{Harnesses: hs}).markdown()
+	if !strings.Contains(md, "- `"+event+"` (2 keys): from span `codex.turn_input` to `run_hooks_and_record_inputs`") || strings.Contains(md, removedMark) {
+		t.Errorf("digest:\n%s", md)
+	}
+
+	_, _, hs = fieldDrift(cat, rows("0.165.0", "run_hooks_and_record_inputs", tonight, "slug"), ran, tonight)
+	if h := hs[0]; len(h.Moved) != 0 || len(h.Unseen) != 1 || len(h.NewSurfaces) != 1 {
+		t.Errorf("keys changed: moved %+v, unseen %+v, new %+v", h.Moved, h.Unseen, h.NewSurfaces)
+	}
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/e2e"
 )
@@ -253,4 +254,75 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 		}
 		base = now
 	}
+}
+
+// pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from one
+// span and new on another, in Version, with the same event name and the same keys. Codex
+// 0.165.0 emits its user_prompt event inside run_hooks_and_record_inputs, not codex.turn_input.
+// An event name more than one gone or new surface carries is left as it is.
+func (d *HarnessDrift) pairMoves(idx catalogIndex, seen map[string]e2e.FieldRow) {
+	if d.Judged != "" {
+		return
+	}
+	gone, came := map[string][]int{}, map[string][]int{}
+	for i, g := range d.Unseen {
+		if _, event, ok := spanEvent(g.Surface); ok && g.In == "" {
+			gone[event] = append(gone[event], i)
+		}
+	}
+	for i, s := range d.NewSurfaces {
+		if _, event, ok := spanEvent(s.Surface); ok && s.From == "" && s.NewKeys == 0 {
+			came[event] = append(came[event], i)
+		}
+	}
+	var dropGone, dropCame []int
+	for _, event := range slices.Sorted(maps.Keys(gone)) {
+		if len(gone[event]) != 1 || len(came[event]) != 1 {
+			continue
+		}
+		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
+		var was, now []string
+		for _, f := range idx.known {
+			if f.Harness == d.Harness && f.Surface == g.Surface {
+				was = append(was, f.Key)
+			}
+		}
+		for _, r := range seen {
+			if r.Surface == s.Surface {
+				now = append(now, r.Key)
+			}
+		}
+		slices.Sort(was)
+		slices.Sort(now)
+		if !slices.Equal(was, now) {
+			continue
+		}
+		from, _, _ := spanEvent(g.Surface)
+		to, _, _ := spanEvent(s.Surface)
+		d.Moved = append(d.Moved, MovedEvent{Event: event, From: from, To: to, Keys: s.Keys})
+		dropGone, dropCame = append(dropGone, gone[event][0]), append(dropCame, came[event][0])
+	}
+	d.Unseen = deleteAt(d.Unseen, dropGone)
+	d.NewSurfaces = deleteAt(d.NewSurfaces, dropCame)
+}
+
+// spanEvent splits a span event's surface, traces/<span>/events/<event>, into its span and
+// its event.
+func spanEvent(surface string) (span, event string, ok bool) {
+	rest, ok := strings.CutPrefix(surface, "traces/")
+	if !ok {
+		return "", "", false
+	}
+	return strings.Cut(rest, "/events/")
+}
+
+// deleteAt is s without the elements at the indexes in at.
+func deleteAt[T any](s []T, at []int) []T {
+	out := s[:0]
+	for i, v := range s {
+		if !slices.Contains(at, i) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
