@@ -313,38 +313,81 @@ func TestAPartialFirstCensusSaysSo(t *testing.T) {
 
 // A span event the new build sends on another span, with the same keys, moved: Codex 0.165.0
 // emits user_prompt inside run_hooks_and_record_inputs, not codex.turn_input. It is said once,
-// not as a surface gone and another new. One whose keys changed stays both.
+// unsigned, not as a surface gone and another new, and the release counts it.
 func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
-	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
-	const event = "event otel/src/events/session_telemetry.rs"
-	rows := func(version, span string, at time.Time, keys ...string) []e2e.FieldRow {
-		out := []e2e.FieldRow{field(version, "logs/codex.api_request", "model", "safe", at)}
-		for _, k := range keys {
-			out = append(out, field(version, "traces/"+span+"/events/"+event, k, "safe", at))
-		}
-		return out
-	}
+	day := time.Date(2026, 10, 26, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
-	mergeFields(&cat, rows("0.164.0", "codex.turn_input", day, "prompt_length", "slug"), nil)
-	tonight := day.Add(24 * time.Hour)
+	// A key the build before the baseline sent is in the catalog, not in what is judged.
+	mergeFields(&cat, promptRows("0.163.0", day, "codex.turn_input", "prompt_length", "slug", "dropped_key"), nil)
+	mergeFields(&cat, promptRows("0.164.0", day.Add(24*time.Hour), "codex.turn_input", "prompt_length", "slug"), nil)
+	tonight := day.Add(48 * time.Hour)
 	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}})
+	rows := promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "slug", "prompt_length")
 
-	_, _, hs := fieldDrift(cat, rows("0.165.0", "run_hooks_and_record_inputs", tonight, "slug", "prompt_length"), ran, tonight)
+	_, _, hs := fieldDrift(cat, rows, ran, tonight)
 	h := hs[0]
-	want := MovedEvent{Event: event, From: "codex.turn_input", To: "run_hooks_and_record_inputs", Keys: 2}
+	want := MovedEvent{Event: promptEvent, From: "codex.turn_input", To: "run_hooks_and_record_inputs", Keys: 2}
 	if len(h.Moved) != 1 || h.Moved[0] != want || len(h.Unseen)+len(h.NewSurfaces) != 0 {
 		t.Fatalf("moved %+v, unseen %+v, new %+v", h.Moved, h.Unseen, h.NewSurfaces)
 	}
 	if got := h.headline(); !strings.HasSuffix(got, "): 1 span event moved") {
 		t.Errorf("headline %q", got)
 	}
-	md := (Drift{Harnesses: hs}).markdown()
-	if !strings.Contains(md, "- `"+event+"` (2 keys): from span `codex.turn_input` to `run_hooks_and_record_inputs`") || strings.Contains(md, removedMark) {
+	d := Drift{Harnesses: hs}
+	line := "`" + promptEvent + "` (2 keys): from span `codex.turn_input` to `run_hooks_and_record_inputs`"
+	if md := d.markdown(); !strings.Contains(md, "- "+line) || strings.Contains(md, removedMark) || strings.Contains(md, addedMark) {
 		t.Errorf("digest:\n%s", md)
 	}
-
-	_, _, hs = fieldDrift(cat, rows("0.165.0", "run_hooks_and_record_inputs", tonight, "slug"), ran, tonight)
-	if h := hs[0]; len(h.Moved) != 0 || len(h.Unseen) != 1 || len(h.NewSurfaces) != 1 {
-		t.Errorf("keys changed: moved %+v, unseen %+v, new %+v", h.Moved, h.Unseen, h.NewSurfaces)
+	// Unsigned, it joins the headline on Slack's own bar: no green or red attachment.
+	if items := slackItems(t, d); !slices.ContainsFunc(items, func(i slackItem) bool {
+		return i.colour == "" && strings.Contains(i.text, "_Span events on another span, keys unchanged_\n• "+line)
+	}) || slices.ContainsFunc(items, func(i slackItem) bool { return i.colour != "" }) {
+		t.Errorf("slack: %+v", items)
 	}
+	if f := h.fieldsOf("0.165.0", rows, ran); f == nil || f.Moved != 1 || f.NewSurfaces+f.Unseen != 0 {
+		t.Errorf("release fields %+v", f)
+	}
+}
+
+// A span event is no move where its keys changed, where its name is on more than one surface
+// gone (tracing names events after their file), or where the new build's census is partial:
+// each is said as a surface gone and one new, as before.
+func TestASpanEventThatIsNoMove(t *testing.T) {
+	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
+	tonight := day.Add(24 * time.Hour)
+	var cat Catalog
+	mergeFields(&cat, append(promptRows("0.164.0", day, "codex.turn_input", "prompt_length", "slug"),
+		field("0.164.0", "traces/session_init/events/"+promptEvent, "slug", "safe", day)), nil)
+	whole := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}})
+	for _, c := range []struct {
+		name string
+		rows []e2e.FieldRow
+		ran  censusRuns
+	}{
+		{"keys changed", promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "slug"), whole},
+		{"two surfaces gone", promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "prompt_length", "slug"), whole},
+		{"partial", promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "prompt_length", "slug"),
+			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0", Failed: true}})},
+	} {
+		rows := c.rows
+		if c.name != "two surfaces gone" {
+			rows = append(rows, field("0.165.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))
+		}
+		_, _, hs := fieldDrift(cat, rows, c.ran, tonight)
+		if h := hs[0]; len(h.Moved) != 0 || len(h.NewSurfaces) != 1 {
+			t.Errorf("%s: moved %+v, new %+v, unseen %+v", c.name, h.Moved, h.NewSurfaces, h.Unseen)
+		}
+	}
+}
+
+// promptEvent is the name tracing gives Codex's user_prompt event, after its file.
+const promptEvent = "event otel/src/events/session_telemetry.rs"
+
+// promptRows are a build's user_prompt event on span, with keys, beside a log it always sends.
+func promptRows(version string, at time.Time, span string, keys ...string) []e2e.FieldRow {
+	out := []e2e.FieldRow{field(version, "logs/codex.api_request", "model", "safe", at)}
+	for _, k := range keys {
+		out = append(out, field(version, "traces/"+span+"/events/"+promptEvent, k, "safe", at))
+	}
+	return out
 }

@@ -88,9 +88,9 @@ type HarnessDrift struct {
 	// still sends, and surfaces. See fieldDrift for when a build is judged.
 	Removed []FieldChange `json:"removed,omitempty"`
 	Unseen  []GoneSurface `json:"unseen,omitempty"`
-	// Moved are span events the build sends on another span than the build before did: a gone
-	// surface and a new one with the same event name and keys, taken out of Unseen and
-	// NewSurfaces (pairMoves).
+	// Moved are span events Version sends on another span than the build it was judged against
+	// did: a gone surface and a new one with the same event name and keys, taken out of Unseen
+	// and NewSurfaces (pairMoves).
 	Moved []MovedEvent `json:"moved,omitempty"`
 	// Compare links the source's changes from Previous to Version, where it is public.
 	Compare string `json:"compare,omitempty"`
@@ -211,7 +211,6 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		}
 		d.additions(idx, n.seen())
 		d.judgeChain(n, chooseBaseline(cat, n, judgedBuilds(cat, n), d.First))
-		d.pairMoves(idx, n.seen())
 		out = append(out, d)
 	}
 	return len(rows) == 0, missing, out

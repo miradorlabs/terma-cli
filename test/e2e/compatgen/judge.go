@@ -252,18 +252,18 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 			unseenAt[s] = len(d.Unseen)
 			d.Unseen = append(d.Unseen, g)
 		}
+		if v == d.Version {
+			d.pairMoves(base, now)
+		}
 		base = now
 	}
 }
 
-// pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from one
-// span and new on another, in Version, with the same event name and the same keys. Codex
-// 0.165.0 emits its user_prompt event inside run_hooks_and_record_inputs, not codex.turn_input.
-// An event name more than one gone or new surface carries is left as it is.
-func (d *HarnessDrift) pairMoves(idx catalogIndex, seen map[string]e2e.FieldRow) {
-	if d.Judged != "" {
-		return
-	}
+// pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from
+// one span and new on another in Version, with the same event name and, as before sent it and
+// now sends it, the same keys. An event name more than one gone or new surface carries is left
+// as it is: tracing names an event after its file, so names repeat.
+func (d *HarnessDrift) pairMoves(before, now sending) {
 	gone, came := map[string][]int{}, map[string][]int{}
 	for i, g := range d.Unseen {
 		if _, event, ok := spanEvent(g.Surface); ok && g.In == "" {
@@ -271,39 +271,38 @@ func (d *HarnessDrift) pairMoves(idx catalogIndex, seen map[string]e2e.FieldRow)
 		}
 	}
 	for i, s := range d.NewSurfaces {
-		if _, event, ok := spanEvent(s.Surface); ok && s.From == "" && s.NewKeys == 0 {
+		if _, event, ok := spanEvent(s.Surface); ok && s.From == "" {
 			came[event] = append(came[event], i)
 		}
 	}
-	var dropGone, dropCame []int
+	moved, arrived := map[int]bool{}, map[int]bool{}
 	for _, event := range slices.Sorted(maps.Keys(gone)) {
 		if len(gone[event]) != 1 || len(came[event]) != 1 {
 			continue
 		}
 		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
-		var was, now []string
-		for _, f := range idx.known {
-			if f.Harness == d.Harness && f.Surface == g.Surface {
-				was = append(was, f.Key)
-			}
-		}
-		for _, r := range seen {
-			if r.Surface == s.Surface {
-				now = append(now, r.Key)
-			}
-		}
-		slices.Sort(was)
-		slices.Sort(now)
-		if !slices.Equal(was, now) {
+		if !slices.Equal(keysOn(before, g.Surface), keysOn(now, s.Surface)) {
 			continue
 		}
 		from, _, _ := spanEvent(g.Surface)
 		to, _, _ := spanEvent(s.Surface)
 		d.Moved = append(d.Moved, MovedEvent{Event: event, From: from, To: to, Keys: s.Keys})
-		dropGone, dropCame = append(dropGone, gone[event][0]), append(dropCame, came[event][0])
+		moved[gone[event][0]], arrived[came[event][0]] = true, true
 	}
-	d.Unseen = deleteAt(d.Unseen, dropGone)
-	d.NewSurfaces = deleteAt(d.NewSurfaces, dropCame)
+	d.Unseen = dropMarked(d.Unseen, moved)
+	d.NewSurfaces = dropMarked(d.NewSurfaces, arrived)
+}
+
+// keysOn are the keys s sent on surface, sorted.
+func keysOn(s sending, surface string) []string {
+	var keys []string
+	for _, c := range s.keys {
+		if c.Surface == surface {
+			keys = append(keys, c.Key)
+		}
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 // spanEvent splits a span event's surface, traces/<span>/events/<event>, into its span and
@@ -316,11 +315,11 @@ func spanEvent(surface string) (span, event string, ok bool) {
 	return strings.Cut(rest, "/events/")
 }
 
-// deleteAt is s without the elements at the indexes in at.
-func deleteAt[T any](s []T, at []int) []T {
+// dropMarked is s without the elements whose index is marked.
+func dropMarked[T any](s []T, marked map[int]bool) []T {
 	out := s[:0]
 	for i, v := range s {
-		if !slices.Contains(at, i) {
+		if !marked[i] {
 			out = append(out, v)
 		}
 	}
