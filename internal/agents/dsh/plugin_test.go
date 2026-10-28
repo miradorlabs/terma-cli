@@ -1,7 +1,9 @@
 package dsh
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -74,5 +76,87 @@ func TestRemovePluginTakesOutItsInsert(t *testing.T) {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Fatalf("plugin survived: %v", err)
 		}
+	}
+}
+
+// exportedSpan is one span a driver captured from a plugin's export.
+type exportedSpan struct {
+	Name  string            `json:"name"`
+	Error bool              `json:"error"`
+	Start int64             `json:"start"` // ms
+	Attrs map[string]string `json:"attrs"`
+}
+
+// Each model call's span carries why it stopped and its reasoning count when the adapter
+// reports one; an attempt that committed no message is its own span, charged to its own call
+// of the agent loop (never an auxiliary one, nor one a message already settled), an error
+// unless it was cancelled.
+func TestPluginSpansEachModelCall(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("no node")
+	}
+	text, err := renderPlugin(pluginConfig{Endpoint: "http://127.0.0.1:1", HookCommand: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "terma.mjs")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Read here, not only by node, so the test cache sees a changed driver.
+	driver := filepath.Join(filepath.Dir(path), "drive.mjs")
+	src, err := os.ReadFile(filepath.Join("testdata", "drive.mjs"))
+	if err == nil {
+		err = os.WriteFile(driver, src, 0o600)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(node, driver, path).Output()
+	if err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	var spans []exportedSpan
+	for line := range strings.Lines(string(out)) {
+		var s exportedSpan
+		if err := json.Unmarshal([]byte(line), &s); err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		spans = append(spans, s)
+	}
+	want := []struct {
+		name, provider, finish, reasoning, input string
+		error                                    bool
+	}{
+		{"chat deepseek-v4", "deepseek", "tool-calls", "4", "5", false},
+		{"chat deepseek-v4", "deepseek", "error", "absent", "5", true},
+		{"chat deepseek-v4", "deepseek", "aborted", "absent", "", false},
+		{"chat deepseek-title", "deepseek", "stop", "absent", "1", false},
+		{"chat deepseek-v4", "deepseek", "error", "absent", "", true},
+		{"chat deepseek-v4", "deepseek", "stop", "absent", "", false},
+		{"chat ", "", "error", "absent", "", true},
+	}
+	if len(spans) != len(want) {
+		t.Fatalf("got %d spans, want %d: %+v", len(spans), len(want), spans)
+	}
+	for i, w := range want {
+		s := spans[i]
+		model := strings.TrimPrefix(w.name, "chat ")
+		// An unreported count must stay absent, never collapse into a reported one.
+		reasoning, ok := s.Attrs["gen_ai.usage.reasoning.output_tokens"]
+		if !ok {
+			reasoning = "absent"
+		}
+		if s.Name != w.name || s.Error != w.error || s.Attrs["gen_ai.response.finish_reasons"] != w.finish ||
+			s.Attrs["gen_ai.request.model"] != model || s.Attrs["gen_ai.provider.name"] != w.provider ||
+			reasoning != w.reasoning || s.Attrs["gen_ai.usage.input_tokens"] != w.input {
+			t.Errorf("span %d = %+v, want %+v", i, s, w)
+		}
+	}
+	// The attempt after a committed message starts where its step did (step/start at 1000).
+	if last := spans[len(spans)-1]; last.Start != 1000 {
+		t.Errorf("the attempt after a message starts at %d, want the step's 1000", last.Start)
 	}
 }

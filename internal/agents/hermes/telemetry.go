@@ -11,7 +11,8 @@ func (Agent) Correlation() shape.Correlation {
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
 		PromptBodyEvents: []string{"hermes.user_prompt", "hermes.assistant_response"},
-		SafeKeys:         []string{"hermes.turn_id"},
+		// error.type is a failed call's category (Hermes's failover reason), never its message.
+		SafeKeys: []string{"hermes.turn_id", "error.type"},
 	}
 }
 

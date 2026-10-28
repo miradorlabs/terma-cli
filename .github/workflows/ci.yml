@@ -48,6 +48,12 @@ jobs:
 
       - run: go vet ./...
 
+      # The exporter plugins' tests drive them with node (22.6+ strips the Pi extension's types)
+      # and python3 where one is installed.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
       # The shell launcher tests parse their fish block with a real fish where one is installed.
       - name: Install fish
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fish

@@ -209,14 +209,16 @@ export default function (pi: any) {
       "gen_ai.operation.name": "chat",
       "gen_ai.provider.name": m.provider,
       "gen_ai.request.model": m.model,
-      "gen_ai.response.model": m.responseModel || m.model,
+      // Pi names the served model responseModel, omp upstreamModel (only when it knows it).
+      "gen_ai.response.model": m.responseModel || m.upstreamModel || m.model,
       "gen_ai.response.id": m.responseId,
       "gen_ai.response.finish_reasons": m.stopReason,
       "gen_ai.usage.input_tokens": u.input,
       "gen_ai.usage.output_tokens": u.output,
       "gen_ai.usage.cache_read.input_tokens": u.cacheRead,
       "gen_ai.usage.cache_creation.input_tokens": u.cacheWrite,
-      "gen_ai.usage.reasoning.output_tokens": u.reasoning,
+      // Pi names the count reasoning, omp reasoningTokens; either is absent when unreported.
+      "gen_ai.usage.reasoning.output_tokens": u.reasoning ?? u.reasoningTokens,
       "gen_ai.usage.total_tokens": u.totalTokens,
       "gen_ai.usage.total_cost": u.cost && typeof u.cost.total === "number" ? u.cost.total : undefined,
       "gen_ai.completion": CONFIG!.includePrompts ? truncate(text, MAX_TEXT) : undefined,

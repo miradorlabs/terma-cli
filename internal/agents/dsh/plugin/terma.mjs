@@ -7,9 +7,10 @@
 //
 // dsh's own OTLP goes to DeepSeek's collector and carries no usage, so this plugin is its
 // exporter, under the GenAI semantic conventions: a `chat {model}` span per model
-// response with its usage (from the assistant/message session event), one for each
-// auxiliary call too (the session title, seen through the llm/stream waterfall with its
-// purpose), an `execute_tool {tool}` span per tool call, and a `dsh.user_prompt` and a
+// response with its usage and why it stopped (from the assistant/message session event), one
+// per attempt that committed no message (assistant/attempt: failed, retried or cancelled),
+// one for each auxiliary call too (the session title, seen through the llm/stream waterfall
+// with its purpose), an `execute_tool {tool}` span per tool call, and a `dsh.user_prompt` and a
 // `dsh.assistant_response` log per turn. Every record names dsh's session
 // (`session-<uuid>`) as `session.id`. Session lifecycle, prompts and file edits are handed
 // to `terma hook dsh-*`, which claims the session for the local relay and records commit
@@ -131,7 +132,23 @@ function usageAttrs(u) {
     "gen_ai.usage.cache_read.input_tokens": u.cacheReadTokens,
     "gen_ai.usage.cache_creation.input_tokens": u.cacheWriteTokens,
     "gen_ai.usage.total_tokens": u.totalTokens,
+    // Absent when the adapter reports none, which is not zero.
+    "gen_ai.usage.reasoning.output_tokens": u.reasoningTokens,
   }
+}
+
+// settlement is how an attempt's compact stream records ended, in one pass from the end: why
+// it stopped (its finish chunk's kind, never the failure beside it) and the usage it reported.
+function settlement(stream) {
+  let finish, usage
+  if (!Array.isArray(stream)) return { finish, usage }
+  for (let i = stream.length - 1; i >= 0 && (finish === undefined || usage === undefined); i--) {
+    const c = stream[i] && stream[i].type === "chunk" ? stream[i].chunk : undefined
+    if (!c) continue
+    if (finish === undefined && c.type === "finish" && c.reason) finish = c.reason.kind
+    if (usage === undefined && c.type === "usage") usage = c.usage
+  }
+  return { finish, usage }
 }
 
 // --- terma hook ------------------------------------------------------------------------
@@ -153,6 +170,7 @@ const EDIT_TOOLS = new Set(["write", "edit", "multi_edit"])
 
 const cwds = new Map() // session → workspace
 const stepStart = new Map() // session → when its model step began
+const lastCall = new Map() // session → its agent loop's call in flight: model, provider, start
 const calls = new Map() // callId → { name, args, start }
 const ended = new Set()
 
@@ -209,17 +227,36 @@ export function apply(ctx) {
       case "assistant/message": {
         const m = d.message || {}
         const src = m.source || {}
+        // The message settles the loop's call in flight; an attempt after it streams its own.
+        lastCall.delete(s)
         span(s, "chat " + (src.model || ""), stepStart.get(s) || at, at, {
           "gen_ai.operation.name": "chat",
           "gen_ai.provider.name": src.provider,
           "gen_ai.request.model": src.model,
           "gen_ai.response.model": src.model,
           "gen_ai.response.id": m.id,
+          "gen_ai.response.finish_reasons": settlement(d.stream).finish,
           "dsh.turn": d.turn,
           ...usageAttrs(d.usage),
         })
         const reply = text(m.content)
         if (reply) record(s, "dsh.assistant_response", CONFIG.includePrompts ? truncate(reply, MAX_TEXT) : "", { response_length: reply.length })
+        break
+      }
+      // A model call that committed no message: failed, retried or cancelled. Its usage, when
+      // the provider billed any, is in its stream; its model and start are its llm/stream call's.
+      case "assistant/attempt": {
+        const { finish, usage } = settlement(d.stream)
+        const call = lastCall.get(s) || {}
+        lastCall.delete(s)
+        span(s, "chat " + (call.model || ""), call.start || stepStart.get(s) || at, at, {
+          "gen_ai.operation.name": "chat",
+          "gen_ai.provider.name": call.provider,
+          "gen_ai.request.model": call.model,
+          "gen_ai.response.finish_reasons": finish,
+          "dsh.turn": d.turn,
+          ...usageAttrs(usage),
+        }, finish !== "aborted")
         break
       }
       case "tool/call":
@@ -244,6 +281,8 @@ export function apply(ctx) {
         break
       }
       case "turn/end":
+        stepStart.delete(s)
+        lastCall.delete(s)
         void flush()
         break
     }
@@ -253,17 +292,21 @@ export function apply(ctx) {
   // title) have a purpose and no assistant/message event, so their usage is spanned here.
   ctx.on("llm/stream", async function* (options, next) {
     const start = Date.now()
-    let usage
+    const s = String((options && options.sessionId) || "")
+    // An attempt is the agent loop's own call; an auxiliary one (the title) can run beside it.
+    if (s && options.model && !options.purpose) lastCall.set(s, { model: options.model, provider: options.provider, start })
+    let usage, finish
     for await (const chunk of next()) {
       if (chunk && chunk.type === "usage") usage = chunk.usage
+      if (chunk && chunk.type === "finish" && chunk.reason) finish = chunk.reason.kind
       yield chunk
     }
-    const s = String((options && options.sessionId) || "")
     if (s && options.purpose && usage) {
       span(s, "chat " + (options.model || ""), start, Date.now(), {
         "gen_ai.operation.name": "chat",
         "gen_ai.provider.name": options.provider,
         "gen_ai.request.model": options.model,
+        "gen_ai.response.finish_reasons": finish,
         "dsh.purpose": options.purpose,
         ...usageAttrs(usage),
       })
