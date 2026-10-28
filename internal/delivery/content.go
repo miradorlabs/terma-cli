@@ -33,6 +33,7 @@ var contentFree = map[string]bool{
 	semconv.TermaSessionCaptureEvent: true, semconv.TermaSubagentStartEvent: true, semconv.TermaSubagentEndEvent: true,
 	semconv.TermaSubagentCallEvent: true, semconv.TermaSessionObservationEvent: true,
 	semconv.TermaAssistantMessageEvent: true, semconv.TermaSessionTitleEvent: true,
+	semconv.TermaModelCallResponseEvent: true,
 }
 
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without
