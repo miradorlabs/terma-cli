@@ -83,12 +83,14 @@ func TestRemovePluginTakesOutItsInsert(t *testing.T) {
 type exportedSpan struct {
 	Name  string            `json:"name"`
 	Error bool              `json:"error"`
+	Start int64             `json:"start"` // ms
 	Attrs map[string]string `json:"attrs"`
 }
 
 // Each model call's span carries why it stopped and its reasoning count when the adapter
-// reports one; an attempt that committed no message is its own span, charged to the agent
-// loop's model, an error unless it was cancelled.
+// reports one; an attempt that committed no message is its own span, charged to its own call
+// of the agent loop (never an auxiliary one, nor one a message already settled), an error
+// unless it was cancelled.
 func TestPluginSpansEachModelCall(t *testing.T) {
 	t.Parallel()
 	node, err := exec.LookPath("node")
@@ -125,14 +127,16 @@ func TestPluginSpansEachModelCall(t *testing.T) {
 		spans = append(spans, s)
 	}
 	want := []struct {
-		name, finish, reasoning, input string
-		error                          bool
+		name, provider, finish, reasoning, input string
+		error                                    bool
 	}{
-		{"chat deepseek-v4", "tool-calls", "4", "5", false},
-		{"chat deepseek-v4", "error", "absent", "5", true},
-		{"chat deepseek-v4", "aborted", "absent", "", false},
-		{"chat deepseek-title", "stop", "absent", "1", false},
-		{"chat deepseek-v4", "error", "absent", "", true},
+		{"chat deepseek-v4", "deepseek", "tool-calls", "4", "5", false},
+		{"chat deepseek-v4", "deepseek", "error", "absent", "5", true},
+		{"chat deepseek-v4", "deepseek", "aborted", "absent", "", false},
+		{"chat deepseek-title", "deepseek", "stop", "absent", "1", false},
+		{"chat deepseek-v4", "deepseek", "error", "absent", "", true},
+		{"chat deepseek-v4", "deepseek", "stop", "absent", "", false},
+		{"chat ", "", "error", "absent", "", true},
 	}
 	if len(spans) != len(want) {
 		t.Fatalf("got %d spans, want %d: %+v", len(spans), len(want), spans)
@@ -146,9 +150,13 @@ func TestPluginSpansEachModelCall(t *testing.T) {
 			reasoning = "absent"
 		}
 		if s.Name != w.name || s.Error != w.error || s.Attrs["gen_ai.response.finish_reasons"] != w.finish ||
-			s.Attrs["gen_ai.request.model"] != model || s.Attrs["gen_ai.provider.name"] != "deepseek" ||
+			s.Attrs["gen_ai.request.model"] != model || s.Attrs["gen_ai.provider.name"] != w.provider ||
 			reasoning != w.reasoning || s.Attrs["gen_ai.usage.input_tokens"] != w.input {
 			t.Errorf("span %d = %+v, want %+v", i, s, w)
 		}
+	}
+	// The attempt after a committed message starts where its step did (step/start at 1000).
+	if last := spans[len(spans)-1]; last.Start != 1000 {
+		t.Errorf("the attempt after a message starts at %d, want the step's 1000", last.Start)
 	}
 }

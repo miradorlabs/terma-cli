@@ -1,5 +1,6 @@
-// Drives the rendered plugin (argv[2]) through one turn of dsh session events and prints each
-// span it would export as a JSON line: {name, error, attrs}. The export is captured, never sent.
+// Drives the rendered plugin (argv[2]) through dsh session events and prints each span it
+// would export as a JSON line: {name, error, start (ms), attrs}. The export is captured, never
+// sent.
 const sent = []
 globalThis.fetch = async (url, init) => {
   sent.push(JSON.parse(init.body))
@@ -37,11 +38,18 @@ await stream(loop, [])
 await stream({ sessionId: "session-1", purpose: "title", model: "deepseek-title", provider: "deepseek" },
   [{ type: "usage", usage: { inputTokens: 1, outputTokens: 1 } }, { type: "finish", reason: { kind: "stop" } }])
 event("assistant/attempt", { turn: 2, stream: [finish("error")] }, 2700)
+// A committed message settles its call: an attempt after it with no stream of its own takes
+// neither that call's model nor its start, only the step's.
+await stream(loop, [])
+event("assistant/message", {
+  turn: 2, message: { id: "m2", source: { model: "deepseek-v4", provider: "deepseek" }, content: [] }, stream: [finish("stop")],
+}, 2800)
+event("assistant/attempt", { turn: 2, stream: [finish("error")] }, 2900)
 event("turn/end", {}, 3000)
 await new Promise((resolve) => setTimeout(resolve, 50))
 
 for (const body of sent) for (const rs of body.resourceSpans || []) for (const ss of rs.scopeSpans) for (const sp of ss.spans) {
   const attrs = Object.fromEntries(sp.attributes.map((a) => [a.key, Object.values(a.value)[0]]))
-  console.log(JSON.stringify({ name: sp.name, error: sp.status.code === 2, attrs }))
+  console.log(JSON.stringify({ name: sp.name, error: sp.status.code === 2, start: Number(BigInt(sp.startTimeUnixNano) / 1000000n), attrs }))
 }
 process.exit(0)

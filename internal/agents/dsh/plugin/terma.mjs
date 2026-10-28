@@ -7,9 +7,10 @@
 //
 // dsh's own OTLP goes to DeepSeek's collector and carries no usage, so this plugin is its
 // exporter, under the GenAI semantic conventions: a `chat {model}` span per model
-// response with its usage (from the assistant/message session event), one for each
-// auxiliary call too (the session title, seen through the llm/stream waterfall with its
-// purpose), an `execute_tool {tool}` span per tool call, and a `dsh.user_prompt` and a
+// response with its usage and why it stopped (from the assistant/message session event), one
+// per attempt that committed no message (assistant/attempt: failed, retried or cancelled),
+// one for each auxiliary call too (the session title, seen through the llm/stream waterfall
+// with its purpose), an `execute_tool {tool}` span per tool call, and a `dsh.user_prompt` and a
 // `dsh.assistant_response` log per turn. Every record names dsh's session
 // (`session-<uuid>`) as `session.id`. Session lifecycle, prompts and file edits are handed
 // to `terma hook dsh-*`, which claims the session for the local relay and records commit
