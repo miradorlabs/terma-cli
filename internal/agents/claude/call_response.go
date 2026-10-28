@@ -65,8 +65,9 @@ type callResponseState struct {
 }
 
 // captureClaudeCallResponses spools what the API answered for each call the transcript
-// recorded since the last read, one terma.model_call.response per call, when a turn or a
-// subagent stops. Only labels and counts leave the machine, under the title's consent.
+// recorded since the last read, one terma.model_call.response per call, when a turn stops or
+// fails, a subagent stops, or the session ends. Only labels and counts leave the machine, under
+// the title's consent.
 func captureClaudeCallResponses(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
 	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return

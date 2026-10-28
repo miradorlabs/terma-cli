@@ -83,6 +83,9 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	limitFromTranscript(env, r, in)
+	// A turn's last response can reach the transcript after its Stop read it, and an interrupted
+	// turn has no Stop.
+	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	env.EndSession(r, in.SessionID, claudeTool)
 	// A /rename after the last turn ends no turn.
 	captureClaudeTitle(env, r, in)

@@ -48,9 +48,16 @@ func spooledResponses(t *testing.T, sp *spool.Spool) []spool.Event {
 
 func stopClaude(t *testing.T, env hookrun.Env, path string) {
 	t.Helper()
-	b, _ := json.Marshal(map[string]any{"session_id": titleSession, "cwd": env.Cwd, "transcript_path": path, "hook_event_name": "Stop"})
+	runClaudeHook(t, env, stop, map[string]any{"transcript_path": path, "hook_event_name": "Stop"})
+}
+
+// runClaudeHook runs a Claude hook handler on the title session with the given input.
+func runClaudeHook(t *testing.T, env hookrun.Env, handler func(context.Context, hookrun.Env) error, in map[string]any) {
+	t.Helper()
+	in["session_id"], in["cwd"] = titleSession, env.Cwd
+	b, _ := json.Marshal(in)
 	env.Stdin = strings.NewReader(string(b))
-	if err := stop(context.Background(), env); err != nil {
+	if err := handler(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -240,5 +247,42 @@ func TestClaudeStopSendsAStreamingCallOnceItIsFinal(t *testing.T) {
 	got := spooledResponses(t, env.Spool)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
 		t.Fatalf("got %+v, want req_a with its final count", got)
+	}
+}
+
+// A turn that fails after a completed call has no Stop: its failure sends the call, and the
+// session's end does not send it again.
+func TestClaudeStopFailureSendsTheTurnsCompletedCalls(t *testing.T) {
+	env := titleEnv(t)
+	path := transcript(t, t.TempDir(),
+		assistantRecord("req_a", "2026-10-28T03:31:45Z", 76),
+		`{"type":"assistant","sessionId":"`+titleSession+`","timestamp":"2026-10-28T03:31:50Z","isApiErrorMessage":true,"error":"server_error","message":{"model":"<synthetic>","stop_reason":"stop_sequence","usage":{"output_tokens":0}}}`,
+	)
+	runClaudeHook(t, env, stopFailure, map[string]any{"transcript_path": path, "hook_event_name": "StopFailure", "error": "server_error"})
+	got := spooledResponses(t, env.Spool)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" {
+		t.Fatalf("got %+v, want req_a at the failure", got)
+	}
+	runClaudeHook(t, env, sessionEnd, map[string]any{"transcript_path": path, "hook_event_name": "SessionEnd"})
+	if again := spooledResponses(t, env.Spool); len(again) != 0 {
+		t.Fatalf("the session's end sent a call again: %+v", again)
+	}
+}
+
+// A final record written after the turn's Stop read the transcript is sent when the session ends.
+func TestClaudeSessionEndSendsACallFinishedAfterStop(t *testing.T) {
+	env := titleEnv(t)
+	path := transcript(t, t.TempDir(),
+		`{"type":"assistant","requestId":"req_a","timestamp":"2026-10-28T03:31:44Z","message":{"model":"claude-opus-5-5","stop_reason":null,"usage":{"output_tokens":243,"output_tokens_details":{"thinking_tokens":40}}}}`,
+	)
+	stopClaude(t, env, path)
+	if got := spooledResponses(t, env.Spool); len(got) != 0 {
+		t.Fatalf("a streaming call was sent: %+v", got)
+	}
+	appendTranscript(t, path, assistantRecord("req_a", "2026-10-28T03:31:45Z", 76)+"\n")
+	runClaudeHook(t, env, sessionEnd, map[string]any{"transcript_path": path, "hook_event_name": "SessionEnd"})
+	got := spooledResponses(t, env.Spool)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
+		t.Fatalf("got %+v, want req_a with its final count at the session's end", got)
 	}
 }
