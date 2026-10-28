@@ -24,7 +24,7 @@ var pinnedSafeKeys = []string{
 	"code.module.name", "codex.op", "codex.request.reasoning_effort", "codex.turn.phase",
 	"codex.turn.reasoning_effort", "command_category", "conversation.id",
 	"core_tools_enabled", "cost_usd", "cost_usd_micros", "credential_kind", "decision",
-	"decision_model", "decision_source", "dsh.purpose", "dsh.turn", "duration_ms", "effort",
+	"decision_model", "decision_source", "decision_type", "dsh.purpose", "dsh.turn", "duration_ms", "effort",
 	"embedding_model", "enabled_via", "encoding", "end_time", "endpoint",
 	"enduser.pseudo.id", "env",
 	"environment_id", "error.type", "error_class", "error_kind", "error_type", "event.kind", "event.name",
