@@ -141,20 +141,21 @@ func (a Agent) UnconfigureRelay(_ context.Context, token string) (agents.RelayRe
 // addr. It is unknown on a machine with no VS Code Copilot runs in, where only the CLI's
 // environment could say, where an endpoint in the shell keeps setup from writing the
 // settings, and where a TLS setting in the shell keeps the agent host from exporting to
-// them: RelayProblem says those.
+// settings that point at the relay: RelayProblem says those. Settings not written yet are
+// not pointed, TLS setting or not: setup writes them.
 // Accepted risk: an organization's Copilot telemetry policy outranks the settings and is not
 // read, so under one that manages the exporter this reports pointed while the relay gets
 // nothing. Upgrade path: read the managed configuration once its shape is known (README).
 func (Agent) RelayPointed(addr string) (pointed, known bool) {
 	dirs := vscodeUserDirs(false)
-	if len(dirs) > 0 && shellTLS() != "" {
-		return false, false
-	}
 	for _, dir := range dirs {
 		if !vscodePointed(filepath.Join(dir, "settings.json"), addr) {
 			_, blocked := shellEndpoint(addr)
 			return false, !blocked
 		}
+	}
+	if len(dirs) > 0 && shellTLS() != "" {
+		return false, false
 	}
 	return len(dirs) > 0, len(dirs) > 0
 }

@@ -399,6 +399,16 @@ func TestShellTLSKeepsVSCodeFromTheRelay(t *testing.T) {
 	}
 }
 
+// Settings setup has not written yet are not pointed, TLS setting or not: doctor asks for
+// setup, which unsetting the variable alone would never do.
+func TestShellTLSBeforeSetupStillAsksForSetup(t *testing.T) {
+	a, _ := sandbox(t)
+	t.Setenv("OTEL_EXPORTER_OTLP_CERTIFICATE", "/etc/otel/ca.pem")
+	if pointed, known := a.RelayPointed(relayAddr); pointed || !known {
+		t.Fatalf("RelayPointed before setup = %v, %v; want not pointed, known", pointed, known)
+	}
+}
+
 // Mutual TLS sets a certificate and its key together: both are named, so one unset clears them.
 func TestShellTLSNamesEverySetting(t *testing.T) {
 	a, _ := sandbox(t)
