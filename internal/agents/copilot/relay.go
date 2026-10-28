@@ -74,6 +74,10 @@ func (a Agent) configureVSCode(cfg agents.RelayConfig, out *agents.RelayResult) 
 	if restart {
 		out.Notes = append(out.Notes, "Restart VS Code so Copilot starts exporting there: it reads these settings as it starts.")
 	}
+	// The settings stay written: they are right, and export once the variable is gone.
+	if variable, set := shellTLS(); set && len(out.Paths) > 0 {
+		out.Notes = append(out.Notes, variable+" is exported in your shell, and with it Copilot in VS Code exports to an https:// endpoint alone, so it sends nothing to the relay. Unset "+variable+" where VS Code starts, then restart VS Code.")
+	}
 }
 
 func configureCLI(out *agents.RelayResult) {
@@ -154,6 +158,10 @@ func (Agent) RelayProblem(addr string) (detail, fix string, ok bool) {
 		return variable + " is exported in your shell, and VS Code reads it ahead of its settings, so Copilot in VS Code exports where it says and not to the relay",
 			"unset " + variable + " where VS Code starts, then run `terma setup`", true
 	}
+	if variable, set := shellTLS(); set && len(vscodeUserDirs(false)) > 0 {
+		return variable + " is exported in your shell, and with it Copilot in VS Code exports to an https:// endpoint alone, so it sends nothing to the relay",
+			"unset " + variable + " where VS Code starts, then restart VS Code", true
+	}
 	if _, err := exec.LookPath(command); err == nil && !shellrc.LauncherInstalled(command) {
 		quiet := ", so the Copilot CLI exports nothing when you start it yourself"
 		if shellrc.LaunchersOff() {
@@ -175,19 +183,21 @@ func (Agent) LaunchCommand() string { return command }
 // LaunchEnv is the CLI's exporter, pointed at the relay with all content: the relay
 // withholds what the team's policy does not collect. The token rides the endpoint path, as
 // in VS Code's settings: a header would also go to a per-signal endpoint of the
-// developer's own. Those, and a file exporter, would take the export elsewhere, so they
-// are cleared for this one process. The CLI keeps all of these out of what it runs.
+// developer's own. Those, and a file exporter, would take the export elsewhere, and a TLS
+// setting would stop it at the relay's plain HTTP, so they are cleared for this one process.
+// The CLI keeps all of these out of what it runs.
 func (Agent) LaunchEnv(cfg agents.RelayConfig) (set map[string]string, unset []string) {
+	unset = append([]string{
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+		"COPILOT_OTEL_ENDPOINT", "COPILOT_OTEL_EXPORTER_TYPE", "COPILOT_OTEL_FILE_EXPORTER_PATH",
+	}, tlsVariables...)
 	return map[string]string{
 		"COPILOT_OTEL_ENABLED":                               "true",
 		harness.EnvOTLPEndpoint:                              cfg.Endpoint + "/" + cfg.Token,
 		harness.EnvOTLPProtocol:                              "http/json",
 		"OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true",
-	}, []string{
-		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
-		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
-		"COPILOT_OTEL_ENDPOINT", "COPILOT_OTEL_EXPORTER_TYPE", "COPILOT_OTEL_FILE_EXPORTER_PATH",
-	}
+	}, unset
 }
 
 var (

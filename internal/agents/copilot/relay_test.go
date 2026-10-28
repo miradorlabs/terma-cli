@@ -64,6 +64,11 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 		!slices.Contains(unset, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") || !slices.Contains(unset, "COPILOT_OTEL_ENDPOINT") {
 		t.Fatalf("LaunchEnv = %v, %v", set, unset)
 	}
+	for _, name := range tlsVariables {
+		if !slices.Contains(unset, name) {
+			t.Errorf("LaunchEnv keeps %s, which stops the export at the relay's plain HTTP", name)
+		}
+	}
 	if _, has := set[harness.EnvOTLPHeaders]; has {
 		t.Error("the token is in a header a per-signal endpoint would also receive")
 	}
