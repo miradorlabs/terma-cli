@@ -136,19 +136,18 @@ function usageAttrs(u) {
   }
 }
 
-// rawChunk is the stream's last raw chunk of a type, from an attempt's compact stream records.
-function rawChunk(stream, type) {
-  if (!Array.isArray(stream)) return undefined
-  for (let i = stream.length - 1; i >= 0; i--) {
-    const r = stream[i]
-    if (r && r.type === "chunk" && r.chunk && r.chunk.type === type) return r.chunk
+// settlement is how an attempt's compact stream records ended, in one pass from the end: why
+// it stopped (its finish chunk's kind, never the failure beside it) and the usage it reported.
+function settlement(stream) {
+  let finish, usage
+  if (!Array.isArray(stream)) return { finish, usage }
+  for (let i = stream.length - 1; i >= 0 && (finish === undefined || usage === undefined); i--) {
+    const c = stream[i] && stream[i].type === "chunk" ? stream[i].chunk : undefined
+    if (!c) continue
+    if (finish === undefined && c.type === "finish" && c.reason) finish = c.reason.kind
+    if (usage === undefined && c.type === "usage") usage = c.usage
   }
-}
-
-// finishOf is why a model stream stopped: its finish chunk's kind, never the failure beside it.
-function finishOf(stream) {
-  const f = rawChunk(stream, "finish")
-  return f && f.reason ? f.reason.kind : undefined
+  return { finish, usage }
 }
 
 // --- terma hook ------------------------------------------------------------------------
@@ -170,6 +169,7 @@ const EDIT_TOOLS = new Set(["write", "edit", "multi_edit"])
 
 const cwds = new Map() // session → workspace
 const stepStart = new Map() // session → when its model step began
+const lastCall = new Map() // session → the model and provider of its agent loop's latest call
 const calls = new Map() // callId → { name, args, start }
 const ended = new Set()
 
@@ -232,7 +232,7 @@ export function apply(ctx) {
           "gen_ai.request.model": src.model,
           "gen_ai.response.model": src.model,
           "gen_ai.response.id": m.id,
-          "gen_ai.response.finish_reasons": finishOf(d.stream),
+          "gen_ai.response.finish_reasons": settlement(d.stream).finish,
           "dsh.turn": d.turn,
           ...usageAttrs(d.usage),
         })
@@ -241,15 +241,17 @@ export function apply(ctx) {
         break
       }
       // A model call that committed no message: failed, retried or cancelled. Its usage, when
-      // the provider billed any, is in its stream.
+      // the provider billed any, is in its stream; its model is the one the call streamed from.
       case "assistant/attempt": {
-        const finish = finishOf(d.stream)
-        const u = rawChunk(d.stream, "usage")
-        span(s, "chat", stepStart.get(s) || at, at, {
+        const { finish, usage } = settlement(d.stream)
+        const call = lastCall.get(s) || {}
+        span(s, "chat " + (call.model || ""), stepStart.get(s) || at, at, {
           "gen_ai.operation.name": "chat",
+          "gen_ai.provider.name": call.provider,
+          "gen_ai.request.model": call.model,
           "gen_ai.response.finish_reasons": finish,
           "dsh.turn": d.turn,
-          ...usageAttrs(u && u.usage),
+          ...usageAttrs(usage),
         }, finish !== "aborted")
         break
       }
@@ -284,13 +286,15 @@ export function apply(ctx) {
   // title) have a purpose and no assistant/message event, so their usage is spanned here.
   ctx.on("llm/stream", async function* (options, next) {
     const start = Date.now()
+    const s = String((options && options.sessionId) || "")
+    // An attempt is the agent loop's own call; an auxiliary one (the title) can run beside it.
+    if (s && options.model && !options.purpose) lastCall.set(s, { model: options.model, provider: options.provider })
     let usage, finish
     for await (const chunk of next()) {
       if (chunk && chunk.type === "usage") usage = chunk.usage
       if (chunk && chunk.type === "finish" && chunk.reason) finish = chunk.reason.kind
       yield chunk
     }
-    const s = String((options && options.sessionId) || "")
     if (s && options.purpose && usage) {
       span(s, "chat " + (options.model || ""), start, Date.now(), {
         "gen_ai.operation.name": "chat",

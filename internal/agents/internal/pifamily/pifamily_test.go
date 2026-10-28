@@ -1,7 +1,10 @@
 package pifamily
 
 import (
+	"encoding/json"
+	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,5 +33,53 @@ func TestWrite(t *testing.T) {
 	}
 	if !strings.Contains(template, configMarker) {
 		t.Fatal("the raw template must stay inert, with its configuration line")
+	}
+}
+
+// The served model and the reasoning count are read under Pi's names and omp's, a reported 0
+// stays 0, and a count neither reports stays absent rather than 0.
+func TestExtensionReadsPiAndOmpResponses(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("no node")
+	}
+	// TypeScript runs under Node's type stripping, from 22.6.
+	if out, err := exec.Command(node, "--experimental-strip-types", "--no-warnings", "-e", "").CombinedOutput(); err != nil {
+		t.Skipf("node cannot strip types: %v %s", err, out)
+	}
+	text, err := Render(Config{Agent: "omp", Endpoint: "http://127.0.0.1:1", HookCommand: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "terma.ts")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	driver, err := filepath.Abs(filepath.Join("testdata", "drive.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(node, "--experimental-strip-types", "--no-warnings", driver, path).Output()
+	if err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	got := map[string][2]string{}
+	for line := range strings.Lines(string(out)) {
+		var s struct {
+			Attrs map[string]string `json:"attrs"`
+		}
+		if err := json.Unmarshal([]byte(line), &s); err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		reasoning, ok := s.Attrs["gen_ai.usage.reasoning.output_tokens"]
+		if !ok {
+			reasoning = "absent"
+		}
+		got[s.Attrs["gen_ai.response.id"]] = [2]string{s.Attrs["gen_ai.response.model"], reasoning}
+	}
+	want := map[string][2]string{"r-pi": {"pi-served", "4"}, "r-omp": {"omp-served", "0"}, "r-none": {"requested", "absent"}}
+	if !maps.Equal(got, want) {
+		t.Fatalf("served model and reasoning count by response: got %v, want %v", got, want)
 	}
 }

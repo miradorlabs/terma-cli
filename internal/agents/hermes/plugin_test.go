@@ -1,6 +1,7 @@
 package hermes
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,5 +42,55 @@ func TestRenderHermesPluginIsValidPython(t *testing.T) {
 	}
 	if out, err := exec.Command(python, "-c", "import sys; sys.path.insert(0, sys.argv[1]); import raw; assert raw.CONFIG is None", dir).CombinedOutput(); err != nil {
 		t.Fatalf("the raw template is not inert: %v\n%s", err, out)
+	}
+}
+
+// A failed call is a chat span of its own, with its failure's category and status code; the
+// error's message and the request beside it never leave.
+func TestPluginSpansAFailedCall(t *testing.T) {
+	t.Parallel()
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("no python3")
+	}
+	text, err := renderPlugin(pluginConfig{Endpoint: "http://127.0.0.1:1", HookCommand: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "termaplug.py"), []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(python, "-I", filepath.Join("testdata", "drive.py"), dir).Output()
+	if err != nil {
+		t.Fatalf("python: %v\n%s", err, out)
+	}
+	type line struct {
+		Name    string            `json:"name"`
+		Error   bool              `json:"error"`
+		Attrs   map[string]string `json:"attrs"`
+		Private *bool             `json:"private"`
+	}
+	var spans []line
+	for raw := range strings.Lines(string(out)) {
+		var s line
+		if err := json.Unmarshal([]byte(raw), &s); err != nil {
+			t.Fatalf("%q: %v", raw, err)
+		}
+		spans = append(spans, s)
+	}
+	if len(spans) != 3 || spans[2].Private == nil {
+		t.Fatalf("got %+v, want two spans and the private-text verdict", spans)
+	}
+	if *spans[2].Private {
+		t.Fatal("the export holds the failure's message or request")
+	}
+	ok, failed := spans[0], spans[1]
+	if ok.Error || ok.Attrs["gen_ai.response.model"] != "m-served" || ok.Attrs["error.type"] != "" {
+		t.Errorf("successful call: %+v", ok)
+	}
+	if !failed.Error || failed.Name != "chat m" || failed.Attrs["error.type"] != "rate_limit" ||
+		failed.Attrs["http.response.status_code"] != "429" || failed.Attrs["gen_ai.response.id"] != "t1:api:2" {
+		t.Errorf("failed call: %+v", failed)
 	}
 }
