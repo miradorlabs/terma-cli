@@ -71,12 +71,15 @@ func (a Agent) configureVSCode(cfg agents.RelayConfig, out *agents.RelayResult) 
 			out.Notes = append(out.Notes, note)
 		}
 	}
+	// The settings stay written: they are right, and export once the variables are gone. Until
+	// then they wait on the developer, so setup does not say Copilot exports to the relay.
+	if names := shellTLS(); names != "" && len(out.Paths) > 0 {
+		out.Pending = true
+		out.Notes = append(out.Notes, names+" exported in your shell keeps Copilot in VS Code exporting to an https:// endpoint alone, so it sends nothing to the relay. Unset "+names+" where VS Code starts, then restart VS Code.")
+		return
+	}
 	if restart {
 		out.Notes = append(out.Notes, "Restart VS Code so Copilot starts exporting there: it reads these settings as it starts.")
-	}
-	// The settings stay written: they are right, and export once the variable is gone.
-	if variable, set := shellTLS(); set && len(out.Paths) > 0 {
-		out.Notes = append(out.Notes, variable+" is exported in your shell, and with it Copilot in VS Code exports to an https:// endpoint alone, so it sends nothing to the relay. Unset "+variable+" where VS Code starts, then restart VS Code.")
 	}
 }
 
@@ -136,13 +139,17 @@ func (a Agent) UnconfigureRelay(_ context.Context, token string) (agents.RelayRe
 
 // RelayPointed reports whether the exporter of VS Code's agent host sends to the relay at
 // addr. It is unknown on a machine with no VS Code Copilot runs in, where only the CLI's
-// environment could say, and where an endpoint in the shell keeps setup from writing the
-// settings: RelayProblem says that.
+// environment could say, where an endpoint in the shell keeps setup from writing the
+// settings, and where a TLS setting in the shell keeps the agent host from exporting to
+// them: RelayProblem says those.
 // Accepted risk: an organization's Copilot telemetry policy outranks the settings and is not
 // read, so under one that manages the exporter this reports pointed while the relay gets
 // nothing. Upgrade path: read the managed configuration once its shape is known (README).
 func (Agent) RelayPointed(addr string) (pointed, known bool) {
 	dirs := vscodeUserDirs(false)
+	if len(dirs) > 0 && shellTLS() != "" {
+		return false, false
+	}
 	for _, dir := range dirs {
 		if !vscodePointed(filepath.Join(dir, "settings.json"), addr) {
 			_, blocked := shellEndpoint(addr)
@@ -158,9 +165,9 @@ func (Agent) RelayProblem(addr string) (detail, fix string, ok bool) {
 		return variable + " is exported in your shell, and VS Code reads it ahead of its settings, so Copilot in VS Code exports where it says and not to the relay",
 			"unset " + variable + " where VS Code starts, then run `terma setup`", true
 	}
-	if variable, set := shellTLS(); set && len(vscodeUserDirs(false)) > 0 {
-		return variable + " is exported in your shell, and with it Copilot in VS Code exports to an https:// endpoint alone, so it sends nothing to the relay",
-			"unset " + variable + " where VS Code starts, then restart VS Code", true
+	if names := shellTLS(); names != "" && len(vscodeUserDirs(false)) > 0 {
+		return names + " exported in your shell keeps Copilot in VS Code exporting to an https:// endpoint alone, so it sends nothing to the relay",
+			"unset " + names + " where VS Code starts, then restart VS Code", true
 	}
 	if _, err := exec.LookPath(command); err == nil && !shellrc.LauncherInstalled(command) {
 		quiet := ", so the Copilot CLI exports nothing when you start it yourself"

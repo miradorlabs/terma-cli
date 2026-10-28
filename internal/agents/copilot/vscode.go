@@ -116,16 +116,18 @@ var tlsVariables = []string{
 	"OTEL_EXPORTER_OTLP_CLIENT_KEY", "OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY", "OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY",
 }
 
-// shellTLS names a TLS setting of the exporter exported where terma runs, which keeps the
-// agent host VS Code starts from that shell from exporting to the relay. The value is a path,
-// but only the name is returned, as for an endpoint.
-func shellTLS() (string, bool) {
+// shellTLS names the TLS settings of the exporter exported where terma runs, each of which
+// keeps the agent host VS Code starts from that shell from exporting to the relay. All are
+// named, since mutual TLS sets a certificate and a key together. Each value is a path, but
+// only the names are returned, as for an endpoint.
+func shellTLS() string {
+	var set []string
 	for _, name := range tlsVariables {
 		if os.Getenv(name) != "" {
-			return name, true
+			set = append(set, name)
 		}
 	}
-	return "", false
+	return strings.Join(set, " ")
 }
 
 // shellEndpoint names an exporter variable exported where terma runs that sends the agent
