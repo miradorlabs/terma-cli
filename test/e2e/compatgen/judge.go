@@ -260,8 +260,8 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 
 // pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from
 // one span and new on another in the last build judged, with the same event name, and the same
-// keys as before (the build it was judged against) sent and now (it) sends; a surface gone or
-// new in an earlier build has no keys in one of them. An event name more than one gone or new
+// keys as before (the build it was judged against) sent and now (it) sends; a surface gone in an
+// earlier build has no keys in before, and one new in an earlier build is in before. An event name more than one gone or new
 // surface carries is left as it is: tracing names an event after its file, so names repeat. A
 // move has no source note.
 func (d *HarnessDrift) pairMoves(before, now sending) {
@@ -283,7 +283,7 @@ func (d *HarnessDrift) pairMoves(before, now sending) {
 		}
 		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
 		keys := keysOn(now, s.Surface)
-		if len(keys) == 0 || !slices.Equal(keysOn(before, g.Surface), keys) {
+		if len(keys) == 0 || slices.Contains(before.surfaces, s.Surface) || !slices.Equal(keysOn(before, g.Surface), keys) {
 			continue
 		}
 		from, _, _ := spanEvent(g.Surface)

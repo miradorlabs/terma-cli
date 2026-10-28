@@ -351,8 +351,8 @@ func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
 
 // A span event is no move where its keys changed, where its name is on more than one surface
 // gone or new (tracing names events after their file), where it moved in an earlier build of
-// the night, or where the new build's census is partial: each is said as surfaces gone and new,
-// as before.
+// the night, where an earlier build sent it on both spans before the last dropped one, or where
+// the new build's census is partial: each is said as surfaces gone and new, as before.
 func TestASpanEventThatIsNoMove(t *testing.T) {
 	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
 	tonight := day.Add(24 * time.Hour)
@@ -381,6 +381,10 @@ func TestASpanEventThatIsNoMove(t *testing.T) {
 		{"two surfaces new", append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
 			promptRows("0.165.0", tonight, "other_span", "prompt_length", "slug")[1:]...), runs(false, "0.165.0"), 1, 2},
 		{"moved in an earlier build", append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
+			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
+			runs(false, "0.165.0", "0.166.0"), 1, 1},
+		{"on both spans in an earlier build", append(append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
+			promptRows("0.165.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:]...),
 			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
 			runs(false, "0.165.0", "0.166.0"), 1, 1},
 		{"partial", append(moved("0.165.0", "prompt_length", "slug"), sessionInit), runs(true, "0.165.0"), 0, 1},
