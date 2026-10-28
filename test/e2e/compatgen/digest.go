@@ -88,9 +88,9 @@ type HarnessDrift struct {
 	// still sends, and surfaces. See fieldDrift for when a build is judged.
 	Removed []FieldChange `json:"removed,omitempty"`
 	Unseen  []GoneSurface `json:"unseen,omitempty"`
-	// Moved are span events Version sends on another span than the build it was judged against
-	// did: a gone surface and a new one with the same event name and keys, taken out of Unseen
-	// and NewSurfaces (pairMoves).
+	// Moved are span events the last build judged sends on another span than the build it was
+	// judged against did: a gone surface and a new one with the same event name and keys, taken
+	// out of Unseen and NewSurfaces (pairMoves).
 	Moved []MovedEvent `json:"moved,omitempty"`
 	// Compare links the source's changes from Previous to Version, where it is public.
 	Compare string `json:"compare,omitempty"`

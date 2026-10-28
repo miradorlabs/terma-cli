@@ -350,32 +350,44 @@ func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
 }
 
 // A span event is no move where its keys changed, where its name is on more than one surface
-// gone (tracing names events after their file), or where the new build's census is partial:
-// each is said as a surface gone and one new, as before.
+// gone or new (tracing names events after their file), where it moved in an earlier build of
+// the night, or where the new build's census is partial: each is said as surfaces gone and new,
+// as before.
 func TestASpanEventThatIsNoMove(t *testing.T) {
 	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
 	tonight := day.Add(24 * time.Hour)
 	var cat Catalog
 	mergeFields(&cat, append(promptRows("0.164.0", day, "codex.turn_input", "prompt_length", "slug"),
 		field("0.164.0", "traces/session_init/events/"+promptEvent, "slug", "safe", day)), nil)
-	whole := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}})
-	for _, c := range []struct {
-		name string
-		rows []e2e.FieldRow
-		ran  censusRuns
-	}{
-		{"keys changed", promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "slug"), whole},
-		{"two surfaces gone", promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "prompt_length", "slug"), whole},
-		{"partial", promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "prompt_length", "slug"),
-			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0", Failed: true}})},
-	} {
-		rows := c.rows
-		if c.name != "two surfaces gone" {
-			rows = append(rows, field("0.165.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))
+	sessionInit := field("0.165.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight)
+	moved := func(version string, keys ...string) []e2e.FieldRow {
+		return promptRows(version, tonight, "run_hooks_and_record_inputs", keys...)
+	}
+	runs := func(failed bool, versions ...string) censusRuns {
+		var rs []e2e.CensusRun
+		for _, v := range versions {
+			rs = append(rs, e2e.CensusRun{Harness: "codex", Version: v, Failed: failed})
 		}
-		_, _, hs := fieldDrift(cat, rows, c.ran, tonight)
-		if h := hs[0]; len(h.Moved) != 0 || len(h.NewSurfaces) != 1 {
-			t.Errorf("%s: moved %+v, new %+v, unseen %+v", c.name, h.Moved, h.NewSurfaces, h.Unseen)
+		return censusRan(rs)
+	}
+	for _, c := range []struct {
+		name        string
+		rows        []e2e.FieldRow
+		ran         censusRuns
+		unseen, new int
+	}{
+		{"keys changed", append(moved("0.165.0", "slug"), sessionInit), runs(false, "0.165.0"), 1, 1},
+		{"two surfaces gone", moved("0.165.0", "prompt_length", "slug"), runs(false, "0.165.0"), 2, 1},
+		{"two surfaces new", append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
+			promptRows("0.165.0", tonight, "other_span", "prompt_length", "slug")[1:]...), runs(false, "0.165.0"), 1, 2},
+		{"moved in an earlier build", append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
+			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
+			runs(false, "0.165.0", "0.166.0"), 1, 1},
+		{"partial", append(moved("0.165.0", "prompt_length", "slug"), sessionInit), runs(true, "0.165.0"), 0, 1},
+	} {
+		_, _, hs := fieldDrift(cat, c.rows, c.ran, tonight)
+		if h := hs[0]; len(h.Moved) != 0 || len(h.Unseen) != c.unseen || len(h.NewSurfaces) != c.new {
+			t.Errorf("%s: moved %+v, unseen %+v, new %+v", c.name, h.Moved, h.Unseen, h.NewSurfaces)
 		}
 	}
 }

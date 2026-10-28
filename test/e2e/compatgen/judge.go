@@ -209,6 +209,7 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 	d.Earlier, d.EarlierPartial = b.earlier, b.partial
 	removedAt, unseenAt := map[string]int{}, map[string]int{}
 	base := b.base
+	var judgedAgainst sending
 	for i, v := range b.chain {
 		in := ""
 		if v != last {
@@ -252,26 +253,26 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 			unseenAt[s] = len(d.Unseen)
 			d.Unseen = append(d.Unseen, g)
 		}
-		if v == d.Version {
-			d.pairMoves(base, now)
-		}
-		base = now
+		judgedAgainst, base = base, now
 	}
+	d.pairMoves(judgedAgainst, base)
 }
 
 // pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from
-// one span and new on another in Version, with the same event name and, as before sent it and
-// now sends it, the same keys. An event name more than one gone or new surface carries is left
-// as it is: tracing names an event after its file, so names repeat.
+// one span and new on another in the last build judged, with the same event name, and the same
+// keys as before (the build it was judged against) sent and now (it) sends; a surface gone or
+// new in an earlier build has no keys in one of them. An event name more than one gone or new
+// surface carries is left as it is: tracing names an event after its file, so names repeat. A
+// move has no source note.
 func (d *HarnessDrift) pairMoves(before, now sending) {
 	gone, came := map[string][]int{}, map[string][]int{}
 	for i, g := range d.Unseen {
-		if _, event, ok := spanEvent(g.Surface); ok && g.In == "" {
+		if _, event, ok := spanEvent(g.Surface); ok {
 			gone[event] = append(gone[event], i)
 		}
 	}
 	for i, s := range d.NewSurfaces {
-		if _, event, ok := spanEvent(s.Surface); ok && s.From == "" {
+		if _, event, ok := spanEvent(s.Surface); ok {
 			came[event] = append(came[event], i)
 		}
 	}
@@ -281,12 +282,13 @@ func (d *HarnessDrift) pairMoves(before, now sending) {
 			continue
 		}
 		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
-		if !slices.Equal(keysOn(before, g.Surface), keysOn(now, s.Surface)) {
+		keys := keysOn(now, s.Surface)
+		if len(keys) == 0 || !slices.Equal(keysOn(before, g.Surface), keys) {
 			continue
 		}
 		from, _, _ := spanEvent(g.Surface)
 		to, _, _ := spanEvent(s.Surface)
-		d.Moved = append(d.Moved, MovedEvent{Event: event, From: from, To: to, Keys: s.Keys})
+		d.Moved = append(d.Moved, MovedEvent{Event: event, From: from, To: to, Keys: len(keys)})
 		moved[gone[event][0]], arrived[came[event][0]] = true, true
 	}
 	d.Unseen = dropMarked(d.Unseen, moved)
