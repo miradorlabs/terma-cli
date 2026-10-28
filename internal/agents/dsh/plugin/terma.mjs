@@ -226,6 +226,8 @@ export function apply(ctx) {
       case "assistant/message": {
         const m = d.message || {}
         const src = m.source || {}
+        // The message settles the loop's call in flight; an attempt after it streams its own.
+        lastCall.delete(s)
         span(s, "chat " + (src.model || ""), stepStart.get(s) || at, at, {
           "gen_ai.operation.name": "chat",
           "gen_ai.provider.name": src.provider,

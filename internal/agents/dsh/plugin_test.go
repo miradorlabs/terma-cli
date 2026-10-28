@@ -129,10 +129,10 @@ func TestPluginSpansEachModelCall(t *testing.T) {
 		error                          bool
 	}{
 		{"chat deepseek-v4", "tool-calls", "4", "5", false},
-		{"chat deepseek-v4", "error", "", "5", true},
-		{"chat deepseek-v4", "aborted", "", "", false},
-		{"chat deepseek-title", "stop", "", "1", false},
-		{"chat deepseek-v4", "error", "", "", true},
+		{"chat deepseek-v4", "error", "absent", "5", true},
+		{"chat deepseek-v4", "aborted", "absent", "", false},
+		{"chat deepseek-title", "stop", "absent", "1", false},
+		{"chat deepseek-v4", "error", "absent", "", true},
 	}
 	if len(spans) != len(want) {
 		t.Fatalf("got %d spans, want %d: %+v", len(spans), len(want), spans)
@@ -140,9 +140,14 @@ func TestPluginSpansEachModelCall(t *testing.T) {
 	for i, w := range want {
 		s := spans[i]
 		model := strings.TrimPrefix(w.name, "chat ")
+		// An unreported count must stay absent, never collapse into a reported one.
+		reasoning, ok := s.Attrs["gen_ai.usage.reasoning.output_tokens"]
+		if !ok {
+			reasoning = "absent"
+		}
 		if s.Name != w.name || s.Error != w.error || s.Attrs["gen_ai.response.finish_reasons"] != w.finish ||
 			s.Attrs["gen_ai.request.model"] != model || s.Attrs["gen_ai.provider.name"] != "deepseek" ||
-			s.Attrs["gen_ai.usage.reasoning.output_tokens"] != w.reasoning || s.Attrs["gen_ai.usage.input_tokens"] != w.input {
+			reasoning != w.reasoning || s.Attrs["gen_ai.usage.input_tokens"] != w.input {
 			t.Errorf("span %d = %+v, want %+v", i, s, w)
 		}
 	}
