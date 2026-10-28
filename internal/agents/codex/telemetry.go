@@ -32,7 +32,11 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// spans, and the hosting product. Each a fixed vocabulary in codex-rs
 			// (otel/src/auth_storage.rs, bounded_product_sku: "codex" or "other").
 			"actual_store", "selected_store", "store_mode", "storage_phase", "credential_kind", "secure_outcome", "secure_error", "fallback_reason",
-			"codex.turn.phase", "product_sku"},
+			"codex.turn.phase", "product_sku",
+			// The service tier a response.completed event's call asked for, not the one that
+			// served it: priority, flex, default or a model catalog's tier id (0.164
+			// core/src/client.rs session_telemetry_for_request, protocol/src/config_types.rs).
+			"service_tier"},
 		SafePrefixes: []string{"codex.turn.token_usage.", "codex.usage."},
 		// A shell snapshot's state is one of protected, prewarm_pending, prewarm_ready or
 		// unavailable (codex-rs core/src/tools/runtimes/unified_exec/snapshot_metrics.rs, from

@@ -131,7 +131,24 @@ function usageAttrs(u) {
     "gen_ai.usage.cache_read.input_tokens": u.cacheReadTokens,
     "gen_ai.usage.cache_creation.input_tokens": u.cacheWriteTokens,
     "gen_ai.usage.total_tokens": u.totalTokens,
+    // Absent when the adapter reports none, which is not zero.
+    "gen_ai.usage.reasoning.output_tokens": u.reasoningTokens,
   }
+}
+
+// rawChunk is the stream's last raw chunk of a type, from an attempt's compact stream records.
+function rawChunk(stream, type) {
+  if (!Array.isArray(stream)) return undefined
+  for (let i = stream.length - 1; i >= 0; i--) {
+    const r = stream[i]
+    if (r && r.type === "chunk" && r.chunk && r.chunk.type === type) return r.chunk
+  }
+}
+
+// finishOf is why a model stream stopped: its finish chunk's kind, never the failure beside it.
+function finishOf(stream) {
+  const f = rawChunk(stream, "finish")
+  return f && f.reason ? f.reason.kind : undefined
 }
 
 // --- terma hook ------------------------------------------------------------------------
@@ -215,11 +232,25 @@ export function apply(ctx) {
           "gen_ai.request.model": src.model,
           "gen_ai.response.model": src.model,
           "gen_ai.response.id": m.id,
+          "gen_ai.response.finish_reasons": finishOf(d.stream),
           "dsh.turn": d.turn,
           ...usageAttrs(d.usage),
         })
         const reply = text(m.content)
         if (reply) record(s, "dsh.assistant_response", CONFIG.includePrompts ? truncate(reply, MAX_TEXT) : "", { response_length: reply.length })
+        break
+      }
+      // A model call that committed no message: failed, retried or cancelled. Its usage, when
+      // the provider billed any, is in its stream.
+      case "assistant/attempt": {
+        const finish = finishOf(d.stream)
+        const u = rawChunk(d.stream, "usage")
+        span(s, "chat", stepStart.get(s) || at, at, {
+          "gen_ai.operation.name": "chat",
+          "gen_ai.response.finish_reasons": finish,
+          "dsh.turn": d.turn,
+          ...usageAttrs(u && u.usage),
+        }, finish !== "aborted")
         break
       }
       case "tool/call":
@@ -253,9 +284,10 @@ export function apply(ctx) {
   // title) have a purpose and no assistant/message event, so their usage is spanned here.
   ctx.on("llm/stream", async function* (options, next) {
     const start = Date.now()
-    let usage
+    let usage, finish
     for await (const chunk of next()) {
       if (chunk && chunk.type === "usage") usage = chunk.usage
+      if (chunk && chunk.type === "finish" && chunk.reason) finish = chunk.reason.kind
       yield chunk
     }
     const s = String((options && options.sessionId) || "")
@@ -264,6 +296,7 @@ export function apply(ctx) {
         "gen_ai.operation.name": "chat",
         "gen_ai.provider.name": options.provider,
         "gen_ai.request.model": options.model,
+        "gen_ai.response.finish_reasons": finish,
         "dsh.purpose": options.purpose,
         ...usageAttrs(usage),
       })

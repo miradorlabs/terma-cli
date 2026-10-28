@@ -271,6 +271,26 @@ def _on_post_api_request(session_id="", model="", response_model="", provider=""
     }, error=finish_reason == "error")
 
 
+def _on_api_request_error(session_id="", model="", provider="", started_at=None, ended_at=None, api_request_id="",
+                          turn_id="", status_code=None, reason="", error=None, **_):
+    # A call that failed fires this in place of post_api_request. Only its failure's category
+    # leaves: the error's message and the request beside it can hold private text.
+    if not session_id:
+        return
+    end = ended_at or time.time()
+    start = started_at or end
+    kind = reason or (error.get("type") if isinstance(error, dict) else "")
+    _span(session_id, "chat " + (model or ""), start, end, {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": provider,
+        "gen_ai.request.model": model,
+        "gen_ai.response.id": api_request_id,
+        "error.type": kind if isinstance(kind, str) else "",
+        "http.response.status_code": status_code if isinstance(status_code, int) and not isinstance(status_code, bool) else None,
+        "hermes.turn_id": turn_id,
+    }, error=True)
+
+
 def _on_post_tool_call(session_id="", tool_name="", args=None, result=None, tool_call_id="", duration_ms=None,
                        status="", turn_id="", **_):
     if not session_id:
@@ -312,6 +332,7 @@ def register(ctx):
         ("pre_llm_call", _on_pre_llm_call),
         ("post_llm_call", _on_post_llm_call),
         ("post_api_request", _on_post_api_request),
+        ("api_request_error", _on_api_request_error),
         ("post_tool_call", _on_post_tool_call),
         ("on_session_end", _on_session_end),
         ("on_session_finalize", _on_session_finalize),
