@@ -3,6 +3,7 @@ package main
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/e2e"
 )
@@ -34,7 +35,7 @@ func (n night) sends(version string) sending {
 	keys, surfaces := map[string]FieldChange{}, map[string]bool{}
 	for _, r := range n.rows {
 		if r.Version == version {
-			keys[fieldID(r.Surface, r.Key)] = FieldChange{Surface: r.Surface, Key: r.Key, Class: r.Class, Kinds: r.Kinds}
+			keys[fieldID(r.Surface, r.Key)] = FieldChange{Surface: r.Surface, Key: r.Key, Event: r.Event, Class: r.Class, Kinds: r.Kinds}
 			surfaces[r.Surface] = true
 		}
 	}
@@ -175,7 +176,7 @@ func chooseBaseline(cat Catalog, n night, judged []string, first bool) (b baseli
 	b = baseline{since: whole.Version, base: sending{map[string]FieldChange{}, whole.Surfaces}, chain: judged}
 	for _, f := range cat.Fields {
 		if f.Harness == n.harness && slices.Contains(f.Whole, whole.Version) {
-			b.base.keys[fieldID(f.Surface, f.Key)] = FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds}
+			b.base.keys[fieldID(f.Surface, f.Key)] = FieldChange{Surface: f.Surface, Key: f.Key, Event: f.Event, Class: f.Class, Kinds: f.Kinds}
 		}
 	}
 	switch again := n.sends(whole.Version); {
@@ -208,6 +209,7 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 	d.Earlier, d.EarlierPartial = b.earlier, b.partial
 	removedAt, unseenAt := map[string]int{}, map[string]int{}
 	base := b.base
+	var judgedAgainst sending
 	for i, v := range b.chain {
 		in := ""
 		if v != last {
@@ -251,6 +253,95 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 			unseenAt[s] = len(d.Unseen)
 			d.Unseen = append(d.Unseen, g)
 		}
-		base = now
+		judgedAgainst, base = base, now
 	}
+	d.pairMoves(n, last, judgedAgainst, base)
+}
+
+// pairMoves turns a gone and a new surface of the last build judged into one Moved, taking them
+// out of Unseen and NewSurfaces, where they are the same span event on another span: before, the
+// build last was judged against, sent the old one as a span event and last sends the new one as
+// the same event (e2e.FieldRow.Event), with the same keys, and
+//   - the old span went in last itself, not in an earlier build;
+//   - no build older than last sent the new span tonight, its census whole or partial: the new
+//     span is that build's new surface (fieldsOf);
+//   - no other surface gone in last or new carries the event (tracing names an event after its
+//     file, so names repeat).
+//
+// A move has no source note. A surface whose event no census has named yet (a catalog entry filed
+// before rows carried it) is no span event, so it is said gone or new, as before.
+//
+// Accepted risk: another event from the same file that went from one span while a new span got
+// one with the same keys reads as a move, hiding a surface no longer sent; the upgrade path is to
+// match on the event.name value, which the census does not keep.
+func (d *HarnessDrift) pairMoves(n night, last string, before, now sending) {
+	gone, came := map[string][]int{}, map[string][]int{}
+	for i, g := range d.Unseen {
+		if event := eventOf(before, g.Surface); event != "" && g.In == "" {
+			gone[event] = append(gone[event], i)
+		}
+	}
+	for i, s := range d.NewSurfaces {
+		if event := eventOf(now, s.Surface); event != "" {
+			came[event] = append(came[event], i)
+		}
+	}
+	moved, arrived := map[int]bool{}, map[int]bool{}
+	for _, event := range slices.Sorted(maps.Keys(gone)) {
+		if len(gone[event]) != 1 || len(came[event]) != 1 {
+			continue
+		}
+		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
+		keys := keysOn(now, s.Surface)
+		if n.sentBefore(last, s.Surface) || !slices.Equal(keysOn(before, g.Surface), keys) {
+			continue
+		}
+		d.Moved = append(d.Moved, MovedEvent{Event: event, From: spanOf(g.Surface, event), To: spanOf(s.Surface, event), Keys: len(keys)})
+		moved[gone[event][0]], arrived[came[event][0]] = true, true
+	}
+	d.Unseen = dropMarked(d.Unseen, moved)
+	d.NewSurfaces = dropMarked(d.NewSurfaces, arrived)
+}
+
+// sentBefore reports whether a build older than version sent surface tonight.
+func (n night) sentBefore(version, surface string) bool {
+	return slices.ContainsFunc(n.rows, func(r e2e.FieldRow) bool { return r.Surface == surface && versionLess(r.Version, version) })
+}
+
+// keysOn are the keys s sent on surface, sorted.
+func keysOn(s sending, surface string) []string {
+	var keys []string
+	for _, c := range s.keys {
+		if c.Surface == surface {
+			keys = append(keys, c.Key)
+		}
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+// eventOf is the span event surface is, as s sent it; none for a surface that is no span event.
+func eventOf(s sending, surface string) string {
+	for _, c := range s.keys {
+		if c.Surface == surface && c.Event != "" {
+			return c.Event
+		}
+	}
+	return ""
+}
+
+// spanOf is the span a span event surface is on: traces/<span>/events/<event>.
+func spanOf(surface, event string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(surface, "traces/"), "/events/"+event)
+}
+
+// dropMarked is s without the elements whose index is marked.
+func dropMarked[T any](s []T, marked map[int]bool) []T {
+	out := s[:0]
+	for i, v := range s {
+		if !marked[i] {
+			out = append(out, v)
+		}
+	}
+	return out
 }
