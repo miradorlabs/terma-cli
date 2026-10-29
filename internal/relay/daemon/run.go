@@ -364,11 +364,8 @@ func listen(dir, addr string) (net.Listener, error) {
 // finds its hold empty, no export in flight and none for updateQuiet (for none at all after
 // updatePauseWait), however long that takes: the release is already in place for every
 // hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
-// on disk, so a route still retrying never keeps it. A newer terma asking it to make way
-// cuts that wait short, as for any relay: once the hold is empty, or replacedMaxWait after
-// the request, since an earlier release left running refreshes sign-in tokens outside the
-// lock the newer one takes. It still stops as updated, so the new release refreshes what
-// earlier ones installed (afterRelay).
+// on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
+// is answered by that same wait.
 func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan Pass) (stopReason, string, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
@@ -403,20 +400,19 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		if replacing.IsZero() && requested(dir, ReplaceFile) {
 			replacing = time.Now()
 		}
-		// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
-		makeWay := !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait)
 		if !upgraded.IsZero() {
 			quiet := updateQuiet
 			if time.Since(upgraded) >= updatePauseWait {
 				quiet = 0
 			}
-			if makeWay || r.Quiesce(quiet) {
+			if r.Quiesce(quiet) {
 				if installed.Replaced {
 					return stopUpdatedByAnother, installed.Installed, nil
 				}
 				return stopUpdated, installed.Installed, nil
 			}
-		} else if makeWay {
+		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
+			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
 			return stopReplaced, installed.Installed, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
