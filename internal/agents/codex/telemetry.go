@@ -33,11 +33,8 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// (otel/src/auth_storage.rs, bounded_product_sku: "codex" or "other").
 			"actual_store", "selected_store", "store_mode", "storage_phase", "credential_kind", "secure_outcome", "secure_error", "fallback_reason",
 			"codex.turn.phase", "product_sku",
-			// 0.166: a tool dispatch span's phase, only ever "dispatch" (core/src/tools/parallel.rs),
-			// and the shell snapshot rollout cohort exec_command tags its codex.tool.call and
-			// codex.tool.call.duration_ms points with, "v2", "v1" or "disabled"
-			// (core/src/tools/handlers/unified_exec/exec_command.rs).
-			"codex.tool.phase", "shell_snapshot_mode"},
+			// 0.166: a tool dispatch span's phase, only ever "dispatch" (core/src/tools/parallel.rs).
+			"codex.tool.phase"},
 		SafePrefixes: []string{"codex.turn.token_usage.", "codex.usage."},
 		// A shell snapshot's state is one of protected, prewarm_pending, prewarm_ready or
 		// unavailable (codex-rs core/src/tools/runtimes/unified_exec/snapshot_metrics.rs, from
@@ -58,6 +55,11 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// direct_model_only, deferred, deferred_model_only, code_mode_only, hidden) and a
 			// ToolMode (direct, code_mode, code_mode_only).
 			"codex.tools.registered": {"exposure", "tool_mode"},
+			// 0.166's shell snapshot rollout cohort, "v2", "v1" or "disabled", which exec_command
+			// tags its tool call points with and nothing else
+			// (core/src/tools/handlers/unified_exec/exec_command.rs).
+			"codex.tool.call":             {"shell_snapshot_mode"},
+			"codex.tool.call.duration_ms": {"shell_snapshot_mode"},
 		},
 		// The backend keys a Codex seat on the workspace and the login; the email is withheld.
 		Principal: shape.Principal{Scope: "user.account_id", Email: "user.email"},
