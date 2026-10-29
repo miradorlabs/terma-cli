@@ -68,7 +68,7 @@ func lockOnce(ctx context.Context, path string) (*lockedFile, error) {
 			return nil, ctx.Err()
 		case <-timer.C:
 		}
-		wait = min(wait*2, pollMax)
+		wait = min(wait*2, PollMax)
 	}
 	return &lockedFile{f}, nil
 }

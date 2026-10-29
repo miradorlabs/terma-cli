@@ -92,12 +92,12 @@ type Client struct {
 	// tokenGen counts credential replacements, so a 401 that raced another goroutine's
 	// refresh retries with its token instead of redeeming the refresh token twice.
 	tokenGen uint64
-	// unstored are the refresh tokens this client redeemed since storing the pair that
-	// replaced one last failed: a store still holding one lags this client (see refresh).
-	unstored []string
-	// refreshMu serializes this process's token exchanges; the credential lock (see
-	// refresh) serializes them across processes.
-	refreshMu sync.Mutex
+	// unsaved holds the refresh tokens this client spent since its last successful save.
+	// A store that still holds one of them is behind this client.
+	unsaved []string
+	// refreshing is a one-slot semaphore for this process's token exchanges. The
+	// credential lock serializes them across processes.
+	refreshing chan struct{}
 
 	projectID string
 }
@@ -119,14 +119,15 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 		timeout = 30 * time.Second
 	}
 	c := &Client{
-		baseURL:   strings.TrimRight(cfg.APIURL, "/"),
-		authURL:   strings.TrimRight(cfg.AuthURL, "/"),
-		http:      newHTTPClient(timeout),
-		version:   opts.Version,
-		dir:       cfg.Dir,
-		profile:   cfg.ProfileName,
-		apiKey:    cfg.APIKey,
-		projectID: firstNonEmpty(opts.ProjectID, cfg.ProjectID),
+		baseURL:    strings.TrimRight(cfg.APIURL, "/"),
+		authURL:    strings.TrimRight(cfg.AuthURL, "/"),
+		http:       newHTTPClient(timeout),
+		version:    opts.Version,
+		dir:        cfg.Dir,
+		profile:    cfg.ProfileName,
+		apiKey:     cfg.APIKey,
+		projectID:  firstNonEmpty(opts.ProjectID, cfg.ProjectID),
+		refreshing: make(chan struct{}, 1),
 	}
 	if c.apiKey != "" {
 		return c, nil
@@ -151,9 +152,10 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 // NewAnonymous builds a credential-less client for the auth host's minting endpoints.
 func NewAnonymous(authURL, version string) *Client {
 	return &Client{
-		authURL: strings.TrimRight(authURL, "/"),
-		http:    newHTTPClient(30 * time.Second),
-		version: version,
+		authURL:    strings.TrimRight(authURL, "/"),
+		http:       newHTTPClient(30 * time.Second),
+		version:    version,
+		refreshing: make(chan struct{}, 1),
 	}
 }
 

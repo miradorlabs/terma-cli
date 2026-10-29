@@ -22,10 +22,20 @@ import (
 )
 
 // A rotation the store failed to take leaves it holding the refresh token the server
-// spent: the next refresh must redeem the client's own live one, not take the stored
-// pair back, which the server's reuse detection would answer by revoking the session.
+// spent. Every later refresh must redeem the client's own live token, never take the
+// stored one back: the server's reuse detection would revoke the session. Saves fail once,
+// then twice in a row, before the store takes the pair again.
 func TestClient_KeepsARotationTheStoreMissed(t *testing.T) {
 	t.Parallel()
+	for _, failures := range []int{1, 2} {
+		t.Run(fmt.Sprintf("%d failed saves", failures), func(t *testing.T) {
+			t.Parallel()
+			testFailedSaves(t, failures)
+		})
+	}
+}
+
+func testFailedSaves(t *testing.T, failures int) {
 	var mu sync.Mutex
 	spent := map[string]bool{}
 	revoked := false
@@ -44,13 +54,18 @@ func TestClient_KeepsARotationTheStoreMissed(t *testing.T) {
 		}
 		spent[req.RefreshToken] = true
 		n++
-		// Each pair is spent at once, so the next call refreshes again.
+		// Each pair is already within the expiry skew, so every Refresh redeems again.
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": fmt.Sprintf("mir_cli_%d", n), "refresh_token": fmt.Sprintf("mir_clr_%d", n), "expires_in": 30,
 			"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
 		})
 	}))
 	defer srv.Close()
+	isRevoked := func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return revoked
+	}
 
 	dir := t.TempDir()
 	// Tokens in credentials.json, where a failed write leaves the spent pair.
@@ -66,35 +81,39 @@ func TestClient_KeepsARotationTheStoreMissed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// A read-only directory: the store keeps mir_clr_0 through every failed save.
 	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
-	if err := client.Refresh(context.Background()); err == nil {
-		t.Fatal("Refresh stored its pair in a read-only directory")
-	}
-	if got := client.Credential().RefreshToken; got != "mir_clr_1" {
-		t.Fatalf("client refresh token = %q, want the rotated mir_clr_1", got)
+	for i := 1; i <= failures; i++ {
+		if err := client.Refresh(context.Background()); err == nil {
+			t.Fatalf("refresh %d stored its pair in a read-only directory", i)
+		}
+		if isRevoked() {
+			t.Fatalf("refresh %d redeemed a spent refresh token and the session was revoked", i)
+		}
+		if got, want := client.Credential().RefreshToken, fmt.Sprintf("mir_clr_%d", i); got != want {
+			t.Fatalf("after %d failed saves the client holds %q, want the live %q", i, got, want)
+		}
 	}
 
-	for _, mode := range []os.FileMode{0o500, 0o700} {
-		if err := os.Chmod(dir, mode); err != nil {
-			t.Fatal(err)
-		}
-		_ = client.Refresh(context.Background())
-		mu.Lock()
-		gone := revoked
-		mu.Unlock()
-		if gone {
-			t.Fatalf("directory %o: the refresh redeemed a spent refresh token and the session was revoked", mode)
-		}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("refresh once the store is writable: %v", err)
+	}
+	if isRevoked() {
+		t.Fatal("the refresh redeemed a spent refresh token and the session was revoked")
 	}
 	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := client.Credential().RefreshToken; stored.RefreshToken != want || want != "mir_clr_3" {
-		t.Errorf("stored %q, client %q; want both the live mir_clr_3", stored.RefreshToken, want)
+	want := fmt.Sprintf("mir_clr_%d", failures+1)
+	if got := client.Credential().RefreshToken; stored.RefreshToken != want || got != want {
+		t.Errorf("stored %q, client %q; want both the live %q", stored.RefreshToken, got, want)
 	}
 }
 

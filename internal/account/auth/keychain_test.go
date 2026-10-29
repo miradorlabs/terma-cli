@@ -363,14 +363,16 @@ func TestRelocateMovesEveryCredential(t *testing.T) {
 }
 
 // Relocate holds the credential lock through one credential's keychain write at a time,
-// never through every one, so a writer behind it waits no longer than a single write.
+// never through every one, so a writer behind it waits about one write, not all of them.
+// The writer's deadline is five writes: well past the one it should wait, and well short
+// of the eight it would wait if Relocate kept the lock.
 func TestRelocateLetsTheLockGoBetweenCredentials(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	orgs := []string{"org-a", "org-b", "org-c", "org-d"}
+	orgs := []string{"org-a", "org-b", "org-c", "org-d", "org-e", "org-f", "org-g", "org-h"}
 	for _, org := range orgs {
 		if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential(org, "s-"+org)); err != nil {
 			t.Fatal(err)
@@ -379,13 +381,13 @@ func TestRelocateLetsTheLockGoBetweenCredentials(t *testing.T) {
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = false }); err != nil {
 		t.Fatal(err)
 	}
-	const write = 300 * time.Millisecond
+	const write = 250 * time.Millisecond
 	secret.DelayForTest(t, dir, write)
 	done := make(chan error)
 	go func() { done <- Relocate(dir) }()
 	time.Sleep(write / 3)
 
-	ctx, cancel := context.WithTimeout(t.Context(), 2*write)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*write)
 	defer cancel()
 	if err := Locked(ctx, dir, func(*Tx) error { return nil }); err != nil {
 		t.Fatalf("a writer behind Relocate's %d keychain writes: %v; want the lock within one", len(orgs), err)

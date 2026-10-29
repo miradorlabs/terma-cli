@@ -8,6 +8,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 func itemName(profile, organizationID string) string {
@@ -19,6 +20,10 @@ type tokenPair struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// errTokensGone means the file indexes a credential whose keychain item is missing or
+// unreadable. Readers treat it as signed out. A writer must not: see Tx.LoadFor.
+var errTokensGone = fmt.Errorf("%w: the system keychain has no tokens for this sign-in", ErrNotLoggedIn)
+
 // hydrate reads from the keychain the tokens of a credential the file holds without them.
 // A keychain that cannot be reached is an error, never ErrNotLoggedIn.
 func hydrate(dir, profile string, c *Credential) error {
@@ -27,23 +32,24 @@ func hydrate(dir, profile string, c *Credential) error {
 	}
 	v, err := secret.Get(dir, itemName(profile, c.OrganizationID))
 	if errors.Is(err, secret.ErrNotFound) {
-		return ErrNotLoggedIn
+		return errTokensGone
 	}
 	if err != nil {
 		return err
 	}
 	var pair tokenPair
 	if json.Unmarshal([]byte(v), &pair) != nil || pair.AccessToken == "" {
-		return ErrNotLoggedIn
+		return errTokensGone
 	}
 	c.AccessToken, c.RefreshToken = pair.AccessToken, pair.RefreshToken
 	return nil
 }
 
-// keep stores cred's tokens in the keychain, unless inFile or the keychain fails, and
-// returns the copy credentials.json holds. Tokens that land in the file while an item may
-// hold earlier ones (old kept them there, or a write timed out and may yet land) mark
-// the item stale; sweepStale removes it once the file is on disk, never before.
+// keep stores cred's tokens in the keychain and returns the copy credentials.json holds.
+// With inFile, or when the keychain fails, the tokens stay in that copy instead. If the
+// keychain item may still hold older tokens, the copy marks it stale. That happens when
+// old kept its tokens there, or when a write timed out and may still land. sweepStale
+// removes a stale item once the file is on disk, never before.
 func keep(dir, profile string, cred, old *Credential, inFile bool) *Credential {
 	c := *cred
 	c.StaleKeychainItem = old.present() && (old.AccessToken == "" || old.StaleKeychainItem)
@@ -126,10 +132,10 @@ func afterSave(dir, profile, organizationID string, unindexed bool, err error) {
 }
 
 // Relocate moves every stored credential's tokens, in every profile, to where config.json
-// now keeps secrets: into the keychain, or into credentials.json under InsecureStorage.
-// A credential the keychain will not take or give up stays where it is. Each credential
-// moves under a lock of its own: a keychain write may wait a minute on a prompt, and one
-// lock held through them all would keep every other writer waiting past lockWait.
+// now keeps secrets: the keychain, or credentials.json under InsecureStorage. A credential
+// the keychain will not take or give up stays where it is. Each credential moves under its
+// own lock. A keychain write may wait a minute on a prompt, so one lock held through all
+// of them could keep other writers waiting past lockWait.
 func Relocate(dir string) error {
 	file, err := loadCredentialFile(dir)
 	if err != nil || len(file) == 0 {
@@ -141,7 +147,7 @@ func Relocate(dir string) error {
 			if err := relocate(dir, profile, org, inFile); err != nil {
 				return err
 			}
-			// The lock is not fair: a waiter polls it, so give one the chance to take it.
+			// Let a waiter in before the next credential: see flock.PollMax.
 			time.Sleep(relocateYield)
 		}
 	}
@@ -149,9 +155,9 @@ func Relocate(dir string) error {
 	return nil
 }
 
-// relocateYield is how long Relocate leaves the lock free between credentials: longer
-// than a waiter's poll of it (a millisecond at most).
-const relocateYield = 10 * time.Millisecond
+// relocateYield is how long Relocate leaves the lock free between credentials. Ten polls
+// leave room for a waiter whose timer fires late on a busy machine.
+const relocateYield = 10 * flock.PollMax
 
 // relocate is Relocate for one credential, as the file holds it once locked.
 func relocate(dir, profile, org string, inFile bool) error {

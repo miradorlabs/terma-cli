@@ -142,27 +142,44 @@ func (c *Client) refreshIfNeeded(ctx context.Context) error {
 // refreshIfCurrent redeems the refresh token only if no other goroutine has rotated past
 // gen, so racing callers make exactly one exchange.
 func (c *Client) refreshIfCurrent(ctx context.Context, gen uint64, redeem redeemFunc) error {
-	c.refreshMu.Lock()
-	defer c.refreshMu.Unlock()
+	unlock, err := c.lockRefresh(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if c.currentGen() != gen {
 		return nil
 	}
 	return c.refresh(ctx, redeem)
 }
 
+// lockRefresh takes this process's one refresh slot. It gives up when ctx ends, so a
+// caller with a short deadline does not wait behind a sibling's long wait for the lock.
+func (c *Client) lockRefresh(ctx context.Context) (unlock func(), err error) {
+	select {
+	case c.refreshing <- struct{}{}:
+		return func() { <-c.refreshing }, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("wait for another refresh in this process: %w", ctx.Err())
+	}
+}
+
 // Refresh rotates the pair when its access token is about to expire.
 func (c *Client) Refresh(ctx context.Context) error { return c.refreshIfNeeded(ctx) }
 
-// RefreshRefused rotates the pair although its access token has not expired, because a
-// server refused it, but only while the stored access token is still that one, whose
-// SHA-256 is refusedSHA256 in hex: every process that saw the one refusal shares a
-// single rotation.
+// RefreshRefused rotates the pair even though its access token has not expired, because a
+// server refused it. It rotates only while the stored access token is still the refused
+// one, whose SHA-256 in hex is refusedSHA256. That way every process that saw the same
+// refusal shares one rotation.
 func (c *Client) RefreshRefused(ctx context.Context, refusedSHA256 string) error {
 	if !c.canRefresh() {
 		return auth.ErrNotLoggedIn
 	}
-	c.refreshMu.Lock()
-	defer c.refreshMu.Unlock()
+	unlock, err := c.lockRefresh(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return c.refresh(ctx, func(_, current *auth.Credential) bool {
 		return TokenSHA256(current.AccessToken) == strings.ToLower(refusedSHA256) || current.Expired()
 	})
@@ -175,18 +192,23 @@ func TokenSHA256(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// redeemFunc decides, given the credential this client held and the pair as it now
-// stands, which another process may have rotated, whether to redeem the refresh token.
+// redeemFunc decides whether to redeem the refresh token. held is the credential this
+// client had. current is the pair as it stands now, which another process may have rotated.
 type redeemFunc func(held, current *auth.Credential) bool
 
-// refresh brings the token pair up to date as one transaction across terma processes,
-// since the server's reuse detection revokes the whole session when a rotated refresh
-// token is redeemed twice: under the credential lock it reloads the stored pair, takes it
-// when another process has already rotated past this client's, redeems only if redeem
-// still asks for it, and persists the new pair before the lock is let go. The lock is
-// held through the exchange and keychain writes, so the wait for it is auth's, longer
-// than the request timeout: a healthy holder must not read as a hung one. Call it with
-// refreshMu held.
+// refresh brings the token pair up to date as one transaction across terma processes.
+// The server revokes the whole session if a rotated refresh token is redeemed twice, so
+// every step runs under the credential lock:
+//
+//   - reload the stored pair;
+//   - take it if another process has already rotated past this client's pair;
+//   - redeem only if redeem still asks for it;
+//   - save the new pair before the lock is released.
+//
+// The lock is held through the exchange and the keychain writes. So the wait for it is
+// auth's lockWait, which is longer than the request timeout.
+//
+// Call it in this process's refresh slot (lockRefresh).
 func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 	c.mu.Lock()
 	held := c.credential
@@ -202,22 +224,20 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		switch {
 		case err == nil && sameSession(stored, held):
 		case err == nil || errors.Is(err, auth.ErrNotLoggedIn):
-			// Signed out, or signed in afresh, since: this session is no longer the
-			// stored one, so a rotation stays in memory and replaces nothing.
+			// The developer signed out, or signed in again, since this client loaded its
+			// pair. This session is no longer the stored one: rotate it in memory only.
 			return c.redeem(ctx, held, held, redeem, nil)
 		default:
 			return err
 		}
-		if c.spentUnstored(stored.RefreshToken) {
-			// This client's rotations never reached the store, which still holds a refresh
-			// token it spent: keep its own pair, and store it while the lock is held.
-			if err := tx.Update(c.profile, held); err == nil {
-				c.stored()
-			}
+		if c.spent(stored.RefreshToken) {
+			// The store still holds a token this client spent, because saving its
+			// rotation failed. Keep the client's own live pair and try to save it now.
+			_ = c.save(tx, held, "")
 			return c.redeem(ctx, held, held, redeem, tx)
 		}
-		// Decide from the stored pair, never the one held: that was read without the lock,
-		// and may pair a rotation's tokens with the expiry before it.
+		// Decide from the stored pair, not the held one. The held one was read without the
+		// lock, and may pair a rotation's tokens with the expiry from before it.
 		if !samePair(stored, held) {
 			c.replace(stored)
 		}
@@ -225,7 +245,7 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 	})
 }
 
-// redeem exchanges current's refresh token if redeem asks, persisting the new pair in tx
+// redeem exchanges current's refresh token if redeem asks, and saves the new pair in tx
 // when there is one.
 func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx *auth.Tx) error {
 	if !redeem(held, current) {
@@ -242,34 +262,38 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	// A refresh keeps the session and its user.
 	cred.SessionID = cmp.Or(cred.SessionID, current.SessionID)
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
-	// Held before it is stored: the server has spent current's refresh token, so this
-	// pair is the session's only live one.
+	// The server has spent current's refresh token, so this pair is the session's only
+	// live one. Hold it before trying to store it.
 	c.replace(cred)
-	if tx != nil {
-		if err := tx.Update(c.profile, cred); err != nil {
-			c.mu.Lock()
-			c.unstored = append(c.unstored, current.RefreshToken)
-			c.mu.Unlock()
-			return fmt.Errorf("persist refreshed credential: %w", err)
-		}
-		c.stored()
+	if tx == nil {
+		return nil
+	}
+	if err := c.save(tx, cred, current.RefreshToken); err != nil {
+		return fmt.Errorf("persist refreshed credential: %w", err)
 	}
 	return nil
 }
 
-// spentUnstored reports whether this client redeemed refreshToken without storing the
-// pair that replaced it.
-func (c *Client) spentUnstored(refreshToken string) bool {
+// save stores cred and keeps unsaved in step. spent is the refresh token cred replaced,
+// or "" when cred replaced nothing.
+func (c *Client) save(tx *auth.Tx, cred *auth.Credential, spent string) error {
+	err := tx.Update(c.profile, cred)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return slices.Contains(c.unstored, refreshToken)
+	switch {
+	case err == nil:
+		c.unsaved = nil
+	case spent != "":
+		c.unsaved = append(c.unsaved, spent)
+	}
+	return err
 }
 
-// stored records that the store holds this client's pair.
-func (c *Client) stored() {
+// spent reports whether refreshToken is one this client spent but could not save past.
+func (c *Client) spent(refreshToken string) bool {
 	c.mu.Lock()
-	c.unstored = nil
-	c.mu.Unlock()
+	defer c.mu.Unlock()
+	return slices.Contains(c.unsaved, refreshToken)
 }
 
 // replace makes cred the client's credential.
@@ -285,8 +309,8 @@ func samePair(a, b *auth.Credential) bool {
 	return a.AccessToken == b.AccessToken && a.RefreshToken == b.RefreshToken && a.ExpiresAt.Equal(b.ExpiresAt)
 }
 
-// sameSession reports whether two credentials are one sign-in, possibly rotated; one
-// saved before sessions were named is taken to be.
+// sameSession reports whether two credentials belong to one sign-in, possibly rotated.
+// A credential saved before sessions had ids has no session id, and matches any.
 func sameSession(a, b *auth.Credential) bool {
 	return a.SessionID == "" || b.SessionID == "" || a.SessionID == b.SessionID
 }

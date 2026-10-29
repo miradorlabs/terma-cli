@@ -8,7 +8,6 @@ package auth
 
 import (
 	"cmp"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -252,11 +250,11 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credent
 	return replaced, err
 }
 
-// ResaveCredential activates and saves again, as SaveCredential does, a session that was
-// read from the store earlier. Under the lock it keeps the pair stored now rather than
-// cred's: another process may have rotated it since, or signed in afresh, and writing
-// back the pair read earlier would hand the next refresh a spent refresh token. It
-// returns the credential as it was saved.
+// ResaveCredential activates and saves a session read from the store earlier, as
+// SaveCredential does. Under the lock it keeps the pair stored now, not cred's. Another
+// process may have rotated the pair or signed in again since, and writing back the older
+// pair would give the next refresh a spent refresh token. It returns the credential as
+// saved.
 func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
 	saved := cred
 	err := lockedWrite(dir, func(tx *Tx) error {
@@ -279,88 +277,6 @@ func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error
 // new pair written to the file, so a rotated token is never lost.
 func UpdateCredential(dir, profile string, cred *Credential) error {
 	return lockedWrite(dir, func(tx *Tx) error { return tx.Update(profile, cred) })
-}
-
-// Tx is the credential file held under its cross-process lock: what it loads cannot
-// change until the transaction ends, and what it saves takes no second lock, which the
-// holder would wait on for ever.
-type Tx struct {
-	dir string
-	// after runs once the lock is let go: sweeping stale keychain items locks again.
-	after []func()
-}
-
-// lockWait bounds every wait for the credential lock, so a holder that hangs costs the
-// waiter an error, never a stall. It is longer than a healthy holder keeps the lock: a
-// refresh holds it through its exchange (30 s by default) and at most two keychain
-// writes, the pair it holds and the one it gets; every other holder through one
-// credential's keychain write and a few deletes of seconds each. Relocate, which touches
-// every credential, takes the lock once for each.
-var lockWait = 2*secret.WriteTimeout + time.Minute
-
-// lockedWrite is Locked for a write that has no deadline of its own.
-func lockedWrite(dir string, fn func(tx *Tx) error) error {
-	return Locked(context.Background(), dir, fn)
-}
-
-// Locked runs fn holding the credential lock, waiting for it until ctx is done or lockWait
-// has passed, since another process may hold the lock through a network call.
-func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, lockWait)
-	unlock, err := lockCredentialFile(ctx, config.CredentialsPath(dir))
-	cancel()
-	if err != nil {
-		return err
-	}
-	tx := &Tx{dir: dir}
-	err = fn(tx)
-	unlock()
-	for _, f := range tx.after {
-		f()
-	}
-	return err
-}
-
-// LoadFor is LoadCredentialFor inside the transaction.
-func (tx *Tx) LoadFor(profile, organizationID string) (*Credential, error) {
-	return LoadCredentialFor(tx.dir, profile, organizationID)
-}
-
-// Update is UpdateCredential inside the transaction.
-func (tx *Tx) Update(profile string, cred *Credential) error {
-	inFile := config.InsecureStorage(tx.dir)
-	var unindexed bool
-	err := tx.mutate(func(file credentialFile) {
-		p := file[profile]
-		if p == nil {
-			p = &profileCredentials{}
-			file[profile] = p
-		}
-		old := p.Organizations[cred.OrganizationID]
-		if old.present() && old.AccessToken != "" {
-			inFile = true
-		}
-		kept := keep(tx.dir, profile, cred, old, inFile)
-		unindexed = !old.present() && kept.AccessToken == ""
-		p.put(kept)
-		if p.Active == "" {
-			p.Active = cred.OrganizationID
-		}
-	})
-	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, cred.OrganizationID, unindexed, err) })
-	return err
-}
-
-func (tx *Tx) mutate(mutate func(credentialFile)) error {
-	file, err := loadCredentialFile(tx.dir)
-	if err != nil {
-		return err
-	}
-	mutate(file)
-	return saveCredentialFile(config.CredentialsPath(tx.dir), file)
 }
 
 // DeleteCredential forgets every credential a profile holds — logout.
