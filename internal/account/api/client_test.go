@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -480,5 +481,300 @@ func TestParseErrorBoundsAPlainBody(t *testing.T) {
 		if got := parseError(resp).Error(); got != tc.want {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
 		}
+	}
+}
+
+// A pair another process rotated while this client held the old one is taken from the
+// store, not redeemed again: the server revokes a session whose spent refresh token
+// comes back.
+func TestClient_TakesAPairAnotherProcessRotated(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == tokenPath {
+			redemptions.Add(1)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer mir_cli_rotated" {
+			t.Errorf("read used %q, want the pair the other process stored", r.Header.Get("Authorization"))
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	rotated := *expired
+	rotated.AccessToken, rotated.RefreshToken, rotated.ExpiresAt = "mir_cli_rotated", "mir_clr_rotated", time.Now().Add(time.Hour)
+	if err := auth.UpdateCredential(client.dir, config.DefaultProfile, &rotated); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got := redemptions.Load(); got != 0 {
+		t.Errorf("redemptions = %d, want none", got)
+	}
+}
+
+// A session the store no longer holds (one a sign-in replaced, being revoked) still
+// refreshes, but its pair never overwrites the stored one.
+func TestClient_RefreshOfASupersededSessionStoresNothing(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == tokenPath {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "mir_cli_old_rotated", "refresh_token": "mir_clr_old_rotated", "expires_in": 3600,
+				"session_id": "session-old", "organization": map[string]string{"id": "org-test"},
+			})
+			return
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	old := &auth.Credential{AccessToken: "mir_cli_old", RefreshToken: "mir_clr_old", SessionID: "session-old",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, old, "")
+	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
+		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got := client.Credential().AccessToken; got != "mir_cli_old_rotated" {
+		t.Errorf("client token = %q, want its own session rotated", got)
+	}
+	stored, err := auth.LoadCredential(client.dir, config.DefaultProfile)
+	if err != nil || stored.RefreshToken != "mir_clr_new" {
+		t.Fatalf("stored = %+v, %v; want the new sign-in untouched", stored, err)
+	}
+}
+
+// Under the lock the stored pair decides, not the one held: read without the lock, that
+// can pair a rotation's tokens with the expiry before it, while another process's write
+// has reached the keychain and not yet credentials.json. Neither refresh may rotate a
+// token nobody refused, or that has not expired.
+func TestClient_DecidesFromTheStoredPair(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redemptions.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	torn := &auth.Credential{AccessToken: "mir_cli_rotated", RefreshToken: "mir_clr_rotated", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, torn, "")
+	whole := *torn
+	whole.ExpiresAt = time.Now().Add(time.Hour)
+	if err := auth.UpdateCredential(client.dir, config.DefaultProfile, &whole); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_before")); err != nil {
+		t.Fatalf("RefreshRefused: %v", err)
+	}
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if got := redemptions.Load(); got != 0 {
+		t.Errorf("redemptions = %d, want none: the stored token is neither refused nor expired", got)
+	}
+	if got := client.Credential().ExpiresAt; !got.Equal(whole.ExpiresAt) {
+		t.Errorf("client expiry = %v, want the stored %v", got, whole.ExpiresAt)
+	}
+}
+
+// A token endpoint that never answers holds the credential lock no longer than the
+// request timeout: the refresh fails, and the next writer takes the lock at once.
+func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
+	t.Parallel()
+	hung := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-hung:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+	defer close(hung)
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	const timeout = 300 * time.Millisecond
+	client.http.Timeout = timeout
+
+	start := time.Now()
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("Refresh against a hung token endpoint succeeded")
+	}
+	if elapsed := time.Since(start); elapsed > timeout+2*time.Second {
+		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v request timeout", elapsed, timeout)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err := auth.Locked(ctx, client.dir, func(*auth.Tx) error { return nil }); err != nil {
+		t.Fatalf("credential lock after the refresh gave up: %v", err)
+	}
+}
+
+// A refresh waits for the credential lock longer than its request timeout: a healthy
+// holder may keep it through its own exchange and keychain writes, and the refresh behind
+// it then takes the pair as that holder left it.
+func TestClient_RefreshWaitsOutAHolderPastTheRequestTimeout(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated",
+			"token_type": "Bearer", "expires_in": 3600,
+		})
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	const timeout = 200 * time.Millisecond
+	client.http.Timeout = timeout
+
+	held, done := make(chan struct{}), make(chan error)
+	go func() {
+		done <- auth.Locked(t.Context(), client.dir, func(*auth.Tx) error {
+			close(held)
+			time.Sleep(4 * timeout)
+			return nil
+		})
+	}()
+	<-held
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh behind a holder that keeps the lock past the request timeout: %v", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if got := client.Credential().RefreshToken; got != "mir_clr_rotated" {
+		t.Errorf("refresh token = %q, want the rotated one", got)
+	}
+}
+
+// A credential saved before sessions had ids matches any session. So a client holding one
+// takes a fresh sign-in's pair from the store rather than redeeming its own legacy token.
+func TestClient_ALegacyCredentialTakesAFreshSignIn(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redemptions.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	legacy := &auth.Credential{AccessToken: "mir_cli_legacy", RefreshToken: "mir_clr_legacy", ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, legacy, "")
+	fresh := &auth.Credential{AccessToken: "mir_cli_fresh", RefreshToken: "mir_clr_fresh", SessionID: "session-new",
+		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, fresh); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if got := redemptions.Load(); got != 0 {
+		t.Errorf("redemptions = %d, want none: the fresh sign-in has not expired", got)
+	}
+	if got := client.Credential().RefreshToken; got != "mir_clr_fresh" {
+		t.Errorf("client refresh token = %q, want the fresh sign-in's", got)
+	}
+}
+
+// A caller waits for this process's refresh slot only as long as its own context allows.
+// A sibling that holds the slot while it waits minutes for the credential lock must not
+// hold it up.
+func TestClient_RefreshWaitFollowsTheCallersContext(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated", "expires_in": 3600,
+		})
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+
+	// Another process holds the credential lock. It lets go when the test is done, or
+	// after a few seconds, so a caller stuck behind the sibling fails rather than hangs.
+	release, held, holder := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		holder <- auth.Locked(t.Context(), client.dir, func(*auth.Tx) error {
+			close(held)
+			select {
+			case <-release:
+			case <-time.After(5 * time.Second):
+			}
+			return nil
+		})
+	}()
+	<-held
+	sibling := make(chan error, 1)
+	go func() { sibling <- client.Refresh(context.Background()) }()
+	for deadline := time.Now().Add(5 * time.Second); len(client.refreshing) == 0; time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the sibling refresh never took the refresh slot")
+		}
+	}
+
+	const wait = 100 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	start := time.Now()
+	err := client.Refresh(ctx)
+	elapsed := time.Since(start)
+	close(release)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Refresh behind a waiting sibling = %v, want its own deadline", err)
+	}
+	if elapsed > 10*wait {
+		t.Fatalf("Refresh waited %v behind a sibling; want about its %v deadline", elapsed, wait)
+	}
+	if err := <-sibling; err != nil {
+		t.Fatalf("the sibling refresh: %v", err)
+	}
+	if err := <-holder; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A credential the file indexes but whose keychain item is missing, perhaps only for a
+// moment, is not a sign-out. The refresh must fail without redeeming anything: a rotation
+// it could not store would leave a spent refresh token in the store.
+func TestClient_RefreshRefusesAnIndexedCredentialWithoutTokens(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redemptions.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+	// The keychain item auth keeps for the default profile's org-test credential.
+	if err := secret.Delete(client.dir, "credential/"+config.DefaultProfile+"/org-test"); err != nil {
+		t.Fatalf("the credential's keychain item: %v", err)
+	}
+
+	err := client.Refresh(context.Background())
+	if err == nil || errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("Refresh = %v, want an error that is not a sign-out", err)
+	}
+	if n := redemptions.Load(); n != 0 {
+		t.Fatalf("%d redemptions; want none", n)
+	}
+	if got := client.Credential().RefreshToken; got != "mir_clr_stale" {
+		t.Errorf("client refresh token = %q, want its pair untouched", got)
 	}
 }

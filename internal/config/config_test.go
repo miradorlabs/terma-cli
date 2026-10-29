@@ -195,8 +195,10 @@ func TestLoad_RejectsNonHTTPSchemes(t *testing.T) {
 
 // TestLoad_DefaultsToProductionOnEveryHost: with no configuration, every endpoint is production.
 func TestLoad_DefaultsToProductionOnEveryHost(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV.
+	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV, nor
+	// the TERMA_MCP_URL a bridge developer exports.
 	t.Setenv("TERMA_ENV", "")
+	t.Setenv("TERMA_MCP_URL", "")
 	dir := seedConfig(t, nil)
 
 	cfg, err := Load(dir, dir, Overrides{})
@@ -207,10 +209,42 @@ func TestLoad_DefaultsToProductionOnEveryHost(t *testing.T) {
 		{"api", cfg.APIURL, DefaultAPIURL},
 		{"auth", cfg.AuthURL, DefaultAuthURL},
 		{"app", cfg.AppURL, DefaultAppURL},
+		{"mcp", cfg.MCPURL, DefaultMCPURL},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s = %q, want %q", tc.name, tc.got, tc.want)
 		}
+	}
+}
+
+// The MCP gateway follows the environment, and TERMA_MCP_URL overrides it: the URL the
+// terma-mcp bridge is handed (MIR-542).
+func TestLoad_MCPURL(t *testing.T) {
+	dir := seedConfig(t, nil)
+	for _, tc := range []struct{ env, override, want string }{
+		{"", "", "https://mcp.terma.ai/mcp"},
+		{EnvDev, "", "https://mcp-dev.terma.ai/mcp"},
+		{EnvLocal, "", "https://mcp-dev.terma.ai/mcp"},
+		{EnvDev, "http://127.0.0.1:8065/mcp/", "http://127.0.0.1:8065/mcp"},
+	} {
+		t.Setenv("TERMA_ENV", tc.env)
+		t.Setenv("TERMA_MCP_URL", tc.override)
+		cfg, err := Load(dir, dir, Overrides{})
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if cfg.MCPURL != tc.want {
+			t.Errorf("TERMA_ENV=%q TERMA_MCP_URL=%q: MCPURL = %q, want %q", tc.env, tc.override, cfg.MCPURL, tc.want)
+		}
+	}
+	// Only `terma auth token` uses it, so a bad one fails that, not every command.
+	t.Setenv("TERMA_MCP_URL", "http://mcp.example/mcp")
+	cfg, err := Load(dir, dir, Overrides{})
+	if err != nil {
+		t.Fatalf("Load with a bad TERMA_MCP_URL: %v", err)
+	}
+	if cfg.CheckMCPURL() == nil {
+		t.Error("an http MCP URL off loopback was accepted; the bridge would send the token in cleartext")
 	}
 }
 

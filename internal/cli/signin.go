@@ -208,8 +208,10 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 	// A credential saved before terma kept the email and user id learns them from whoami.
 	verified.UserEmail = cmp.Or(verified.UserEmail, identity.Email)
 	verified.UserID = cmp.Or(verified.UserID, identity.UserID)
-	// Saved as a sign-in would, so running setup again moves the tokens to where they now belong.
-	if _, err := auth.SaveCredential(app.dir, cfg.ProfileName, verified); err != nil {
+	// Saved as a sign-in would, so running setup again moves the tokens to where they now
+	// belong; but keeping whatever pair another process rotated in since it was read.
+	verified, err = auth.ResaveCredential(app.dir, cfg.ProfileName, verified)
+	if err != nil {
 		return nil, false, err
 	}
 	orgName := ""

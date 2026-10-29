@@ -7,6 +7,10 @@
 // the package version npm records until npm installs the package again. Nothing
 // runs from the network: the archive is verified before it is extracted, and
 // only the single binary is kept.
+//
+// It never writes to stdout, nor lets a child process: a package that depends on this one
+// may be started through npx by a client that reads its stdout as a protocol (an MCP
+// server), and npm's foreground-scripts would put this script's output there.
 'use strict';
 
 const fs = require('node:fs');
@@ -19,6 +23,8 @@ const { execFileSync } = require('node:child_process');
 const pkg = require('./package.json');
 const REPO = 'miradorlabs/terma-cli';
 const VENDOR = path.join(__dirname, 'vendor');
+// A child's output goes to stderr, never stdout, and it reads nothing.
+const CHILD_STDIO = ['ignore', 2, 2];
 
 function assetName() {
   const osName = { darwin: 'Darwin', linux: 'Linux', win32: 'Windows' }[process.platform];
@@ -54,7 +60,7 @@ function fetch(url, redirects = 5) {
 
 async function main() {
   if (process.env.TERMA_SKIP_DOWNLOAD === '1') {
-    console.log('terma: TERMA_SKIP_DOWNLOAD=1, not downloading the binary');
+    console.error('terma: TERMA_SKIP_DOWNLOAD=1, not downloading the binary');
     return;
   }
   const version = pkg.version === '0.0.0' ? process.env.TERMA_VERSION : `v${pkg.version}`;
@@ -63,7 +69,7 @@ async function main() {
   }
   const asset = assetName();
   const base = `https://github.com/${REPO}/releases/download/${version}`;
-  console.log(`terma: downloading ${asset} (${version})`);
+  console.error(`terma: downloading ${asset} (${version})`);
   const [archive, sums] = await Promise.all([fetch(`${base}/${asset}`), fetch(`${base}/checksums.txt`)]);
 
   const line = sums.toString('utf8').split('\n').find((l) => l.trim().endsWith(`  ${asset}`));
@@ -73,8 +79,8 @@ async function main() {
   if (actual !== expected) throw new Error(`checksum mismatch for ${asset}`);
 
   installArchive(archive, asset);
-  console.log(`terma: installed ${version}`);
-  console.log('terma: next, run `terma setup` in a terminal.');
+  console.error(`terma: installed ${version}`);
+  console.error('terma: next, run `terma setup` in a terminal.');
 }
 
 // Keep verified bytes in a private, unpredictable directory until extraction
@@ -92,11 +98,11 @@ function installArchive(archive, asset, { vendor = VENDOR, tmpRoot = os.tmpdir()
       // directory, then validate and copy only terma.exe into the installation.
       run('powershell', ['-NoProfile', '-NonInteractive', '-Command',
         "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $env:TERMA_ARCHIVE_PATH -DestinationPath $env:TERMA_EXTRACT_DIR -Force"], {
-        stdio: 'inherit',
+        stdio: CHILD_STDIO,
         env: { ...process.env, TERMA_ARCHIVE_PATH: archivePath, TERMA_EXTRACT_DIR: extracted },
       });
     } else {
-      run('tar', ['-xzf', archivePath, '-C', extracted, 'terma'], { stdio: 'inherit' });
+      run('tar', ['-xzf', archivePath, '-C', extracted, 'terma'], { stdio: CHILD_STDIO });
     }
     const binary = asset.endsWith('.zip') ? 'terma.exe' : 'terma';
     const source = path.join(extracted, binary);

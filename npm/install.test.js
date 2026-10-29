@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const { installArchive } = require('./install');
 
@@ -150,4 +150,45 @@ test('an extracted symlink cannot substitute an outside file for the binary', {
   assert.deepEqual(fs.readdirSync(options.tmpRoot), []);
   assert.equal(fs.readFileSync(path.join(options.vendor, 'terma'), 'utf8'), 'existing binary');
   assert.equal(fs.readFileSync(outside, 'utf8'), 'must not be installed');
+});
+
+// A package that depends on this one may be started through npx by an MCP client, which
+// reads its stdout as the protocol; with npm's foreground-scripts on, anything the install
+// script or its children print there corrupts the stream.
+test('the install script writes nothing to stdout', () => {
+  const run = (env) => spawnSync(process.execPath, [path.join(__dirname, 'install.js')], {
+    env: { ...process.env, TERMA_VERSION: '', ...env }, encoding: 'utf8',
+  });
+  const skipped = run({ TERMA_SKIP_DOWNLOAD: '1' });
+  assert.equal(skipped.status, 0);
+  assert.equal(skipped.stdout, '');
+  assert.match(skipped.stderr, /TERMA_SKIP_DOWNLOAD=1/);
+  if (require('./package.json').version === '0.0.0') { // a development copy: no version to fetch
+    const failed = run({ TERMA_SKIP_DOWNLOAD: '' });
+    assert.equal(failed.status, 1);
+    assert.equal(failed.stdout, '');
+    assert.match(failed.stderr, /install manually/);
+  }
+});
+
+test('an extracting child process writes nothing to stdout', (t) => {
+  const options = fixture(t);
+  // The child prints to its stdout, as an extractor may; it must reach stderr instead.
+  const child = `
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { execFileSync, spawnSync } = require('node:child_process');
+    const { installArchive } = require(${JSON.stringify(path.join(__dirname, 'install.js'))});
+    installArchive(Buffer.from('archive'), 'terma.tar.gz', {
+      vendor: ${JSON.stringify(options.vendor)}, tmpRoot: ${JSON.stringify(options.tmpRoot)},
+      run(_command, args, childOptions) {
+        fs.writeFileSync(path.join(args[3], 'terma'), 'binary');
+        execFileSync(process.execPath, ['-e', 'process.stdout.write("extracted\\\\n")'], childOptions);
+      },
+    });`;
+  const result = spawnSync(process.execPath, ['-e', child], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /extracted/);
+  assert.equal(fs.readFileSync(path.join(options.vendor, 'terma'), 'utf8'), 'binary');
 });

@@ -7,6 +7,7 @@
 package auth
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -205,9 +206,26 @@ func Credentials(dir, profile string) ([]*Credential, error) {
 // for the caller to revoke. Signing in decides where the tokens live: the system
 // keychain, unless there is none or config.json asks for files (InsecureStorage).
 func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
+	err = lockedWrite(dir, func(tx *Tx) error {
+		replaced, err = tx.saveReplacing(profile, cred)
+		return err
+	})
+	if replaced != nil && replaced.SessionID == cred.SessionID {
+		replaced = nil
+	}
+	return replaced, err
+}
+
+func (tx *Tx) save(profile string, cred *Credential) error {
+	_, err := tx.saveReplacing(profile, cred)
+	return err
+}
+
+func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credential, err error) {
+	dir := tx.dir
 	inFile := config.InsecureStorage(dir)
 	var unindexed bool
-	err = mutateCredentialFile(dir, func(file credentialFile) {
+	err = tx.mutate(func(file credentialFile) {
 		p := file[profile]
 		if p == nil {
 			p = &profileCredentials{}
@@ -228,38 +246,37 @@ func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential
 		p.put(kept)
 		p.Active = cred.OrganizationID
 	})
-	afterSave(dir, profile, cred.OrganizationID, unindexed, err)
-	if replaced != nil && replaced.SessionID == cred.SessionID {
-		replaced = nil
-	}
+	tx.after = append(tx.after, func() { afterSave(dir, profile, cred.OrganizationID, unindexed, err) })
 	return replaced, err
+}
+
+// ResaveCredential activates and saves a session read from the store earlier, as
+// SaveCredential does. Under the lock it keeps the pair stored now, not cred's. Another
+// process may have rotated the pair or signed in again since, and writing back the older
+// pair would give the next refresh a spent refresh token. It returns the credential as
+// saved.
+func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
+	saved := cred
+	err := lockedWrite(dir, func(tx *Tx) error {
+		switch stored, err := tx.LoadFor(profile, cred.OrganizationID); {
+		case err == nil:
+			stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
+			stored.UserID = cmp.Or(stored.UserID, cred.UserID)
+			saved = stored
+		case !errors.Is(err, ErrNotLoggedIn):
+			// Unreadable is not absent: what is stored may be newer than cred.
+			return err
+		}
+		return tx.save(profile, saved)
+	})
+	return saved, err
 }
 
 // UpdateCredential persists a refreshed credential without changing which organization
 // is active, keeping its tokens where they already are; a keychain that fails gets the
 // new pair written to the file, so a rotated token is never lost.
 func UpdateCredential(dir, profile string, cred *Credential) error {
-	inFile := config.InsecureStorage(dir)
-	var unindexed bool
-	err := mutateCredentialFile(dir, func(file credentialFile) {
-		p := file[profile]
-		if p == nil {
-			p = &profileCredentials{}
-			file[profile] = p
-		}
-		old := p.Organizations[cred.OrganizationID]
-		if old.present() && old.AccessToken != "" {
-			inFile = true
-		}
-		kept := keep(dir, profile, cred, old, inFile)
-		unindexed = !old.present() && kept.AccessToken == ""
-		p.put(kept)
-		if p.Active == "" {
-			p.Active = cred.OrganizationID
-		}
-	})
-	afterSave(dir, profile, cred.OrganizationID, unindexed, err)
-	return err
+	return lockedWrite(dir, func(tx *Tx) error { return tx.Update(profile, cred) })
 }
 
 // DeleteCredential forgets every credential a profile holds — logout.
@@ -316,23 +333,7 @@ func DeleteCredentialFor(dir, profile, organizationID string) error {
 // mutateCredentialFile runs mutate under a cross-process lock: unlocked, a second
 // concurrent writer erases the first's entry.
 func mutateCredentialFile(dir string, mutate func(credentialFile)) error {
-	path := config.CredentialsPath(dir)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-
-	unlock, err := lockCredentialFile(path)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-
-	file, err := loadCredentialFile(dir)
-	if err != nil {
-		return err
-	}
-	mutate(file)
-	return saveCredentialFile(path, file)
+	return lockedWrite(dir, func(tx *Tx) error { return tx.mutate(mutate) })
 }
 
 func loadCredentialFile(dir string) (credentialFile, error) {

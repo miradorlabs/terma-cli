@@ -92,7 +92,8 @@ Every command is safe to run again.`,
 		app.newTeardownCommand(),
 		// Hidden. Other programs run these: agents and git run hook, the relay service runs
 		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version,
-		// and the shell functions setup writes run launch.
+		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth.
+		app.newAuthCommand(),
 		app.newHookCommand(),
 		app.newLaunchCommand(),
 		app.newRelayCommand(),
@@ -149,7 +150,8 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
 		// nate removes the updater's state and the executable; its post-run must not recreate them.
-		case "hook", "launch", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
+		// auth's stdout is read by the terma-mcp bridge, which waits on it.
+		case "auth", "hook", "launch", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
 			return false
 		}
 	}

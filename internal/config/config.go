@@ -110,6 +110,9 @@ type Config struct {
 	AppURL  string
 	// OTLPURL is the ingest host written into agents' exporters; the CLI never calls it.
 	OTLPURL string
+	// MCPURL is the MCP gateway `terma auth token` hands the terma-mcp bridge; the CLI
+	// never calls it.
+	MCPURL string
 
 	OrganizationID   string
 	OrganizationName string
@@ -180,6 +183,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		AuthURL:            strings.TrimRight(firstNonEmpty(o.AuthURL, os.Getenv("TERMA_AUTH_URL"), profile.AuthURL, defaults.AuthURL), "/"),
 		AppURL:             strings.TrimRight(firstNonEmpty(o.AppURL, os.Getenv("TERMA_APP_URL"), profile.AppURL, defaults.AppURL), "/"),
 		OTLPURL:            strings.TrimRight(firstNonEmpty(o.OTLPURL, os.Getenv("TERMA_OTLP_URL"), profile.OTLPURL, defaults.OTLPURL), "/"),
+		MCPURL:             strings.TrimRight(firstNonEmpty(os.Getenv("TERMA_MCP_URL"), defaults.MCPURL), "/"),
 		OrganizationID:     firstNonEmpty(os.Getenv("TERMA_ORGANIZATION_ID"), profile.OrganizationID),
 		OrganizationName:   profile.OrganizationName,
 		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
@@ -211,6 +215,11 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 	}
 	return cfg, nil
 }
+
+// CheckMCPURL holds the MCP gateway to the standard of the other hosts, since the bridge
+// sends the CLI token there. Only `terma auth token` uses it, so Load leaves the check
+// to it rather than failing every command.
+func (c *Config) CheckMCPURL() error { return validateEndpoint("mcp", c.MCPURL) }
 
 // validateEndpoint refuses http except to loopback: every one of these hosts receives
 // a secret at some point.
