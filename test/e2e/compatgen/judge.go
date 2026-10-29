@@ -255,16 +255,17 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 		}
 		judgedAgainst, base = base, now
 	}
-	d.pairMoves(judgedAgainst, base)
+	d.pairMoves(n, last, judgedAgainst, base)
 }
 
 // pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from
 // one span and new on another in the last build judged, with the same event name, and the same
 // keys as before (the build it was judged against) sent and now (it) sends. A surface gone in
-// an earlier build has no keys in before, and one new in an earlier build is in before. An
-// event name more than one gone or new surface carries is left as it is: tracing names an event
-// after its file, so names repeat. A move has no source note.
-func (d *HarnessDrift) pairMoves(before, now sending) {
+// an earlier build has no keys in before; one a build older than last sent tonight, its census
+// whole or partial, is that build's new surface (fieldsOf). An event name more than one gone or
+// new surface carries is left as it is: tracing names an event after its file, so names repeat.
+// A move has no source note.
+func (d *HarnessDrift) pairMoves(n night, last string, before, now sending) {
 	gone, came := map[string][]int{}, map[string][]int{}
 	for i, g := range d.Unseen {
 		if _, event, ok := spanEvent(g.Surface); ok {
@@ -283,7 +284,7 @@ func (d *HarnessDrift) pairMoves(before, now sending) {
 		}
 		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
 		keys := keysOn(now, s.Surface)
-		if len(keys) == 0 || slices.Contains(before.surfaces, s.Surface) || !slices.Equal(keysOn(before, g.Surface), keys) {
+		if len(keys) == 0 || n.sentBefore(last, s.Surface) || !slices.Equal(keysOn(before, g.Surface), keys) {
 			continue
 		}
 		from, _, _ := spanEvent(g.Surface)
@@ -293,6 +294,11 @@ func (d *HarnessDrift) pairMoves(before, now sending) {
 	}
 	d.Unseen = dropMarked(d.Unseen, moved)
 	d.NewSurfaces = dropMarked(d.NewSurfaces, arrived)
+}
+
+// sentBefore reports whether a build older than version sent surface tonight.
+func (n night) sentBefore(version, surface string) bool {
+	return slices.ContainsFunc(n.rows, func(r e2e.FieldRow) bool { return r.Surface == surface && versionLess(r.Version, version) })
 }
 
 // keysOn are the keys s sent on surface, sorted.

@@ -351,8 +351,9 @@ func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
 
 // A span event is no move where its keys changed, where its name is on more than one surface
 // gone or new (tracing names events after their file), where it moved in an earlier build of
-// the night, where an earlier build sent it on both spans before the last dropped one, or where
-// the new build's census is partial: each is said as surfaces gone and new, as before.
+// the night, where an earlier build, its census whole or partial, sent it on both spans before
+// the last dropped one, or where only a build newer than the last judged sent it, or where the
+// new build's census is partial: each is said as surfaces gone and new, as before.
 func TestASpanEventThatIsNoMove(t *testing.T) {
 	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
 	tonight := day.Add(24 * time.Hour)
@@ -387,6 +388,14 @@ func TestASpanEventThatIsNoMove(t *testing.T) {
 			promptRows("0.165.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:]...),
 			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
 			runs(false, "0.165.0", "0.166.0"), 1, 1},
+		{"on both spans in an earlier, partial build", append(append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
+			promptRows("0.165.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:]...),
+			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
+			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0", Failed: true}, {Harness: "codex", Version: "0.166.0"}}), 1, 1},
+		{"sent only by a later, partial build", append(append(promptRows("0.165.0", tonight, "session_init", "slug"),
+			promptRows("0.166.0", tonight, "session_init", "slug")...), moved("0.167.0", "prompt_length", "slug")...),
+			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}, {Harness: "codex", Version: "0.166.0"},
+				{Harness: "codex", Version: "0.167.0", Failed: true}}), 1, 1},
 		{"partial", append(moved("0.165.0", "prompt_length", "slug"), sessionInit), runs(true, "0.165.0"), 0, 1},
 	} {
 		_, _, hs := fieldDrift(cat, c.rows, c.ran, tonight)
