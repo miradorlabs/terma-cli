@@ -318,11 +318,11 @@ func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
 	day := time.Date(2026, 10, 26, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
 	// A key the build before the baseline sent is in the catalog, not in what is judged.
-	mergeFields(&cat, promptRows("0.163.0", day, "codex.turn_input", "prompt_length", "slug", "dropped_key"), nil)
-	mergeFields(&cat, promptRows("0.164.0", day.Add(24*time.Hour), "codex.turn_input", "prompt_length", "slug"), nil)
+	mergeFields(&cat, promptRows("0.163.0", day, "codex.turn_input:prompt_length,slug,dropped_key"), nil)
+	mergeFields(&cat, promptRows("0.164.0", day.Add(24*time.Hour), "codex.turn_input"), nil)
 	tonight := day.Add(48 * time.Hour)
 	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}})
-	rows := promptRows("0.165.0", tonight, "run_hooks_and_record_inputs", "slug", "prompt_length")
+	rows := promptRows("0.165.0", tonight, "run_hooks_and_record_inputs")
 
 	_, _, hs := fieldDrift(cat, rows, ran, tonight)
 	h := hs[0]
@@ -349,58 +349,46 @@ func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
 	}
 }
 
-// A span event is no move where its keys changed, where its name is on more than one surface
-// gone or new (tracing names events after their file), where it moved in an earlier build of
-// the night, where its span went in an earlier build and came back, where an earlier build, its census whole or partial, sent it on both spans before
-// the last dropped one, or where only a build newer than the last judged sent it, or where the
-// new build's census is partial: each is said as surfaces gone and new, as before.
+// A span event is no move where it is not one event changing span in the last build judged:
+// each is said as surfaces gone and new, as before.
 func TestASpanEventThatIsNoMove(t *testing.T) {
 	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
 	tonight := day.Add(24 * time.Hour)
 	var cat Catalog
-	mergeFields(&cat, append(promptRows("0.164.0", day, "codex.turn_input", "prompt_length", "slug"),
-		field("0.164.0", "traces/session_init/events/"+promptEvent, "slug", "safe", day)), nil)
-	sessionInit := field("0.165.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight)
-	moved := func(version string, keys ...string) []e2e.FieldRow {
-		return promptRows(version, tonight, "run_hooks_and_record_inputs", keys...)
-	}
-	runs := func(failed bool, versions ...string) censusRuns {
+	mergeFields(&cat, promptRows("0.164.0", day, "codex.turn_input", "session_init"), nil)
+	at := func(version string, spans ...string) []e2e.FieldRow { return promptRows(version, tonight, spans...) }
+	const old, moved, initSpan = "codex.turn_input", "run_hooks_and_record_inputs", "session_init"
+	whole := func(versions ...string) censusRuns {
 		var rs []e2e.CensusRun
 		for _, v := range versions {
-			rs = append(rs, e2e.CensusRun{Harness: "codex", Version: v, Failed: failed})
+			rs = append(rs, e2e.CensusRun{Harness: "codex", Version: v})
 		}
 		return censusRan(rs)
 	}
+	partialFirst := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0", Failed: true}, {Harness: "codex", Version: "0.166.0"}})
+	partialLast := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}, {Harness: "codex", Version: "0.166.0"},
+		{Harness: "codex", Version: "0.167.0", Failed: true}})
 	for _, c := range []struct {
 		name        string
 		rows        []e2e.FieldRow
 		ran         censusRuns
 		unseen, new int
 	}{
-		{"keys changed", append(moved("0.165.0", "slug"), sessionInit), runs(false, "0.165.0"), 1, 1},
-		{"two surfaces gone", moved("0.165.0", "prompt_length", "slug"), runs(false, "0.165.0"), 2, 1},
-		{"two surfaces new", append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
-			promptRows("0.165.0", tonight, "other_span", "prompt_length", "slug")[1:]...), runs(false, "0.165.0"), 1, 2},
-		{"moved in an earlier build", append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
-			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
-			runs(false, "0.165.0", "0.166.0"), 1, 1},
-		{"on both spans in an earlier build", append(append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
-			promptRows("0.165.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:]...),
-			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
-			runs(false, "0.165.0", "0.166.0"), 1, 1},
-		{"on both spans in an earlier, partial build", append(append(append(moved("0.165.0", "prompt_length", "slug"), sessionInit),
-			promptRows("0.165.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:]...),
-			append(moved("0.166.0", "prompt_length", "slug"), field("0.166.0", "traces/session_init/events/"+promptEvent, "slug", "safe", tonight))...),
-			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0", Failed: true}, {Harness: "codex", Version: "0.166.0"}}), 1, 1},
-		{"sent only by a later, partial build", append(append(promptRows("0.165.0", tonight, "session_init", "slug"),
-			promptRows("0.166.0", tonight, "session_init", "slug")...), moved("0.167.0", "prompt_length", "slug")...),
-			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}, {Harness: "codex", Version: "0.166.0"},
-				{Harness: "codex", Version: "0.167.0", Failed: true}}), 1, 1},
-		{"gone in an earlier build and back", slices.Concat(promptRows("0.165.0", tonight, "session_init", "slug"),
-			promptRows("0.166.0", tonight, "session_init", "slug"), promptRows("0.166.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:],
-			promptRows("0.167.0", tonight, "session_init", "slug"), promptRows("0.167.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:],
-			moved("0.167.0", "prompt_length", "slug")[1:]), runs(false, "0.165.0", "0.166.0", "0.167.0"), 1, 1},
-		{"partial", append(moved("0.165.0", "prompt_length", "slug"), sessionInit), runs(true, "0.165.0"), 0, 1},
+		{"keys changed", at("0.165.0", moved+":slug", initSpan), whole("0.165.0"), 1, 1},
+		// session_init is gone too, and carries the same event name.
+		{"two surfaces gone", at("0.165.0", moved), whole("0.165.0"), 2, 1},
+		{"two surfaces new", at("0.165.0", moved, "other_span", initSpan), whole("0.165.0"), 1, 2},
+		{"moved in an earlier build", slices.Concat(at("0.165.0", moved, initSpan), at("0.166.0", moved, initSpan)),
+			whole("0.165.0", "0.166.0"), 1, 1},
+		{"on both spans in an earlier build", slices.Concat(at("0.165.0", old, moved, initSpan), at("0.166.0", moved, initSpan)),
+			whole("0.165.0", "0.166.0"), 1, 1},
+		{"on both spans in an earlier, partial build", slices.Concat(at("0.165.0", old, moved, initSpan), at("0.166.0", moved, initSpan)),
+			partialFirst, 1, 1},
+		{"sent only by a later, partial build", slices.Concat(at("0.165.0", initSpan), at("0.166.0", initSpan), at("0.167.0", moved)),
+			partialLast, 1, 1},
+		{"gone in an earlier build and back", slices.Concat(at("0.165.0", initSpan), at("0.166.0", old, initSpan), at("0.167.0", old, moved, initSpan)),
+			whole("0.165.0", "0.166.0", "0.167.0"), 1, 1},
+		{"partial", at("0.165.0", moved, initSpan), censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0", Failed: true}}), 0, 1},
 	} {
 		_, _, hs := fieldDrift(cat, c.rows, c.ran, tonight)
 		if h := hs[0]; len(h.Moved) != 0 || len(h.Unseen) != c.unseen || len(h.NewSurfaces) != c.new {
@@ -412,11 +400,22 @@ func TestASpanEventThatIsNoMove(t *testing.T) {
 // promptEvent is the name tracing gives Codex's user_prompt event, after its file.
 const promptEvent = "event otel/src/events/session_telemetry.rs"
 
-// promptRows are a build's user_prompt event on span, with keys, beside a log it always sends.
-func promptRows(version string, at time.Time, span string, keys ...string) []e2e.FieldRow {
+// promptRows are what a build sent: a log it always sends, and promptEvent on each span, with
+// its keys after a colon; without them session_init's are slug, any other span's prompt_length
+// and slug.
+func promptRows(version string, at time.Time, spans ...string) []e2e.FieldRow {
 	out := []e2e.FieldRow{field(version, "logs/codex.api_request", "model", "safe", at)}
-	for _, k := range keys {
-		out = append(out, field(version, "traces/"+span+"/events/"+promptEvent, k, "safe", at))
+	for _, span := range spans {
+		span, keys, ok := strings.Cut(span, ":")
+		switch {
+		case !ok && span == "session_init":
+			keys = "slug"
+		case !ok:
+			keys = "prompt_length,slug"
+		}
+		for k := range strings.SplitSeq(keys, ",") {
+			out = append(out, field(version, "traces/"+span+"/events/"+promptEvent, k, "safe", at))
+		}
 	}
 	return out
 }

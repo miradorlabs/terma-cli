@@ -258,17 +258,21 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 	d.pairMoves(n, last, judgedAgainst, base)
 }
 
-// pairMoves takes each span event that only moved, in the last build judged, out of Unseen and
-// NewSurfaces. It is a move when:
-//   - the old span is gone in last (In empty), not in an earlier build, back or not;
-//   - no build older than last sent the new span tonight, its census whole or partial: that
-//     build's new surface it stays (fieldsOf);
-//   - before (the build last was judged against) sent the old span with the same keys as last
-//     sends on the new one;
-//   - no other gone or new surface carries the event's name: tracing names an event after its
-//     file, so names repeat.
+// pairMoves turns a gone and a new surface of the last build judged into one Moved, taking them
+// out of Unseen and NewSurfaces, where they are the same span event on another span: they carry
+// one event name that no other gone or new surface carries (tracing names an event after its
+// file, so names repeat), and
+//   - the old span went in last itself, not in an earlier build;
+//   - no build older than last sent the new span tonight, its census whole or partial: the new
+//     span is that build's new surface (fieldsOf);
+//   - last sends the new span with the keys before, the build it was judged against, sent on the
+//     old one.
 //
 // A move has no source note.
+//
+// Accepted risk: another event from the same file that went from one span while a new span got
+// one with the same keys reads as a move, hiding a surface no longer sent; the upgrade path is to
+// match on the event.name value, which the census does not keep.
 func (d *HarnessDrift) pairMoves(n night, last string, before, now sending) {
 	gone, came := map[string][]int{}, map[string][]int{}
 	for i, g := range d.Unseen {
