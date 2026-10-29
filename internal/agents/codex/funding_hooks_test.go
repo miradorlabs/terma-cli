@@ -44,7 +44,7 @@ func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {
 		_ = stop(context.Background(), env)
 	}
 	evs := hookruntest.Spooled(t, env.Spool)
-	if len(evs) != 1 || evs[0].Name != semconv.TermaSessionQuotaEvent || evs[0].Attrs[semconv.TermaAccountPlanTypeKey] != "team" || evs[0].Attrs[semconv.TermaObservationTimeKey] != at || evs[0].Attrs[semconv.TermaCreditsPresentKey] != false {
+	if len(evs) != 1 || evs[0].Name != semconv.TermaSessionQuotaEvent || evs[0].Attrs[semconv.TermaAccountPlanTypeKey] != "team" || evs[0].Attrs[semconv.TermaAccountRateLimitTierKey] != "team" || evs[0].Attrs[semconv.TermaObservationTimeKey] != at || evs[0].Attrs[semconv.TermaCreditsPresentKey] != false {
 		t.Fatalf("delivered quota: %+v", evs)
 	}
 }
@@ -71,7 +71,7 @@ func TestCodexNotifyCapturesRolloutWithoutTranscriptPath(t *testing.T) {
 			break
 		}
 	}
-	if quota == nil || quota.Attrs[semconv.TermaAccountPlanTypeKey] != "team" || quota.Attrs[semconv.TermaRateLimitPrimaryUsedPercentKey] != float64(42) {
+	if quota == nil || quota.Attrs[semconv.TermaAccountPlanTypeKey] != "team" || quota.Attrs[semconv.TermaAccountRateLimitTierKey] != "team" || quota.Attrs[semconv.TermaRateLimitPrimaryUsedPercentKey] != float64(42) {
 		t.Fatalf("notify quota: %+v", evs)
 	}
 }

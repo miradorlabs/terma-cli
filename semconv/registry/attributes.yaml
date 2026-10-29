@@ -372,9 +372,10 @@ attributes:
     stability: development
     brief: The provider's word for the usage limits the account's user runs under.
     note: >
-      Claude's userRateLimitTier. It sets how much a percent of each window buys: a Team seat can run
-      on Max 5x limits, and Max 5x and Max 20x both report the plan "max".
-    examples: ["default_claude_max_5x", "default_claude_max_20x"]
+      What sizes each plan window, so how much a percent of it buys, whatever the agent: Claude's
+      userRateLimitTier (a Team seat can run on Max 5x limits, and Max 5x and Max 20x both report the
+      plan "max"), and Codex's plan type, which is its limits' own label.
+    examples: ["default_claude_max_5x", "default_claude_max_20x", "prolite"]
   - key: terma.account.organization.rate_limit_tier
     type: string
     stability: development

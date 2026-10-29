@@ -288,6 +288,7 @@ events:
       - ref: terma.account.id
       - ref: terma.account.organization.id
       - ref: terma.account.plan_type
+      - ref: terma.account.rate_limit_tier
       - ref: user.email
         note: Withheld whenever the team's policy withholds prompts or tool content.
       - ref: terma.account.seat.id

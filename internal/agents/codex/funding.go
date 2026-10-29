@@ -260,6 +260,8 @@ func codexQuota(raw json.RawMessage, at time.Time) hookrun.FundingEvidence {
 	}
 	e.Status = "present"
 	hookrun.CopyEvidenceString(e.Attrs, limits, "plan_type", semconv.TermaAccountPlanTypeKey)
+	// Codex's plan is also what sizes its windows ("prolite", "self_serve_business_prolite"), so it is the tier too.
+	hookrun.CopyEvidenceString(e.Attrs, limits, "plan_type", semconv.TermaAccountRateLimitTierKey)
 	hookrun.CopyEvidenceString(e.Attrs, limits, "rate_limit_reached_type", semconv.TermaRateLimitReachedTypeKey)
 	hookrun.CopyEvidenceBool(e.Attrs, limits, "spend_control_reached", semconv.TermaSpendControlReachedKey)
 	for _, w := range []struct{ name, used, minutes, resets string }{
