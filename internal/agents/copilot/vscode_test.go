@@ -33,7 +33,7 @@ func sandbox(t *testing.T) (Agent, string) {
 	t.Setenv("SHELL", "/bin/nu")
 	t.Setenv("PATH", "")
 	t.Setenv("TERMA_SHELL_LAUNCHERS", "")
-	for _, name := range append(append(slices.Clone(shellEndpoints), shellProtocols...), shellExporterType) {
+	for _, name := range append(append(append(slices.Clone(shellEndpoints), shellProtocols...), tlsVariables...), shellExporterType) {
 		t.Setenv(name, "")
 	}
 	base, err := os.UserConfigDir()
@@ -364,6 +364,60 @@ func TestSetupLeavesVSCodeAloneUnderAShellEndpoint(t *testing.T) {
 				t.Fatalf("RelayProblem = %q, %q, %v", detail, fix, problem)
 			}
 		})
+	}
+}
+
+// A TLS setting in the shell stops the agent host's export at the relay's plain HTTP, and
+// terma cannot take it out of VS Code's environment: setup still writes its settings, which
+// export once the variable is gone, but leaves them pending and says what keeps them from the
+// relay, without the path. Doctor hears it from RelayProblem, not as a setup to run again.
+func TestShellTLSKeepsVSCodeFromTheRelay(t *testing.T) {
+	for _, name := range tlsVariables {
+		t.Run(name, func(t *testing.T) {
+			a, _ := sandbox(t)
+			t.Setenv(name, "/etc/otel/secret-ca.pem")
+			res := configure(t, a)
+			if len(res.Paths) != 1 || !res.Pending || !noted(res, name+" exported in your shell") || noted(res, "starts exporting there") ||
+				strings.Contains(strings.Join(res.Notes, " "), "secret") {
+				t.Fatalf("configure beside a TLS setting: %+v", res)
+			}
+			if pointed, known := a.RelayPointed(relayAddr); pointed || known {
+				t.Errorf("RelayPointed = %v, %v: setup running again would not fix this", pointed, known)
+			}
+			detail, fix, problem := a.RelayProblem(relayAddr)
+			if !problem || !strings.Contains(detail, name) || !strings.Contains(fix, "unset "+name) || strings.Contains(detail+fix, "secret") {
+				t.Fatalf("RelayProblem = %q, %q, %v", detail, fix, problem)
+			}
+			t.Setenv(name, "")
+			if _, _, problem := a.RelayProblem(relayAddr); problem {
+				t.Fatal("a problem once the variable is gone")
+			}
+			if pointed, known := a.RelayPointed(relayAddr); !pointed || !known {
+				t.Errorf("RelayPointed once the variable is gone = %v, %v", pointed, known)
+			}
+		})
+	}
+}
+
+// Settings setup has not written yet are not pointed, TLS setting or not: doctor asks for
+// setup, which unsetting the variable alone would never do.
+func TestShellTLSBeforeSetupStillAsksForSetup(t *testing.T) {
+	a, _ := sandbox(t)
+	t.Setenv("OTEL_EXPORTER_OTLP_CERTIFICATE", "/etc/otel/ca.pem")
+	if pointed, known := a.RelayPointed(relayAddr); pointed || !known {
+		t.Fatalf("RelayPointed before setup = %v, %v; want not pointed, known", pointed, known)
+	}
+}
+
+// Mutual TLS sets a certificate and its key together: both are named, so one unset clears them.
+func TestShellTLSNamesEverySetting(t *testing.T) {
+	a, _ := sandbox(t)
+	configure(t, a)
+	t.Setenv("OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "/etc/otel/client.pem")
+	t.Setenv("OTEL_EXPORTER_OTLP_CLIENT_KEY", "/etc/otel/client.key")
+	_, fix, problem := a.RelayProblem(relayAddr)
+	if want := "unset OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE OTEL_EXPORTER_OTLP_CLIENT_KEY "; !problem || !strings.HasPrefix(fix, want) {
+		t.Fatalf("RelayProblem fix = %q, %v; want it to start %q", fix, problem, want)
 	}
 }
 

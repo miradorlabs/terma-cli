@@ -107,6 +107,29 @@ const shellExporterType = "COPILOT_OTEL_EXPORTER_TYPE"
 // shellProtocols pick the OTLP exporter's wire protocol, which no setting overrides.
 var shellProtocols = []string{harness.EnvOTLPProtocol, "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "COPILOT_OTEL_PROTOCOL"}
 
+// tlsVariables are the Copilot runtime's TLS settings for its OTLP exporter. With any of them
+// set it exports to an https:// endpoint alone: to the relay's plain HTTP it sends nothing,
+// and says so only in its own log (`copilot help monitoring`).
+var tlsVariables = []string{
+	"OTEL_EXPORTER_OTLP_CERTIFICATE", "OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE", "OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE",
+	"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE", "OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE",
+	"OTEL_EXPORTER_OTLP_CLIENT_KEY", "OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY", "OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY",
+}
+
+// shellTLS names the TLS settings of the exporter exported where terma runs, each of which
+// keeps the agent host VS Code starts from that shell from exporting to the relay. All are
+// named, since mutual TLS sets a certificate and a key together. Each value is a path, but
+// only the names are returned, as for an endpoint.
+func shellTLS() string {
+	var set []string
+	for _, name := range tlsVariables {
+		if os.Getenv(name) != "" {
+			set = append(set, name)
+		}
+	}
+	return strings.Join(set, " ")
+}
+
 // shellEndpoint names an exporter variable exported where terma runs that sends the agent
 // host's spans elsewhere than the relay at addr: an OTLP endpoint that is not the relay's, or
 // an exporter type that writes a file or the console. VS Code applies its settings only to the

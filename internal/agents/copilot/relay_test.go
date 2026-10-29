@@ -64,6 +64,17 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 		!slices.Contains(unset, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") || !slices.Contains(unset, "COPILOT_OTEL_ENDPOINT") {
 		t.Fatalf("LaunchEnv = %v, %v", set, unset)
 	}
+	// Copilot's TLS settings, as `copilot help monitoring` lists them: a name dropped from
+	// tlsVariables fails here, not in an export that stops.
+	for _, name := range []string{
+		"OTEL_EXPORTER_OTLP_CERTIFICATE", "OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE", "OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE",
+		"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE", "OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE", "OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE",
+		"OTEL_EXPORTER_OTLP_CLIENT_KEY", "OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY", "OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY",
+	} {
+		if !slices.Contains(unset, name) {
+			t.Errorf("LaunchEnv keeps %s, which stops the export at the relay's plain HTTP", name)
+		}
+	}
 	if _, has := set[harness.EnvOTLPHeaders]; has {
 		t.Error("the token is in a header a per-signal endpoint would also receive")
 	}
