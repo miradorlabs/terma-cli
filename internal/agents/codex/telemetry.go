@@ -32,7 +32,11 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// spans, and the hosting product. Each a fixed vocabulary in codex-rs
 			// (otel/src/auth_storage.rs, bounded_product_sku: "codex" or "other").
 			"actual_store", "selected_store", "store_mode", "storage_phase", "credential_kind", "secure_outcome", "secure_error", "fallback_reason",
-			"codex.turn.phase", "product_sku"},
+			"codex.turn.phase", "product_sku",
+			// 0.166: a tool dispatch span's phase, only ever "dispatch" (core/src/tools/parallel.rs),
+			// and exec_command's shell snapshot rollout cohort, "v2", "v1" or "disabled"
+			// (core/src/tools/handlers/unified_exec/exec_command.rs).
+			"codex.tool.phase", "shell_snapshot_mode"},
 		SafePrefixes: []string{"codex.turn.token_usage.", "codex.usage."},
 		// A shell snapshot's state is one of protected, prewarm_pending, prewarm_ready or
 		// unavailable (codex-rs core/src/tools/runtimes/unified_exec/snapshot_metrics.rs, from
