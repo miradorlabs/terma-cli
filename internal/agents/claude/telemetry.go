@@ -20,6 +20,9 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// and tool_decision's mode (2.1.301), one of the modes --permission-mode takes
 			// (acceptEdits, auto, bypassPermissions, manual, dontAsk, plan) or "default".
 			"from_mode", "to_mode", "permission_mode",
+			// tool_result's decision_type, beside decision_source: always "accept", as a
+			// rejected call has no tool_result.
+			"decision_type",
 			// Subagents and tool errors (2.1.29x), as the field census saw them: an agent's type
 			// ("general-purpose") and source ("built-in"), its model and opaque id, and an error's
 			// class ("ShellError"), never its message.
