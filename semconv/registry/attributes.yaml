@@ -367,6 +367,22 @@ attributes:
     type: string
     stability: development
     brief: The provider's word for the seat's tier.
+  - key: terma.account.rate_limit_tier
+    type: string
+    stability: development
+    brief: The provider's word for the usage limits the account's user runs under.
+    note: >
+      Claude's userRateLimitTier. It sets how much a percent of each window buys: a Team seat can run
+      on Max 5x limits, and Max 5x and Max 20x both report the plan "max".
+    examples: ["default_claude_max_5x", "default_claude_max_20x"]
+  - key: terma.account.organization.rate_limit_tier
+    type: string
+    stability: development
+    brief: The provider's word for the usage limits of the account's organization.
+    note: >
+      Claude's organizationRateLimitTier. It names the organization's tier, which a seat's own
+      terma.account.rate_limit_tier can differ from.
+    examples: ["default_raven"]
   - key: terma.account.billing_type
     type: string
     stability: development

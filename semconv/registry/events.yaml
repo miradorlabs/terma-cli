@@ -326,6 +326,8 @@ events:
       - ref: terma.account.organization.id
       - ref: terma.account.organization.type
       - ref: terma.account.seat_tier
+      - ref: terma.account.rate_limit_tier
+      - ref: terma.account.organization.rate_limit_tier
       - ref: terma.account.billing_type
       - ref: terma.account.extra_usage.enabled
       - ref: user.email
