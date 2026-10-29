@@ -402,17 +402,48 @@ func TestASpanEventThatIsNoMove(t *testing.T) {
 	}
 }
 
-// A span whose own name holds "/events/" is no span event: one replaced by another with the
-// same keys is a surface gone and one new, never an event that moved.
+// A span whose own name holds "/events/" is no span event, its parent route a span or not: one
+// replaced by another with the same keys is a surface gone and one new, never an event that moved.
 func TestASpanNamedLikeAnEventIsNoMove(t *testing.T) {
 	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
-	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{field("0.164.0", "traces/GET /v1/events/x", "http.method", "safe", day)}, nil)
 	tonight := day.Add(24 * time.Hour)
-	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.165.0", "traces/POST /v2/events/x", "http.method", "safe", tonight)},
+	spans := func(version string, at time.Time, names ...string) []e2e.FieldRow {
+		var rows []e2e.FieldRow
+		for _, n := range names {
+			rows = append(rows, field(version, "traces/"+n, "http.method", "safe", at))
+		}
+		return rows
+	}
+	var cat Catalog
+	mergeFields(&cat, spans("0.164.0", day, "GET /v1", "GET /v1/events/x"), nil)
+	_, _, hs := fieldDrift(cat, spans("0.165.0", tonight, "GET /v2", "GET /v2/events/x"),
+		censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}}), tonight)
+	if h := hs[0]; len(h.Moved) != 0 || len(h.Unseen) != 2 || len(h.NewSurfaces) != 2 {
+		t.Errorf("moved %+v, unseen %+v, new %+v", h.Moved, h.Unseen, h.NewSurfaces)
+	}
+}
+
+// A catalog entry filed before census rows named their span event is no span event, so a move
+// judged against it is said as before; the next census of the key names it.
+func TestACatalogEntryWithoutItsEvent(t *testing.T) {
+	day := time.Date(2026, 10, 27, 4, 0, 0, 0, time.UTC)
+	tonight := day.Add(24 * time.Hour)
+	unnamed := promptRows("0.164.0", day, "codex.turn_input", "run_hooks_and_record_inputs:")
+	for i := range unnamed {
+		unnamed[i].Event = ""
+	}
+	var cat Catalog
+	mergeFields(&cat, unnamed, nil)
+	_, _, hs := fieldDrift(cat, promptRows("0.165.0", tonight, "codex.turn_input:", "run_hooks_and_record_inputs"),
 		censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}}), tonight)
 	if h := hs[0]; len(h.Moved) != 0 || len(h.Unseen) != 1 || len(h.NewSurfaces) != 1 {
 		t.Errorf("moved %+v, unseen %+v, new %+v", h.Moved, h.Unseen, h.NewSurfaces)
+	}
+	mergeFields(&cat, promptRows("0.164.0", tonight, "codex.turn_input"), nil)
+	for _, f := range cat.Fields {
+		if strings.Contains(f.Surface, "/events/") && f.Event != promptEvent {
+			t.Errorf("%s %s: event %q", f.Surface, f.Key, f.Event)
+		}
 	}
 }
 
@@ -436,7 +467,9 @@ func promptRows(version string, at time.Time, spans ...string) []e2e.FieldRow {
 			continue
 		}
 		for k := range strings.SplitSeq(keys, ",") {
-			out = append(out, field(version, "traces/"+span+"/events/"+promptEvent, k, "safe", at))
+			r := field(version, "traces/"+span+"/events/"+promptEvent, k, "safe", at)
+			r.Event = promptEvent
+			out = append(out, r)
 		}
 	}
 	return out

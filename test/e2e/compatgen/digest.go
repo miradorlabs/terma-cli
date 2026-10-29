@@ -107,10 +107,12 @@ func (h HarnessDrift) changed() bool {
 
 // FieldChange is one key on one surface.
 type FieldChange struct {
-	Surface string   `json:"surface"`
-	Key     string   `json:"key"`
-	Class   string   `json:"class,omitempty"`
-	Kinds   []string `json:"kinds,omitempty"`
+	Surface string `json:"surface"`
+	Key     string `json:"key"`
+	// Event is the span event's name, for a key on one (e2e.FieldRow.Event).
+	Event string   `json:"event,omitempty"`
+	Class string   `json:"class,omitempty"`
+	Kinds []string `json:"kinds,omitempty"`
 	// From is the build that sent it, of an addition, where it is not Version. In is the build
 	// that no longer sends it, of a removal, where it is not the last build judged; Back the
 	// later build judged that sends it again, if one does.

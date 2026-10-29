@@ -53,12 +53,15 @@ const (
 
 // FieldRow is one key one harness build emitted on one surface, in one run.
 type FieldRow struct {
-	Harness string   `json:"harness"`
-	Version string   `json:"version"`
-	Surface string   `json:"surface"`
-	Key     string   `json:"key"`
-	Kinds   []string `json:"kinds"`
-	Class   string   `json:"class,omitempty"` // safe | prompt | tool_content | unclassified
+	Harness string `json:"harness"`
+	Version string `json:"version"`
+	Surface string `json:"surface"`
+	// Event is the span event's name, for a key on one: Surface is traces/<span>/events/<Event>,
+	// and either name may hold a "/".
+	Event string   `json:"event,omitempty"`
+	Key   string   `json:"key"`
+	Kinds []string `json:"kinds"`
+	Class string   `json:"class,omitempty"` // safe | prompt | tool_content | unclassified
 	// Kept are the kinds of value the relay keeps of an unclassified key where it sits, as
 	// `terma relay classify` says: on a record numbers and booleans, on a resource none.
 	Kept     []string  `json:"kept,omitempty"`
@@ -311,7 +314,11 @@ func WriteFields(dir, terma string) error {
 	queries := map[classQuery]bool{}
 	asked := make([]classQuery, 0, len(fieldSeen))
 	for id, f := range fieldSeen {
-		rows = append(rows, FieldRow{Harness: id.harness, Version: id.version, Surface: id.surface, Key: id.key,
+		event := ""
+		if f.query.Site == "event" {
+			event = f.query.Event
+		}
+		rows = append(rows, FieldRow{Harness: id.harness, Version: id.version, Surface: id.surface, Key: id.key, Event: event,
 			Kinds: slices.Sorted(maps.Keys(f.kinds)), Platform: platform, Terma: version, At: now})
 		asked = append(asked, f.query)
 		queries[f.query] = true
