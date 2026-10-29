@@ -258,17 +258,21 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 	d.pairMoves(n, last, judgedAgainst, base)
 }
 
-// pairMoves takes each span event that only moved out of Unseen and NewSurfaces: gone from
-// one span and new on another in the last build judged, with the same event name, and the same
-// keys as before (the build it was judged against) sent and now (it) sends. A surface gone in
-// an earlier build has no keys in before; one a build older than last sent tonight, its census
-// whole or partial, is that build's new surface (fieldsOf). An event name more than one gone or
-// new surface carries is left as it is: tracing names an event after its file, so names repeat.
+// pairMoves takes each span event that only moved, in the last build judged, out of Unseen and
+// NewSurfaces. It is a move when:
+//   - the old span is gone in last (In empty), not in an earlier build, back or not;
+//   - no build older than last sent the new span tonight, its census whole or partial: that
+//     build's new surface it stays (fieldsOf);
+//   - before (the build last was judged against) sent the old span with the same keys as last
+//     sends on the new one;
+//   - no other gone or new surface carries the event's name: tracing names an event after its
+//     file, so names repeat.
+//
 // A move has no source note.
 func (d *HarnessDrift) pairMoves(n night, last string, before, now sending) {
 	gone, came := map[string][]int{}, map[string][]int{}
 	for i, g := range d.Unseen {
-		if _, event, ok := spanEvent(g.Surface); ok {
+		if _, event, ok := spanEvent(g.Surface); ok && g.In == "" {
 			gone[event] = append(gone[event], i)
 		}
 	}
@@ -284,7 +288,7 @@ func (d *HarnessDrift) pairMoves(n night, last string, before, now sending) {
 		}
 		g, s := d.Unseen[gone[event][0]], d.NewSurfaces[came[event][0]]
 		keys := keysOn(now, s.Surface)
-		if len(keys) == 0 || n.sentBefore(last, s.Surface) || !slices.Equal(keysOn(before, g.Surface), keys) {
+		if n.sentBefore(last, s.Surface) || !slices.Equal(keysOn(before, g.Surface), keys) {
 			continue
 		}
 		from, _, _ := spanEvent(g.Surface)

@@ -351,7 +351,7 @@ func TestASpanEventOnAnotherSpanMoved(t *testing.T) {
 
 // A span event is no move where its keys changed, where its name is on more than one surface
 // gone or new (tracing names events after their file), where it moved in an earlier build of
-// the night, where an earlier build, its census whole or partial, sent it on both spans before
+// the night, where its span went in an earlier build and came back, where an earlier build, its census whole or partial, sent it on both spans before
 // the last dropped one, or where only a build newer than the last judged sent it, or where the
 // new build's census is partial: each is said as surfaces gone and new, as before.
 func TestASpanEventThatIsNoMove(t *testing.T) {
@@ -396,6 +396,10 @@ func TestASpanEventThatIsNoMove(t *testing.T) {
 			promptRows("0.166.0", tonight, "session_init", "slug")...), moved("0.167.0", "prompt_length", "slug")...),
 			censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}, {Harness: "codex", Version: "0.166.0"},
 				{Harness: "codex", Version: "0.167.0", Failed: true}}), 1, 1},
+		{"gone in an earlier build and back", slices.Concat(promptRows("0.165.0", tonight, "session_init", "slug"),
+			promptRows("0.166.0", tonight, "session_init", "slug"), promptRows("0.166.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:],
+			promptRows("0.167.0", tonight, "session_init", "slug"), promptRows("0.167.0", tonight, "codex.turn_input", "prompt_length", "slug")[1:],
+			moved("0.167.0", "prompt_length", "slug")[1:]), runs(false, "0.165.0", "0.166.0", "0.167.0"), 1, 1},
 		{"partial", append(moved("0.165.0", "prompt_length", "slug"), sessionInit), runs(true, "0.165.0"), 0, 1},
 	} {
 		_, _, hs := fieldDrift(cat, c.rows, c.ran, tonight)
