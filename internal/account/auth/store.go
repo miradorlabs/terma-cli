@@ -207,7 +207,7 @@ func Credentials(dir, profile string) ([]*Credential, error) {
 // for the caller to revoke. Signing in decides where the tokens live: the system
 // keychain, unless there is none or config.json asks for files (InsecureStorage).
 func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
-	err = Locked(context.Background(), dir, func(tx *Tx) error {
+	err = lockedWrite(dir, func(tx *Tx) error {
 		replaced, err = tx.saveReplacing(profile, cred)
 		return err
 	})
@@ -258,7 +258,7 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credent
 // returns the credential as it was saved.
 func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
 	saved := cred
-	err := Locked(context.Background(), dir, func(tx *Tx) error {
+	err := lockedWrite(dir, func(tx *Tx) error {
 		switch stored, err := tx.LoadFor(profile, cred.OrganizationID); {
 		case err == nil:
 			stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
@@ -277,7 +277,7 @@ func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error
 // is active, keeping its tokens where they already are; a keychain that fails gets the
 // new pair written to the file, so a rotated token is never lost.
 func UpdateCredential(dir, profile string, cred *Credential) error {
-	return Locked(context.Background(), dir, func(tx *Tx) error { return tx.Update(profile, cred) })
+	return lockedWrite(dir, func(tx *Tx) error { return tx.Update(profile, cred) })
 }
 
 // Tx is the credential file held under its cross-process lock: what it loads cannot
@@ -289,7 +289,20 @@ type Tx struct {
 	after []func()
 }
 
-// Locked runs fn holding the credential lock, waiting for it until ctx is done.
+// lockWait bounds a write's wait for the credential lock: longer than a refresh holds it,
+// through its exchange (the request timeout) and a keychain write (a minute), so a holder
+// that hangs costs the waiter an error, never a stall.
+var lockWait = 2 * time.Minute
+
+// lockedWrite is Locked for a write that has no deadline of its own.
+func lockedWrite(dir string, fn func(tx *Tx) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
+	defer cancel()
+	return Locked(ctx, dir, fn)
+}
+
+// Locked runs fn holding the credential lock, waiting for it until ctx is done; ctx
+// carries a deadline, since another process may hold the lock through a network call.
 func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
@@ -400,7 +413,7 @@ func DeleteCredentialFor(dir, profile, organizationID string) error {
 // mutateCredentialFile runs mutate under a cross-process lock: unlocked, a second
 // concurrent writer erases the first's entry.
 func mutateCredentialFile(dir string, mutate func(credentialFile)) error {
-	return Locked(context.Background(), dir, func(tx *Tx) error { return tx.mutate(mutate) })
+	return lockedWrite(dir, func(tx *Tx) error { return tx.mutate(mutate) })
 }
 
 func loadCredentialFile(dir string) (credentialFile, error) {

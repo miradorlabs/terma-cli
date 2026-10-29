@@ -588,3 +588,36 @@ func TestClient_DecidesFromTheStoredPair(t *testing.T) {
 		t.Errorf("client expiry = %v, want the stored %v", got, whole.ExpiresAt)
 	}
 }
+
+// A token endpoint that never answers holds the credential lock no longer than the
+// request timeout: the refresh fails, and the next writer takes the lock at once.
+func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
+	t.Parallel()
+	hung := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-hung:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+	defer close(hung)
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	const timeout = 300 * time.Millisecond
+	client.http.Timeout = timeout
+
+	start := time.Now()
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("Refresh against a hung token endpoint succeeded")
+	}
+	if elapsed := time.Since(start); elapsed > timeout+2*time.Second {
+		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v request timeout", elapsed, timeout)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err := auth.Locked(ctx, client.dir, func(*auth.Tx) error { return nil }); err != nil {
+		t.Fatalf("credential lock after the refresh gave up: %v", err)
+	}
+}

@@ -3,13 +3,17 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -91,5 +95,73 @@ func TestClient_KeepsARotationTheStoreMissed(t *testing.T) {
 	}
 	if want := client.Credential().RefreshToken; stored.RefreshToken != want || want != "mir_clr_3" {
 		t.Errorf("stored %q, client %q; want both the live mir_clr_3", stored.RefreshToken, want)
+	}
+}
+
+// TestHoldCredentialLock is the hung process TestClient_RefreshGivesUpOnAHungHolder waits
+// behind: it takes the credential lock, says so, and never lets go until it is killed.
+func TestHoldCredentialLock(t *testing.T) {
+	dir := os.Getenv("TERMA_HOLD_CREDENTIAL_LOCK")
+	if dir == "" {
+		t.Skip("run only as TestClient_RefreshGivesUpOnAHungHolder's child")
+	}
+	_ = auth.Locked(context.Background(), dir, func(*auth.Tx) error {
+		fmt.Println("held")
+		time.Sleep(time.Hour)
+		return nil
+	})
+}
+
+// A process that hangs holding the credential lock stalls no other: a refresh waits for
+// it no longer than its request timeout, then fails without redeeming anything.
+func TestClient_RefreshGivesUpOnAHungHolder(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		redemptions.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+
+	holder := exec.Command(os.Args[0], "-test.run=^TestHoldCredentialLock$")
+	holder.Env = append(os.Environ(), "TERMA_HOLD_CREDENTIAL_LOCK="+dir)
+	out, err := holder.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = holder.Process.Kill(); _ = holder.Wait() })
+	if line, err := bufio.NewReader(out).ReadString('\n'); err != nil || line != "held\n" {
+		t.Fatalf("holder said %q, %v; want it holding the lock", line, err)
+	}
+
+	const timeout = 300 * time.Millisecond
+	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
+		Options{Version: "test", Timeout: timeout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	err = client.Refresh(context.Background())
+	elapsed := time.Since(start)
+	if err == nil || !strings.Contains(err.Error(), "another terma process held them") {
+		t.Fatalf("Refresh behind a hung holder = %v; want the lock's deadline", err)
+	}
+	if elapsed > timeout+2*time.Second {
+		t.Fatalf("Refresh waited %v behind a hung holder; want about its %v request timeout", elapsed, timeout)
+	}
+	if n := redemptions.Load(); n != 0 {
+		t.Fatalf("%d redemptions without the lock; want none", n)
 	}
 }
