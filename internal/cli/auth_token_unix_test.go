@@ -77,7 +77,10 @@ func TestAuthToken_ConcurrentProcessesRedeemOnce(t *testing.T) {
 		t.Fatalf("setup beside them: %v", setupErr)
 	}
 	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
-	if err != nil || stored.RefreshToken != refresh {
-		t.Fatalf("stored refresh token %q (%v), want the live one %q", stored.RefreshToken, err, refresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.RefreshToken != refresh {
+		t.Fatalf("stored refresh token %q, want the live one %q", stored.RefreshToken, refresh)
 	}
 }

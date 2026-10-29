@@ -553,3 +553,38 @@ func TestClient_RefreshOfASupersededSessionStoresNothing(t *testing.T) {
 		t.Fatalf("stored = %+v, %v; want the new sign-in untouched", stored, err)
 	}
 }
+
+// Under the lock the stored pair decides, not the one held: read without the lock, that
+// can pair a rotation's tokens with the expiry before it, while another process's write
+// has reached the keychain and not yet credentials.json. Neither refresh may rotate a
+// token nobody refused, or that has not expired.
+func TestClient_DecidesFromTheStoredPair(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redemptions.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	torn := &auth.Credential{AccessToken: "mir_cli_rotated", RefreshToken: "mir_clr_rotated", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, torn, "")
+	whole := *torn
+	whole.ExpiresAt = time.Now().Add(time.Hour)
+	if err := auth.UpdateCredential(client.dir, config.DefaultProfile, &whole); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_before")); err != nil {
+		t.Fatalf("RefreshRefused: %v", err)
+	}
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if got := redemptions.Load(); got != 0 {
+		t.Errorf("redemptions = %d, want none: the stored token is neither refused nor expired", got)
+	}
+	if got := client.Credential().ExpiresAt; !got.Equal(whole.ExpiresAt) {
+		t.Errorf("client expiry = %v, want the stored %v", got, whole.ExpiresAt)
+	}
+}

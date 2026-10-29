@@ -76,16 +76,20 @@ revoked or unavailable.
 --force-refresh rotates a token that has not expired yet, once a server refused it, but
 only while the stored token is still the one refused, named by its SHA-256 in
 --refused-token-sha256, so the token itself never appears on a command line.`,
-		Args: cobra.NoArgs,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if err := cobra.NoArgs(cmd, args); err != nil {
+				return writeTokenUsage(cmd, err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if !asJSON {
-				return errors.New("only --json output is supported")
-			}
-			if forceRefresh != (refusedSHA256 != "") {
-				return errors.New("--force-refresh and --refused-token-sha256 go together")
-			}
-			if refusedSHA256 != "" && !sha256Hex.MatchString(refusedSHA256) {
-				return errors.New("--refused-token-sha256 takes the token's SHA-256 as 64 hex digits")
+			switch {
+			case !asJSON:
+				return writeTokenUsage(cmd, errors.New("only --json output is supported"))
+			case forceRefresh != (refusedSHA256 != ""):
+				return writeTokenUsage(cmd, errors.New("--force-refresh and --refused-token-sha256 go together"))
+			case refusedSHA256 != "" && !sha256Hex.MatchString(refusedSHA256):
+				return writeTokenUsage(cmd, errors.New("--refused-token-sha256 takes the token's SHA-256 as 64 hex digits"))
 			}
 			grant, failure := app.authToken(cmd.Context(), refusedSHA256)
 			if failure != nil {
@@ -97,7 +101,15 @@ only while the stored token is still the one refused, named by its SHA-256 in
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON (the only format)")
 	cmd.Flags().BoolVar(&forceRefresh, "force-refresh", false, "rotate the access token although it has not expired")
 	cmd.Flags().StringVar(&refusedSHA256, "refused-token-sha256", "", "with --force-refresh: hex SHA-256 of the access token a server refused")
+	cmd.SetFlagErrorFunc(writeTokenUsage)
 	return cmd
+}
+
+// writeTokenUsage reports arguments this terma does not take as a failure the bridge can
+// read: one that calls with them expects a different terma.
+func writeTokenUsage(cmd *cobra.Command, err error) error {
+	return writeTokenFailure(cmd.OutOrStdout(), cmd.ErrOrStderr(), &tokenFailure{Code: tokenUnavailable,
+		Message: "this terma does not take the arguments the terma-mcp bridge passed: run `terma update`, or update the bridge", cause: err})
 }
 
 func writeTokenFailure(stdout, stderr io.Writer, failure *tokenFailure) error {
@@ -117,6 +129,9 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 	if err != nil {
 		return nil, &tokenFailure{Code: tokenUnavailable, Message: "terma could not read its configuration: run `terma doctor`", cause: err}
 	}
+	if err := cfg.CheckMCPURL(); err != nil {
+		return nil, &tokenFailure{Code: tokenUnavailable, Message: "TERMA_MCP_URL is not a usable MCP gateway URL: fix it, or unset it", cause: err}
+	}
 	switch {
 	case cfg.APIKey != "":
 		return nil, &tokenFailure{Code: tokenSignedOut,
@@ -126,7 +141,7 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 			Message: "terma is signed in with a team's server key, which cannot be used for the MCP: run `terma setup` to sign in as yourself"}
 	}
 	client, err := api.New(cfg, api.Options{Version: app.version})
-	if failure := tokenFailureOf(err, tokenSignedOut); failure != nil {
+	if failure := tokenFailureOf(err, false); failure != nil {
 		return nil, failure
 	}
 	teamID := cmp.Or(cfg.ProjectID, cfg.Team)
@@ -135,15 +150,15 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 	}
 
 	if refusedSHA256 != "" {
-		_, err = client.RefreshRefused(ctx, refusedSHA256)
+		err = client.RefreshRefused(ctx, refusedSHA256)
 	} else {
-		_, err = client.Fresh(ctx)
+		err = client.Refresh(ctx)
 	}
-	if failure := tokenFailureOf(err, tokenRevoked); failure != nil {
+	if failure := tokenFailureOf(err, true); failure != nil {
 		return nil, failure
 	}
 	projects, err := fetchProjects(ctx, client)
-	if failure := tokenFailureOf(err, tokenRevoked); failure != nil {
+	if failure := tokenFailureOf(err, true); failure != nil {
 		return nil, failure
 	}
 	if !slices.ContainsFunc(projects, func(p project) bool { return p.ID == teamID }) {
@@ -166,9 +181,9 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 	}, nil
 }
 
-// tokenFailureOf classifies err: a missing or rejected credential is signedOut's code
-// (signed_out before any exchange, revoked after one), anything else unavailable.
-func tokenFailureOf(err error, signedOut string) *tokenFailure {
+// tokenFailureOf classifies err: a missing or rejected credential is signed_out, or
+// revoked once the server has seen it (exchanged), and anything else unavailable.
+func tokenFailureOf(err error, exchanged bool) *tokenFailure {
 	if err == nil {
 		return nil
 	}
@@ -176,7 +191,7 @@ func tokenFailureOf(err error, signedOut string) *tokenFailure {
 		return &tokenFailure{Code: tokenSignedOut, Message: wrongEnv.Error()}
 	}
 	if errors.Is(err, auth.ErrNotLoggedIn) {
-		if signedOut == tokenRevoked {
+		if exchanged {
 			return &tokenFailure{Code: tokenRevoked, Message: "your Terma session has ended: run `terma setup` to sign in again", cause: err}
 		}
 		return &tokenFailure{Code: tokenSignedOut, Message: "not signed in to Terma: run `terma setup`"}

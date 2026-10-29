@@ -195,8 +195,10 @@ func TestLoad_RejectsNonHTTPSchemes(t *testing.T) {
 
 // TestLoad_DefaultsToProductionOnEveryHost: with no configuration, every endpoint is production.
 func TestLoad_DefaultsToProductionOnEveryHost(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV.
+	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV, nor
+	// the TERMA_MCP_URL a bridge developer exports.
 	t.Setenv("TERMA_ENV", "")
+	t.Setenv("TERMA_MCP_URL", "")
 	dir := seedConfig(t, nil)
 
 	cfg, err := Load(dir, dir, Overrides{})
@@ -235,8 +237,13 @@ func TestLoad_MCPURL(t *testing.T) {
 			t.Errorf("TERMA_ENV=%q TERMA_MCP_URL=%q: MCPURL = %q, want %q", tc.env, tc.override, cfg.MCPURL, tc.want)
 		}
 	}
+	// Only `terma auth token` uses it, so a bad one fails that, not every command.
 	t.Setenv("TERMA_MCP_URL", "http://mcp.example/mcp")
-	if _, err := Load(dir, dir, Overrides{}); err == nil {
+	cfg, err := Load(dir, dir, Overrides{})
+	if err != nil {
+		t.Fatalf("Load with a bad TERMA_MCP_URL: %v", err)
+	}
+	if cfg.CheckMCPURL() == nil {
 		t.Error("an http MCP URL off loopback was accepted; the bridge would send the token in cleartext")
 	}
 }

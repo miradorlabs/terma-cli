@@ -208,8 +208,6 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		{"app", cfg.AppURL},
 		// Agents send a server key to the OTLP host, so it is held to the same standard.
 		{"otlp", cfg.OTLPURL},
-		// The bridge sends the CLI token there.
-		{"mcp", cfg.MCPURL},
 	} {
 		if err := validateEndpoint(endpoint.name, endpoint.value); err != nil {
 			return nil, err
@@ -217,6 +215,11 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 	}
 	return cfg, nil
 }
+
+// CheckMCPURL holds the MCP gateway to the standard of the other hosts, since the bridge
+// sends the CLI token there. Only `terma auth token` uses it, so Load leaves the check
+// to it rather than failing every command.
+func (c *Config) CheckMCPURL() error { return validateEndpoint("mcp", c.MCPURL) }
 
 // validateEndpoint refuses http except to loopback: every one of these hosts receives
 // a secret at some point.

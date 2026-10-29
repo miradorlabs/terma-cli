@@ -92,6 +92,9 @@ type Client struct {
 	// tokenGen counts credential replacements, so a 401 that raced another goroutine's
 	// refresh retries with its token instead of redeeming the refresh token twice.
 	tokenGen uint64
+	// unstored are the refresh tokens this client redeemed since storing the pair that
+	// replaced one last failed: a store still holding one lags this client (see refresh).
+	unstored []string
 	// refreshMu serializes this process's token exchanges; the credential lock (see
 	// refresh) serializes them across processes.
 	refreshMu sync.Mutex

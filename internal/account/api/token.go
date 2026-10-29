@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -149,32 +150,22 @@ func (c *Client) refreshIfCurrent(ctx context.Context, gen uint64, redeem redeem
 	return c.refresh(ctx, redeem)
 }
 
-// Fresh returns the credential with an access token that is not about to expire,
-// refreshing it first when it is.
-func (c *Client) Fresh(ctx context.Context) (*auth.Credential, error) {
-	if err := c.refreshIfNeeded(ctx); err != nil {
-		return nil, err
-	}
-	return c.Credential(), nil
-}
+// Refresh rotates the pair when its access token is about to expire.
+func (c *Client) Refresh(ctx context.Context) error { return c.refreshIfNeeded(ctx) }
 
 // RefreshRefused rotates the pair although its access token has not expired, because a
 // server refused it, but only while the stored access token is still that one, whose
 // SHA-256 is refusedSHA256 in hex: every process that saw the one refusal shares a
 // single rotation.
-func (c *Client) RefreshRefused(ctx context.Context, refusedSHA256 string) (*auth.Credential, error) {
+func (c *Client) RefreshRefused(ctx context.Context, refusedSHA256 string) error {
 	if !c.canRefresh() {
-		return nil, auth.ErrNotLoggedIn
+		return auth.ErrNotLoggedIn
 	}
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
-	err := c.refresh(ctx, func(_, current *auth.Credential) bool {
+	return c.refresh(ctx, func(_, current *auth.Credential) bool {
 		return TokenSHA256(current.AccessToken) == strings.ToLower(refusedSHA256) || current.Expired()
 	})
-	if err != nil {
-		return nil, err
-	}
-	return c.Credential(), nil
 }
 
 // TokenSHA256 is how a token is named where the token itself must not appear: its
@@ -218,12 +209,20 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		default:
 			return err
 		}
-		current := held
-		if stored.AccessToken != held.AccessToken {
-			current = stored
+		if c.spentUnstored(stored.RefreshToken) {
+			// This client's rotations never reached the store, which still holds a refresh
+			// token it spent: keep its own pair, and store it while the lock is held.
+			if err := tx.Update(c.profile, held); err == nil {
+				c.stored()
+			}
+			return c.redeem(ctx, held, held, redeem, tx)
+		}
+		// Decide from the stored pair, never the one held: that was read without the lock,
+		// and may pair a rotation's tokens with the expiry before it.
+		if !samePair(stored, held) {
 			c.replace(stored)
 		}
-		return c.redeem(ctx, held, current, redeem, tx)
+		return c.redeem(ctx, held, stored, redeem, tx)
 	})
 }
 
@@ -244,13 +243,34 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	// A refresh keeps the session and its user.
 	cred.SessionID = cmp.Or(cred.SessionID, current.SessionID)
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
+	// Held before it is stored: the server has spent current's refresh token, so this
+	// pair is the session's only live one.
 	c.replace(cred)
 	if tx != nil {
 		if err := tx.Update(c.profile, cred); err != nil {
+			c.mu.Lock()
+			c.unstored = append(c.unstored, current.RefreshToken)
+			c.mu.Unlock()
 			return fmt.Errorf("persist refreshed credential: %w", err)
 		}
+		c.stored()
 	}
 	return nil
+}
+
+// spentUnstored reports whether this client redeemed refreshToken without storing the
+// pair that replaced it.
+func (c *Client) spentUnstored(refreshToken string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Contains(c.unstored, refreshToken)
+}
+
+// stored records that the store holds this client's pair.
+func (c *Client) stored() {
+	c.mu.Lock()
+	c.unstored = nil
+	c.mu.Unlock()
 }
 
 // replace makes cred the client's credential.
@@ -259,6 +279,11 @@ func (c *Client) replace(cred *auth.Credential) {
 	c.credential = cred
 	c.tokenGen++
 	c.mu.Unlock()
+}
+
+// samePair reports whether two credentials hold the same tokens and expiry.
+func samePair(a, b *auth.Credential) bool {
+	return a.AccessToken == b.AccessToken && a.RefreshToken == b.RefreshToken && a.ExpiresAt.Equal(b.ExpiresAt)
 }
 
 // sameSession reports whether two credentials are one sign-in, possibly rotated; one

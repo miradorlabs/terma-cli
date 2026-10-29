@@ -178,8 +178,16 @@ func assertTokenGrant(t *testing.T, stdout, want string) tokenGrant {
 	return grant
 }
 
-// assertTokenError checks the command failed with stdout exactly one error of code.
+// assertTokenError checks the command failed with stdout exactly one error of code,
+// naming `terma setup`.
 func assertTokenError(t *testing.T, stdout string, err error, code string) {
+	t.Helper()
+	assertTokenFailure(t, stdout, err, code, "terma setup")
+}
+
+// assertTokenFailure checks the command failed with stdout exactly one error of code,
+// whose message names fix.
+func assertTokenFailure(t *testing.T, stdout string, err error, code, fix string) {
 	t.Helper()
 	if c, ok := exitCodeOf(err); !ok || c == 0 {
 		t.Fatalf("err = %v, want a non-zero exit", err)
@@ -195,8 +203,8 @@ func assertTokenError(t *testing.T, stdout string, err error, code string) {
 	if err := dec.Decode(&out); err != nil || dec.More() {
 		t.Fatalf("stdout is not one error object (%v):\n%s", err, stdout)
 	}
-	if out.Error.Code != code || !strings.Contains(out.Error.Message, "terma setup") {
-		t.Errorf("error = %+v, want code %q and a message naming `terma setup`", out.Error, code)
+	if out.Error.Code != code || !strings.Contains(out.Error.Message, fix) {
+		t.Errorf("error = %+v, want code %q and a message naming %s", out.Error, code, fix)
 	}
 }
 
@@ -260,6 +268,8 @@ func TestAuthToken_ForceRefreshRotatesOnlyTheRefusedToken(t *testing.T) {
 	}
 }
 
+// Arguments this terma does not take fail as the contract says every failure does: one
+// error object on stdout, which a bridge built for another terma can read.
 func TestAuthToken_RejectsMalformedFlags(t *testing.T) {
 	srv := newTokenServer(t)
 	signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
@@ -268,10 +278,27 @@ func TestAuthToken_RejectsMalformedFlags(t *testing.T) {
 		{"auth", "token", "--json", "--force-refresh"},
 		{"auth", "token", "--json", "--refused-token-sha256=" + api.TokenSHA256("x")},
 		{"auth", "token", "--json", "--force-refresh", "--refused-token-sha256=mir_cli_0"},
+		{"auth", "token", "--json", "--refused-token=" + api.TokenSHA256("x")},
+		{"auth", "token", "--json", "--force-refresh=maybe"},
+		{"auth", "token", "--json", "extra"},
 	} {
-		if stdout, _, err := (termaRun{}).exec(t, args...); err == nil || strings.Contains(stdout, "mir_cli_") {
-			t.Errorf("%v = %v, stdout %q; want refused with no token printed", args, err, stdout)
+		stdout, _, err := termaRun{}.exec(t, args...)
+		if strings.Contains(stdout, "mir_cli_") {
+			t.Errorf("%v printed a token: %s", args, stdout)
 		}
+		assertTokenFailure(t, stdout, err, "unavailable", "terma update")
+	}
+}
+
+// A bad TERMA_MCP_URL fails the one command that hands it out, naming it.
+func TestAuthToken_RefusesACleartextMCPURL(t *testing.T) {
+	srv := newTokenServer(t)
+	signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	t.Setenv("TERMA_MCP_URL", "http://mcp.example/mcp")
+	stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
+	assertTokenFailure(t, stdout, err, "unavailable", "TERMA_MCP_URL")
+	if _, _, err := (termaRun{}).exec(t, "config", "show"); err != nil {
+		t.Errorf("config show with a bad TERMA_MCP_URL: %v; want only auth token to fail", err)
 	}
 }
 
