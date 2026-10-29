@@ -34,7 +34,8 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			"actual_store", "selected_store", "store_mode", "storage_phase", "credential_kind", "secure_outcome", "secure_error", "fallback_reason",
 			"codex.turn.phase", "product_sku",
 			// 0.166: a tool dispatch span's phase, only ever "dispatch" (core/src/tools/parallel.rs),
-			// and exec_command's shell snapshot rollout cohort, "v2", "v1" or "disabled"
+			// and the shell snapshot rollout cohort exec_command tags its codex.tool.call and
+			// codex.tool.call.duration_ms points with, "v2", "v1" or "disabled"
 			// (core/src/tools/handlers/unified_exec/exec_command.rs).
 			"codex.tool.phase", "shell_snapshot_mode"},
 		SafePrefixes: []string{"codex.turn.token_usage.", "codex.usage."},
