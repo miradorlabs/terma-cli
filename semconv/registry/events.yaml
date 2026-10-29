@@ -601,6 +601,28 @@ events:
       - ref: terma.session.title
         requirement_level: required
 
+  - name: terma.model_call.response
+    stability: development
+    requirement_level: recommended
+    brief: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.model_call.id
+        requirement_level: required
+      - ref: gen_ai.response.finish_reasons
+        requirement_level: required
+      - ref: gen_ai.response.model
+      - ref: gen_ai.usage.reasoning.output_tokens
+        requirement_level:
+          conditionally_required: When the agent recorded the count.
+      - ref: terma.response.service_tier
+      - ref: terma.response.inference_geo
+
   - name: terma.relay.heartbeat
     stability: development
     requirement_level: recommended
