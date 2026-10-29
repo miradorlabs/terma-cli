@@ -61,6 +61,10 @@ const (
 	TermaAccountSeatIDKey = "terma.account.seat.id"
 	// TermaAccountSeatTierKey is terma.account.seat_tier: The provider's word for the seat's tier.
 	TermaAccountSeatTierKey = "terma.account.seat_tier"
+	// TermaAccountRateLimitTierKey is terma.account.rate_limit_tier: The provider's word for the usage limits the account's user runs under.
+	TermaAccountRateLimitTierKey = "terma.account.rate_limit_tier"
+	// TermaAccountOrganizationRateLimitTierKey is terma.account.organization.rate_limit_tier: The provider's word for the usage limits of the account's organization.
+	TermaAccountOrganizationRateLimitTierKey = "terma.account.organization.rate_limit_tier"
 	// TermaAccountStatusKey is terma.account.status: Whether the record names the account.
 	TermaAccountStatusKey = "terma.account.status"
 	// TermaAgentFullyIdleKey is terma.agent.fully_idle: Whether the agent had nothing left running when the turn ended.
