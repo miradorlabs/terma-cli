@@ -61,11 +61,13 @@ fi
 echo "== brew style (informational)"
 brew style --cask "$tap/Casks/terma.rb" || echo "brew style has findings (GoReleaser's template; not enforced)"
 
+# Homebrew >= 6 will not load a cask from an untrusted third-party tap, audit included.
+brew trust "$TAPNAME" >/dev/null 2>&1 || true
+
 echo "== brew audit --strict"
 brew audit --cask --strict "$TAPNAME/terma" || fail "brew audit"
 
 echo "== brew install"
-brew trust "$TAPNAME" >/dev/null 2>&1 || true # Homebrew >= 6 will not load an untrusted third-party tap
 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install --cask "$TAPNAME/terma"
 # `brew install` also loads every cask already on the machine, so its output cannot
 # tell whose deprecation warning it is; ask about this cask alone.

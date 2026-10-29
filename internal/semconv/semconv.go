@@ -21,6 +21,8 @@ const (
 	GenAIRequestModelKey = "gen_ai.request.model"
 	// GenAIRequestReasoningLevelKey is gen_ai.request.reasoning.level: The reasoning or thinking effort level requested for a GenAI model.
 	GenAIRequestReasoningLevelKey = "gen_ai.request.reasoning.level"
+	// GenAIResponseFinishReasonsKey is gen_ai.response.finish_reasons: Array of reasons the model stopped generating tokens, corresponding to each generation received.
+	GenAIResponseFinishReasonsKey = "gen_ai.response.finish_reasons"
 	// GenAIResponseModelKey is gen_ai.response.model: The name of the model that generated the response.
 	GenAIResponseModelKey = "gen_ai.response.model"
 	// GenAIToolCallArgumentsKey is gen_ai.tool.call.arguments: Parameters passed to the tool call.
@@ -31,6 +33,8 @@ const (
 	GenAIToolNameKey = "gen_ai.tool.name"
 	// GenAIToolTypeKey is gen_ai.tool.type: Type of the tool utilized by the agent
 	GenAIToolTypeKey = "gen_ai.tool.type"
+	// GenAIUsageReasoningOutputTokensKey is gen_ai.usage.reasoning.output_tokens: The number of output tokens used for reasoning (e.g. chain-of-thought, extended thinking).
+	GenAIUsageReasoningOutputTokensKey = "gen_ai.usage.reasoning.output_tokens"
 	// HostNameKey is host.name: Name of the host. On UNIX systems, it may contain what the hostname command returns, or the fully qualified hostname, or another name specified by the user.
 	HostNameKey = "host.name"
 	// MiradorProjectIDKey is mirador.project.id: The Mirador project the record is delivered to, the platform's routing key.
@@ -149,6 +153,8 @@ const (
 	TermaMessageTextKey = "terma.message.text"
 	// TermaMessageTruncatedKey is terma.message.truncated: Whether terma.message.text was cut at terma's bound.
 	TermaMessageTruncatedKey = "terma.message.truncated"
+	// TermaModelCallIDKey is terma.model_call.id: The model call the event is about, in the agent's own id.
+	TermaModelCallIDKey = "terma.model_call.id"
 	// TermaModelParamContextKey is terma.model_param.context: The context setting the developer selected for the model.
 	TermaModelParamContextKey = "terma.model_param.context"
 	// TermaModelParamThinkingKey is terma.model_param.thinking: The thinking setting the developer selected for the model.
@@ -247,6 +253,10 @@ const (
 	TermaRepositoryWorktreeLinkedKey = "terma.repository.worktree.linked"
 	// TermaRepositoryWorktreeNameKey is terma.repository.worktree.name: Git's name for the linked worktree the session's hooks last ran in.
 	TermaRepositoryWorktreeNameKey = "terma.repository.worktree.name"
+	// TermaResponseInferenceGeoKey is terma.response.inference_geo: Where the provider says it ran the call, in its own spelling.
+	TermaResponseInferenceGeoKey = "terma.response.inference_geo"
+	// TermaResponseServiceTierKey is terma.response.service_tier: The service tier the provider says served the call, in its own spelling.
+	TermaResponseServiceTierKey = "terma.response.service_tier"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
@@ -319,6 +329,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
+	TermaModelCallResponseEvent = "terma.model_call.response"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.
 	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
