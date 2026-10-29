@@ -7,6 +7,8 @@
 package auth
 
 import (
+	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -205,9 +207,26 @@ func Credentials(dir, profile string) ([]*Credential, error) {
 // for the caller to revoke. Signing in decides where the tokens live: the system
 // keychain, unless there is none or config.json asks for files (InsecureStorage).
 func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
+	err = Locked(context.Background(), dir, func(tx *Tx) error {
+		replaced, err = tx.saveReplacing(profile, cred)
+		return err
+	})
+	if replaced != nil && replaced.SessionID == cred.SessionID {
+		replaced = nil
+	}
+	return replaced, err
+}
+
+func (tx *Tx) save(profile string, cred *Credential) error {
+	_, err := tx.saveReplacing(profile, cred)
+	return err
+}
+
+func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credential, err error) {
+	dir := tx.dir
 	inFile := config.InsecureStorage(dir)
 	var unindexed bool
-	err = mutateCredentialFile(dir, func(file credentialFile) {
+	err = tx.mutate(func(file credentialFile) {
 		p := file[profile]
 		if p == nil {
 			p = &profileCredentials{}
@@ -228,20 +247,76 @@ func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential
 		p.put(kept)
 		p.Active = cred.OrganizationID
 	})
-	afterSave(dir, profile, cred.OrganizationID, unindexed, err)
-	if replaced != nil && replaced.SessionID == cred.SessionID {
-		replaced = nil
-	}
+	tx.after = append(tx.after, func() { afterSave(dir, profile, cred.OrganizationID, unindexed, err) })
 	return replaced, err
+}
+
+// ResaveCredential activates and saves again, as SaveCredential does, a session that was
+// read from the store earlier. Under the lock it keeps the pair stored now rather than
+// cred's: another process may have rotated it since, or signed in afresh, and writing
+// back the pair read earlier would hand the next refresh a spent refresh token. It
+// returns the credential as it was saved.
+func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
+	saved := cred
+	err := Locked(context.Background(), dir, func(tx *Tx) error {
+		switch stored, err := tx.LoadFor(profile, cred.OrganizationID); {
+		case err == nil:
+			stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
+			stored.UserID = cmp.Or(stored.UserID, cred.UserID)
+			saved = stored
+		case !errors.Is(err, ErrNotLoggedIn):
+			// Unreadable is not absent: what is stored may be newer than cred.
+			return err
+		}
+		return tx.save(profile, saved)
+	})
+	return saved, err
 }
 
 // UpdateCredential persists a refreshed credential without changing which organization
 // is active, keeping its tokens where they already are; a keychain that fails gets the
 // new pair written to the file, so a rotated token is never lost.
 func UpdateCredential(dir, profile string, cred *Credential) error {
-	inFile := config.InsecureStorage(dir)
+	return Locked(context.Background(), dir, func(tx *Tx) error { return tx.Update(profile, cred) })
+}
+
+// Tx is the credential file held under its cross-process lock: what it loads cannot
+// change until the transaction ends, and what it saves takes no second lock, which the
+// holder would wait on for ever.
+type Tx struct {
+	dir string
+	// after runs once the lock is let go: sweeping stale keychain items locks again.
+	after []func()
+}
+
+// Locked runs fn holding the credential lock, waiting for it until ctx is done.
+func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+	unlock, err := lockCredentialFile(ctx, config.CredentialsPath(dir))
+	if err != nil {
+		return err
+	}
+	tx := &Tx{dir: dir}
+	err = fn(tx)
+	unlock()
+	for _, f := range tx.after {
+		f()
+	}
+	return err
+}
+
+// LoadFor is LoadCredentialFor inside the transaction.
+func (tx *Tx) LoadFor(profile, organizationID string) (*Credential, error) {
+	return LoadCredentialFor(tx.dir, profile, organizationID)
+}
+
+// Update is UpdateCredential inside the transaction.
+func (tx *Tx) Update(profile string, cred *Credential) error {
+	inFile := config.InsecureStorage(tx.dir)
 	var unindexed bool
-	err := mutateCredentialFile(dir, func(file credentialFile) {
+	err := tx.mutate(func(file credentialFile) {
 		p := file[profile]
 		if p == nil {
 			p = &profileCredentials{}
@@ -251,15 +326,24 @@ func UpdateCredential(dir, profile string, cred *Credential) error {
 		if old.present() && old.AccessToken != "" {
 			inFile = true
 		}
-		kept := keep(dir, profile, cred, old, inFile)
+		kept := keep(tx.dir, profile, cred, old, inFile)
 		unindexed = !old.present() && kept.AccessToken == ""
 		p.put(kept)
 		if p.Active == "" {
 			p.Active = cred.OrganizationID
 		}
 	})
-	afterSave(dir, profile, cred.OrganizationID, unindexed, err)
+	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, cred.OrganizationID, unindexed, err) })
 	return err
+}
+
+func (tx *Tx) mutate(mutate func(credentialFile)) error {
+	file, err := loadCredentialFile(tx.dir)
+	if err != nil {
+		return err
+	}
+	mutate(file)
+	return saveCredentialFile(config.CredentialsPath(tx.dir), file)
 }
 
 // DeleteCredential forgets every credential a profile holds — logout.
@@ -316,23 +400,7 @@ func DeleteCredentialFor(dir, profile, organizationID string) error {
 // mutateCredentialFile runs mutate under a cross-process lock: unlocked, a second
 // concurrent writer erases the first's entry.
 func mutateCredentialFile(dir string, mutate func(credentialFile)) error {
-	path := config.CredentialsPath(dir)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-
-	unlock, err := lockCredentialFile(path)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-
-	file, err := loadCredentialFile(dir)
-	if err != nil {
-		return err
-	}
-	mutate(file)
-	return saveCredentialFile(path, file)
+	return Locked(context.Background(), dir, func(tx *Tx) error { return tx.mutate(mutate) })
 }
 
 func loadCredentialFile(dir string) (credentialFile, error) {

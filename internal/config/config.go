@@ -110,6 +110,9 @@ type Config struct {
 	AppURL  string
 	// OTLPURL is the ingest host written into agents' exporters; the CLI never calls it.
 	OTLPURL string
+	// MCPURL is the MCP gateway `terma auth token` hands the terma-mcp bridge; the CLI
+	// never calls it.
+	MCPURL string
 
 	OrganizationID   string
 	OrganizationName string
@@ -180,6 +183,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		AuthURL:            strings.TrimRight(firstNonEmpty(o.AuthURL, os.Getenv("TERMA_AUTH_URL"), profile.AuthURL, defaults.AuthURL), "/"),
 		AppURL:             strings.TrimRight(firstNonEmpty(o.AppURL, os.Getenv("TERMA_APP_URL"), profile.AppURL, defaults.AppURL), "/"),
 		OTLPURL:            strings.TrimRight(firstNonEmpty(o.OTLPURL, os.Getenv("TERMA_OTLP_URL"), profile.OTLPURL, defaults.OTLPURL), "/"),
+		MCPURL:             strings.TrimRight(firstNonEmpty(os.Getenv("TERMA_MCP_URL"), defaults.MCPURL), "/"),
 		OrganizationID:     firstNonEmpty(os.Getenv("TERMA_ORGANIZATION_ID"), profile.OrganizationID),
 		OrganizationName:   profile.OrganizationName,
 		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
@@ -204,6 +208,8 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		{"app", cfg.AppURL},
 		// Agents send a server key to the OTLP host, so it is held to the same standard.
 		{"otlp", cfg.OTLPURL},
+		// The bridge sends the CLI token there.
+		{"mcp", cfg.MCPURL},
 	} {
 		if err := validateEndpoint(endpoint.name, endpoint.value); err != nil {
 			return nil, err

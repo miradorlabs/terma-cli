@@ -92,8 +92,8 @@ type Client struct {
 	// tokenGen counts credential replacements, so a 401 that raced another goroutine's
 	// refresh retries with its token instead of redeeming the refresh token twice.
 	tokenGen uint64
-	// refreshMu serializes the token exchange: the server's reuse detection revokes the
-	// whole session when a rotated refresh token is redeemed twice.
+	// refreshMu serializes this process's token exchanges; the credential lock (see
+	// refresh) serializes them across processes.
 	refreshMu sync.Mutex
 
 	projectID string
@@ -288,7 +288,11 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 
 	if resp.StatusCode == http.StatusUnauthorized && c.canRefresh() {
 		resp.Body.Close()
-		if refreshErr := c.refreshIfCurrent(ctx, gen); refreshErr != nil {
+		// The refused token is redeemed past unless another process already has.
+		refused := func(held, current *auth.Credential) bool {
+			return current.AccessToken == held.AccessToken || current.Expired()
+		}
+		if refreshErr := c.refreshIfCurrent(ctx, gen, refused); refreshErr != nil {
 			return nil, refreshErr
 		}
 		resp, err = c.attempt(ctx, h, method, path, query, headers, body)

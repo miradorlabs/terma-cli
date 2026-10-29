@@ -9,8 +9,8 @@ import (
 
 // lockCredentialFile locks a sidecar, since the atomic rename over the credential file
 // would drop a lock held on its inode.
-func lockCredentialFile(path string) (func(), error) {
-	unlock, err := flock.Lock(context.Background(), path+".lock")
+func lockCredentialFile(ctx context.Context, path string) (func(), error) {
+	unlock, err := flock.Lock(ctx, path+".lock")
 	if err != nil {
 		return nil, fmt.Errorf("lock credentials: %w", err)
 	}

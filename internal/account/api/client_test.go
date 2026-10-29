@@ -482,3 +482,74 @@ func TestParseErrorBoundsAPlainBody(t *testing.T) {
 		}
 	}
 }
+
+// A pair another process rotated while this client held the old one is taken from the
+// store, not redeemed again: the server revokes a session whose spent refresh token
+// comes back.
+func TestClient_TakesAPairAnotherProcessRotated(t *testing.T) {
+	t.Parallel()
+	var redemptions atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == tokenPath {
+			redemptions.Add(1)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer mir_cli_rotated" {
+			t.Errorf("read used %q, want the pair the other process stored", r.Header.Get("Authorization"))
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	rotated := *expired
+	rotated.AccessToken, rotated.RefreshToken, rotated.ExpiresAt = "mir_cli_rotated", "mir_clr_rotated", time.Now().Add(time.Hour)
+	if err := auth.UpdateCredential(client.dir, config.DefaultProfile, &rotated); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got := redemptions.Load(); got != 0 {
+		t.Errorf("redemptions = %d, want none", got)
+	}
+}
+
+// A session the store no longer holds (one a sign-in replaced, being revoked) still
+// refreshes, but its pair never overwrites the stored one.
+func TestClient_RefreshOfASupersededSessionStoresNothing(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == tokenPath {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "mir_cli_old_rotated", "refresh_token": "mir_clr_old_rotated", "expires_in": 3600,
+				"session_id": "session-old", "organization": map[string]string{"id": "org-test"},
+			})
+			return
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	old := &auth.Credential{AccessToken: "mir_cli_old", RefreshToken: "mir_clr_old", SessionID: "session-old",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, old, "")
+	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
+		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got := client.Credential().AccessToken; got != "mir_cli_old_rotated" {
+		t.Errorf("client token = %q, want its own session rotated", got)
+	}
+	stored, err := auth.LoadCredential(client.dir, config.DefaultProfile)
+	if err != nil || stored.RefreshToken != "mir_clr_new" {
+		t.Fatalf("stored = %+v, %v; want the new sign-in untouched", stored, err)
+	}
+}

@@ -17,9 +17,12 @@ type Endpoints struct {
 	AppURL  string
 	// OTLPURL is the ingest host agents and the spool export to.
 	OTLPURL string
+	// MCPURL is the MCP gateway the terma-mcp bridge forwards an agent's tool calls to.
+	MCPURL string
 }
 
-// environments are the built-in hosts; TERMA_*_URL or `terma config set` overrides any.
+// environments are the built-in hosts; TERMA_*_URL or `terma config set` overrides any
+// but the MCP gateway's, which only TERMA_MCP_URL does.
 // Pre-production runs on the shared Mirador dev backend.
 var environments = map[string]Endpoints{
 	EnvProd: {
@@ -27,12 +30,14 @@ var environments = map[string]Endpoints{
 		AuthURL: "https://auth.terma.ai",
 		AppURL:  "https://app.terma.ai",
 		OTLPURL: "https://otel.terma.ai",
+		MCPURL:  "https://mcp.terma.ai/mcp",
 	},
 	EnvDev: {
 		APIURL:  "https://api-dev.terma.ai",
 		AuthURL: "https://auth-dev.terma.ai",
 		AppURL:  "https://dev.terma.ai",
 		OTLPURL: "https://otel-dev.terma.ai",
+		MCPURL:  "https://mcp-dev.terma.ai/mcp",
 	},
 	EnvLocal: {
 		// A local app in front of the dev backend: there is no local account service.
@@ -40,6 +45,7 @@ var environments = map[string]Endpoints{
 		AuthURL: "https://auth-dev.terma.ai",
 		AppURL:  "http://localhost:3000",
 		OTLPURL: "https://otel-dev.terma.ai",
+		MCPURL:  "https://mcp-dev.terma.ai/mcp",
 	},
 }
 
@@ -49,6 +55,7 @@ const (
 	DefaultAuthURL = "https://auth.terma.ai"
 	DefaultAppURL  = "https://app.terma.ai"
 	DefaultOTLPURL = "https://otel.terma.ai"
+	DefaultMCPURL  = "https://mcp.terma.ai/mcp"
 )
 
 // EndpointsFor resolves a named environment; an unknown name is an error, so a typo
