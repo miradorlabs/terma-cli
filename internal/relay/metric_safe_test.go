@@ -120,3 +120,21 @@ func TestCodexSandboxAndToolFieldsAreSafeOnTheirMetrics(t *testing.T) {
 		}
 	}
 }
+
+// Codex 0.166's shell snapshot cohort is safe on its tool call metrics and nowhere else; its
+// tool dispatch phase is safe on a span.
+func TestCodexToolCallFieldsAreSafeOnTheirMetrics(t *testing.T) {
+	t.Parallel()
+	q := func(metric, key string) FieldQuery { return FieldQuery{Site: SiteMetric, Event: metric, Key: key} }
+	got := Classify(testCapturers, []FieldQuery{
+		q("codex.tool.call", "shell_snapshot_mode"), q("codex.tool.call.duration_ms", "shell_snapshot_mode"),
+		q("codex.turn.e2e_duration_ms", "shell_snapshot_mode"), {Site: SiteRecord, Key: "shell_snapshot_mode"},
+		{Site: SiteRecord, Key: "codex.tool.phase"},
+	})
+	want := []FieldClass{FieldSafe, FieldSafe, FieldUnclassified, FieldUnclassified, FieldSafe}
+	for i := range want {
+		if got[i].Class != want[i] {
+			t.Errorf("query %d: %s, want %s", i, got[i].Class, want[i])
+		}
+	}
+}
