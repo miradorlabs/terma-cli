@@ -260,8 +260,8 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 
 // pairMoves turns a gone and a new surface of the last build judged into one Moved, taking them
 // out of Unseen and NewSurfaces, where they are the same span event on another span: they carry
-// one event name that no other gone or new surface carries (tracing names an event after its
-// file, so names repeat), and
+// one event name that no other surface gone in last or new carries (tracing names an event after
+// its file, so names repeat), and
 //   - the old span went in last itself, not in an earlier build;
 //   - no build older than last sent the new span tonight, its census whole or partial: the new
 //     span is that build's new surface (fieldsOf);
