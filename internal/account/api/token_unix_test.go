@@ -113,7 +113,7 @@ func TestHoldCredentialLock(t *testing.T) {
 }
 
 // A process that hangs holding the credential lock stalls no other: a refresh waits for
-// it no longer than its request timeout, then fails without redeeming anything.
+// it no longer than its deadline, then fails without redeeming anything.
 func TestClient_RefreshGivesUpOnAHungHolder(t *testing.T) {
 	t.Parallel()
 	var redemptions atomic.Int32
@@ -146,20 +146,22 @@ func TestClient_RefreshGivesUpOnAHungHolder(t *testing.T) {
 		t.Fatalf("holder said %q, %v; want it holding the lock", line, err)
 	}
 
-	const timeout = 300 * time.Millisecond
 	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
-		Options{Version: "test", Timeout: timeout})
+		Options{Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	const wait = 300 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
 	start := time.Now()
-	err = client.Refresh(context.Background())
+	err = client.Refresh(ctx)
 	elapsed := time.Since(start)
 	if err == nil || !strings.Contains(err.Error(), "another terma process held them") {
 		t.Fatalf("Refresh behind a hung holder = %v; want the lock's deadline", err)
 	}
-	if elapsed > timeout+2*time.Second {
-		t.Fatalf("Refresh waited %v behind a hung holder; want about its %v request timeout", elapsed, timeout)
+	if elapsed > wait+2*time.Second {
+		t.Fatalf("Refresh waited %v behind a hung holder; want about its %v deadline", elapsed, wait)
 	}
 	if n := redemptions.Load(); n != 0 {
 		t.Fatalf("%d redemptions without the lock; want none", n)

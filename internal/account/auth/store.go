@@ -18,6 +18,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -289,25 +290,28 @@ type Tx struct {
 	after []func()
 }
 
-// lockWait bounds a write's wait for the credential lock: longer than a refresh holds it,
-// through its exchange (the request timeout) and a keychain write (a minute), so a holder
-// that hangs costs the waiter an error, never a stall.
-var lockWait = 2 * time.Minute
+// lockWait bounds every wait for the credential lock, so a holder that hangs costs the
+// waiter an error, never a stall. It is longer than a healthy holder keeps the lock: a
+// refresh holds it through its exchange (30 s by default) and at most two keychain
+// writes, the pair it holds and the one it gets; every other holder through one
+// credential's keychain write and a few deletes of seconds each. Relocate, which touches
+// every credential, takes the lock once for each.
+var lockWait = 2*secret.WriteTimeout + time.Minute
 
 // lockedWrite is Locked for a write that has no deadline of its own.
 func lockedWrite(dir string, fn func(tx *Tx) error) error {
-	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
-	defer cancel()
-	return Locked(ctx, dir, fn)
+	return Locked(context.Background(), dir, fn)
 }
 
-// Locked runs fn holding the credential lock, waiting for it until ctx is done; ctx
-// carries a deadline, since another process may hold the lock through a network call.
+// Locked runs fn holding the credential lock, waiting for it until ctx is done or lockWait
+// has passed, since another process may hold the lock through a network call.
 func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
+	ctx, cancel := context.WithTimeout(ctx, lockWait)
 	unlock, err := lockCredentialFile(ctx, config.CredentialsPath(dir))
+	cancel()
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/zalando/go-keyring"
 )
@@ -24,13 +25,16 @@ func backend(dir string) store {
 	case slow:
 		return failingStore{err: &UnavailableError{Err: errors.New("no answer"), TimedOut: true}}
 	}
+	if d := memory.delays[dir]; d > 0 {
+		return delayedStore{store: &memory, delay: d}
+	}
 	return &memory
 }
 
 // useSystemInTests lets this package's opt-in test reach the real store.
 var useSystemInTests bool
 
-var memory = memoryStore{items: map[string]string{}, failing: map[string]failure{}}
+var memory = memoryStore{items: map[string]string{}, failing: map[string]failure{}, delays: map[string]time.Duration{}}
 
 // errRefused is a keychain declining one item while taking others, as one that will not store
 // a secret that large would.
@@ -48,6 +52,8 @@ type memoryStore struct {
 	mu      sync.Mutex
 	items   map[string]string
 	failing map[string]failure
+	// delays are how long each config directory's writes take to land (DelayForTest).
+	delays map[string]time.Duration
 	// refusing are service and item-name prefixes whose items Set refuses (RefuseForTest).
 	refusing []string
 }
@@ -82,6 +88,17 @@ func (m *memoryStore) Delete(service, user string) error {
 	return nil
 }
 
+// delayedStore is a store whose writes land late.
+type delayedStore struct {
+	store
+	delay time.Duration
+}
+
+func (d delayedStore) Set(service, user, password string) error {
+	time.Sleep(d.delay)
+	return d.store.Set(service, user, password)
+}
+
 type failingStore struct{ err error }
 
 var errLocked = errors.New("the keychain is locked")
@@ -109,6 +126,19 @@ func failFor(t testing.TB, dir string, f failure) (unlock func()) {
 	}
 	t.Cleanup(unlock)
 	return unlock
+}
+
+// DelayForTest makes every write for dir land only after d, as one waiting on a keychain
+// prompt would, until t ends. Only for tests.
+func DelayForTest(t testing.TB, dir string, d time.Duration) {
+	memory.mu.Lock()
+	memory.delays[dir] = d
+	memory.mu.Unlock()
+	t.Cleanup(func() {
+		memory.mu.Lock()
+		delete(memory.delays, dir)
+		memory.mu.Unlock()
+	})
 }
 
 // RefuseForTest makes the store refuse to keep any item for the config directory dir whose

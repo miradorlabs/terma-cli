@@ -621,3 +621,41 @@ func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 		t.Fatalf("credential lock after the refresh gave up: %v", err)
 	}
 }
+
+// A refresh waits for the credential lock longer than its request timeout: a healthy
+// holder may keep it through its own exchange and keychain writes, and the refresh behind
+// it then takes the pair as that holder left it.
+func TestClient_RefreshWaitsOutAHolderPastTheRequestTimeout(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated",
+			"token_type": "Bearer", "expires_in": 3600,
+		})
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "project-123")
+	const timeout = 200 * time.Millisecond
+	client.http.Timeout = timeout
+
+	held, done := make(chan struct{}), make(chan error)
+	go func() {
+		done <- auth.Locked(t.Context(), client.dir, func(*auth.Tx) error {
+			close(held)
+			time.Sleep(4 * timeout)
+			return nil
+		})
+	}()
+	<-held
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh behind a holder that keeps the lock past the request timeout: %v", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if got := client.Credential().RefreshToken; got != "mir_clr_rotated" {
+		t.Errorf("refresh token = %q, want the rotated one", got)
+	}
+}

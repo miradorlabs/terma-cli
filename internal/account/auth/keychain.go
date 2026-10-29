@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -126,40 +127,54 @@ func afterSave(dir, profile, organizationID string, unindexed bool, err error) {
 
 // Relocate moves every stored credential's tokens, in every profile, to where config.json
 // now keeps secrets: into the keychain, or into credentials.json under InsecureStorage.
-// A credential the keychain will not take or give up stays where it is.
+// A credential the keychain will not take or give up stays where it is. Each credential
+// moves under a lock of its own: a keychain write may wait a minute on a prompt, and one
+// lock held through them all would keep every other writer waiting past lockWait.
 func Relocate(dir string) error {
-	if file, err := loadCredentialFile(dir); err != nil || len(file) == 0 {
+	file, err := loadCredentialFile(dir)
+	if err != nil || len(file) == 0 {
 		return err
 	}
 	inFile := config.InsecureStorage(dir)
-	var moved []string
-	err := mutateCredentialFile(dir, func(file credentialFile) {
-		for profile, p := range file {
-			for org, c := range p.organizations() {
-				switch {
-				case !c.present():
-				case !inFile && c.AccessToken != "":
-					kept := keep(dir, profile, c, c, false)
-					p.Organizations[org] = kept
-					if kept.AccessToken == "" {
-						moved = append(moved, itemName(profile, org))
-					}
-				case inFile && c.AccessToken == "":
-					indexed := *c
-					if hydrate(dir, profile, c) == nil {
-						p.Organizations[org] = keep(dir, profile, c, &indexed, true)
-					}
-				}
+	for profile, p := range file {
+		for org := range p.organizations() {
+			if err := relocate(dir, profile, org, inFile); err != nil {
+				return err
 			}
+			// The lock is not fair: a waiter polls it, so give one the chance to take it.
+			time.Sleep(relocateYield)
 		}
-	})
-	if err != nil {
-		// The file still holds these tokens: the copies the keychain took would be lost track of.
-		for _, item := range moved {
-			_ = secret.Delete(dir, item)
-		}
-		return err
 	}
 	sweepStale(dir)
 	return nil
+}
+
+// relocateYield is how long Relocate leaves the lock free between credentials: longer
+// than a waiter's poll of it (a millisecond at most).
+const relocateYield = 10 * time.Millisecond
+
+// relocate is Relocate for one credential, as the file holds it once locked.
+func relocate(dir, profile, org string, inFile bool) error {
+	moved := false
+	err := mutateCredentialFile(dir, func(file credentialFile) {
+		p := file[profile]
+		c := p.organizations()[org]
+		switch {
+		case !c.present():
+		case !inFile && c.AccessToken != "":
+			kept := keep(dir, profile, c, c, false)
+			p.Organizations[org] = kept
+			moved = kept.AccessToken == ""
+		case inFile && c.AccessToken == "":
+			indexed := *c
+			if hydrate(dir, profile, c) == nil {
+				p.Organizations[org] = keep(dir, profile, c, &indexed, true)
+			}
+		}
+	})
+	if err != nil && moved {
+		// The file still holds these tokens: the copy the keychain took would be lost track of.
+		_ = secret.Delete(dir, itemName(profile, org))
+	}
+	return err
 }

@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -357,6 +359,42 @@ func TestRelocateMovesEveryCredential(t *testing.T) {
 	}
 	if creds, err := Credentials(dir, config.DefaultProfile); err != nil || len(creds) != 2 {
 		t.Fatalf("Credentials = %d, %v", len(creds), err)
+	}
+}
+
+// Relocate holds the credential lock through one credential's keychain write at a time,
+// never through every one, so a writer behind it waits no longer than a single write.
+func TestRelocateLetsTheLockGoBetweenCredentials(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	orgs := []string{"org-a", "org-b", "org-c", "org-d"}
+	for _, org := range orgs {
+		if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential(org, "s-"+org)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = false }); err != nil {
+		t.Fatal(err)
+	}
+	const write = 300 * time.Millisecond
+	secret.DelayForTest(t, dir, write)
+	done := make(chan error)
+	go func() { done <- Relocate(dir) }()
+	time.Sleep(write / 3)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*write)
+	defer cancel()
+	if err := Locked(ctx, dir, func(*Tx) error { return nil }); err != nil {
+		t.Fatalf("a writer behind Relocate's %d keychain writes: %v; want the lock within one", len(orgs), err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if f := credentialsFile(t, dir); strings.Contains(f, "ter_cli_") {
+		t.Fatalf("Relocate left tokens in the file:\n%s", f)
 	}
 }
 

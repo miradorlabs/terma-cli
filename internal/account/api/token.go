@@ -184,8 +184,9 @@ type redeemFunc func(held, current *auth.Credential) bool
 // token is redeemed twice: under the credential lock it reloads the stored pair, takes it
 // when another process has already rotated past this client's, redeems only if redeem
 // still asks for it, and persists the new pair before the lock is let go. The lock is
-// held through the exchange, so waiting for it is bounded as the exchange is. Call it
-// with refreshMu held.
+// held through the exchange and keychain writes, so the wait for it is auth's, longer
+// than the request timeout: a healthy holder must not read as a hung one. Call it with
+// refreshMu held.
 func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 	c.mu.Lock()
 	held := c.credential
@@ -196,9 +197,7 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 	if c.profile == "" {
 		return c.redeem(ctx, held, held, redeem, nil)
 	}
-	lockCtx, cancel := context.WithTimeout(ctx, c.http.Timeout)
-	defer cancel()
-	return auth.Locked(lockCtx, c.dir, func(tx *auth.Tx) error {
+	return auth.Locked(ctx, c.dir, func(tx *auth.Tx) error {
 		stored, err := tx.LoadFor(c.profile, held.OrganizationID)
 		switch {
 		case err == nil && sameSession(stored, held):

@@ -44,8 +44,9 @@ func MayLand(err error) bool {
 // A read answers an export or a flush, so it gives up soon; a write may wait for someone
 // typing a keychain password, as gh does.
 const (
-	readTimeout  = 5 * time.Second
-	writeTimeout = time.Minute
+	readTimeout = 5 * time.Second
+	// WriteTimeout bounds a write, and so how long a holder of a lock may spend on one.
+	WriteTimeout = time.Minute
 )
 
 type store interface {
@@ -90,7 +91,7 @@ func Get(dir, name string) (string, error) {
 
 // Set stores value as name for the config directory dir, replacing any earlier value.
 func Set(dir, name, value string) error {
-	_, err := bounded(writeTimeout, dir, name, func(s store, service, user string) (string, error) {
+	_, err := bounded(WriteTimeout, dir, name, func(s store, service, user string) (string, error) {
 		return "", s.Set(service, user, value)
 	})
 	return err
