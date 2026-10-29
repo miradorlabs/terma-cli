@@ -53,18 +53,18 @@ const (
 	TermaAccountIDKey = "terma.account.id"
 	// TermaAccountOrganizationIDKey is terma.account.organization.id: The provider's id for the account's organization.
 	TermaAccountOrganizationIDKey = "terma.account.organization.id"
+	// TermaAccountOrganizationRateLimitTierKey is terma.account.organization.rate_limit_tier: The provider's word for the usage limits of the account's organization.
+	TermaAccountOrganizationRateLimitTierKey = "terma.account.organization.rate_limit_tier"
 	// TermaAccountOrganizationTypeKey is terma.account.organization.type: The provider's word for the organization's kind.
 	TermaAccountOrganizationTypeKey = "terma.account.organization.type"
 	// TermaAccountPlanTypeKey is terma.account.plan_type: The provider's word for the account's plan.
 	TermaAccountPlanTypeKey = "terma.account.plan_type"
+	// TermaAccountRateLimitTierKey is terma.account.rate_limit_tier: The provider's word for the usage limits the account's user runs under.
+	TermaAccountRateLimitTierKey = "terma.account.rate_limit_tier"
 	// TermaAccountSeatIDKey is terma.account.seat.id: An opaque id for one person's seat in a shared account.
 	TermaAccountSeatIDKey = "terma.account.seat.id"
 	// TermaAccountSeatTierKey is terma.account.seat_tier: The provider's word for the seat's tier.
 	TermaAccountSeatTierKey = "terma.account.seat_tier"
-	// TermaAccountRateLimitTierKey is terma.account.rate_limit_tier: The provider's word for the usage limits the account's user runs under.
-	TermaAccountRateLimitTierKey = "terma.account.rate_limit_tier"
-	// TermaAccountOrganizationRateLimitTierKey is terma.account.organization.rate_limit_tier: The provider's word for the usage limits of the account's organization.
-	TermaAccountOrganizationRateLimitTierKey = "terma.account.organization.rate_limit_tier"
 	// TermaAccountStatusKey is terma.account.status: Whether the record names the account.
 	TermaAccountStatusKey = "terma.account.status"
 	// TermaAgentFullyIdleKey is terma.agent.fully_idle: Whether the agent had nothing left running when the turn ended.

@@ -63,8 +63,10 @@ func TestClaudeFundingSnapshotAndHints(t *testing.T) {
 	if _, ok := e.Attrs[semconv.TermaAccountExtraUsageEnabledKey]; ok {
 		t.Fatal("unknown extra usage became false")
 	}
-	if _, ok := e.Attrs[semconv.TermaAccountRateLimitTierKey]; ok {
-		t.Fatal("a login without a tier reported one")
+	for _, k := range []string{semconv.TermaAccountRateLimitTierKey, semconv.TermaAccountOrganizationRateLimitTierKey} {
+		if _, ok := e.Attrs[k]; ok {
+			t.Fatalf("a login without a tier reported %s", k)
+		}
 	}
 }
 

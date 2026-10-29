@@ -379,6 +379,9 @@ attributes:
     type: string
     stability: development
     brief: The provider's word for the usage limits of the account's organization.
+    note: >
+      Claude's organizationRateLimitTier. It names the organization's tier, which a seat's own
+      terma.account.rate_limit_tier can differ from.
     examples: ["default_raven"]
   - key: terma.account.billing_type
     type: string
