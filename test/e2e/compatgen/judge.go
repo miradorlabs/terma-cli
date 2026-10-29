@@ -266,7 +266,9 @@ func (d *HarnessDrift) judgeChain(n night, b baseline) {
 //   - no build older than last sent the new span tonight, its census whole or partial: the new
 //     span is that build's new surface (fieldsOf);
 //   - last sends the new span with the keys before, the build it was judged against, sent on the
-//     old one.
+//     old one;
+//   - before sent the old span itself and last the new one: a span whose own name holds
+//     "/events/" (traces/GET /v1/events/x) has no such surface, so it is never read as an event.
 //
 // A move has no source note.
 //
@@ -297,6 +299,9 @@ func (d *HarnessDrift) pairMoves(n night, last string, before, now sending) {
 		}
 		from, _, _ := spanEvent(g.Surface)
 		to, _, _ := spanEvent(s.Surface)
+		if !slices.Contains(before.surfaces, "traces/"+from) || !slices.Contains(now.surfaces, "traces/"+to) {
+			continue
+		}
 		d.Moved = append(d.Moved, MovedEvent{Event: event, From: from, To: to, Keys: len(keys)})
 		moved[gone[event][0]], arrived[came[event][0]] = true, true
 	}
