@@ -384,7 +384,8 @@ func TestASpanEventThatIsNoMove(t *testing.T) {
 			whole("0.165.0", "0.166.0"), 1, 1},
 		{"on both spans in an earlier, partial build", slices.Concat(at("0.165.0", old, moved, initSpan), at("0.166.0", moved, initSpan)),
 			partialFirst, 1, 1},
-		{"sent only by a later, partial build", slices.Concat(at("0.165.0", initSpan), at("0.166.0", initSpan), at("0.167.0", moved)),
+		// The old span goes in 0.166.0, the last judged; only the partial 0.167.0 sends the new.
+		{"sent only by a later, partial build", slices.Concat(at("0.165.0", old, initSpan), at("0.166.0", initSpan), at("0.167.0", moved)),
 			partialLast, 1, 1},
 		{"gone in an earlier build and back", slices.Concat(at("0.165.0", initSpan), at("0.166.0", old, initSpan), at("0.167.0", old, moved, initSpan)),
 			whole("0.165.0", "0.166.0", "0.167.0"), 1, 1},
