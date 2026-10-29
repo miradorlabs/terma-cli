@@ -35,6 +35,8 @@ type tokenServer struct {
 	spent              map[string]bool
 	revoked            bool
 	redemptions, fails int
+	// refuseProjects answers /v1/projects 401 even to a valid token.
+	refuseProjects bool
 }
 
 func newTokenServer(t *testing.T) *tokenServer {
@@ -51,7 +53,8 @@ func (s *tokenServer) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	ok := !s.revoked && r.Header.Get("Authorization") == "Bearer "+s.access
+	ok := !s.revoked && r.Header.Get("Authorization") == "Bearer "+s.access &&
+		(!s.refuseProjects || r.URL.Path != "/v1/projects")
 	s.mu.Unlock()
 	if !ok {
 		unauthorized(w)
@@ -328,6 +331,15 @@ func TestAuthToken_ErrorCodes(t *testing.T) {
 		signInForToken(t, srv, time.Now().Add(-time.Minute), grantTeam)
 		srv.mu.Lock()
 		srv.revoked = true
+		srv.mu.Unlock()
+		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
+		assertTokenError(t, stdout, err, "revoked")
+	})
+	t.Run("rejected after a refresh", func(t *testing.T) {
+		srv := newTokenServer(t)
+		signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+		srv.mu.Lock()
+		srv.refuseProjects = true
 		srv.mu.Unlock()
 		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
 		assertTokenError(t, stdout, err, "revoked")

@@ -190,7 +190,9 @@ func tokenFailureOf(err error, exchanged bool) *tokenFailure {
 	if wrongEnv, ok := errors.AsType[*auth.ErrWrongEnvironment](err); ok {
 		return &tokenFailure{Code: tokenSignedOut, Message: wrongEnv.Error()}
 	}
-	if errors.Is(err, auth.ErrNotLoggedIn) {
+	// A 401 here is final: the client has already refreshed and retried once.
+	apiErr, isAPIErr := errors.AsType[*api.Error](err)
+	if errors.Is(err, auth.ErrNotLoggedIn) || isAPIErr && apiErr.Unauthenticated() {
 		if exchanged {
 			return &tokenFailure{Code: tokenRevoked, Message: "your Terma session has ended: run `terma setup` to sign in again", cause: err}
 		}
