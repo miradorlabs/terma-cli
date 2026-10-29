@@ -209,6 +209,7 @@ func assertTokenFailure(t *testing.T, stdout string, err error, code, fix string
 }
 
 func TestAuthToken_PrintsTheStoredTokenWhileFresh(t *testing.T) {
+	t.Setenv("TERMA_ENV", config.EnvDev)
 	srv := newTokenServer(t)
 	signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
 
