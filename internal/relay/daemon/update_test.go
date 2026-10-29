@@ -225,13 +225,60 @@ func TestAReleaseAnotherInstallPutInPlaceIsLoggedAsSuch(t *testing.T) {
 	}
 }
 
-// A relay that installed a newer terma while it holds records waits for its hold to empty
-// and its agents to fall quiet, however long that takes — even when a hook of the new
-// release asks it to make way — so a restart drops nothing it held.
-func TestAnUpdatedRelayDropsNothingItHolds(t *testing.T) {
+// A relay that installed a newer terma, asked to make way by a newer terma while its agents
+// keep exporting, does not wait for them to pause: it stops as soon as it holds nothing, as
+// updated, so the new release still refreshes what earlier ones installed.
+func TestAnUpdatedRelayAskedToMakeWayDoesNotWaitForAPause(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Version, c.Service, c.Updater = "1.2.0", true, installsAtOnce()
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	// The relay started moments ago, so nothing has paused for updateQuiet.
+	askToMakeWay(t, dir)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the updated relay asked to make way still waits for its agents to pause")
+	}
+	if !r.res.Updated || !r.res.Restart() || r.res.Installed != "1.3.0" {
+		t.Fatalf("Run = %+v, want Updated to 1.3.0 and a restart", r.res)
+	}
+}
+
+// A relay that installed a newer terma and is asked to make way while it holds records
+// waits for its hold to empty for replacedMaxWait at most, as any relay asked to make way.
+func TestAnUpdatedRelayAskedToMakeWayStepsAsideAtTheCap(t *testing.T) {
 	was := replacedMaxWait
-	replacedMaxWait = time.Second
+	replacedMaxWait = 3 * time.Second
 	t.Cleanup(func() { replacedMaxWait = was })
+	stateDir, dir, token := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Addr, c.Version, c.Service, c.Updater = freeAddr(t), "1.2.0", true, installsAtOnce()
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	postSessionlessSpans(t, c.Addr, token, 5)
+	askToMakeWay(t, dir)
+	asked := time.Now()
+	select {
+	case <-r.done:
+	case <-time.After(replacedMaxWait + 5*time.Second):
+		t.Fatal("the updated relay kept running past the cap")
+	}
+	if waited := time.Since(asked); waited < replacedMaxWait {
+		t.Fatalf("the relay stepped aside %v after the request, before the cap", waited)
+	}
+	if !r.res.Updated || !r.res.Restart() {
+		t.Fatalf("Run = %+v, want Updated and a restart", r.res)
+	}
+	if got := counters(t, filepath.Join(dir, StatsFile))["dropped.no_session_trace_at_exit.traces"]; got != 5 {
+		t.Fatalf("the relay dropped %d held spans at exit, want 5", got)
+	}
+}
+
+// With no request to make way, a relay that installed a newer terma while it holds records
+// waits for its hold to empty and its agents to fall quiet, so a restart drops nothing.
+func TestAnUpdatedRelayDropsNothingItHolds(t *testing.T) {
 	stateDir, dir, token := setUpRelay(t)
 	c := runConfig(stateDir, 0, nil)
 	c.Addr, c.Version, c.Service, c.Updater = freeAddr(t), "1.2.0", true, installsAtOnce()
@@ -240,7 +287,6 @@ func TestAnUpdatedRelayDropsNothingItHolds(t *testing.T) {
 	r := startRun(t, c)
 	r.await(t, "the relay")
 	postSessionlessSpans(t, c.Addr, token, 5)
-	askToMakeWay(t, dir)
 	select {
 	case <-r.done:
 		t.Fatalf("the relay restarted while it held: %+v", r.res)
