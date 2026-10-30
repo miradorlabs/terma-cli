@@ -51,6 +51,18 @@ type EnvExporter interface {
 	ExportsFromEnvironment()
 }
 
+// TraceGated is an agent whose spans need switches of their own beyond its exporter, and
+// carry what no other signal does.
+type TraceGated interface {
+	Agent
+	// TracesOff names the settings that keep the agent's spans from being exported in the
+	// repository at root ("" for none) or, with env, the variables of a running process's
+	// startup environment that switch them off; none when spans are exported.
+	TracesOff(root string, env []string) []string
+	// SpansCarry is what only the agent's spans carry, lost without them.
+	SpansCarry() string
+}
+
 // Labeled is an agent whose hooks and trailers use a label other than its name.
 type Labeled interface {
 	Tool() string

@@ -26,39 +26,18 @@ const envFix = "remove those variables where they are set: the process that star
 	"(an IDE or agent host, often from a config file of its own; `ps -o ppid= -p <pid>` names it) or a shell profile; " +
 	"then restart the agent, which reads its exporter settings only when it starts"
 
+// agentProc is a running agent process and the environment it started with, nil unread.
+type agentProc struct {
+	agent agents.Agent
+	env   []string
+}
+
 // AgentEnvCheck judges the environment each running agent process of a collected session
-// started with, against the relay: an exporter variable there overrides the settings files
-// the export check reads. A claim under stateDir lists the ancestors of each hook that ran
-// for the session, nearest first, one chain after another; a hook's own processes exit with
-// it, so the nearest process of each run of running ones is an agent, or what a git hook
-// ran under (a developer's shell), or an exited process's id that another has taken since.
-// All are judged, so the agent always is; the others add a finding only when they too
-// started with exporter variables that bypass the relay. Only variable names are said,
-// never a value: an endpoint or header may hold a credential.
+// started with (runningAgents), against the relay: an exporter variable there overrides the
+// settings files the export check reads. Only variable names are said, never a value: an
+// endpoint or header may hold a credential.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
-	type proc struct {
-		agent string
-		env   []string
-	}
-	procs := map[int]proc{}
-	unread := false
-	for _, c := range claim.List(stateDir, now) {
-		a, ok := reg.ForTool(c.Tool)
-		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
-			continue
-		}
-		after := false
-		for _, pid := range c.PIDs {
-			env, alive := environ(pid)
-			switch {
-			case alive && !after && env == nil:
-				unread = true
-			case alive && !after:
-				procs[pid] = proc{a.DisplayName(), env}
-			}
-			after = alive
-		}
-	}
+	procs, unread := runningAgents(reg, stateDir, environ, now)
 	switch {
 	case len(procs) == 0 && unread:
 		return Check{Status: Skip, Detail: "terma cannot read the environment of the running agent processes on this system"}
@@ -70,11 +49,11 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 	var names []string
 	for _, pid := range slices.Sorted(maps.Keys(procs)) {
 		p := procs[pid]
-		if !slices.Contains(names, p.agent) {
-			names = append(names, p.agent)
+		if !slices.Contains(names, p.agent.DisplayName()) {
+			names = append(names, p.agent.DisplayName())
 		}
 		if what := exporterEnvFindings(p.env, relay.Addr, relay.Token); what != "" {
-			f := finding{p.agent, what}
+			f := finding{p.agent.DisplayName(), what}
 			found[f] = append(found[f], pid)
 		}
 	}
@@ -87,6 +66,36 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 		parts = append(parts, f.agent+" ("+pidList(found[f])+") started with exporter variables that override terma's setup: "+f.what)
 	}
 	return Check{Status: Warn, Detail: strings.Join(parts, "; "), Fix: envFix}
+}
+
+// runningAgents are the running processes of agents whose exporter reads its startup
+// environment, in collected sessions claimed under stateDir, readable ones by pid; unread
+// says one ran that could not be read. A claim lists the ancestors of each hook that ran
+// for the session, nearest first, one chain after another; a hook's own processes exit with
+// it, so the nearest process of each run of running ones is an agent, or what a git hook
+// ran under (a developer's shell), or an exited process's id that another has taken since.
+// All are returned, so the agent always is; the others add a finding only when they too
+// started with what a check flags.
+func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now time.Time) (procs map[int]agentProc, unread bool) {
+	procs = map[int]agentProc{}
+	for _, c := range claim.List(stateDir, now) {
+		a, ok := reg.ForTool(c.Tool)
+		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
+			continue
+		}
+		after := false
+		for _, pid := range c.PIDs {
+			env, alive := environ(pid)
+			switch {
+			case alive && !after && env == nil:
+				unread = true
+			case alive && !after:
+				procs[pid] = agentProc{a, env}
+			}
+			after = alive
+		}
+	}
+	return procs, unread
 }
 
 // exporterEnvFindings names, by variable, what in env keeps an exporter from the relay at
