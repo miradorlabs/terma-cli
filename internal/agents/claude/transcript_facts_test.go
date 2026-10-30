@@ -374,3 +374,34 @@ func TestClaudeStopSpoolsAFallbackOnceWithoutItsText(t *testing.T) {
 		t.Fatalf("a later stop sent the fallback again: %+v", again)
 	}
 }
+
+// A fallback naming no destination model sends nothing, and a later stop does not retry it.
+func TestClaudeStopSkipsAFallbackWithoutItsModel(t *testing.T) {
+	env := titleEnv(t)
+	path := transcript(t, t.TempDir(), strings.Replace(fallbackRecord("req_refused", "session", false), `"fallbackModel":"claude-opus-4-8"`, `"fallbackModel":""`, 1))
+	stopClaude(t, env, path)
+	if got := spooledFallbacks(t, env.Spool); len(got) != 0 {
+		t.Fatalf("a fallback with no model was sent: %+v", got)
+	}
+}
+
+// A subagent's transcript records its own refusals as sidechain records: its stop sends no
+// fallback for the session.
+func TestClaudeSubagentStopSendsNoSidechainFallback(t *testing.T) {
+	env := titleEnv(t)
+	ctx := context.Background()
+	agentPath := filepath.Join(t.TempDir(), "agent-a44816aa66a297cdd.jsonl")
+	hookruntest.WriteFile(t, filepath.Dir(agentPath), filepath.Base(agentPath), fallbackRecord("req_sub", "session", true)+"\n")
+	common := `"session_id":"` + titleSession + `","cwd":"` + env.Cwd + `","agent_id":"a44816aa66a297cdd","agent_type":"Explore"`
+	env.Stdin = strings.NewReader(`{` + common + `,"hook_event_name":"SubagentStart"}`)
+	if err := subagentStart(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	env.Stdin = strings.NewReader(`{` + common + `,"hook_event_name":"SubagentStop","agent_transcript_path":` + jsonString(agentPath) + `}`)
+	if err := subagentStop(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if got := spooledFallbacks(t, env.Spool); len(got) != 0 {
+		t.Fatalf("a subagent's fallback was sent for the session: %+v", got)
+	}
+}

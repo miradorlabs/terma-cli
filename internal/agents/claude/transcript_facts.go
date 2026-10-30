@@ -32,9 +32,9 @@ const (
 	claudeFallbackScopeSession = "session"
 )
 
-// claudeCallResponseStateDir holds how far each transcript's facts have been read. Its name
+// claudeTranscriptFactsStateDir holds how far each transcript's facts have been read. Its name
 // predates the fallbacks, and keeping it keeps every transcript's offset across the upgrade.
-var claudeCallResponseStateDir = hookrun.AgentStateDir(name, "call-responses")
+var claudeTranscriptFactsStateDir = hookrun.AgentStateDir(name, "call-responses")
 
 // claudeCallResponse is what the API answered for one model call, as its transcript records it.
 type claudeCallResponse struct {
@@ -88,8 +88,8 @@ type claudeTranscriptRecord struct {
 	} `json:"message"`
 }
 
-// callResponseState is the transcript offset up to which its facts were spooled.
-type callResponseState struct {
+// transcriptFactsState is the transcript offset up to which its facts were spooled.
+type transcriptFactsState struct {
 	Offset int64 `json:"offset"`
 }
 
@@ -101,7 +101,7 @@ func captureClaudeTranscriptFacts(e hookrun.Env, r *hookrun.Repo, sessionID, tra
 	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return
 	}
-	dir := filepath.Join(e.StateDir, claudeCallResponseStateDir)
+	dir := filepath.Join(e.StateDir, claudeTranscriptFactsStateDir)
 	if os.MkdirAll(dir, 0o700) != nil {
 		return
 	}
@@ -112,10 +112,10 @@ func captureClaudeTranscriptFacts(e hookrun.Env, r *hookrun.Repo, sessionID, tra
 		return
 	}
 	defer unlock()
-	var last callResponseState
+	var last transcriptFactsState
 	b, readErr := os.ReadFile(path)
 	if readErr == nil && json.Unmarshal(b, &last) != nil {
-		last = callResponseState{}
+		last = transcriptFactsState{}
 	}
 	calls, fallbacks, offset, err := readTranscriptFacts(transcript, last.Offset)
 	if err != nil {
@@ -158,7 +158,7 @@ func captureClaudeTranscriptFacts(e hookrun.Env, r *hookrun.Repo, sessionID, tra
 			return
 		}
 	}
-	if b, err := json.Marshal(callResponseState{Offset: offset}); err == nil {
+	if b, err := json.Marshal(transcriptFactsState{Offset: offset}); err == nil {
 		if err := hookrun.WriteState(path, b); err != nil {
 			e.Logf("transcript facts state: %v", err)
 		}
