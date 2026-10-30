@@ -76,8 +76,11 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 		},
 		Keys: app.storedKeys,
 		Environ: func(pid int) ([]string, bool) {
+			if !procinfo.Alive(pid) {
+				return nil, false
+			}
 			env, _ := procinfo.Environ(pid)
-			return env, procinfo.Alive(pid)
+			return env, true
 		},
 	}
 }

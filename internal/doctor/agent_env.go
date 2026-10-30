@@ -32,8 +32,9 @@ const envFix = "remove those variables where they are set: the process that star
 // each run's appended last, and the processes a running agent descends from all run; so
 // the nearest of the running processes that end the list is the latest run's agent, never
 // an exited run's process whose id another has taken since. Once that agent exits, its host
-// is judged until the claim expires. Only variable names are said, never a value: an
-// endpoint or header may hold a credential.
+// is judged until the claim expires; and an agent whose outermost recorded ancestor has
+// exited since its last hook (a terminal closed under it) is missed until its next one.
+// Only variable names are said, never a value: an endpoint or header may hold a credential.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	type proc struct {
 		agent string
@@ -71,6 +72,10 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 	case len(procs) == 0:
 		return Check{Status: Skip, Detail: "no agent process of a collected session is running"}
 	}
+	unreadNote := ""
+	if unread > 0 {
+		unreadNote = fmt.Sprintf("; %d more whose environment terma cannot read", unread)
+	}
 	type finding struct{ agent, what string }
 	found := map[finding][]int{}
 	var names []string
@@ -89,14 +94,14 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 		if len(procs) > 1 {
 			running = fmt.Sprintf("%d running processes", len(procs))
 		}
-		return Check{Status: Pass, Detail: fmt.Sprintf("%s (%s) started with no exporter variable that overrides the local relay on %s",
-			strings.Join(names, ", "), running, relay.Addr)}
+		return Check{Status: Pass, Detail: fmt.Sprintf("%s (%s) started with no exporter variable that overrides the local relay on %s%s",
+			strings.Join(names, ", "), running, relay.Addr, unreadNote)}
 	}
 	var parts []string
 	for _, f := range slices.SortedFunc(maps.Keys(found), func(a, b finding) int { return strings.Compare(a.agent+a.what, b.agent+b.what) }) {
 		parts = append(parts, f.agent+" ("+pidList(found[f])+") started with exporter variables that override terma's setup: "+f.what)
 	}
-	return Check{Status: Warn, Detail: strings.Join(parts, "; "), Fix: envFix}
+	return Check{Status: Warn, Detail: strings.Join(parts, "; ") + unreadNote, Fix: envFix}
 }
 
 // exporterEnvFindings names, by variable, what in env keeps an exporter from the relay at
@@ -122,7 +127,9 @@ func exporterEnvFindings(env []string, addr, token string) string {
 		}
 	}
 	// A token leading an endpoint's path authorizes in place of the header.
-	onPath := slices.ContainsFunc(exporterEndpoints, func(key string) bool { return strings.Contains(vars[key], token) })
+	onPath := slices.ContainsFunc(exporterEndpoints, func(key string) bool {
+		return relayEndpoint(vars[key], addr) && strings.Contains(vars[key], token)
+	})
 	if h, ok := vars[harness.EnvOTLPHeaders]; ok && token != "" && !strings.Contains(h, token) && !onPath {
 		out = append(out, harness.EnvOTLPHeaders+" lacks the relay's current token")
 	}

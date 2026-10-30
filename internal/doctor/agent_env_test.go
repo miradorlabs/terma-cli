@@ -79,6 +79,8 @@ func TestAgentEnvCheckJudgesTheLiveProcessEnvironment(t *testing.T) {
 		{name: "(c) headers without the relay's token", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180",
 			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + secret},
 			status: Warn, want: []string{"OTEL_EXPORTER_OTLP_HEADERS lacks the relay's current token"}, absent: []string{"sends elsewhere"}},
+		{name: "(c) the token on a foreign endpoint's path", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com/" + relayToken,
+			"OTEL_EXPORTER_OTLP_HEADERS=x-other=1"}, status: Warn, want: []string{"sends elsewhere", "OTEL_EXPORTER_OTLP_HEADERS lacks"}},
 		{name: "the incident: all three", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel-dev.example.com/v1/traces",
 			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + secret},
 			status: Warn, want: []string{"OTEL_EXPORTER_OTLP_ENDPOINT sends elsewhere", "ends in a signal path", "OTEL_EXPORTER_OTLP_HEADERS lacks"}},
@@ -192,5 +194,13 @@ func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 	c := AgentEnvCheck(reg, claimed(t, "fake"), Relay{Addr: "127.0.0.1:43180", Token: relayToken}, processes(table), time.Now())
 	if c.Status != Skip || !strings.Contains(c.Detail, "cannot read") {
 		t.Fatalf("check = %+v, want a skip saying the environment cannot be read", c)
+	}
+	// Beside a readable one, it is still counted.
+	dir := claimed(t, "fake")
+	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{102, 202}}, time.Now())
+	table[202] = []string{"HOME=/home/dev"}
+	c = AgentEnvCheck(reg, dir, Relay{Addr: "127.0.0.1:43180", Token: relayToken}, processes(table), time.Now())
+	if c.Status != Pass || !strings.Contains(c.Detail, "1 more whose environment terma cannot read") {
+		t.Fatalf("check = %+v, want a pass that counts the unreadable agent", c)
 	}
 }
