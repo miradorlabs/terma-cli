@@ -95,6 +95,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	limitFromTranscript(env, r, in)
+	claudeClaims.Settle(env, r, in.SessionID) // an interrupted last turn had no Stop
 	// A turn's last response can reach the transcript after its Stop read it, and an interrupted
 	// turn has no Stop.
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
@@ -124,6 +125,26 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// userPromptSubmit settles the claims of a turn that ended without a Stop: declining a Bash
+// call interrupts the turn, and an interrupted turn has no Stop. Its caller
+// (internal/cli/hook.go) claims the session and starts the relay. It must print nothing: its
+// stdout goes to the model.
+//
+// Accepted risk: a developer's commit of a file a declined call named, made before the next
+// prompt or the session's end, is stamped as the session's. Upgrade path: settle a claim in the
+// commit hook when its file is unchanged since the call's PreToolUse.
+func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
+	in, err := readClaudeInput(env.Stdin)
+	if err != nil {
+		return err
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	if r, err := env.Repo(ctx); err == nil {
+		claudeClaims.Settle(env, r, in.SessionID)
+	}
+	return nil
+}
+
 // preToolUse records the files a Bash call writes before its first commit, so that commit is
 // stamped: the call's PostToolUse comes after it.
 func preToolUse(ctx context.Context, env hookrun.Env) error {
@@ -150,6 +171,11 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	if in.ToolName == claudeBashTool {
+		if written, _ := shellwrites.Writes(in.ToolInput.Command, env.Cwd); len(written) == 0 {
+			return nil // most Bash calls write nothing: no repository to resolve
+		}
+	}
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -164,7 +190,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
 	if in.ToolName == claudeBashTool {
 		// Accepted risk: a file a command writes without naming it (a script, a code generator,
-		// make) stays unrecorded, so its commit goes unstamped. Upgrade path: compare the
+		// make) stays unrecorded, so its commit goes unstamped; so does one a background command
+		// writes after the turn's Stop settled its unchanged claim. Upgrade path: compare the
 		// checkout's changed files before and after the call.
 		shellwrites.AfterCall(env, r, sess, in.ToolName, in.ToolInput.Command, attrs)
 		return nil

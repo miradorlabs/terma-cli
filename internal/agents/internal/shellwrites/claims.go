@@ -49,7 +49,7 @@ func (c Claims) BeforeCall(ctx context.Context, e hookrun.Env, sess session.Sess
 	if err != nil {
 		return
 	}
-	held := Held(r, sess.Key())
+	held := held(r, sess.Key())
 	c.expect(e, r, sess, held, e.Expect(r, sess, paths))
 }
 
@@ -142,8 +142,8 @@ func AfterCall(e hookrun.Env, r *hookrun.Repo, sess session.Session, toolName, c
 	e.Report(r, sess, toolName, candidates, attrs)
 }
 
-// Held is the files k's manifest in r holds.
-func Held(r *hookrun.Repo, k session.Key) map[string]bool {
+// held is the files k's manifest in r holds.
+func held(r *hookrun.Repo, k session.Key) map[string]bool {
 	held := map[string]bool{}
 	manifests, _ := r.Store.Manifests()
 	for _, m := range manifests {

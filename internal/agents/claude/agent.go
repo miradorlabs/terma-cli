@@ -40,7 +40,7 @@ func (Agent) Events() map[string]agents.Handler {
 		"stop":          stop,
 		"stop-failure":  stopFailure,
 		// internal/cli/hook.go claims the session and starts the relay from the payload.
-		"user-prompt-submit": hookrun.TurnStart,
+		"user-prompt-submit": userPromptSubmit,
 		"subagent-start":     subagentStart,
 		"subagent-stop":      subagentStop,
 	}

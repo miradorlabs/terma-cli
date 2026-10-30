@@ -29,7 +29,7 @@ func TestParallelCallsKeepAWrittenClaim(t *testing.T) {
 	hookruntest.WriteFile(t, root, "f.txt", "agent")
 	claims.expect(env, r, sess, nil, files) // the declined call, recorded late
 	claims.Settle(env, r, sess.ID)
-	if !Held(r, sess.Key())["f.txt"] {
+	if !held(r, sess.Key())["f.txt"] {
 		t.Fatal("the declined call withdrew the parallel call's written claim")
 	}
 }

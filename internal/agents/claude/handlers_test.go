@@ -208,11 +208,15 @@ func TestClaudeBashWriteCommittedLaterIsStamped(t *testing.T) {
 	}
 }
 
-// A Bash call the developer declines claims nothing once the turn ends.
+// A Bash call the developer declines claims nothing once the next prompt starts: declining
+// interrupts the turn, which then has no Stop.
 func TestClaudeDeclinedBashCallClaimsNothing(t *testing.T) {
 	c := newClaudeBash(t)
 	c.call("printf agent > base.txt", nil)
-	c.endTurn()
+	prompt := `{"session_id":"` + claudeBashSession + `","transcript_path":"","cwd":` + strconv.Quote(c.root) + `,"hook_event_name":"UserPromptSubmit"}`
+	if err := userPromptSubmit(c.ctx, c.env(prompt)); err != nil {
+		t.Fatal(err)
+	}
 	hookruntest.WriteFile(t, c.root, "base.txt", "human\n")
 	c.git("add", "base.txt")
 	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
