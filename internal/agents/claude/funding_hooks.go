@@ -151,6 +151,7 @@ func stopFailure(ctx context.Context, env hookrun.Env) error {
 	if spoolLimit(env, r, in, in.Error, sourceClaudeStopFailure) {
 		markLimit(env, in.SessionID)
 	}
+	claudeClaims.Settle(env, r, in.SessionID) // a failed turn has no Stop
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	return nil
 }
