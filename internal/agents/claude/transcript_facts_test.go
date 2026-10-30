@@ -375,7 +375,7 @@ func TestClaudeStopSpoolsAFallbackOnceWithoutItsText(t *testing.T) {
 	}
 }
 
-// A fallback naming no destination model sends nothing, and a later stop does not retry it.
+// A fallback naming no destination model sends nothing.
 func TestClaudeStopSkipsAFallbackWithoutItsModel(t *testing.T) {
 	env := titleEnv(t)
 	path := transcript(t, t.TempDir(), strings.Replace(fallbackRecord("req_refused", "session", false), `"fallbackModel":"claude-opus-4-8"`, `"fallbackModel":""`, 1))
@@ -385,13 +385,14 @@ func TestClaudeStopSkipsAFallbackWithoutItsModel(t *testing.T) {
 	}
 }
 
-// A subagent's transcript records its own refusals as sidechain records: its stop sends no
-// fallback for the session.
+// A subagent's transcript records its own refusals as sidechain records: its stop sends the
+// subagent's calls but no fallback for the session.
 func TestClaudeSubagentStopSendsNoSidechainFallback(t *testing.T) {
 	env := titleEnv(t)
 	ctx := context.Background()
 	agentPath := filepath.Join(t.TempDir(), "agent-a44816aa66a297cdd.jsonl")
-	hookruntest.WriteFile(t, filepath.Dir(agentPath), filepath.Base(agentPath), fallbackRecord("req_sub", "session", true)+"\n")
+	hookruntest.WriteFile(t, filepath.Dir(agentPath), filepath.Base(agentPath),
+		assistantRecord("req_call", "2026-10-26T09:12:00Z", 5)+"\n"+fallbackRecord("req_sub", "session", true)+"\n")
 	common := `"session_id":"` + titleSession + `","cwd":"` + env.Cwd + `","agent_id":"a44816aa66a297cdd","agent_type":"Explore"`
 	env.Stdin = strings.NewReader(`{` + common + `,"hook_event_name":"SubagentStart"}`)
 	if err := subagentStart(ctx, env); err != nil {
@@ -401,7 +402,16 @@ func TestClaudeSubagentStopSendsNoSidechainFallback(t *testing.T) {
 	if err := subagentStop(ctx, env); err != nil {
 		t.Fatal(err)
 	}
-	if got := spooledFallbacks(t, env.Spool); len(got) != 0 {
-		t.Fatalf("a subagent's fallback was sent for the session: %+v", got)
+	var calls, fallbacks int
+	for _, e := range hookruntest.Spooled(t, env.Spool) {
+		switch e.Name {
+		case semconv.TermaModelCallResponseEvent:
+			calls++
+		case semconv.TermaModelFallbackEvent:
+			fallbacks++
+		}
+	}
+	if calls != 1 || fallbacks != 0 {
+		t.Fatalf("got %d responses and %d fallbacks, want the subagent's call and no fallback", calls, fallbacks)
 	}
 }
