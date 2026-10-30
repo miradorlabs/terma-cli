@@ -73,6 +73,7 @@ const (
 	KeyHooks         = "hooks"
 	KeyUserHooks     = "user-hooks"
 	KeyHarness       = "harness"
+	KeyAgentEnv      = "agent-env"
 	KeyCompatibility = "compatibility"
 	KeyRouting       = "routing"
 	KeyStatusLine    = "statusline"

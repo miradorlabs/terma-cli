@@ -293,6 +293,23 @@ func Read(dir, sessionID string, now time.Time) (Claim, bool) {
 	return read(p)
 }
 
+// List returns every claim under the state directory dir written less than TTL ago.
+func List(dir string, now time.Time) []Claim {
+	entries, err := os.ReadDir(filepath.Join(Dir(dir), claimsDir))
+	if err != nil {
+		return nil
+	}
+	var out []Claim
+	for _, e := range entries {
+		if id, ok := strings.CutSuffix(e.Name(), ".json"); ok {
+			if c, ok := Read(dir, id, now); ok {
+				out = append(out, c)
+			}
+		}
+	}
+	return out
+}
+
 func read(p string) (Claim, bool) {
 	data, err := os.ReadFile(p)
 	if err != nil {

@@ -47,6 +47,8 @@ type Probes struct {
 	Credential func() (Credential, error)
 	// Keys are the delivery keys stored on this machine.
 	Keys Keys
+	// Environ reads what a live agent process started with.
+	Environ Environ
 }
 
 // Credential is the signed-in developer as doctor needs them.
@@ -85,6 +87,8 @@ func (k Keys) has(agent, projectID string) bool {
 type Relay struct {
 	Addr              string
 	Running, Squatted bool
+	// Token is the relay's local token, which the agents' exporters present; never printed.
+	Token string
 	// LastFailure is why the relay last failed to start, when none runs; "" if it did not fail.
 	LastFailure string
 	// Environment is the backend environment the running relay delivers to; "" when unknown
@@ -196,6 +200,10 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	}
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
+	// The settings files above can be right while a running agent's environment overrides them.
+	if claim.Enabled(env.StateDir) {
+		timed(KeyAgentEnv, "live agent environment", d.agentEnv)
+	}
 
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
 		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
@@ -219,6 +227,8 @@ type run struct {
 	nonGit    bool
 	admitted  bool
 	projectID string
+	// relay is the local relay as the export check found it.
+	relay Relay
 }
 
 // unlessCaptureOff keeps a passing collection check from reading as working while pol
@@ -299,10 +309,15 @@ func (d *run) commitHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled(d.env.StateDir) {
-		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
+		d.relay = d.env.Probes.Relay()
+		return RelayCheck(d.env.Agents, d.relay, d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.admitted)
+}
+
+func (d *run) agentEnv() Check {
+	return AgentEnvCheck(d.env.Agents, d.env.StateDir, d.relay, d.env.Probes.Environ, time.Now())
 }
 
 func (d *run) statusLine() Check {

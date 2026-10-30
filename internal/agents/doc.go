@@ -23,6 +23,7 @@
 //
 //	RelayExporter    points the agent's exporter at the local relay
 //	RelayChecker     a condition that keeps its telemetry from the relay after setup
+//	EnvExporter      an exporter the environment it started with can redirect
 //	Exporting        an exporter terma configures in the agent's own settings (harness.Harness)
 //	Labeled          a hook and trailer label other than its name
 //	MachineRefresher home-directory files `terma update --refresh` rewrites

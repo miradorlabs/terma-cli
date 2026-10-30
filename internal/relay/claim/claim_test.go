@@ -450,3 +450,23 @@ func TestClaimFollowsTheBranch(t *testing.T) {
 		}
 	}
 }
+
+// List returns the fresh claims and passes over stale ones and the locks beside them.
+func TestListReturnsFreshClaims(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	Write(dir, "fresh", Claim{ProjectID: "p1", PIDs: []int{1234}}, now)
+	Write(dir, "stale", Claim{ProjectID: "p2"}, now)
+	old := now.Add(-TTL - time.Minute)
+	if err := os.Chtimes(filepath.Join(Dir(dir), claimsDir, "stale.json"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	got := List(dir, now)
+	if len(got) != 1 || got[0].ProjectID != "p1" || len(got[0].PIDs) != 1 {
+		t.Fatalf("List = %+v, want the fresh claim alone", got)
+	}
+	if got := List(t.TempDir(), now); got != nil {
+		t.Fatalf("List without a claims directory = %+v", got)
+	}
+}

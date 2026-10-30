@@ -1,8 +1,10 @@
 package procinfo
 
 import (
+	"bytes"
 	"encoding/binary"
 	"net/netip"
+	"os"
 	"syscall"
 	"unsafe"
 
@@ -105,4 +107,41 @@ func allPIDs() []int {
 		}
 	}
 	return out
+}
+
+// environ reads the environment pid was started with from KERN_PROCARGS2.
+func environ(pid int) ([]string, bool) {
+	kp, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
+	if err != nil || kp == nil || int(kp.Eproc.Ucred.Uid) != os.Getuid() {
+		return nil, false
+	}
+	buf, err := unix.SysctlRaw("kern.procargs2", pid)
+	if err != nil {
+		return nil, false
+	}
+	return procArgsEnv(buf)
+}
+
+// procArgsEnv reads the environment from KERN_PROCARGS2's strings, those exec copied onto the
+// process's stack: argc, the executable's path padded with NULs, argc arguments, then the
+// environment.
+func procArgsEnv(buf []byte) ([]string, bool) {
+	if len(buf) < 4 {
+		return nil, false
+	}
+	argc := int(binary.LittleEndian.Uint32(buf))
+	rest := buf[4:]
+	i := bytes.IndexByte(rest, 0)
+	if i < 0 {
+		return nil, false
+	}
+	rest = bytes.TrimLeft(rest[i:], "\x00")
+	for range argc {
+		i := bytes.IndexByte(rest, 0)
+		if i < 0 {
+			return nil, false
+		}
+		rest = rest[i+1:]
+	}
+	return splitEnv(rest), true
 }
