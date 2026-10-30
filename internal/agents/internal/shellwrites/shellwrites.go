@@ -1,4 +1,6 @@
-package codex
+// Package shellwrites reads the files a shell command writes and keeps the claims a call makes
+// on them before it runs, for the agents whose shell tool can write and commit in one call.
+package shellwrites
 
 import (
 	"os"
@@ -11,12 +13,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
 )
 
-// shellWrites returns the files a shell command names as written (redirect targets, the
+// Writes returns the files a shell command names as written (redirect targets, the
 // operands of the writers in writtenIndexes, and the files of a patch it runs), in the
 // order it writes them, resolved against cwd and any cd before them; commits holds, for
 // each git commit it makes, how many of them come before it. A command that does not parse
 // gives only the files of a patch in its text.
-func shellWrites(command, cwd string) (paths []string, commits []int) {
+func Writes(command, cwd string) (paths []string, commits []int) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
 		for _, p := range applypatch.Paths(command) {

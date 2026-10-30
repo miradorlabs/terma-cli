@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/shellwrites"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -36,6 +37,8 @@ type claudeHookInput struct {
 		} `json:"edits"`
 		// SubagentType is the Agent tool's; the task's description and prompt beside it are not decoded.
 		SubagentType string `json:"subagent_type"`
+		// Command is the Bash tool's, parsed only for the files it writes.
+		Command string `json:"command"`
 	} `json:"tool_input"`
 	// ToolResponse is opened only for the Agent tool, into claudeAgentResult: for an edit it holds
 	// file content.
@@ -54,6 +57,15 @@ func readClaudeInput(r io.Reader) (*claudeHookInput, error) {
 }
 
 const claudeTool = "claude-code"
+
+// claudeBashTool is the tool_name of Claude Code's shell tool.
+const claudeBashTool = "Bash"
+
+// claudeExpectedDir holds the claims Bash calls make before they run.
+var claudeExpectedDir = hookrun.AgentStateDir(name, "expected")
+
+// claudeClaims are the claims Claude Code's Bash calls make before they run.
+var claudeClaims = shellwrites.Claims{Dir: claudeExpectedDir, Tool: claudeTool}
 
 func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
@@ -105,9 +117,26 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
+	claudeClaims.Settle(env, r, in.SessionID)
 	captureClaudeAccount(env, r, in)
 	captureClaudeTitle(env, r, in)
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
+	return nil
+}
+
+// preToolUse records the files a Bash call writes before its first commit, so that commit is
+// stamped: the call's PostToolUse comes after it.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	in, err := readClaudeInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if in.ToolName != claudeBashTool || !session.ValidID(in.SessionID) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	claudeClaims.BeforeCall(ctx, env, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolInput.Command)
 	return nil
 }
 
@@ -129,11 +158,19 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		claudeSubagentCall(env, r, in)
 		return nil
 	}
-	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
 	// Inside a subagent the manifest stays the session's; the event names the agent.
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolUseID)
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName, paths, attrs)
+	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
+	if in.ToolName == claudeBashTool {
+		// Accepted risk: a file a command writes without naming it (a script, a code generator,
+		// make) stays unrecorded, so its commit goes unstamped. Upgrade path: compare the
+		// checkout's changed files before and after the call.
+		shellwrites.AfterCall(env, r, sess, in.ToolName, in.ToolInput.Command, attrs)
+		return nil
+	}
+	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
+	env.Touch(r, sess, in.ToolName, paths, attrs)
 	return nil
 }
 
