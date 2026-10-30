@@ -226,6 +226,25 @@ func TestClaudeBashGuessAfterACommitIsWithdrawn(t *testing.T) {
 	}
 }
 
+// A path a call writes, commits, then names again on a condition it never meets is the
+// committed write's alone: the developer's later commit of it is not the session's.
+func TestClaudeBashRepeatedGuessAfterACommitIsNotClaimed(t *testing.T) {
+	c := newClaudeBash(t)
+	c.call("printf agent > f; git add f; git commit -m agent; test -e sentinel && printf later > f", func() {
+		hookruntest.WriteFile(t, c.root, "f", "agent")
+		c.git("add", "f")
+		if msg := c.commit("agent"); !strings.Contains(msg, "Agent-Session-Id: "+claudeBashSession) {
+			t.Fatalf("commit in the writing call not stamped:\n%s", msg)
+		}
+	})
+	c.endTurn()
+	hookruntest.WriteFile(t, c.root, "f", "human\n")
+	c.git("add", "f")
+	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+		t.Fatalf("an unmet guess at a committed path stamped the developer's commit:\n%s", msg)
+	}
+}
+
 // A Bash call the developer declines claims nothing once the turn is over: declining
 // interrupts the turn, which then has no Stop, so the next prompt, a failed turn's
 // StopFailure or the session's end settles it.

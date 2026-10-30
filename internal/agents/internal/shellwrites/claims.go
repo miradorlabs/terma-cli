@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -152,8 +153,11 @@ func AfterCall(e hookrun.Env, r *hookrun.Repo, sess session.Session, toolName, c
 	recorded := candidates
 	if len(commits) > 0 {
 		// The call's commits took in what it wrote before them: recording those files again
-		// would hand the next commit of them to this session.
-		recorded = candidates[commits[len(commits)-1]:]
+		// would hand the next commit of them to this session. A path also named before a commit
+		// is left out after it too: its baseline predates that first write, so Stop could not
+		// tell an unwritten guess from a write.
+		before := candidates[:commits[len(commits)-1]]
+		recorded = slices.DeleteFunc(slices.Clone(candidates[len(before):]), func(p string) bool { return slices.Contains(before, p) })
 	}
 	e.Expect(r, sess, recorded)
 	e.Report(r, sess, toolName, candidates, attrs)
