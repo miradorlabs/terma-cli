@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
@@ -74,6 +75,13 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName)}, nil
 		},
 		Keys: app.storedKeys,
+		Environ: func(pid int) ([]string, bool) {
+			if !procinfo.Alive(pid) {
+				return nil, false
+			}
+			env, _ := procinfo.Environ(pid)
+			return env, true
+		},
 	}
 }
 
@@ -97,6 +105,7 @@ func (app *App) serverKeyCredential(cfg *config.Config) (doctor.Credential, erro
 func (app *App) relayFacts() doctor.Relay {
 	dir := claim.Dir(app.stateDir)
 	r := doctor.Relay{Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
+	r.Token, _ = daemon.Token(app.stateDir)
 	r.Squatted = !r.Running && daemon.Squatted(r.Addr)
 	if data, err := os.ReadFile(filepath.Join(dir, daemon.ErrorFile)); err == nil && !r.Running {
 		r.LastFailure = strings.TrimSpace(string(data))

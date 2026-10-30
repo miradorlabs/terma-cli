@@ -1,6 +1,7 @@
 // Package procinfo tells the local relay which processes a hook runs under, which
 // process owns the other end of a loopback connection, and whether a process still
-// runs, so a claim covers only the agent process that made it.
+// runs, so a claim covers only the agent process that made it; and doctor the
+// environment an agent process started with.
 package procinfo
 
 import (
@@ -28,6 +29,17 @@ func Ancestors() []int {
 		pid = next
 	}
 	return out
+}
+
+// Environ returns the environment pid started with, as os.Environ lists it; false when it
+// cannot be read: the process is gone or another user's, or the platform does not say. An
+// empty one is unread too: macOS withholds a platform binary's, and a zombie has none.
+func Environ(pid int) ([]string, bool) {
+	if pid <= 1 {
+		return nil, false
+	}
+	env, ok := environ(pid)
+	return env, ok && len(env) > 0
 }
 
 // FindSender returns the process holding the client end of a loopback connection from
