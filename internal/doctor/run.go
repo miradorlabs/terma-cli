@@ -205,8 +205,13 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
 	// The settings files above can be right while a running agent's environment overrides them.
+	var environ Environ
 	if claim.Enabled(env.StateDir) {
 		timed(KeyAgentEnv, "live agent environment", d.agentEnv)
+		environ = env.Probes.Environ
+	}
+	if c, ok := TracesCheck(ctx, env.Agents, cfg.Harnesses, env.StateDir, environ, time.Now()); ok {
+		timed(KeyTraces, "agent spans exported", func() Check { return c })
 	}
 
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
