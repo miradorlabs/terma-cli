@@ -208,6 +208,24 @@ func TestClaudeBashWriteCommittedLaterIsStamped(t *testing.T) {
 	}
 }
 
+// A file a call names after its commit, only on a condition, is a guess: left unchanged, the
+// turn's Stop withdraws it, so the developer's later commit of it is not the session's.
+func TestClaudeBashGuessAfterACommitIsWithdrawn(t *testing.T) {
+	c := newClaudeBash(t)
+	hookruntest.WriteFile(t, c.root, "notes.txt", "base\n")
+	c.git("add", "notes.txt")
+	c.git("commit", "-qm", "notes")
+	c.call("git commit --allow-empty -m agent; test -e sentinel && echo x > notes.txt; true", func() {
+		c.git("commit", "-q", "--allow-empty", "-m", "agent")
+	})
+	c.endTurn()
+	hookruntest.WriteFile(t, c.root, "notes.txt", "human\n")
+	c.git("add", "notes.txt")
+	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+		t.Fatalf("an unwritten guess after the call's commit stamped the developer's commit:\n%s", msg)
+	}
+}
+
 // A Bash call the developer declines claims nothing once the turn is over: declining
 // interrupts the turn, which then has no Stop, so the next prompt, a failed turn's
 // StopFailure or the session's end settles it.

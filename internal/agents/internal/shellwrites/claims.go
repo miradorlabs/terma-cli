@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -35,13 +36,11 @@ type fileState struct {
 // BeforeCall records in sess's manifest the files a shell command writes before its first
 // commit, so that commit is stamped: the call's PostToolUse comes after it. A write between
 // two commits is left out, since it would claim the first. A call that makes no commit has
-// all its files recorded. The turn's Stop withdraws the claims on files the call left
-// unchanged (Settle).
+// all its files recorded. Every file the command names, those after a commit too, which
+// AfterCall claims, keeps how it stood before the call, so the turn's Stop withdraws the
+// claims on files the call left unchanged (Settle).
 func (c Claims) BeforeCall(ctx context.Context, e hookrun.Env, sess session.Session, command string) {
 	paths, commits := Writes(command, e.Cwd)
-	if len(commits) > 0 {
-		paths = paths[:commits[0]] // a write after a commit must not claim it
-	}
 	if len(paths) == 0 {
 		return
 	}
@@ -49,8 +48,18 @@ func (c Claims) BeforeCall(ctx context.Context, e hookrun.Env, sess session.Sess
 	if err != nil {
 		return
 	}
+	claimed := paths
+	if len(commits) > 0 {
+		claimed = paths[:commits[0]] // a write after a commit must not claim it
+	}
 	owned := held(r, sess.Key())
-	c.expect(e, r, sess, owned, e.Expect(r, sess, paths))
+	files := e.Expect(r, sess, claimed)
+	for _, p := range paths[len(claimed):] {
+		if rel := gitx.Relativize(r.Root, p); rel != "" {
+			files = append(files, rel)
+		}
+	}
+	c.expect(e, r, sess, owned, files)
 }
 
 // Settle withdraws, at the end of a turn, the claims of the session's calls on files they
