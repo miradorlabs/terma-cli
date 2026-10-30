@@ -74,8 +74,11 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cred.OrganizationID,
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName)}, nil
 		},
-		Keys:    app.storedKeys,
-		Environ: procinfo.Environ,
+		Keys: app.storedKeys,
+		Environ: func(pid int) ([]string, bool) {
+			env, _ := procinfo.Environ(pid)
+			return env, procinfo.Alive(pid)
+		},
 	}
 }
 

@@ -14,10 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// Environ reads the environment a live process started with; false when it cannot: the
-// process is gone or another user's, or the platform does not say.
-type Environ func(pid int) ([]string, bool)
-
 // exporterEndpoints are the OpenTelemetry SDK's endpoint variables, the generic one first.
 var exporterEndpoints = []string{harness.EnvOTLPEndpoint,
 	"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"}
@@ -30,11 +26,14 @@ const envFix = "remove those variables where they are set: the process that star
 	"(an IDE or agent host, often from a config file of its own; `ps -o ppid= -p <pid>` names it) or a shell profile; " +
 	"then restart the agent, which reads its exporter settings only when it starts"
 
-// AgentEnvCheck judges the environment each live agent process a collected session's claim
-// under stateDir names started with, against the relay: an exporter variable there overrides
-// the settings files the export check reads. A claim lists the claiming hooks' ancestors,
-// nearest first, and the hook's own have exited, so its first live one is the agent.
-// Only variable names are said, never a value: an endpoint or header may hold a credential.
+// AgentEnvCheck judges the environment each running agent process of a collected session
+// started with, against the relay: an exporter variable there overrides the settings files
+// the export check reads. A claim under stateDir lists its hooks' ancestors, nearest first,
+// each run's appended last, and the processes a running agent descends from all run; so
+// the nearest of the running processes that end the list is the latest run's agent, never
+// an exited run's process whose id another has taken since. Once that agent exits, its host
+// is judged until the claim expires. Only variable names are said, never a value: an
+// endpoint or header may hold a credential.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	type proc struct {
 		agent string
@@ -46,15 +45,31 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
 			continue
 		}
-		for _, pid := range c.PIDs {
-			if env, ok := environ(pid); ok {
-				procs[pid] = proc{a.DisplayName(), env}
+		var nearest proc
+		pid := 0
+		for i := len(c.PIDs) - 1; i >= 0; i-- {
+			env, alive := environ(c.PIDs[i])
+			if !alive {
 				break
 			}
+			pid, nearest = c.PIDs[i], proc{a.DisplayName(), env}
+		}
+		if pid != 0 {
+			procs[pid] = nearest
 		}
 	}
-	if len(procs) == 0 {
-		return Check{Status: Skip, Detail: "no running agent process of a collected session whose environment terma can read"}
+	unread := 0
+	for pid, p := range procs {
+		if p.env == nil {
+			unread++
+			delete(procs, pid)
+		}
+	}
+	switch {
+	case len(procs) == 0 && unread > 0:
+		return Check{Status: Skip, Detail: "terma cannot read the environment of the running agent processes on this system"}
+	case len(procs) == 0:
+		return Check{Status: Skip, Detail: "no agent process of a collected session is running"}
 	}
 	type finding struct{ agent, what string }
 	found := map[finding][]int{}
@@ -70,8 +85,12 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 		}
 	}
 	if len(found) == 0 {
+		running := "1 running process"
+		if len(procs) > 1 {
+			running = fmt.Sprintf("%d running processes", len(procs))
+		}
 		return Check{Status: Pass, Detail: fmt.Sprintf("%s (%s) started with no exporter variable that overrides the local relay on %s",
-			strings.Join(names, ", "), counted(len(procs), "running process"), relay.Addr)}
+			strings.Join(names, ", "), running, relay.Addr)}
 	}
 	var parts []string
 	for _, f := range slices.SortedFunc(maps.Keys(found), func(a, b finding) int { return strings.Compare(a.agent+a.what, b.agent+b.what) }) {
@@ -102,8 +121,9 @@ func exporterEnvFindings(env []string, addr, token string) string {
 			out = append(out, harness.EnvOTLPEndpoint+" ends in a signal path the exporter appends again")
 		}
 	}
-	// A token leading the endpoint's path authorizes in place of the header.
-	if h, ok := vars[harness.EnvOTLPHeaders]; ok && token != "" && !strings.Contains(h, token) && !strings.Contains(generic, token) {
+	// A token leading an endpoint's path authorizes in place of the header.
+	onPath := slices.ContainsFunc(exporterEndpoints, func(key string) bool { return strings.Contains(vars[key], token) })
+	if h, ok := vars[harness.EnvOTLPHeaders]; ok && token != "" && !strings.Contains(h, token) && !onPath {
 		out = append(out, harness.EnvOTLPHeaders+" lacks the relay's current token")
 	}
 	return strings.Join(out, ", ")
@@ -113,13 +133,6 @@ func exporterEnvFindings(env []string, addr, token string) string {
 func relayEndpoint(raw, addr string) bool {
 	u, err := url.Parse(strings.Trim(raw, `"'`))
 	return err == nil && addr != "" && u.Scheme == "http" && u.Host == addr
-}
-
-func counted(n int, noun string) string {
-	if n == 1 {
-		return "1 " + noun
-	}
-	return strconv.Itoa(n) + " " + noun + "es"
 }
 
 func pidList(pids []int) string {

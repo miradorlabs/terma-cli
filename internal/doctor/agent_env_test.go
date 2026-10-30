@@ -34,11 +34,12 @@ func claimed(t *testing.T, tool string) string {
 	return dir
 }
 
-// processes is a fake process table: each live process's startup environment.
+// processes is a fake process table: each running process's startup environment, nil for
+// one terma cannot read; a process not in it has exited.
 func processes(table map[int][]string) Environ {
 	return func(pid int) ([]string, bool) {
-		env, ok := table[pid]
-		return env, ok
+		env, alive := table[pid]
+		return env, alive
 	}
 }
 
@@ -62,6 +63,8 @@ func TestAgentEnvCheckJudgesTheLiveProcessEnvironment(t *testing.T) {
 			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + relayToken}, status: Pass},
 		{name: "the token on the relay's path, no header", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/" + relayToken},
 			status: Pass},
+		{name: "the token on a per-signal path, a header without it", env: []string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/" + relayToken + "/v1/traces",
+			"OTEL_EXPORTER_OTLP_HEADERS=x-other=1"}, status: Pass},
 		{name: "(a) generic endpoint elsewhere", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"},
 			status: Warn, want: []string{"fake (pid 200)", "OTEL_EXPORTER_OTLP_ENDPOINT sends elsewhere than the local relay"},
 			absent: []string{"otel.example.com", "signal path"}},
@@ -122,6 +125,35 @@ func TestAgentEnvCheckGroupsProcessesByFinding(t *testing.T) {
 	}
 }
 
+// The latest run's agent is judged: not a process of an earlier run that still runs (the
+// shell a session was first started from), nor one that took an exited process's id.
+func TestAgentEnvCheckJudgesTheLatestRunsAgent(t *testing.T) {
+	t.Parallel()
+	reg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
+	relay := Relay{Addr: "127.0.0.1:43180", Token: relayToken}
+	bad := []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}
+	clean := []string{"HOME=/home/dev"}
+	now := time.Now()
+
+	// Started from a terminal (hook 101, agent 201, shell 301), then resumed in an IDE (hook
+	// 102, agent 202, IDE 302); the first agent has exited, its shell has not.
+	resumed := t.TempDir()
+	claim.Write(resumed, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{101, 201, 301}}, now)
+	claim.Write(resumed, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{102, 202, 302}}, now)
+	c := AgentEnvCheck(reg, resumed, relay, processes(map[int][]string{301: clean, 202: bad, 302: clean}), now)
+	if c.Status != Warn || !strings.Contains(c.Detail, "fake (pid 202)") || strings.Contains(c.Detail, "301") {
+		t.Fatalf("resumed elsewhere = %+v, want a warning about the IDE's agent, pid 202", c)
+	}
+
+	// Pid 500, an exited run's, now belongs to an unrelated process.
+	reused := t.TempDir()
+	claim.Write(reused, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{500, hookPID, agentPID, hostPID}}, now)
+	c = AgentEnvCheck(reg, reused, relay, processes(map[int][]string{500: bad, agentPID: clean, hostPID: clean}), now)
+	if c.Status != Pass {
+		t.Fatalf("reused pid = %+v, want a pass on the agent's own environment", c)
+	}
+}
+
 // With no live process to read, the check skips: none is running, a session is not
 // collected, the agent reads no environment, or the platform does not say.
 func TestAgentEnvCheckSkipsWithoutALiveProcess(t *testing.T) {
@@ -138,7 +170,7 @@ func TestAgentEnvCheckSkipsWithoutALiveProcess(t *testing.T) {
 		table    map[int][]string
 	}{
 		{"no claim", envReg, t.TempDir(), wrong},
-		{"every claimed process gone or unreadable", envReg, claimed(t, "fake"), nil},
+		{"every claimed process gone", envReg, claimed(t, "fake"), nil},
 		{"a session not collected", envReg, notCollected, wrong},
 		{"an agent whose exporter ignores its environment", agents.New(agentstest.Agent{ID: "fake"}), claimed(t, "fake"), wrong},
 		{"an agent this build does not know", envReg, claimed(t, "other"), wrong},
@@ -149,5 +181,16 @@ func TestAgentEnvCheckSkipsWithoutALiveProcess(t *testing.T) {
 				t.Fatalf("check = %+v, want skip", c)
 			}
 		})
+	}
+}
+
+// A running agent whose environment cannot be read is a skip that says so, not a pass.
+func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
+	t.Parallel()
+	reg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
+	table := map[int][]string{agentPID: nil, hostPID: {"HOME=/home/dev"}}
+	c := AgentEnvCheck(reg, claimed(t, "fake"), Relay{Addr: "127.0.0.1:43180", Token: relayToken}, processes(table), time.Now())
+	if c.Status != Skip || !strings.Contains(c.Detail, "cannot read") {
+		t.Fatalf("check = %+v, want a skip saying the environment cannot be read", c)
 	}
 }

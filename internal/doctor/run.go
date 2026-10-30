@@ -51,6 +51,10 @@ type Probes struct {
 	Environ Environ
 }
 
+// Environ reads the environment process pid started with: alive is false once it has
+// exited, and env nil while it runs unread (another user's, or a platform that does not say).
+type Environ func(pid int) (env []string, alive bool)
+
 // Credential is the signed-in developer as doctor needs them.
 type Credential struct {
 	Email, OrganizationID string
@@ -317,6 +321,9 @@ func (d *run) agentsExporting() Check {
 }
 
 func (d *run) agentEnv() Check {
+	if d.relay.Addr == "" {
+		d.relay = d.env.Probes.Relay()
+	}
 	return AgentEnvCheck(d.env.Agents, d.env.StateDir, d.relay, d.env.Probes.Environ, time.Now())
 }
 

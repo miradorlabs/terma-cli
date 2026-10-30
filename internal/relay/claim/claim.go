@@ -301,10 +301,12 @@ func List(dir string, now time.Time) []Claim {
 	}
 	var out []Claim
 	for _, e := range entries {
-		if id, ok := strings.CutSuffix(e.Name(), ".json"); ok {
-			if c, ok := Read(dir, id, now); ok {
-				out = append(out, c)
-			}
+		info, err := e.Info()
+		if !strings.HasSuffix(e.Name(), ".json") || err != nil || now.Sub(info.ModTime()) >= TTL {
+			continue
+		}
+		if c, ok := read(filepath.Join(Dir(dir), claimsDir, e.Name())); ok {
+			out = append(out, c)
 		}
 	}
 	return out

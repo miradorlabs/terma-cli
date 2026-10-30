@@ -14,6 +14,9 @@ func TestProcArgsEnvSkipsThePathAndArguments(t *testing.T) {
 	if want := []string{"A=1", "B=two=2"}; !ok || !slices.Equal(got, want) {
 		t.Fatalf("procArgsEnv = %q, %v; want %q", got, ok, want)
 	}
+	if got, ok := procArgsEnv([]byte("\x01\x00\x00\x00/bin/zsh\x00\x00zsh\x00")); !ok || len(got) != 0 {
+		t.Fatalf("a withheld environment = %q, %v; want none, which Environ reports unread", got, ok)
+	}
 	if _, ok := procArgsEnv([]byte("\x01\x00")); ok {
 		t.Fatal("a truncated buffer was read")
 	}
