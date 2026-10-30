@@ -28,53 +28,42 @@ const envFix = "remove those variables where they are set: the process that star
 
 // AgentEnvCheck judges the environment each running agent process of a collected session
 // started with, against the relay: an exporter variable there overrides the settings files
-// the export check reads. A claim under stateDir lists its hooks' ancestors, nearest first,
-// each run's appended last, and the processes a running agent descends from all run; so
-// the nearest of the running processes that end the list is the latest run's agent, never
-// an exited run's process whose id another has taken since. Once that agent exits, its host
-// is judged until the claim expires; and an agent whose outermost recorded ancestor has
-// exited since its last hook (a terminal closed under it) is missed until its next one.
-// Only variable names are said, never a value: an endpoint or header may hold a credential.
+// the export check reads. A claim under stateDir lists the ancestors of each hook that ran
+// for the session, nearest first, one chain after another; a hook's own processes exit with
+// it, so the nearest process of each run of running ones is an agent, or what a git hook
+// ran under (a developer's shell), or an exited process's id that another has taken since.
+// All are judged, so the agent always is; the others add a finding only when they too
+// started with exporter variables that bypass the relay. Only variable names are said,
+// never a value: an endpoint or header may hold a credential.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	type proc struct {
 		agent string
 		env   []string
 	}
 	procs := map[int]proc{}
+	unread := false
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
 		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
 			continue
 		}
-		var nearest proc
-		pid := 0
-		for i := len(c.PIDs) - 1; i >= 0; i-- {
-			env, alive := environ(c.PIDs[i])
-			if !alive {
-				break
+		after := false
+		for _, pid := range c.PIDs {
+			env, alive := environ(pid)
+			switch {
+			case alive && !after && env == nil:
+				unread = true
+			case alive && !after:
+				procs[pid] = proc{a.DisplayName(), env}
 			}
-			pid, nearest = c.PIDs[i], proc{a.DisplayName(), env}
-		}
-		if pid != 0 {
-			procs[pid] = nearest
-		}
-	}
-	unread := 0
-	for pid, p := range procs {
-		if p.env == nil {
-			unread++
-			delete(procs, pid)
+			after = alive
 		}
 	}
 	switch {
-	case len(procs) == 0 && unread > 0:
+	case len(procs) == 0 && unread:
 		return Check{Status: Skip, Detail: "terma cannot read the environment of the running agent processes on this system"}
 	case len(procs) == 0:
 		return Check{Status: Skip, Detail: "no agent process of a collected session is running"}
-	}
-	unreadNote := ""
-	if unread > 0 {
-		unreadNote = fmt.Sprintf("; %d more whose environment terma cannot read", unread)
 	}
 	type finding struct{ agent, what string }
 	found := map[finding][]int{}
@@ -90,18 +79,14 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 		}
 	}
 	if len(found) == 0 {
-		running := "1 running process"
-		if len(procs) > 1 {
-			running = fmt.Sprintf("%d running processes", len(procs))
-		}
-		return Check{Status: Pass, Detail: fmt.Sprintf("%s (%s) started with no exporter variable that overrides the local relay on %s%s",
-			strings.Join(names, ", "), running, relay.Addr, unreadNote)}
+		return Check{Status: Pass, Detail: fmt.Sprintf("%s started with no exporter variable that overrides the local relay on %s",
+			strings.Join(names, ", "), relay.Addr)}
 	}
 	var parts []string
 	for _, f := range slices.SortedFunc(maps.Keys(found), func(a, b finding) int { return strings.Compare(a.agent+a.what, b.agent+b.what) }) {
 		parts = append(parts, f.agent+" ("+pidList(found[f])+") started with exporter variables that override terma's setup: "+f.what)
 	}
-	return Check{Status: Warn, Detail: strings.Join(parts, "; ") + unreadNote, Fix: envFix}
+	return Check{Status: Warn, Detail: strings.Join(parts, "; "), Fix: envFix}
 }
 
 // exporterEnvFindings names, by variable, what in env keeps an exporter from the relay at

@@ -58,7 +58,7 @@ func TestAgentEnvCheckJudgesTheLiveProcessEnvironment(t *testing.T) {
 		absent []string
 	}{
 		{name: "no exporter variables: the settings decide", env: []string{"HOME=/home/dev", "PATH=/usr/bin"},
-			status: Pass, want: []string{"fake (1 running process) started with no exporter variable", "127.0.0.1:43180"}},
+			status: Pass, want: []string{"fake started with no exporter variable", "127.0.0.1:43180"}},
 		{name: "the relay with its token", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180",
 			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + relayToken}, status: Pass},
 		{name: "the token on the relay's path, no header", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/" + relayToken},
@@ -127,32 +127,44 @@ func TestAgentEnvCheckGroupsProcessesByFinding(t *testing.T) {
 	}
 }
 
-// The latest run's agent is judged: not a process of an earlier run that still runs (the
-// shell a session was first started from), nor one that took an exited process's id.
-func TestAgentEnvCheckJudgesTheLatestRunsAgent(t *testing.T) {
+// Whatever chain ends a claim's list, the agent's own is judged: after a run resumed in an
+// IDE, after a commit made by hand (whose git hook claimed the session under a shell), with
+// the terminal it started in closed, and beside an exited process's id taken by another.
+func TestAgentEnvCheckJudgesTheAgentInEveryChain(t *testing.T) {
 	t.Parallel()
 	reg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
 	relay := Relay{Addr: "127.0.0.1:43180", Token: relayToken}
 	bad := []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}
 	clean := []string{"HOME=/home/dev"}
-	now := time.Now()
-
-	// Started from a terminal (hook 101, agent 201, shell 301), then resumed in an IDE (hook
-	// 102, agent 202, IDE 302); the first agent has exited, its shell has not.
-	resumed := t.TempDir()
-	claim.Write(resumed, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{101, 201, 301}}, now)
-	claim.Write(resumed, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{102, 202, 302}}, now)
-	c := AgentEnvCheck(reg, resumed, relay, processes(map[int][]string{301: clean, 202: bad, 302: clean}), now)
-	if c.Status != Warn || !strings.Contains(c.Detail, "fake (pid 202)") || strings.Contains(c.Detail, "301") {
-		t.Fatalf("resumed elsewhere = %+v, want a warning about the IDE's agent, pid 202", c)
-	}
-
-	// Pid 500, an exited run's, now belongs to an unrelated process.
-	reused := t.TempDir()
-	claim.Write(reused, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{500, hookPID, agentPID, hostPID}}, now)
-	c = AgentEnvCheck(reg, reused, relay, processes(map[int][]string{500: bad, agentPID: clean, hostPID: clean}), now)
-	if c.Status != Pass {
-		t.Fatalf("reused pid = %+v, want a pass on the agent's own environment", c)
+	for _, tc := range []struct {
+		name   string
+		chains [][]int
+		table  map[int][]string
+		agent  string
+	}{
+		// Started from a terminal (hook 101, agent 201, shell 301), resumed in an IDE (hook
+		// 102, agent 202, IDE 302); the first agent has exited, its shell has not.
+		{"resumed in an IDE", [][]int{{101, 201, 301}, {102, 202, 302}},
+			map[int][]string{301: clean, 202: bad, 302: clean}, "fake (pid 202)"},
+		// The agent's hook (100), then a commit by hand: hook script 110, git 120, shell 130, terminal 140.
+		{"a commit made by hand", [][]int{{hookPID, agentPID, hostPID}, {110, 120, 130, 140}},
+			map[int][]string{agentPID: bad, hostPID: clean, 130: clean, 140: clean}, "fake (pid 200)"},
+		{"the terminal it started in closed", [][]int{{hookPID, agentPID, hostPID}},
+			map[int][]string{agentPID: bad}, "fake (pid 200)"},
+		{"an exited process's id taken by another", [][]int{{500, hookPID, agentPID, hostPID}},
+			map[int][]string{500: clean, agentPID: bad, hostPID: clean}, "fake (pid 200)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			for _, pids := range tc.chains {
+				claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: pids}, time.Now())
+			}
+			c := AgentEnvCheck(reg, dir, relay, processes(tc.table), time.Now())
+			if c.Status != Warn || !strings.Contains(c.Detail, tc.agent+" started with") || strings.Count(c.Detail, "started with") != 1 {
+				t.Fatalf("check = %+v, want a warning about %s alone", c, tc.agent)
+			}
+		})
 	}
 }
 
@@ -186,7 +198,7 @@ func TestAgentEnvCheckSkipsWithoutALiveProcess(t *testing.T) {
 	}
 }
 
-// A running agent whose environment cannot be read is a skip that says so, not a pass.
+// A running agent whose environment cannot be read alone is a skip that says so, not a pass.
 func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 	t.Parallel()
 	reg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
@@ -195,12 +207,12 @@ func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 	if c.Status != Skip || !strings.Contains(c.Detail, "cannot read") {
 		t.Fatalf("check = %+v, want a skip saying the environment cannot be read", c)
 	}
-	// Beside a readable one, it is still counted.
+	// Beside a readable one (a shell on macOS is not), the readable one is judged.
 	dir := claimed(t, "fake")
 	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{102, 202}}, time.Now())
 	table[202] = []string{"HOME=/home/dev"}
 	c = AgentEnvCheck(reg, dir, Relay{Addr: "127.0.0.1:43180", Token: relayToken}, processes(table), time.Now())
-	if c.Status != Pass || !strings.Contains(c.Detail, "1 more whose environment terma cannot read") {
-		t.Fatalf("check = %+v, want a pass that counts the unreadable agent", c)
+	if c.Status != Pass {
+		t.Fatalf("check = %+v, want a pass on the readable agent", c)
 	}
 }
