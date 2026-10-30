@@ -625,6 +625,27 @@ events:
       - ref: terma.response.service_tier
       - ref: terma.response.inference_geo
 
+  - name: terma.model.fallback
+    stability: development
+    requirement_level: recommended
+    brief: The agent moved the session to another model after the API refused a call.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.model_call.id
+        requirement_level: required
+        note: The refused call.
+      - ref: gen_ai.request.model
+        note: The model the session moved from.
+      - ref: terma.model.fallback.model
+        requirement_level: required
+      - ref: terma.model.fallback.trigger
+      - ref: terma.refusal.category
+
   - name: terma.relay.heartbeat
     stability: development
     requirement_level: recommended

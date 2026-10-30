@@ -72,7 +72,7 @@ func TestReadCallResponsesKeepsEachCallsLastFinalRecord(t *testing.T) {
 		assistantRecord("req_a", "2026-10-28T03:31:46.200Z", 76),
 		assistantRecord("req_b", "2026-10-28T03:31:50Z", 0),
 	)
-	calls, offset, err := readCallResponses(path, 0)
+	calls, _, offset, err := readTranscriptFacts(path, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestReadCallResponsesToleratesSpacingAndOmittedLabels(t *testing.T) {
 		assistantRecord("req_a", "2026-10-28T03:31:45Z", 76),
 		`{"type": "assistant", "requestId": "req_a", "message": {"model": "claude-opus-5-5", "stop_reason": "tool_use", "usage": {"output_tokens": 1308}}}`,
 	)
-	calls, _, err := readCallResponses(path, 0)
+	calls, _, _, err := readTranscriptFacts(path, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestReadCallResponsesToleratesSpacingAndOmittedLabels(t *testing.T) {
 	spaced := transcript(t, t.TempDir(),
 		`{"type": "assistant", "requestId": "req_s", "message": {"model": "claude-opus-5-5", "stop_reason": "end_turn", "usage": {"output_tokens": 9}}}`,
 	)
-	if calls, _, err := readCallResponses(spaced, 0); err != nil || len(calls) != 1 || calls[0].StopReason != "end_turn" {
+	if calls, _, _, err := readTranscriptFacts(spaced, 0); err != nil || len(calls) != 1 || calls[0].StopReason != "end_turn" {
 		t.Fatalf("spaced record: got %+v, %v", calls, err)
 	}
 }
@@ -122,7 +122,7 @@ func TestReadCallResponsesWithoutAThinkingCount(t *testing.T) {
 		`{"type":"assistant","requestId":"req_old","message":{"model":"claude-opus-4-5","stop_reason":"end_turn","usage":{"output_tokens":90,"service_tier":"standard","inference_geo":"not_available"}}}`,
 		`{"type":"assistant","requestId":"req_syn","message":{"model":"<synthetic>","stop_reason":"end_turn","usage":{"output_tokens":0}}}`,
 	)
-	calls, _, err := readCallResponses(path, 0)
+	calls, _, _, err := readTranscriptFacts(path, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,13 +134,13 @@ func TestReadCallResponsesWithoutAThinkingCount(t *testing.T) {
 // Reading resumes after the last whole line; a line still being written waits for the next read.
 func TestReadCallResponsesResumesAfterTheLastWholeLine(t *testing.T) {
 	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 5))
-	first, offset, err := readCallResponses(path, 0)
+	first, _, offset, err := readTranscriptFacts(path, 0)
 	if err != nil || len(first) != 1 {
 		t.Fatalf("first read: %+v, %v", first, err)
 	}
 	partial := assistantRecord("req_c", "2026-10-28T03:31:47Z", 20)[:20]
 	appendTranscript(t, path, assistantRecord("req_b", "2026-10-28T03:31:46Z", 0)+"\n"+partial)
-	second, next, err := readCallResponses(path, offset)
+	second, _, next, err := readTranscriptFacts(path, offset)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestReadCallResponsesResumesAfterTheLastWholeLine(t *testing.T) {
 // A transcript shorter than the stored offset is read from its start.
 func TestReadCallResponsesRestartsAShorterTranscript(t *testing.T) {
 	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 5))
-	calls, _, err := readCallResponses(path, 1<<20)
+	calls, _, _, err := readTranscriptFacts(path, 1<<20)
 	if err != nil || len(calls) != 1 {
 		t.Fatalf("got %+v, %v; want req_a", calls, err)
 	}
@@ -284,5 +284,93 @@ func TestClaudeSessionEndSendsACallFinishedAfterStop(t *testing.T) {
 	got := spooledResponses(t, env.Spool)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
 		t.Fatalf("got %+v, want req_a with its final count at the session's end", got)
+	}
+}
+
+// fallbackRecord is the system record of a refusal that moved the session to another model,
+// with the text the record carries beside its labels.
+func fallbackRecord(requestID, scope string, sidechain bool) string {
+	return `{"type":"system","subtype":"model_refusal_fallback","level":"warning","isMeta":false,` +
+		`"isSidechain":` + strconv.FormatBool(sidechain) + `,"requestId":"` + requestID + `","timestamp":"2026-10-26T09:12:03Z",` +
+		`"originalModel":"claude-opus-5-5","fallbackModel":"claude-opus-4-8","trigger":"refusal","scope":"` + scope + `",` +
+		`"direction":"retry","apiRefusalCategory":"cyber","apiRefusalExplanation":"SECRET-EXPLANATION",` +
+		`"content":"SECRET-CONTENT","refusedUserMessageUuid":"u-1","retractedMessageUuids":["u-2"]}`
+}
+
+func spooledFallbacks(t *testing.T, sp *spool.Spool) []spool.Event {
+	t.Helper()
+	var out []spool.Event
+	for _, e := range hookruntest.Spooled(t, sp) {
+		if e.Name == semconv.TermaModelFallbackEvent {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// The main thread's session fallback is read beside the calls; a subagent's, one scoped to less
+// than the session, and one naming no refused call are not.
+func TestReadTranscriptFactsReadsTheSessionsFallbacks(t *testing.T) {
+	path := transcript(t, t.TempDir(),
+		assistantRecord("req_a", "2026-10-26T09:12:00Z", 5),
+		fallbackRecord("req_refused", "session", false),
+		fallbackRecord("req_sub", "session", true),
+		fallbackRecord("req_turn", "turn", false),
+		fallbackRecord("", "session", false),
+	)
+	calls, fallbacks, _, err := readTranscriptFacts(path, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 || calls[0].RequestID != "req_a" {
+		t.Errorf("calls %+v, want req_a alone", calls)
+	}
+	want := []claudeModelFallback{{RequestID: "req_refused", From: "claude-opus-5-5", To: "claude-opus-4-8", Trigger: "refusal",
+		Category: "cyber", Time: time.Date(2026, 10, 26, 9, 12, 3, 0, time.UTC)}}
+	if len(fallbacks) != 1 || fallbacks[0] != want[0] {
+		t.Errorf("fallbacks %+v, want %+v", fallbacks, want)
+	}
+}
+
+// Stop spools the fallback once, with its labels only: never the record's text or the API's
+// explanation.
+func TestClaudeStopSpoolsAFallbackOnceWithoutItsText(t *testing.T) {
+	env := titleEnv(t)
+	path := transcript(t, t.TempDir(), fallbackRecord("req_refused", "session", false))
+	stopClaude(t, env, path)
+	all := hookruntest.Spooled(t, env.Spool)
+	var got []spool.Event
+	for _, e := range all {
+		if b, _ := json.Marshal(e); strings.Contains(string(b), "SECRET") {
+			t.Fatalf("the record's text left in %s", b)
+		}
+		if e.Name == semconv.TermaModelFallbackEvent {
+			got = append(got, e)
+		}
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected one fallback, got %+v", all)
+	}
+	e := got[0]
+	want := map[string]any{
+		semconv.GenAIMainAgentNameKey:        claudeTool,
+		semconv.GenAIRequestModelKey:         "claude-opus-5-5",
+		semconv.TermaEvidenceSourceKey:       sourceClaudeTranscript,
+		semconv.TermaModelCallIDKey:          "req_refused",
+		semconv.TermaModelFallbackModelKey:   "claude-opus-4-8",
+		semconv.TermaModelFallbackTriggerKey: "refusal",
+		semconv.TermaRefusalCategoryKey:      "cyber",
+		hookrun.AttrProjectID:                e.Attrs[hookrun.AttrProjectID],
+	}
+	gotJSON, _ := json.Marshal(e.Attrs)
+	wantJSON, _ := json.Marshal(want)
+	if e.SessionID != titleSession || string(gotJSON) != string(wantJSON) || !e.Time.Equal(time.Date(2026, 10, 26, 9, 12, 3, 0, time.UTC)) {
+		t.Fatalf("fallback %s in %s at %v, want %s at the record's time", gotJSON, e.SessionID, e.Time, wantJSON)
+	}
+
+	appendTranscript(t, path, assistantRecord("req_b", "2026-10-26T09:13:00Z", 12)+"\n")
+	stopClaude(t, env, path)
+	if again := spooledFallbacks(t, env.Spool); len(again) != 0 {
+		t.Fatalf("a later stop sent the fallback again: %+v", again)
 	}
 }
