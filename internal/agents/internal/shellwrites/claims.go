@@ -49,16 +49,15 @@ func (c Claims) BeforeCall(ctx context.Context, e hookrun.Env, sess session.Sess
 	if err != nil {
 		return
 	}
-	held := held(r, sess.Key())
-	c.expect(e, r, sess, held, e.Expect(r, sess, paths))
+	owned := held(r, sess.Key())
+	c.expect(e, r, sess, owned, e.Expect(r, sess, paths))
 }
 
 // Settle withdraws, at the end of a turn, the claims of the session's calls on files they
 // left as they were: the call was declined or wrote nothing there. A file two parallel calls
 // claimed is withdrawn only when neither changed it.
 func (c Claims) Settle(e hookrun.Env, r *hookrun.Repo, sessionID string) {
-	dir := filepath.Join(e.StateDir, c.Dir)
-	paths, _ := filepath.Glob(filepath.Join(dir, hookrun.EvidenceID(sessionID)+".*.json"))
+	paths := c.calls(e, sessionID)
 	same := map[string]bool{}
 	for _, p := range paths {
 		var call expectedCall
@@ -85,6 +84,15 @@ func (c Claims) Settle(e hookrun.Env, r *hookrun.Repo, sessionID string) {
 			e.Logf("expected files: %v", err)
 		}
 	}
+}
+
+// Pending reports whether the session has claims to settle, without resolving its repository.
+func (c Claims) Pending(e hookrun.Env, sessionID string) bool { return len(c.calls(e, sessionID)) > 0 }
+
+// calls are the files of the session's claimed calls.
+func (c Claims) calls(e hookrun.Env, sessionID string) []string {
+	paths, _ := filepath.Glob(filepath.Join(e.StateDir, c.Dir, hookrun.EvidenceID(sessionID)+".*.json"))
+	return paths
 }
 
 // expect records sess's claim on files, which BeforeCall just added to its manifest. A file

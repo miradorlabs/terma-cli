@@ -208,18 +208,30 @@ func TestClaudeBashWriteCommittedLaterIsStamped(t *testing.T) {
 	}
 }
 
-// A Bash call the developer declines claims nothing once the next prompt starts: declining
-// interrupts the turn, which then has no Stop.
+// A Bash call the developer declines claims nothing once the turn is over: declining
+// interrupts the turn, which then has no Stop, so the next prompt, a failed turn's
+// StopFailure or the session's end settles it.
 func TestClaudeDeclinedBashCallClaimsNothing(t *testing.T) {
-	c := newClaudeBash(t)
-	c.call("printf agent > base.txt", nil)
-	prompt := `{"session_id":"` + claudeBashSession + `","transcript_path":"","cwd":` + strconv.Quote(c.root) + `,"hook_event_name":"UserPromptSubmit"}`
-	if err := userPromptSubmit(c.ctx, c.env(prompt)); err != nil {
-		t.Fatal(err)
-	}
-	hookruntest.WriteFile(t, c.root, "base.txt", "human\n")
-	c.git("add", "base.txt")
-	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
-		t.Fatalf("a declined call's claim stamped the developer's commit:\n%s", msg)
+	for _, tc := range []struct {
+		event string
+		hook  func(context.Context, hookrun.Env) error
+	}{
+		{"UserPromptSubmit", userPromptSubmit},
+		{"StopFailure", stopFailure},
+		{"SessionEnd", sessionEnd},
+	} {
+		t.Run(tc.event, func(t *testing.T) {
+			c := newClaudeBash(t)
+			c.call("printf agent > base.txt", nil)
+			payload := `{"session_id":"` + claudeBashSession + `","transcript_path":"","cwd":` + strconv.Quote(c.root) + `,"hook_event_name":"` + tc.event + `"}`
+			if err := tc.hook(c.ctx, c.env(payload)); err != nil {
+				t.Fatal(err)
+			}
+			hookruntest.WriteFile(t, c.root, "base.txt", "human\n")
+			c.git("add", "base.txt")
+			if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("a declined call's claim stamped the developer's commit after %s:\n%s", tc.event, msg)
+			}
+		})
 	}
 }

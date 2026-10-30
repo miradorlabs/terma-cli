@@ -138,6 +138,9 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return err
 	}
+	if !claudeClaims.Pending(env, in.SessionID) {
+		return nil // the usual prompt: no repository to resolve
+	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	if r, err := env.Repo(ctx); err == nil {
 		claudeClaims.Settle(env, r, in.SessionID)
