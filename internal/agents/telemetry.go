@@ -52,13 +52,16 @@ type EnvExporter interface {
 }
 
 // TraceGated is an agent whose spans need switches of their own beyond its exporter, and
-// carry what no other signal does.
+// carry what no other signal does. Doctor reads its running processes' environments only
+// when it is an EnvExporter too.
 type TraceGated interface {
 	Agent
-	// TracesOff names the settings that keep the agent's spans from being exported in the
-	// repository at root ("" for none) or, with env, the variables of a running process's
-	// startup environment that switch them off; none when spans are exported.
-	TracesOff(root string, env []string) []string
+	// TracesOff names what in the agent's settings keeps its spans from being exported;
+	// none when they are.
+	TracesOff() ([]string, error)
+	// TracesOffIn names the variables of env, a running process's startup environment,
+	// that switch its spans off.
+	TracesOffIn(env []string) []string
 	// SpansCarry is what only the agent's spans carry, lost without them.
 	SpansCarry() string
 }

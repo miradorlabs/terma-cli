@@ -7,45 +7,43 @@ import (
 	"testing"
 )
 
-// Spans need the beta switch and the traces exporter in the settings that apply, and no
-// running process's environment switching either off.
+// Spans need the master switch, the beta switch and the traces exporter in the user settings
+// file, and no running process's environment switching any of them off.
 func TestTracesOffNamesWhatKeepsSpans(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	root := t.TempDir()
-	write := func(path, env string) {
-		t.Helper()
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(`{"env":{`+env+`}}`), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
 	user := filepath.Join(dir, "settings.json")
-	on := `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_TRACES_EXPORTER":"otlp"`
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(user, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		name, env string
+		want      []string
+	}{
+		{"all on", `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_TRACES_EXPORTER":"otlp"`, nil},
+		{"an earlier terma's: no beta switch", `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_TRACES_EXPORTER":"otlp"`,
+			[]string{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1"}},
+		{"telemetry off", `"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_TRACES_EXPORTER":"none"`,
+			[]string{"CLAUDE_CODE_ENABLE_TELEMETRY=1", "OTEL_TRACES_EXPORTER=otlp"}},
+	} {
+		write(`{"env":{` + tc.env + `}}`)
+		if off, err := (Agent{}).TracesOff(); err != nil || !slices.Equal(off, tc.want) {
+			t.Errorf("%s: TracesOff = %q, %v; want %q", tc.name, off, err, tc.want)
+		}
+	}
+	write(`{"env":`)
+	if _, err := (Agent{}).TracesOff(); err == nil {
+		t.Error("an unreadable settings file read as exporting spans")
+	}
 
-	write(user, on)
-	if off := (Agent{}).TracesOff(root, nil); len(off) != 0 {
-		t.Fatalf("both on: TracesOff = %q", off)
+	env := []string{"HOME=/home/dev", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=0", "OTEL_TRACES_EXPORTER=none", "OTEL_LOGS_EXPORTER=otlp", "CLAUDE_CODE_ENABLE_TELEMETRY="}
+	if off := (Agent{}).TracesOffIn(env); !slices.Equal(off, []string{claudeEnhancedTelemetry, otelTracesExporter}) {
+		t.Errorf("process env: TracesOffIn = %q", off)
 	}
-	// An earlier terma wrote no beta switch.
-	write(user, `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_TRACES_EXPORTER":"otlp"`)
-	if off := (Agent{}).TracesOff(root, nil); len(off) != 1 {
-		t.Fatalf("no beta switch: TracesOff = %q", off)
-	}
-	// A repository switching traces off.
-	write(user, on)
-	write(filepath.Join(root, claudeProjectSettings), `"OTEL_TRACES_EXPORTER":"none"`)
-	if off := (Agent{}).TracesOff(root, nil); len(off) != 1 {
-		t.Fatalf("repository off: TracesOff = %q", off)
-	}
-
-	env := []string{"HOME=/home/dev", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=0", "OTEL_TRACES_EXPORTER=none", "OTEL_LOGS_EXPORTER=otlp"}
-	if off := (Agent{}).TracesOff("", env); !slices.Equal(off, []string{claudeEnhancedTelemetry, otelTracesExporter}) {
-		t.Fatalf("process env: TracesOff = %q", off)
-	}
-	if off := (Agent{}).TracesOff("", []string{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1", "OTEL_TRACES_EXPORTER=otlp", "HOME=/"}); len(off) != 0 {
-		t.Fatalf("process env on: TracesOff = %q", off)
+	if off := (Agent{}).TracesOffIn([]string{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1", "OTEL_TRACES_EXPORTER=otlp", "HOME=/"}); len(off) != 0 {
+		t.Errorf("process env on: TracesOffIn = %q", off)
 	}
 }

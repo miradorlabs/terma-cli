@@ -205,14 +205,12 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
 	// The settings files above can be right while a running agent's environment overrides them.
-	if claim.Enabled(env.StateDir) {
-		timed(KeyAgentEnv, "live agent environment", d.agentEnv)
-	}
 	var environ Environ
 	if claim.Enabled(env.StateDir) {
+		timed(KeyAgentEnv, "live agent environment", d.agentEnv)
 		environ = env.Probes.Environ
 	}
-	if c, ok := TracesCheck(ctx, env.Agents, cfg.Harnesses, d.repoRoot(), env.StateDir, environ, time.Now()); ok {
+	if c, ok := TracesCheck(ctx, env.Agents, cfg.Harnesses, env.StateDir, environ, time.Now()); ok {
 		timed(KeyTraces, "agent spans exported", func() Check { return c })
 	}
 
@@ -335,15 +333,11 @@ func (d *run) agentEnv() Check {
 }
 
 func (d *run) statusLine() Check {
-	return StatusLineCheck(JudgeStatusLine(d.env.Agents, d.repoRoot()))
-}
-
-// repoRoot is the working tree doctor runs in, "" outside one.
-func (d *run) repoRoot() string {
-	if d.env.RepoErr != nil {
-		return ""
+	repoRoot := ""
+	if d.env.RepoErr == nil {
+		repoRoot = d.env.Root
 	}
-	return d.env.Root
+	return StatusLineCheck(JudgeStatusLine(d.env.Agents, repoRoot))
 }
 
 func (d *run) eventSpool() Check {
