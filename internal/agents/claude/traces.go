@@ -44,7 +44,7 @@ func (Agent) TracesOffIn(env []string) []string {
 	return off
 }
 
-// SpansCarry is what only Claude Code's llm_request spans carry.
-func (Agent) SpansCarry() string { return "time to first token, finish reason and attempts" }
+// SpansCarry is what only Claude Code's llm_request spans carry; its api_request log carries time to first token too.
+func (Agent) SpansCarry() string { return "finish reason and attempts" }
 
 var _ agents.TraceGated = Agent{}

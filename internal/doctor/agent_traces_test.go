@@ -32,7 +32,7 @@ func (tracedAgent) TracesOffIn(env []string) []string {
 	return nil
 }
 
-func (tracedAgent) SpansCarry() string { return "time to first token" }
+func (tracedAgent) SpansCarry() string { return "finish reason" }
 
 // The spans check warns, naming what is lost and where it is switched off, from the settings
 // and from running processes' environments; it passes when both export spans, and never
@@ -54,7 +54,7 @@ func TestTracesCheckNamesWhatSpansCarry(t *testing.T) {
 		{"exported", agent(nil), map[int][]string{agentPID: clean}, Pass, []string{"fake exports its spans"}},
 		{"a running process unread", agent(nil), map[int][]string{agentPID: nil}, Pass, []string{"by its settings; terma cannot read"}},
 		{"settings lack the switches", agent(nil, "BETA=1"), nil, Warn,
-			[]string{"fake exports no spans (its settings lack BETA=1)", "time to first token", "terma setup"}},
+			[]string{"fake exports no spans (its settings lack BETA=1)", "finish reason", "terma setup"}},
 		{"settings unreadable", agent(errors.New("parse settings.json")), nil, Warn,
 			[]string{"terma cannot read its settings: parse settings.json", "repair the settings file"}},
 		{"a running process switches them off", agent(nil), map[int][]string{agentPID: {"SPANS=off"}}, Warn,
