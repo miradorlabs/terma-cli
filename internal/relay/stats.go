@@ -18,6 +18,8 @@ type Stats struct {
 	counters map[string]int
 	// beat is the counters as of the last heartbeat that took them.
 	beat map[string]int
+	// refusedAt is when the relay last refused a request for its token or its body.
+	refusedAt time.Time
 }
 
 func newStats() *Stats { return &Stats{started: time.Now(), counters: map[string]int{}} }
@@ -25,6 +27,14 @@ func newStats() *Stats { return &Stats{started: time.Now(), counters: map[string
 func (s *Stats) add(key string, n int) {
 	s.mu.Lock()
 	s.counters[key] += n
+	s.mu.Unlock()
+}
+
+// refused records when the relay refused a request, so a reader tells refusals going on
+// from ones a fixed exporter left in the counters.
+func (s *Stats) refused(at time.Time) {
+	s.mu.Lock()
+	s.refusedAt = at
 	s.mu.Unlock()
 }
 
@@ -83,6 +93,9 @@ func (s *Stats) dropped(sig Signal, reason string, n int) {
 type Snapshot struct {
 	Since    time.Time      `json:"since"`
 	Counters map[string]int `json:"counters"`
+	// RefusedAt is when the relay last refused a request for its token or its body; zero
+	// when it has not.
+	RefusedAt time.Time `json:"refused_at,omitzero"`
 }
 
 // Snapshot copies the counters.
@@ -91,7 +104,7 @@ func (s *Stats) Snapshot() Snapshot {
 	defer s.mu.Unlock()
 	c := make(map[string]int, len(s.counters))
 	maps.Copy(c, s.counters)
-	return Snapshot{Since: s.started, Counters: c}
+	return Snapshot{Since: s.started, Counters: c, RefusedAt: s.refusedAt}
 }
 
 // Keys lists the counters in order, for printing.
