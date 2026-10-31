@@ -165,7 +165,7 @@ func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsD
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("Authorization", "Bearer "+key)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := delivery.NewHTTPClient().Do(req)
 	if err != nil {
 		return &relay.DeliveryError{Err: err}
 	}

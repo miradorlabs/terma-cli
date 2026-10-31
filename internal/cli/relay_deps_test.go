@@ -117,21 +117,24 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 }
 
 // A beat with a target goes with the target team's key alone, and only to the target's
-// endpoint: one the relay would send elsewhere, or for a team with no key here, is not sent,
-// and a key the ingest refuses says so.
+// endpoint: one the relay would send elsewhere, or for a team with no key here, is not sent;
+// a redirect is not followed; and a key the ingest refuses says so.
 func TestATargetedHeartbeatGoesOnlyWhereAsked(t *testing.T) {
 	var sent []string // the key of each beat the ingest received
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		sent = append(sent, key)
-		if key == "ter_srv_revoked" {
+		sent = append(sent, key+r.URL.Path)
+		switch key {
+		case "ter_srv_revoked":
 			http.Error(w, "unknown key", http.StatusUnauthorized)
+		case "ter_srv_moved":
+			http.Redirect(w, r, "/elsewhere", http.StatusFound)
 		}
 	}))
 	defer srv.Close()
 	authSandbox(t, &fakeAuth{srv: srv})
 	hosts := keystore.Hosts{OTLP: srv.URL, API: srv.URL}
-	for team, key := range map[string]string{"team": "ter_srv_team", "other": "ter_srv_other", "revoked": "ter_srv_revoked"} {
+	for team, key := range map[string]string{"team": "ter_srv_team", "other": "ter_srv_other", "revoked": "ter_srv_revoked", "moved": "ter_srv_moved"} {
 		if err := keystore.Set(testApp.dir, team, key, hosts); err != nil {
 			t.Fatal(err)
 		}
@@ -152,12 +155,16 @@ func TestATargetedHeartbeatGoesOnlyWhereAsked(t *testing.T) {
 	if err := send("unkeyed", srv.URL); !errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("beat for a team with no key: %v", err)
 	}
+	// An ingest that redirects is not followed: the key stays put, and nothing is proven.
+	if _, tried := errors.AsType[*relay.DeliveryError](send("moved", srv.URL)); !tried {
+		t.Fatal("a redirected beat did not fail as a delivery")
+	}
 	err := send("revoked", srv.URL)
 	ingest, ok := errors.AsType[*delivery.IngestError](err)
 	if _, tried := errors.AsType[*relay.DeliveryError](err); !tried || !ok || !ingest.KeyRefused() || err.Error() != "otlp ingest returned 401" {
 		t.Fatalf("beat with a revoked key: %v", err)
 	}
-	if want := []string{"ter_srv_team", "ter_srv_revoked"}; !slices.Equal(sent, want) {
+	if want := []string{"ter_srv_team/v1/logs", "ter_srv_moved/v1/logs", "ter_srv_revoked/v1/logs"}; !slices.Equal(sent, want) {
 		t.Fatalf("beats sent with %q, want %q", sent, want)
 	}
 }
