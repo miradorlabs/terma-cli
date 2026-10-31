@@ -13,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -80,6 +81,50 @@ func TestClaudeAccountWithheldOnYesCloudFlag(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "yes")
 	if id, _, ok := readFunding(env.Cwd).oauthAccount(); ok {
 		t.Fatalf("CLAUDE_CODE_USE_BEDROCK=yes: expected the account withheld, got %q", id)
+	}
+}
+
+// SessionStart and Stop name the session's credential in its claim, for the relay to stamp: a
+// hook that does not read it keeps it as it refreshes the claim, and one that cannot tell clears
+// it rather than keep an earlier read.
+func TestClaudeHooksClaimTheCredential(t *testing.T) {
+	env := newFundingEnv(t)
+	ctx := context.Background()
+	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-a"}}`)
+	claimed := func(when string) claim.Claim {
+		t.Helper()
+		c, ok := claim.Read(env.StateDir, "funding-session", env.Time())
+		if !ok {
+			t.Fatalf("%s: no claim", when)
+		}
+		return c
+	}
+	env.Stdin = strings.NewReader(hookPayload(env, "SessionStart"))
+	_ = sessionStart(ctx, env)
+	if got := claimed("start").Credential; got != semconv.TermaAccountCredentialAccount {
+		t.Fatalf("start: credential %q, want account", got)
+	}
+	t.Setenv("ANTHROPIC_API_KEY", "never-export-key")
+	env.Stdin = strings.NewReader(hookPayload(env, "Stop"))
+	_ = stop(ctx, env)
+	if got := claimed("stop under a key").Credential; got != semconv.TermaAccountCredentialApiKey {
+		t.Fatalf("stop under a key: credential %q, want api_key", got)
+	}
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	env.Now = env.Now.Add(2 * claim.Refresh) // the claim is stale, so the tool call rewrites it
+	hookruntest.WriteFile(t, env.Cwd, "x.go", "package x\n")
+	edit, _ := json.Marshal(map[string]any{"session_id": "funding-session", "cwd": env.Cwd, "hook_event_name": "PostToolUse",
+		"tool_name": "Write", "tool_input": map[string]any{"file_path": filepath.Join(env.Cwd, "x.go")}})
+	env.Stdin = strings.NewReader(string(edit))
+	_ = postToolUse(ctx, env)
+	if c := claimed("tool call"); !c.ClaimedAt.Equal(env.Now.UTC()) || c.Credential != semconv.TermaAccountCredentialApiKey {
+		t.Fatalf("tool call: claimed at %v (want %v), credential %q, want api_key kept", c.ClaimedAt, env.Now.UTC(), c.Credential)
+	}
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token-for-some-account")
+	env.Stdin = strings.NewReader(hookPayload(env, "Stop"))
+	_ = stop(ctx, env)
+	if got := claimed("stop that cannot tell").Credential; got != "" {
+		t.Fatalf("stop that cannot tell: credential %q kept", got)
 	}
 }
 

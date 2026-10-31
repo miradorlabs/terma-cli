@@ -110,7 +110,10 @@ leaves (`config.Policy.Content`). The claim also names the checkout the hook ran
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
 its working tree, the directory in it and the worktree's name with tool content only
-(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). Hook events never pass the relay, so delivery applies
+(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). A
+Claude Code claim also names the kind of credential the session runs on, where the hooks that
+read its stored login can tell, which the relay stamps under any policy (`stampCredential`,
+`terma.account.credential`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. A session marked not collected is dropped on arrival;
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
 machine. The exception is a policy in global mode, which collects every session on the
