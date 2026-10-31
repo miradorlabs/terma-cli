@@ -391,6 +391,38 @@ attributes:
     type: boolean
     stability: development
     brief: Whether the account may spend past its plan.
+  - key: terma.account.credential
+    type:
+      members:
+        - id: api_key
+          value: api_key
+          brief: An API key or bearer token, from the agent's environment or a helper command its settings name.
+          stability: development
+        - id: cloud
+          value: cloud
+          brief: A cloud provider's, such as Amazon Bedrock, Google Cloud or Microsoft Foundry.
+          stability: development
+        - id: account
+          value: account
+          brief: The provider's account login the agent stores, which terma.session.account names.
+          stability: development
+    stability: development
+    brief: The kind of credential the session's agent runs on, as its hooks read it.
+    note: >
+      Claude Code's, read by its SessionStart and Stop hooks in the order Claude Code picks one:
+      cloud where CLAUDE_CODE_USE_BEDROCK, CLAUDE_CODE_USE_VERTEX or CLAUDE_CODE_USE_FOUNDRY is
+      on; else api_key where ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set or a settings file
+      names an apiKeyHelper; else account where the claude.ai login it stores names an account.
+      Hooks see the agent's environment and its settings files, not --settings or managed
+      settings, and never CLAUDE_CODE_OAUTH_TOKEN, which Claude Code strips from them, so
+      account may be a session on that token, a claude.ai subscription's too, beside a stored
+      login. Where they cannot tell, as with no stored login, a visible CLAUDE_CODE_OAUTH_TOKEN
+      or an unreadable settings file, it is omitted, never guessed. In an interactive session
+      Claude Code asks once whether to use ANTHROPIC_API_KEY; a session whose developer declined
+      it still reads as api_key. A resource attribute the relay stamps on every part it forwards
+      for the session, from its claim: a closed set naming no account or key, so it leaves under
+      any content policy, and terma's to set, so whatever an agent sent under the key goes
+      first.
   - key: terma.rate_limit.five_hour.used_percent
     type: double
     stability: development

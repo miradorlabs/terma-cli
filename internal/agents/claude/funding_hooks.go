@@ -28,6 +28,7 @@ func captureClaudeAccount(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
 	repin := in.Source == "startup" || in.Source == "resume"
 	f := sessionFunding(e, r.Root, in.SessionID, in.TranscriptPath, repin)
 	e.CaptureFunding(r, in.SessionID, claudeTool, semconv.TermaSessionAccountEvent, f.FundingEvidence)
+	e.ClaimCredential(r, in.SessionID, claudeTool, f.credential())
 }
 
 // accountPin is the account evidence a session was pinned to, and when.
@@ -255,7 +256,7 @@ func lastAPIError(transcript, sessionID string) (time.Time, string, bool) {
 }
 
 // oauthAccount returns the account and organization only when OAuth is the effective credential
-// (oauthAccountIsEffective); the organization shares the gate because one account can switch
+// (effectiveCredential); the organization shares the gate because one account can switch
 // organizations without changing id. It is evidence, never a settled payer.
 func (f claudeFunding) oauthAccount() (accountID, orgID string, ok bool) {
 	if accountID, ok = f.accountID(); !ok {
