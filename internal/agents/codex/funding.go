@@ -262,6 +262,8 @@ func codexQuota(raw json.RawMessage, at time.Time) hookrun.FundingEvidence {
 	hookrun.CopyEvidenceString(e.Attrs, limits, "plan_type", semconv.TermaAccountPlanTypeKey)
 	hookrun.CopyEvidenceString(e.Attrs, limits, "rate_limit_reached_type", semconv.TermaRateLimitReachedTypeKey)
 	hookrun.CopyEvidenceBool(e.Attrs, limits, "spend_control_reached", semconv.TermaSpendControlReachedKey)
+	// Codex's pace warnings would plug in here: each window, with window_minutes as its length,
+	// is a live.Window for live.Project, as Claude Code's status line windows are.
 	for _, w := range []struct{ name, used, minutes, resets string }{
 		{"primary", semconv.TermaRateLimitPrimaryUsedPercentKey, semconv.TermaRateLimitPrimaryWindowMinutesKey, semconv.TermaRateLimitPrimaryResetsAtKey},
 		{"secondary", semconv.TermaRateLimitSecondaryUsedPercentKey, semconv.TermaRateLimitSecondaryWindowMinutesKey, semconv.TermaRateLimitSecondaryResetsAtKey},

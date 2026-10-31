@@ -17,6 +17,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/live"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -58,6 +59,9 @@ type Env struct {
 	Team string
 	// Agents are the agents the developer chose at setup.
 	Agents []string
+	// Notifier tells the developer about a live finding; nil while desktop notifications are
+	// off, or hooks are.
+	Notifier live.Notifier
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.

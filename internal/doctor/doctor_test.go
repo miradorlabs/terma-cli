@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/live"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -77,8 +78,29 @@ func TestContextNamesTheDirectoriesAndTheBackendOutsideARepository(t *testing.T)
 	}
 	configDir, stateDir := t.TempDir(), t.TempDir()
 	rows := Context(Env{ConfigDir: configDir, StateDir: stateDir, Config: &config.Config{Environment: config.EnvDev, AuthURL: "https://auth.example"}, RepoErr: errors.New("not a repository")})
-	if len(rows) != 3 || rows[0] != (Row{"Config", output.TildePath(configDir)}) || rows[1] != (Row{"State", output.TildePath(stateDir)}) ||
-		rows[2].Label != "Environment" || !strings.Contains(rows[2].Value, "https://auth.example") {
+	if len(rows) != 4 || rows[0] != (Row{"Config", output.TildePath(configDir)}) || rows[1] != (Row{"State", output.TildePath(stateDir)}) ||
+		rows[2].Label != "Environment" || !strings.Contains(rows[2].Value, "https://auth.example") || rows[3].Label != "Notifications" {
 		t.Fatalf("rows = %v", rows)
+	}
+}
+
+// Doctor says whether live findings show as desktop notifications, and names the setting
+// that turns them off.
+func TestContextSaysWhetherNotificationsShow(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	setting := `"desktop_notifications": false in ` + output.TildePath(config.Path(dir))
+	if row := notificationsRow(dir, false); row.Value != "off ("+setting+")" {
+		t.Errorf("off: %q", row.Value)
+	}
+	row := notificationsRow(dir, true)
+	if why := live.DesktopUnavailable(); why != "" {
+		if !strings.Contains(row.Value, why) {
+			t.Errorf("on, unavailable: %q, want %q in it", row.Value, why)
+		}
+		return
+	}
+	if !strings.HasPrefix(row.Value, "on: ") || !strings.Contains(row.Value, setting) {
+		t.Errorf("on: %q", row.Value)
 	}
 }

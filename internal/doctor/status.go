@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/live"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -167,7 +168,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 
 // Context is what `terma doctor` prints above its checks, which do not cover it: what this
 // machine collects, which backend it reports to, how it gets new releases (Env.Updates),
-// and the repository's work in progress.
+// whether it shows desktop notifications, and the repository's work in progress.
 func Context(env Env) []Row {
 	if env.Config == nil {
 		return nil
@@ -175,6 +176,7 @@ func Context(env Env) []Row {
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
 		machineRows(env.Config)...)
 	rows = append(rows, env.Updates...)
+	rows = append(rows, notificationsRow(env.ConfigDir, env.Config.DesktopNotifications))
 	if env.RepoErr != nil {
 		return rows
 	}
@@ -204,6 +206,19 @@ func machineRows(cfg *config.Config) []Row {
 		rows = append(rows, Row{"Endpoints", fmt.Sprintf("custom, from profile %s (%s)", cfg.ProfileName, cfg.AuthURL)})
 	}
 	return rows
+}
+
+// notificationsRow says whether live findings show as desktop notifications here, and how
+// the setting in the config directory dir changes that.
+func notificationsRow(dir string, on bool) Row {
+	setting := `"desktop_notifications": false in ` + output.TildePath(config.Path(dir))
+	switch why := live.DesktopUnavailable(); {
+	case !on:
+		return Row{"Notifications", "off (" + setting + ")"}
+	case why != "":
+		return Row{"Notifications", "on, but this machine shows none: " + why}
+	}
+	return Row{"Notifications", "on: live findings show as desktop notifications (" + setting + " turns them off)"}
 }
 
 // workRows are a collected repository's active session and the agent edits not yet committed.

@@ -33,6 +33,8 @@ internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-
 internal/relay/         the local relay daemon
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
+internal/live/          live findings about the session in progress, and the desktop
+                        notifications that tell the developer
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
