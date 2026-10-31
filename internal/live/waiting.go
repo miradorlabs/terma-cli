@@ -140,8 +140,9 @@ func nudge(path, id string, now time.Time, n Notifier, p Processes) bool {
 
 // answered reports the answers no hook reports: a prompt rejected or dismissed ends the turn
 // as an interrupt, with no PostToolUse or Stop, but the agent writes it to the transcript; an
-// approved tool has its PostToolUse only once it ends, but runs as a new child of the agent;
-// and an agent that has gone waits for nobody.
+// approved shell or other external tool has its PostToolUse only once it ends, but runs as a
+// new child of the agent (an approved MCP or in-process tool may not: see the accepted risk at
+// the Claude hook); and an agent that has gone waits for nobody.
 func (w Wait) answered(p Processes) bool {
 	if w.Transcript != "" {
 		if info, err := os.Stat(w.Transcript); err == nil && info.Size() > w.TranscriptSize {

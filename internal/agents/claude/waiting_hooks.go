@@ -22,15 +22,17 @@ import (
 // Claude Code has no hook for the answer itself, and two answers reach none of those hooks:
 // a prompt rejected or dismissed ends the turn as an interrupt, with no PostToolUse or Stop,
 // but is written to the transcript; and an approved tool has no PostToolUse until it ends,
-// but runs as a new child of Claude Code. The wait records the transcript's size and Claude
-// Code's children as it begins, and its check skips the nudge on either change
-// (live.Wait.answered); anything else the session writes or starts meanwhile counts too, so
-// it errs toward silence.
+// but a shell or other external tool runs as a new child of Claude Code. The wait records the
+// transcript's size and Claude Code's children as it begins, and its check skips the nudge on
+// either change (live.Wait.answered); anything else the session writes or starts meanwhile
+// counts too, so it errs toward silence.
 //
-// Accepted risk: where procinfo cannot list processes, an approved tool still running two
-// minutes after its prompt nudges a developer who already answered; and of two prompts
-// waiting at once, the first one answered ends the wait for both. The upgrade path is a hook
-// Claude Code may add for the answer.
+// Accepted risk: an approved tool that runs without a new child (an MCP call to a server
+// already running or remote, or a tool inside Claude Code) and is still running two minutes
+// after its prompt nudges a developer who already answered, as does any approved tool where
+// procinfo cannot list processes; and of two prompts waiting at once, the first one answered
+// ends the wait for both. The upgrade path is a hook Claude Code may add for the answer to a
+// permission prompt (ElicitationResult already says an elicitation was answered).
 
 // claudeWaitingStateDir holds the wait of each session waiting for its developer.
 var claudeWaitingStateDir = hookrun.AgentStateDir(name, "waiting")
