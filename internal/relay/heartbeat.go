@@ -40,10 +40,19 @@ var errNoHeartbeat = errors.New("this relay sends no heartbeat")
 // exit, when set, as terma.relay.exit.reason. The counters are taken as it leaves, so two
 // beats in flight never report the same ones, and handed back if it fails, for the next.
 func (r *Relay) heartbeat(ctx context.Context, reason, exit string) error {
+	return r.beat(ctx, reason, exit, HeartbeatTarget{})
+}
+
+// beat is heartbeat for a target. A beat for a team carries no counters: they are the whole
+// relay's, and that team need not be the one the relay's own beats report to.
+func (r *Relay) beat(ctx context.Context, reason, exit string, target HeartbeatTarget) error {
 	if r.opts.HeartbeatSend == nil {
 		return errNoHeartbeat
 	}
-	delta := r.stats.takeSinceBeat()
+	var delta map[string]int
+	if target.Team == "" {
+		delta = r.stats.takeSinceBeat()
+	}
 	var attrs []*commonpb.KeyValue
 	if exit != "" {
 		attrs = append(attrs, &commonpb.KeyValue{Key: semconv.TermaRelayExitReasonKey, Value: strValue(exit)})
@@ -63,14 +72,58 @@ func (r *Relay) heartbeat(ctx context.Context, reason, exit string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
-	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData(reason, attrs)); err != nil {
+	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData(reason, attrs), target); err != nil {
 		r.stats.untake(delta)
-		r.stats.add("heartbeats_failed", 1)
-		r.warnf("heartbeat: %v", err)
+		// A beat for a team that never left (no key, another ingest) answers its caller; it is
+		// not the relay's heartbeat failing.
+		if _, tried := errors.AsType[*DeliveryError](err); target.Team == "" || tried {
+			r.stats.add("heartbeats_failed", 1)
+			r.warnf("heartbeat: %v", err)
+		}
 		return err
 	}
 	r.stats.add("heartbeats_sent", 1)
 	return nil
+}
+
+// HeartbeatTarget is what a requested beat must prove: that the relay delivers Team's records,
+// with Team's key alone, to Endpoint. HeartbeatSend sends nothing when it cannot; the zero
+// target leaves the key and ingest to it.
+type HeartbeatTarget struct {
+	Team, Endpoint string
+}
+
+// ErrElsewhere is HeartbeatSend's answer when it would send a target's beat to another ingest
+// than the target's; nothing was sent.
+var ErrElsewhere = errors.New("the relay sends this team's records to another ingest")
+
+// DeliveryError is HeartbeatSend's error once it tried the ingest: the network or the ingest
+// failed the beat. Any other error kept the beat from being tried.
+type DeliveryError struct{ Err error }
+
+func (e *DeliveryError) Error() string { return e.Err.Error() }
+func (e *DeliveryError) Unwrap() error { return e.Err }
+
+// The codes a /heartbeat answer gives a beat that was not delivered (HeartbeatAnswer.Code).
+const (
+	HeartbeatNoKey       = "no_key"
+	HeartbeatElsewhere   = "elsewhere"
+	HeartbeatUndelivered = "undelivered"
+	HeartbeatUnsent      = "unsent"
+)
+
+// heartbeatCode is the HeartbeatAnswer.Code for err, HeartbeatSend's error.
+func heartbeatCode(err error) string {
+	var delivery *DeliveryError
+	switch {
+	case errors.Is(err, ErrNoKey):
+		return HeartbeatNoKey
+	case errors.Is(err, ErrElsewhere):
+		return HeartbeatElsewhere
+	case errors.As(err, &delivery):
+		return HeartbeatUndelivered
+	}
+	return HeartbeatUnsent
 }
 
 // unclassifiedPrefix starts the counters named after an attribute (Stats.unclassified).

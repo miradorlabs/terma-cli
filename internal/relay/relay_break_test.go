@@ -867,7 +867,7 @@ func TestRelayStopWaitsForAHeartbeatInFlight(t *testing.T) {
 	var finished atomic.Bool
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Now: f.clock, Grace: time.Second,
 		HeartbeatEvery: time.Minute,
-		HeartbeatSend: func(ctx context.Context, _ *logspb.LogsData) error {
+		HeartbeatSend: func(ctx context.Context, _ *logspb.LogsData, _ HeartbeatTarget) error {
 			close(sending)
 			<-ctx.Done()
 			time.Sleep(50 * time.Millisecond) // a sender slow to give up
@@ -905,7 +905,7 @@ func TestRelayHeartbeat(t *testing.T) {
 	var beats []*logspb.LogsData
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
 		HeartbeatEvery: time.Minute,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
 			mu.Lock()
 			beats = append(beats, b)
 			mu.Unlock()

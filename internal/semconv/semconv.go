@@ -425,6 +425,8 @@ const (
 	TermaRelayHeartbeatReasonInterval = "interval"
 	// TermaRelayHeartbeatReasonSetup is terma.relay.heartbeat.reason setup: Setup finished; the platform reads it as installed and working.
 	TermaRelayHeartbeatReasonSetup = "setup"
+	// TermaRelayHeartbeatReasonDoctor is terma.relay.heartbeat.reason doctor: terma doctor found nothing queued to deliver and asked for a beat to prove delivery instead.
+	TermaRelayHeartbeatReasonDoctor = "doctor"
 	// TermaRelayHeartbeatReasonExit is terma.relay.heartbeat.reason exit: The relay is about to stop, saying why it stopped.
 	TermaRelayHeartbeatReasonExit = "exit"
 	// TermaRelayLaunchService is terma.relay.launch service: The service manager's relay (launchd, systemd, a Windows service).

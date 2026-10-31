@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/policy"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -65,11 +66,27 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
+// A beat with a target goes with the target team's key alone, and only to its endpoint.
 // It sends once, so the user teamUser names never rides on to another key.
-func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
+func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData, t relay.HeartbeatTarget) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return err
+	}
+	if t.Team != "" {
+		key, err := keystore.Get(app.dir, t.Team)
+		switch {
+		case err != nil:
+			return err
+		case key == "":
+			return relay.ErrNoKey
+		}
+		endpoint := app.delivery().Endpoint(cfg, t.Team)
+		if endpoint != t.Endpoint {
+			return fmt.Errorf("%w: %s, not %s", relay.ErrElsewhere, endpoint, t.Endpoint)
+		}
+		relay.NameHeartbeatUser(beat, app.teamUser(cfg, t.Team, endpoint))
+		return sendHeartbeat(ctx, endpoint, key, beat)
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
 	if key, err := keystore.Get(app.dir, selected); selected != "" && key == "" && err == nil && cfg.APIKey == "" {
@@ -148,13 +165,14 @@ func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsD
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("Authorization", "Bearer "+key)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := delivery.NewHTTPClient().Do(req)
 	if err != nil {
-		return err
+		return &relay.DeliveryError{Err: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("the ingest answered HTTP %d", resp.StatusCode)
+		// The status alone: setup prints this, and an ingest's error page is no message.
+		return &relay.DeliveryError{Err: &delivery.IngestError{Status: resp.StatusCode}}
 	}
 	return nil
 }
