@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/live"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -32,8 +33,9 @@ type statusLineOptions struct {
 	// Shell overrides the renderer's shell, for tests.
 	Shell       string
 	CaptureOnly bool
-	// Indicator prefixes the first rendered line with terma's mark; off when capture is off, since
-	// the mark means "watching", not "installed".
+	// Indicator prefixes the first rendered line with terma's mark, and adds a row for a pace
+	// warning (statusline_pace.go); off when capture is off, since the mark means "watching",
+	// not "installed".
 	Indicator bool
 	// OnCapture starts delivery after a new snapshot is queued: rendering can happen after Stop flushed.
 	OnCapture func()
@@ -129,16 +131,22 @@ func statusLine(ctx context.Context, env hookrun.Env, opts statusLineOptions) in
 			env.Logf("status line payload not captured: %v", err)
 		}
 	}
+	now := env.Time()
+	var paces []live.Pace
 	if payload != nil {
 		if captureQuota(env, payload) && opts.OnCapture != nil {
 			opts.OnCapture()
+		}
+		if opts.Indicator {
+			paces = paceWarnings(payload, now)
+			notifyPace(env, paces)
 		}
 	}
 
 	if render != nil {
 		code := waitRenderer(render, renderDone)
 		if opts.Indicator {
-			_, _ = stdout.Write(withIndicator(drawn.Bytes()))
+			_, _ = stdout.Write(withPaceNote(withIndicator(drawn.Bytes()), paces, now))
 		}
 		if errors.Is(renderCtx.Err(), context.DeadlineExceeded) {
 			return 124
