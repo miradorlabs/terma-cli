@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -242,7 +243,7 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 	}
 }
 
-// noticing is fake whose render hook records whether it was handed a notifier.
+// noticing is fake whose render and edit hooks record whether each was handed a notifier.
 type noticing struct {
 	fake
 	handed *[]bool
@@ -255,25 +256,35 @@ func (n noticing) Renders() map[string]agents.RenderHandler {
 	}}
 }
 
+func (n noticing) Events() map[string]agents.Handler {
+	return map[string]agents.Handler{"fake-edit": func(_ context.Context, env hookrun.Env) error {
+		*n.handed = append(*n.handed, env.Notifier != nil && env.AwaitAnswer != nil)
+		return nil
+	}}
+}
+
 type silent struct{}
 
 func (silent) Notify(string) {}
 
-// A hook is handed the notifier only while the developer has desktop notifications on, and
-// hooks are on.
+// A hook is handed the notifier, and an event hook the means to await an answer, only while
+// the developer has desktop notifications on, and hooks are on.
 func TestRunHandsTheNotifierOnlyWhileNotificationsAreOn(t *testing.T) {
 	t.Parallel()
-	h := newHarness(t)
-	var handed []bool
-	h.deps.Agents, h.deps.Notifier = agents.New(noticing{ran: &h.ran, handed: &handed}), silent{}
-	for _, on := range []bool{false, true} {
-		h.deps.Profile = func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}, Notifications: on} }
-		Run(context.Background(), h.deps, request("fake-line"))
-	}
-	off := request("fake-line")
-	off.HooksOff = true
-	Run(context.Background(), h.deps, off)
-	if len(handed) != 3 || handed[0] || !handed[1] || handed[2] {
-		t.Fatalf("handed a notifier %v, want only with notifications and hooks on", handed)
+	for _, event := range []string{"fake-line", "fake-edit"} {
+		h := newHarness(t)
+		var handed []bool
+		h.deps.Agents, h.deps.Notifier = agents.New(noticing{ran: &h.ran, handed: &handed}), silent{}
+		h.deps.AwaitAnswer = func(string, string) {}
+		for _, on := range []bool{false, true} {
+			h.deps.Profile = func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}, Notifications: on} }
+			Run(context.Background(), h.deps, request(event))
+		}
+		off := request(event)
+		off.HooksOff = true
+		Run(context.Background(), h.deps, off)
+		if len(handed) < 2 || handed[0] || !handed[1] || slices.Contains(handed[2:], true) {
+			t.Fatalf("%s handed a notifier %v, want only with notifications and hooks on", event, handed)
+		}
 	}
 }

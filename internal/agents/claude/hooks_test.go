@@ -49,8 +49,12 @@ func TestClaudeSettingsMergeKeepsUnknownKeys(t *testing.T) {
 	if len(doc.Hooks["PostToolUse"]) != 2 || doc.Hooks["PostToolUse"][0].Hooks[0].Command != "./lint.sh" {
 		t.Fatalf("existing PostToolUse hook lost: %+v", doc.Hooks["PostToolUse"])
 	}
-	if doc.Hooks["PostToolUse"][1].Matcher != "Edit|Write|MultiEdit|NotebookEdit|Agent|Task" || doc.Hooks["PostToolUse"][1].Hooks[0].Command != testCommand("post-tool-use") {
+	// Every tool call, since each ends a wait for the developer.
+	if doc.Hooks["PostToolUse"][1].Matcher != "" || doc.Hooks["PostToolUse"][1].Hooks[0].Command != testCommand("post-tool-use") {
 		t.Fatalf("terma hook wrong: %+v", doc.Hooks["PostToolUse"][1])
+	}
+	if n := doc.Hooks["Notification"]; len(n) != 1 || n[0].Matcher != "" || n[0].Hooks[0].Command != testCommand("notification") {
+		t.Fatalf("notification hook wrong: %+v", n)
 	}
 	if len(doc.Hooks["SessionStart"]) != 1 || len(doc.Hooks["SessionEnd"]) != 1 {
 		t.Fatalf("session hooks missing: %v", doc.Hooks)

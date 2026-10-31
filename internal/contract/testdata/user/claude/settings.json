@@ -1,8 +1,18 @@
 {
   "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user notification || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task",
         "hooks": [
           {
             "type": "command",

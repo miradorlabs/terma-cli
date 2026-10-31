@@ -85,13 +85,8 @@ func ParsePushInput(input string) []PushRef {
 	return refs
 }
 
-// gitPushPID is git push's process: terma runs under the hook's shell, which git started.
-var gitPushPID = func() int {
-	if pids := claimPIDs(); len(pids) > 1 {
-		return pids[1]
-	}
-	return 0
-}
+// gitPushPID is git push's process, which ran the pre-push hook.
+var gitPushPID = HookCaller
 
 // pushRecord is a push waiting to be reported.
 type pushRecord struct {

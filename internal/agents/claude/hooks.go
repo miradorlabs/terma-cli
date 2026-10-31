@@ -15,9 +15,11 @@ var claudeHooks = []struct {
 }{
 	{"SessionStart", "", "session-start"},
 	{"SessionEnd", "", "session-end"},
-	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
-	// subagent's model is named.
-	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
+	// Every tool call: each ends a wait for the developer, the call a permission was asked for
+	// and AskUserQuestion's once answered; only claudeRecordedTools record anything more.
+	{"PostToolUse", "", "post-tool-use"},
+	// Claude Code waiting for the developer; the binary tells its kinds apart (waiting_hooks.go).
+	{"Notification", "", "notification"},
 	{"Stop", "", "stop"},
 	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
@@ -26,6 +28,11 @@ var claudeHooks = []struct {
 	{"SubagentStart", "", "subagent-start"},
 	{"SubagentStop", "", "subagent-stop"},
 }
+
+// claudeRecordedTools are the tools whose PostToolUse records more than the end of a wait:
+// edits build the manifest, and the Agent tool's response (Task in older builds) is the only
+// place a subagent's model is named.
+var claudeRecordedTools = []string{"Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"}
 
 // planUserHooks merges terma's machine-wide hooks into <configDir>/settings.json; unknown
 // keys survive byte-for-byte.

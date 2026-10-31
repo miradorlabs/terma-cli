@@ -58,6 +58,8 @@ type Deps struct {
 	// Notifier is how a hook tells the developer about a live finding, while the profile
 	// has desktop notifications on.
 	Notifier live.Notifier
+	// AwaitAnswer starts a detached live.AwaitAnswer for a recorded wait.
+	AwaitAnswer func(path, id string)
 }
 
 // Profile is what a hook reads of the developer's setup.
@@ -124,23 +126,25 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	// directory may not be: cmd starts a hook in a UNC checkout from the Windows directory.
 	claimed, claimedIn, flushed := false, r.Cwd, false
 	env := hookrun.Env{
-		Now:       time.Now(),
-		Cwd:       r.Cwd,
-		Args:      r.Args,
-		Stdin:     io.TeeReader(r.Stdin, payload),
-		OnClaim:   func(root string) { claimed, claimedIn = true, root },
-		Flush:     func() { flushed = true; d.Flush() },
-		AwaitPush: d.AwaitPush,
-		Stdout:    r.Stdout,
-		Stderr:    r.Stderr,
-		ConfigDir: d.ConfigDir,
-		StateDir:  d.StateDir,
-		Version:   r.Version,
-		Debug:     r.Debug,
-		Spool:     d.Spool(),
-		Policy:    p.Policy,
-		Team:      p.Team,
-		Agents:    p.Agents,
+		Now:         time.Now(),
+		Cwd:         r.Cwd,
+		Args:        r.Args,
+		Stdin:       io.TeeReader(r.Stdin, payload),
+		OnClaim:     func(root string) { claimed, claimedIn = true, root },
+		Flush:       func() { flushed = true; d.Flush() },
+		AwaitPush:   d.AwaitPush,
+		AwaitAnswer: d.AwaitAnswer,
+		Stdout:      r.Stdout,
+		Stderr:      r.Stderr,
+		ConfigDir:   d.ConfigDir,
+		StateDir:    d.StateDir,
+		Version:     r.Version,
+		Debug:       r.Debug,
+		Spool:       d.Spool(),
+		Policy:      p.Policy,
+		Team:        p.Team,
+		Agents:      p.Agents,
+		Notifier:    d.notifier(p),
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()

@@ -43,6 +43,24 @@ func parentOf(pid int) (int, bool) {
 	return ppid, true
 }
 
+// children reads one process snapshot, through parentOf, which refuses a reused pid.
+func children(pid int) ([]int, bool) {
+	parents := processParents()
+	if len(parents) == 0 {
+		return nil, false
+	}
+	var out []int
+	for child, ppid := range parents {
+		if ppid != pid {
+			continue
+		}
+		if p, ok := parentOf(child); ok && p == pid {
+			out = append(out, child)
+		}
+	}
+	return out, true
+}
+
 func processParents() map[int]int {
 	snap.mu.Lock()
 	defer snap.mu.Unlock()
