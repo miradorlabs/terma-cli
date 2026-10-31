@@ -21,7 +21,7 @@ func RefusalsCheck(r Refusals, now time.Time, envNamed bool) Check {
 		what = append(what, fmt.Sprintf("%d export requests for a token not its own", r.Unauthorized))
 	}
 	if r.Unreadable > 0 {
-		what = append(what, fmt.Sprintf("%d it could not read", r.Unreadable))
+		what = append(what, fmt.Sprintf("%d it could not read or decode", r.Unreadable))
 	}
 	if len(what) == 0 {
 		return Check{Status: Pass, Detail: "the local relay has refused no export" + since}

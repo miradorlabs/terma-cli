@@ -246,7 +246,7 @@ func TestRelayRunRecordsItsEnvironment(t *testing.T) {
 		t.Fatalf("a relay in another environment passed doctor: %+v", c)
 	}
 	// Doctor reads the running relay's counters with its token.
-	if r, err := testApp.relayRefusals(context.Background()); err != nil || r.Since.IsZero() || r.Unauthorized != 0 || !r.At.IsZero() {
+	if r, err := relayRefusals(context.Background(), testApp.relayFacts()); err != nil || r.Since.IsZero() || r.Unauthorized != 0 || !r.At.IsZero() {
 		t.Fatalf("relayRefusals = %+v, %v; want a relay that has refused nothing", r, err)
 	}
 	if err := <-done; err != nil {

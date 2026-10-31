@@ -306,6 +306,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	parts, err := r.decode(s, body, isJSON)
 	if err != nil {
 		r.stats.add("refused_undecodable", 1)
+		r.stats.refused(r.opts.Now())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

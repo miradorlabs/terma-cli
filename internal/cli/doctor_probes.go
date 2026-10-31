@@ -78,7 +78,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName)}, nil
 		},
 		Keys:          app.storedKeys,
-		RelayRefusals: app.relayRefusals,
+		RelayRefusals: relayRefusals,
 		Environ: func(pid int) ([]string, bool) {
 			if !procinfo.Alive(pid) {
 				return nil, false
@@ -126,18 +126,14 @@ func (app *App) relayFacts() doctor.Relay {
 }
 
 // relayRefusals reads the running relay's counters from its /stats, with its token.
-func (app *App) relayRefusals(ctx context.Context) (doctor.Refusals, error) {
-	token, err := daemon.Token(app.stateDir)
-	if err != nil {
-		return doctor.Refusals{}, err
-	}
+func relayRefusals(ctx context.Context, r doctor.Relay) (doctor.Refusals, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+daemon.Addr(claim.Dir(app.stateDir))+"/stats", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+r.Addr+"/stats", nil)
 	if err != nil {
 		return doctor.Refusals{}, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+r.Token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return doctor.Refusals{}, err
@@ -150,8 +146,9 @@ func (app *App) relayRefusals(ctx context.Context) (doctor.Refusals, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&snap); err != nil {
 		return doctor.Refusals{}, err
 	}
-	return doctor.Refusals{Unauthorized: snap.Counters["refused_unauthorized"], Unreadable: snap.Counters["refused_unreadable"],
-		Since: snap.Since, At: snap.RefusedAt}, nil
+	return doctor.Refusals{Unauthorized: snap.Counters["refused_unauthorized"],
+		Unreadable: snap.Counters["refused_unreadable"] + snap.Counters["refused_undecodable"],
+		Since:      snap.Since, At: snap.RefusedAt}, nil
 }
 
 // storedKeys are the delivery keys in this machine's keystore, masked.

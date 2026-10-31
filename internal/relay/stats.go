@@ -18,7 +18,8 @@ type Stats struct {
 	counters map[string]int
 	// beat is the counters as of the last heartbeat that took them.
 	beat map[string]int
-	// refusedAt is when the relay last refused a request for its token or its body.
+	// refusedAt is when the relay last refused a request for its token or its body, the
+	// latest only.
 	refusedAt time.Time
 }
 
@@ -30,8 +31,9 @@ func (s *Stats) add(key string, n int) {
 	s.mu.Unlock()
 }
 
-// refused records when the relay refused a request, so a reader tells refusals going on
-// from ones a fixed exporter left in the counters.
+// refused records when the relay last refused a request, so a reader tells refusals going
+// on from ones a fixed exporter left in the counters. Its own call beside stats.add keeps
+// each refusal's counter name a literal the pinned-names test reads.
 func (s *Stats) refused(at time.Time) {
 	s.mu.Lock()
 	s.refusedAt = at

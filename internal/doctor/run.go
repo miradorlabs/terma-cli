@@ -49,8 +49,9 @@ type Probes struct {
 	Keys Keys
 	// Environ reads what a live agent process started with.
 	Environ Environ
-	// RelayRefusals are the requests the running relay has refused.
-	RelayRefusals func(ctx context.Context) (Refusals, error)
+	// RelayRefusals are the requests the running relay at r.Addr, whose token is r.Token,
+	// has refused.
+	RelayRefusals func(ctx context.Context, r Relay) (Refusals, error)
 }
 
 // Environ reads the environment process pid started with: alive is false once it has
@@ -58,8 +59,8 @@ type Probes struct {
 type Environ func(pid int) (env []string, alive bool)
 
 // Refusals are the requests the running relay refused since it started (Since): for a token
-// not its own, and for a body it could not read; At is when it last refused one, zero from a
-// relay that does not say.
+// not its own, and for a body it could not read or decode; At is when it last refused one,
+// zero from a relay that does not say.
 type Refusals struct {
 	Unauthorized, Unreadable int
 	Since, At                time.Time
@@ -345,7 +346,7 @@ func (d *run) agentEnv() Check {
 }
 
 func (d *run) refusals() Check {
-	r, err := d.env.Probes.RelayRefusals(d.ctx)
+	r, err := d.env.Probes.RelayRefusals(d.ctx, d.relay)
 	if err != nil {
 		return Check{Status: Skip, Detail: "could not read the local relay's counters: " + err.Error()}
 	}
