@@ -49,11 +49,22 @@ type Probes struct {
 	Keys Keys
 	// Environ reads what a live agent process started with.
 	Environ Environ
+	// RelayRefusals are the requests the running relay at r.Addr, whose token is r.Token,
+	// has refused.
+	RelayRefusals func(ctx context.Context, r Relay) (Refusals, error)
 }
 
 // Environ reads the environment process pid started with: alive is false once it has
 // exited, and env nil while it runs unread (another user's, or a platform that does not say).
 type Environ func(pid int) (env []string, alive bool)
+
+// Refusals are the requests the running relay refused since it started (Since): for a token
+// not its own, and for a body it could not read or decode; At is when it last refused one,
+// zero from a relay that does not say.
+type Refusals struct {
+	Unauthorized, Unreadable int
+	Since, At                time.Time
+}
 
 // Credential is the signed-in developer as doctor needs them.
 type Credential struct {
@@ -207,6 +218,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	// The settings files above can be right while a running agent's environment overrides them.
 	if claim.Enabled(env.StateDir) {
 		timed(KeyAgentEnv, "live agent environment", d.agentEnv)
+		if d.relay.Running && env.Probes.RelayRefusals != nil {
+			timed(KeyRefusals, "relay accepts exports", d.refusals)
+		}
 	}
 
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
@@ -233,6 +247,8 @@ type run struct {
 	projectID string
 	// relay is the local relay as the export check found it.
 	relay Relay
+	// envNamed says the live agent environment check named variables to fix.
+	envNamed bool
 }
 
 // unlessCaptureOff keeps a passing collection check from reading as working while pol
@@ -324,7 +340,17 @@ func (d *run) agentEnv() Check {
 	if d.relay.Addr == "" {
 		d.relay = d.env.Probes.Relay()
 	}
-	return AgentEnvCheck(d.env.Agents, d.env.StateDir, d.relay, d.env.Probes.Environ, time.Now())
+	c := AgentEnvCheck(d.env.Agents, d.env.StateDir, d.relay, d.env.Probes.Environ, time.Now())
+	d.envNamed = c.Status == Warn
+	return c
+}
+
+func (d *run) refusals() Check {
+	r, err := d.env.Probes.RelayRefusals(d.ctx, d.relay)
+	if err != nil {
+		return Check{Status: Skip, Detail: "could not read the local relay's counters: " + err.Error()}
+	}
+	return RefusalsCheck(r, time.Now(), d.envNamed)
 }
 
 func (d *run) statusLine() Check {

@@ -494,8 +494,8 @@ func TestRelayRefusesWithoutToken(t *testing.T) {
 			t.Fatalf("auth %q got %d", auth, code)
 		}
 	}
-	if c := r.Stats().Snapshot().Counters; c["received.logs"] != 0 || c["refused_unauthorized"] != 2 {
-		t.Fatalf("stats = %v", c)
+	if snap := r.Stats().Snapshot(); snap.Counters["received.logs"] != 0 || snap.Counters["refused_unauthorized"] != 2 || snap.RefusedAt.IsZero() {
+		t.Fatalf("stats = %+v, want two refusals and when the last was", snap)
 	}
 }
 

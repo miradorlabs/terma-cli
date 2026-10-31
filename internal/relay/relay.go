@@ -273,6 +273,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	}
 	if !r.authorized(req) {
 		r.stats.add("refused_unauthorized", 1)
+		r.stats.refused(r.opts.Now())
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -297,6 +298,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	body, err := readBody(req)
 	if err != nil {
 		r.stats.add("refused_unreadable", 1)
+		r.stats.refused(r.opts.Now())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -304,6 +306,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	parts, err := r.decode(s, body, isJSON)
 	if err != nil {
 		r.stats.add("refused_undecodable", 1)
+		r.stats.refused(r.opts.Now())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
