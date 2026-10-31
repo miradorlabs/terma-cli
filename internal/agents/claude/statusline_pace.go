@@ -49,10 +49,10 @@ func notifyPace(env hookrun.Env, paces []live.Pace) {
 	}
 }
 
-// withPaceNote adds the notes of paces as a row of their own under what was drawn; alone,
-// the row leads with terma's mark.
+// withPaceNote adds the notes of paces as a row of their own under what was drawn. Nothing
+// drawn stays nothing, as withIndicator leaves it, so a renderer can still hide the status line.
 func withPaceNote(drawn []byte, paces []live.Pace, now time.Time) []byte {
-	if len(paces) == 0 {
+	if len(paces) == 0 || len(drawn) == 0 {
 		return drawn
 	}
 	notes := make([]string, len(paces))
@@ -60,9 +60,6 @@ func withPaceNote(drawn []byte, paces []live.Pace, now time.Time) []byte {
 		notes[i] = p.Note(now)
 	}
 	note := strings.Join(notes, " · ")
-	if len(drawn) == 0 {
-		return []byte(indicatorMark() + note)
-	}
 	if drawn[len(drawn)-1] != '\n' {
 		drawn = append(drawn, '\n')
 	}

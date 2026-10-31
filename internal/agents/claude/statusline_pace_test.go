@@ -23,7 +23,7 @@ func pacePayload(fiveUsed float64, fiveResets time.Time, weekUsed float64, weekR
 var paceNow = time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC)
 
 // A weekly window used faster than it resets adds a row under the developer's own status
-// line, and stands alone, after terma's mark, when there is none.
+// line.
 func TestStatusLinePaceNoteRowUnderTheRendering(t *testing.T) {
 	behind := pacePayload(10, paceNow.Add(4*time.Hour), 57.6, time.Date(2026, 10, 31, 9, 0, 0, 0, time.UTC))
 	note := "weekly limit: runs out ~Thu 14:00, resets Sat 09:00"
@@ -32,8 +32,6 @@ func TestStatusLinePaceNoteRowUnderTheRendering(t *testing.T) {
 	}{
 		{"under a line", "printf custom", indicatorMark() + "custom\n" + note},
 		{"under lines ending in a newline", "printf 'one\\ntwo\\n'", indicatorMark() + "one\ntwo\n" + note},
-		{"alone, with nothing rendered", "true", indicatorMark() + note},
-		{"alone, with no renderer", "", indicatorMark() + note},
 	} {
 		env, out, _ := statusEnv(t, behind)
 		env.Now = paceNow
@@ -51,6 +49,26 @@ func TestStatusLinePaceNoteRowUnderTheRendering(t *testing.T) {
 	statusLine(context.Background(), env, statusLineOptions{Renderer: "printf custom", Indicator: true})
 	if want := indicatorMark() + "custom\n5-hour limit: runs out ~10:00, resets 11:00 · " + note; out.String() != want {
 		t.Errorf("both windows: %q, want %q", out.String(), want)
+	}
+}
+
+// A renderer that draws nothing hides the status line, a warning's note with it; the
+// warning still notifies.
+func TestStatusLinePaceNoteKeepsAHiddenStatusLineHidden(t *testing.T) {
+	behind := pacePayload(10, paceNow.Add(4*time.Hour), 57.6, time.Date(2026, 10, 31, 9, 0, 0, 0, time.UTC))
+	for _, renderer := range []string{"true", ""} {
+		var shown notifications
+		env, out, _ := statusEnv(t, behind)
+		env.Now, env.Notifier = paceNow, &shown
+		if code := statusLine(context.Background(), env, statusLineOptions{Renderer: renderer, Indicator: true}); code != 0 {
+			t.Fatalf("renderer %q: exit %d", renderer, code)
+		}
+		if out.String() != "" {
+			t.Errorf("renderer %q drew nothing, status line %q", renderer, out.String())
+		}
+		if len(shown) != 1 {
+			t.Errorf("renderer %q: notified %q, want the warning once", renderer, shown)
+		}
 	}
 }
 

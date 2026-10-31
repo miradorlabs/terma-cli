@@ -159,9 +159,6 @@ func statusLine(ctx context.Context, env hookrun.Env, opts statusLineOptions) in
 	if renderer != "" && !opts.CaptureOnly {
 		return 1 // The renderer could not be started; capture still ran.
 	}
-	if !opts.CaptureOnly {
-		_, _ = stdout.Write(withPaceNote(nil, paces, now))
-	}
 	return 0
 }
 

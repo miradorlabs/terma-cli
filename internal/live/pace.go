@@ -65,6 +65,8 @@ func (p Pace) Message(agent string, now time.Time) string {
 // FirstWarning reports whether p is the first warning of its window, recording it in dir: a
 // window warns once, however many sessions and redraws see it. A window is keyed by its reset to
 // the hour: the reset a status line reports drifts by seconds between redraws of one window.
+// Accepted risk: a reset near half past the hour that drifts across it can warn twice in one
+// window; the upgrade path is to match a record of the same name within 30 minutes either side.
 func FirstWarning(dir string, p Pace, now time.Time) bool {
 	if os.MkdirAll(dir, 0o700) != nil {
 		return false
