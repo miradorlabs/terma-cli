@@ -5,7 +5,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -83,7 +82,7 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData, t
 			return relay.ErrNoKey
 		}
 		endpoint := app.delivery().Endpoint(cfg, t.Team)
-		if t.Endpoint != "" && endpoint != t.Endpoint {
+		if endpoint != t.Endpoint {
 			return fmt.Errorf("%w: %s, not %s", relay.ErrElsewhere, endpoint, t.Endpoint)
 		}
 		relay.NameHeartbeatUser(beat, app.teamUser(cfg, t.Team, endpoint))
@@ -172,8 +171,8 @@ func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsD
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
-		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return &relay.DeliveryError{Err: &delivery.IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}}
+		// The status alone: setup prints this, and an ingest's error page is no message.
+		return &relay.DeliveryError{Err: &delivery.IngestError{Status: resp.StatusCode}}
 	}
 	return nil
 }

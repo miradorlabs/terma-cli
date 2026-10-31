@@ -414,7 +414,7 @@ func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
 
 // A beat asked for over /heartbeat with a team carries its target to HeartbeatSend, and none
 // of the relay's counters; its answer names the team back, delivered or not, and says what
-// kept a failed one from the platform.
+// kept a failed one from the platform. Only one that left counts as a failed heartbeat.
 func TestTheHeartbeatEndpointCarriesItsTarget(t *testing.T) {
 	t.Parallel()
 	var targets []HeartbeatTarget
@@ -462,9 +462,14 @@ func TestTheHeartbeatEndpointCarriesItsTarget(t *testing.T) {
 		{errors.New("the keychain is locked"), HeartbeatUnsent, false},
 	} {
 		fail = tc.err
+		failed := r.stats.Snapshot().Counters["heartbeats_failed"]
 		code, answer := beat("reason=doctor&team=p1")
 		if code != http.StatusBadGateway || answer.Team != "p1" || answer.Code != tc.code || answer.KeyRefused != tc.keyRefused || answer.Error != tc.err.Error() {
 			t.Errorf("%v: %d %+v", tc.err, code, answer)
+		}
+		// Only a beat that left counts as a failed heartbeat.
+		if counted, tried := r.stats.Snapshot().Counters["heartbeats_failed"]-failed, tc.code == HeartbeatUndelivered; (counted == 1) != tried {
+			t.Errorf("%v: counted %d failed heartbeats", tc.err, counted)
 		}
 	}
 }

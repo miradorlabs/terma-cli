@@ -213,6 +213,9 @@ type IngestError struct {
 }
 
 func (e *IngestError) Error() string {
+	if e.Detail == "" {
+		return fmt.Sprintf("otlp ingest returned %d", e.Status)
+	}
 	return fmt.Sprintf("otlp ingest returned %d: %s", e.Status, e.Detail)
 }
 

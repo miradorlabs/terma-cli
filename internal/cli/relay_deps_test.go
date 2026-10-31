@@ -144,15 +144,17 @@ func TestATargetedHeartbeatGoesOnlyWhereAsked(t *testing.T) {
 	if err := send("team", srv.URL); err != nil {
 		t.Fatalf("beat for the team at its endpoint: %v", err)
 	}
-	if err := send("team", "https://otlp.elsewhere.example"); !errors.Is(err, relay.ErrElsewhere) {
-		t.Fatalf("beat for another endpoint: %v", err)
+	for _, endpoint := range []string{"https://otlp.elsewhere.example", ""} {
+		if err := send("team", endpoint); !errors.Is(err, relay.ErrElsewhere) {
+			t.Fatalf("beat for endpoint %q: %v", endpoint, err)
+		}
 	}
 	if err := send("unkeyed", srv.URL); !errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("beat for a team with no key: %v", err)
 	}
 	err := send("revoked", srv.URL)
 	ingest, ok := errors.AsType[*delivery.IngestError](err)
-	if _, tried := errors.AsType[*relay.DeliveryError](err); !tried || !ok || !ingest.KeyRefused() {
+	if _, tried := errors.AsType[*relay.DeliveryError](err); !tried || !ok || !ingest.KeyRefused() || err.Error() != "otlp ingest returned 401" {
 		t.Fatalf("beat with a revoked key: %v", err)
 	}
 	if want := []string{"ter_srv_team", "ter_srv_revoked"}; !slices.Equal(sent, want) {

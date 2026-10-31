@@ -74,8 +74,12 @@ func (r *Relay) beat(ctx context.Context, reason, exit string, target HeartbeatT
 	defer cancel()
 	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData(reason, attrs), target); err != nil {
 		r.stats.untake(delta)
-		r.stats.add("heartbeats_failed", 1)
-		r.warnf("heartbeat: %v", err)
+		// A beat for a team that never left (no key, another ingest) answers its caller; it is
+		// not the relay's heartbeat failing.
+		if _, tried := errors.AsType[*DeliveryError](err); target.Team == "" || tried {
+			r.stats.add("heartbeats_failed", 1)
+			r.warnf("heartbeat: %v", err)
+		}
 		return err
 	}
 	r.stats.add("heartbeats_sent", 1)
