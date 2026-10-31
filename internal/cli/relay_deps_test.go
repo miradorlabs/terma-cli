@@ -74,7 +74,7 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	}
 	send := func() {
 		t.Helper()
-		if err := testApp.relayHeartbeatSend(context.Background(), beat()); err != nil {
+		if err := testApp.relayHeartbeatSend(context.Background(), beat(), relay.HeartbeatTarget{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -138,8 +138,8 @@ func TestATargetedHeartbeatGoesOnlyWhereAsked(t *testing.T) {
 	}
 	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "other", Revision: 1, FetchedAt: time.Now()})
 	send := func(team, endpoint string) error {
-		ctx := relay.WithHeartbeatTarget(t.Context(), relay.HeartbeatTarget{Team: team, Endpoint: endpoint})
-		return testApp.relayHeartbeatSend(ctx, &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}})
+		return testApp.relayHeartbeatSend(t.Context(), &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}},
+			relay.HeartbeatTarget{Team: team, Endpoint: endpoint})
 	}
 	if err := send("team", srv.URL); err != nil {
 		t.Fatalf("beat for the team at its endpoint: %v", err)
@@ -150,9 +150,10 @@ func TestATargetedHeartbeatGoesOnlyWhereAsked(t *testing.T) {
 	if err := send("unkeyed", srv.URL); !errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("beat for a team with no key: %v", err)
 	}
-	ingest, ok := errors.AsType[*delivery.IngestError](send("revoked", srv.URL))
-	if !ok || !ingest.KeyRefused() {
-		t.Fatalf("beat with a revoked key: %v", ingest)
+	err := send("revoked", srv.URL)
+	ingest, ok := errors.AsType[*delivery.IngestError](err)
+	if _, tried := errors.AsType[*relay.DeliveryError](err); !tried || !ok || !ingest.KeyRefused() {
+		t.Fatalf("beat with a revoked key: %v", err)
 	}
 	if want := []string{"ter_srv_team", "ter_srv_revoked"}; !slices.Equal(sent, want) {
 		t.Fatalf("beats sent with %q, want %q", sent, want)
@@ -175,6 +176,15 @@ func TestDoctorHeartbeatFailsOnlyOnTheRefusal(t *testing.T) {
 		if got := doctorHeartbeat(err); !errors.Is(got, doctor.ErrNoHeartbeat) || !errors.Is(got, err) {
 			t.Errorf("doctorHeartbeat(%v) = %v, want it unproven", err, got)
 		}
+	}
+}
+
+// With no relay running, doctor's probe sends nothing and leaves the check unproven.
+func TestDoctorHeartbeatNeedsARunningRelay(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	probes := testApp.doctorProbes(&config.Config{})
+	if err := probes.Heartbeat(t.Context(), "team", "https://otlp.example"); !errors.Is(err, doctor.ErrNoHeartbeat) {
+		t.Fatalf("heartbeat without a relay = %v", err)
 	}
 }
 

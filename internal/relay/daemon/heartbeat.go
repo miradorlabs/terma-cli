@@ -51,8 +51,8 @@ var ErrNoAnswer = errors.New("the relay did not answer")
 // target: it is older than targets, so the beat proves nothing about the target's delivery.
 var ErrUntargeted = errors.New("the running relay is older than this terma and cannot send a beat for one team")
 
-// UndeliveredError is Beat's error when the relay sent the beat and the platform did not
-// accept it; every other error means it could not be tried.
+// UndeliveredError is Beat's error when the relay sent the beat and the network or the
+// platform failed it; every other error means it could not be tried.
 type UndeliveredError struct {
 	Detail string
 	// Refused says the ingest refused the key.
@@ -71,7 +71,7 @@ func (e *UndeliveredError) KeyRefused() bool { return e.Refused }
 // (relay.HeartbeatTarget). It is nil once the platform accepted the beat; relay.ErrNoKey when
 // this machine holds no key to send it with; relay.ErrElsewhere when the relay would send the
 // target's beat to another ingest; ErrUntargeted when the relay ignored the target; and an
-// *UndeliveredError when the platform refused it.
+// *UndeliveredError when the network or the platform failed it.
 func Beat(ctx context.Context, stateDir, reason string, target relay.HeartbeatTarget, wait time.Duration) error {
 	dir, err := Dir(stateDir)
 	if err != nil {
@@ -103,19 +103,24 @@ func Beat(ctx context.Context, stateDir, reason string, target relay.HeartbeatTa
 	defer resp.Body.Close()
 	var body relay.HeartbeatAnswer
 	_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&body)
+	relayAnswered := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusBadGateway
 	switch {
-	case resp.StatusCode == http.StatusOK && body.Team != target.Team:
-		// A relay from before targets sent the beat with its own pick of key and ingest.
+	case relayAnswered && body.Team != target.Team:
+		// A relay from before targets sent the beat, or failed to, with its own pick of key
+		// and ingest.
 		return ErrUntargeted
 	case resp.StatusCode == http.StatusOK:
 		return nil
-	case strings.Contains(body.Error, relay.ErrNoKey.Error()):
+	case body.Code == relay.HeartbeatNoKey, body.Code == "" && strings.Contains(body.Error, relay.ErrNoKey.Error()):
 		return relay.ErrNoKey
-	case strings.Contains(body.Error, relay.ErrElsewhere.Error()):
-		_, where, _ := strings.Cut(body.Error, relay.ErrElsewhere.Error())
-		return fmt.Errorf("%w%s", relay.ErrElsewhere, where)
-	case body.Error != "":
+	case body.Code == relay.HeartbeatElsewhere:
+		return fmt.Errorf("%w%s", relay.ErrElsewhere, strings.TrimPrefix(body.Error, relay.ErrElsewhere.Error()))
+	case body.Code == relay.HeartbeatUndelivered, body.Code == "" && body.Error != "":
+		// A relay from before codes calls every failure this; only setup's check-in, which
+		// names no target, still meets one.
 		return &UndeliveredError{Detail: body.Error, Refused: body.KeyRefused}
+	case body.Error != "":
+		return errors.New("the relay could not send a beat: " + body.Error)
 	}
 	return fmt.Errorf("the relay answered %d", resp.StatusCode)
 }

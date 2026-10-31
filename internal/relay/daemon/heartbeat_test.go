@@ -87,7 +87,7 @@ func TestARunSendsItsExitHeartbeat(t *testing.T) {
 	c := runConfig(stateDir, time.Millisecond, nil)
 	c.Launch, c.Version = LaunchHook, "1.2.0"
 	c.Engine.HeartbeatEvery = time.Hour
-	c.Engine.HeartbeatSend = func(_ context.Context, b *logspb.LogsData) error {
+	c.Engine.HeartbeatSend = func(_ context.Context, b *logspb.LogsData, _ relay.HeartbeatTarget) error {
 		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
 		if err == nil {
 			unlock()
@@ -147,7 +147,7 @@ func TestARelayWhoseSetupWentSendsNoExitHeartbeat(t *testing.T) {
 	var beats atomic.Int32
 	c := runConfig(stateDir, 0, nil)
 	c.Engine.HeartbeatEvery = time.Hour
-	c.Engine.HeartbeatSend = func(context.Context, *logspb.LogsData) error { beats.Add(1); return nil }
+	c.Engine.HeartbeatSend = func(context.Context, *logspb.LogsData, relay.HeartbeatTarget) error { beats.Add(1); return nil }
 	r := startRun(t, c)
 	r.await(t, "the relay")
 	if err := os.Remove(token); err != nil {
@@ -184,9 +184,9 @@ func TestLastBeatDue(t *testing.T) {
 	}
 }
 
-// A beat for a target names its team and endpoint, and Beat tells the platform's refusal (a
-// refused key too) from a beat the relay would send elsewhere, could not try, or sent without
-// holding it to the target (a relay from before targets).
+// A beat for a target names its team and endpoint, and Beat tells the network's or the
+// platform's failure (a refused key too) from a beat the relay would send elsewhere, could not
+// send, or sent, or failed, without holding it to the target (a relay from before targets).
 func TestBeatForATarget(t *testing.T) {
 	stateDir, dir, _ := setUpRelay(t)
 	for _, tc := range []struct {
@@ -199,9 +199,11 @@ func TestBeatForATarget(t *testing.T) {
 	}{
 		{status: 200, body: `{"team":"p1"}`},
 		{status: 200, body: `{}`, untargeted: true},
-		{status: 502, body: `{"error":"otlp ingest returned 401: bad key","key_refused":true}`, notAccepted: true, keyRefused: true},
-		{status: 502, body: `{"error":"otlp ingest returned 503: busy"}`, notAccepted: true},
-		{status: 502, body: `{"error":"the relay sends this team's records to another ingest: https://a, not https://b"}`, elsewhere: true},
+		{status: 502, body: `{"error":"the ingest answered HTTP 401"}`, untargeted: true},
+		{status: 502, body: `{"team":"p1","error":"otlp ingest returned 401: bad key","code":"undelivered","key_refused":true}`, notAccepted: true, keyRefused: true},
+		{status: 502, body: `{"team":"p1","error":"otlp ingest returned 503: busy","code":"undelivered"}`, notAccepted: true},
+		{status: 502, body: `{"team":"p1","error":"the relay sends this team's records to another ingest: https://a, not https://b","code":"elsewhere"}`, elsewhere: true},
+		{status: 502, body: `{"team":"p1","error":"the keychain is locked","code":"unsent"}`},
 		{status: 401, body: "unauthorized\n"},
 	} {
 		ln, err := net.Listen("tcp", "127.0.0.1:0")

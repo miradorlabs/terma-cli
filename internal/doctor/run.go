@@ -381,19 +381,23 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail}
 	}
 	endpoint := p.Endpoint(projectID)
-	switch err := p.Heartbeat(ctx, projectID, endpoint); {
-	case err == nil:
-		beat := "a test heartbeat with team " + projectID + "'s key was accepted by " + endpoint
+	// What the flush left undelivered goes with the beat's outcome, which leads only with
+	// "nothing queued" when that is so.
+	withUndelivered := func(beat string) string {
 		if len(undelivered) == 0 {
 			beat = "nothing queued; " + beat
 		}
-		return Check{Status: Pass, Detail: strings.Join(append([]string{beat}, undelivered...), "; ")}
+		return strings.Join(append([]string{beat}, undelivered...), "; ")
+	}
+	switch err := p.Heartbeat(ctx, projectID, endpoint); {
+	case err == nil:
+		return Check{Status: Pass, Detail: withUndelivered("a test heartbeat with team " + projectID + "'s key was accepted by " + endpoint)}
 	case errors.Is(err, ErrNoHeartbeat):
 		return Check{Status: Skip, Inconclusive: true, Detail: detail + "; " + err.Error()}
 	default:
 		var refused interface{ KeyRefused() bool }
 		f := Failure{ProjectID: projectID, Endpoint: endpoint, KeyRefused: errors.As(err, &refused) && refused.KeyRefused()}
-		return Check{Status: Fail, Detail: "nothing queued, and a test heartbeat was not accepted: " + err.Error(), Fix: failureFix(f)}
+		return Check{Status: Fail, Detail: withUndelivered("a test heartbeat was not accepted: " + err.Error()), Fix: failureFix(f)}
 	}
 }
 

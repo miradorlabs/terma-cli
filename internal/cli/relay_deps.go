@@ -69,12 +69,12 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
 // A beat with a target goes with the target team's key alone, and only to its endpoint.
 // It sends once, so the user teamUser names never rides on to another key.
-func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
+func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData, t relay.HeartbeatTarget) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return err
 	}
-	if t, ok := relay.HeartbeatTargetOf(ctx); ok {
+	if t.Team != "" {
 		key, err := keystore.Get(app.dir, t.Team)
 		switch {
 		case err != nil:
@@ -168,12 +168,12 @@ func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsD
 	req.Header.Set("Authorization", "Bearer "+key)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return &relay.DeliveryError{Err: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return &delivery.IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
+		return &relay.DeliveryError{Err: &delivery.IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}}
 	}
 	return nil
 }

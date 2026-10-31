@@ -388,6 +388,7 @@ func TestTheBackendCheckSendsAHeartbeatWhenNothingIsQueued(t *testing.T) {
 		name         string
 		team         string
 		sent         int
+		held         bool
 		beat         error
 		status       Status
 		inconclusive bool
@@ -404,12 +405,18 @@ func TestTheBackendCheckSendsAHeartbeatWhenNothingIsQueued(t *testing.T) {
 			detail: "401", fix: "the key this machine holds for team p1 was refused"},
 		{name: "no team", team: "", status: Skip, inconclusive: true, detail: "nothing queued"},
 		{name: "flushed events", team: "p1", sent: 2, status: Pass, detail: "flushed"},
+		{name: "refused, with events held", team: "p1", held: true, beat: errors.New("otlp ingest returned 503"), status: Fail, beats: 1,
+			detail: "a test heartbeat was not accepted: otlp ingest returned 503; holding 2 for a team key"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			beats := 0
 			p := Probes{Keys: keys, Endpoint: func(string) string { return "https://otlp.example" },
 				Deliver: func(context.Context) (Delivery, error) {
-					return Delivery{Sent: tc.sent, Delivered: fmt.Sprintf("%d events", tc.sent)}, nil
+					d := Delivery{Sent: tc.sent, Delivered: fmt.Sprintf("%d events", tc.sent)}
+					if tc.held {
+						d.Undelivered = []string{"holding 2 for a team key (run `terma setup`)"}
+					}
+					return d, nil
 				},
 				Heartbeat: func(_ context.Context, projectID, endpoint string) error {
 					if projectID != tc.team || endpoint != "https://otlp.example" {

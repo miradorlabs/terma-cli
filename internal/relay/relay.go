@@ -74,7 +74,7 @@ type Options struct {
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
-	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
+	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData, target HeartbeatTarget) error
 	HeartbeatEvery time.Duration
 	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long (0: ask every time).
 	ClaimCacheTTL  time.Duration
@@ -251,30 +251,35 @@ func (r *Relay) routes() *http.ServeMux {
 		if reason == "" || len(reason) > 32 {
 			reason = "request"
 		}
-		ctx := req.Context()
-		team := req.URL.Query().Get("team")
-		if team != "" {
-			ctx = WithHeartbeatTarget(ctx, HeartbeatTarget{Team: team, Endpoint: req.URL.Query().Get("endpoint")})
+		target := HeartbeatTarget{Team: req.URL.Query().Get("team")}
+		if target.Team != "" {
+			target.Endpoint = req.URL.Query().Get("endpoint")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := r.heartbeat(ctx, reason, ""); err != nil {
+		// The answer names the target's team, so a caller can tell this relay from one before
+		// targets, which ignores them.
+		answer := HeartbeatAnswer{Team: target.Team}
+		if err := r.beat(req.Context(), reason, "", target); err != nil {
 			// A refused key is the developer's to replace, not the network's to retry.
 			var refused interface{ KeyRefused() bool }
+			answer.Error, answer.Code = err.Error(), heartbeatCode(err)
+			answer.KeyRefused = errors.As(err, &refused) && refused.KeyRefused()
 			w.WriteHeader(http.StatusBadGateway)
-			_ = json.NewEncoder(w).Encode(HeartbeatAnswer{Error: err.Error(), KeyRefused: errors.As(err, &refused) && refused.KeyRefused()})
-			return
 		}
-		_ = json.NewEncoder(w).Encode(HeartbeatAnswer{Team: team})
+		_ = json.NewEncoder(w).Encode(answer)
 	})
 	return mux
 }
 
-// HeartbeatAnswer is the /heartbeat answer: why the beat was not delivered, or the team of a
-// delivered beat's target, which a relay from before targets ignores and never names.
+// HeartbeatAnswer is the /heartbeat answer: the team of the beat's target, which a relay from
+// before targets ignores and never names, and why a beat was not delivered.
 type HeartbeatAnswer struct {
-	Error      string `json:"error,omitempty"`
+	Team  string `json:"team,omitempty"`
+	Error string `json:"error,omitempty"`
+	// Code says what kept the beat from being delivered: HeartbeatNoKey, HeartbeatElsewhere,
+	// HeartbeatUndelivered (the network or the ingest failed it) or HeartbeatUnsent.
+	Code       string `json:"code,omitempty"`
 	KeyRefused bool   `json:"key_refused,omitempty"`
-	Team       string `json:"team,omitempty"`
 }
 
 func (r *Relay) authorized(req *http.Request) bool {
