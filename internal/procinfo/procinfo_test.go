@@ -28,6 +28,32 @@ func TestAncestorsStartAtTheParent(t *testing.T) {
 	}
 }
 
+// Children lists a process this one started while it runs, and not once it has gone.
+func TestChildrenListsAStartedProcess(t *testing.T) {
+	t.Parallel()
+	if !Supported {
+		if _, ok := Children(os.Getpid()); ok {
+			t.Fatal("an unsupported platform listed children")
+		}
+		t.Skip("unsupported")
+	}
+	child := exec.Command(os.Args[0], "-test.run=^$")
+	child.Env = append(os.Environ(), holdEnv+"=1")
+	stdin, _ := child.StdinPipe()
+	if err := child.Start(); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := Children(os.Getpid())
+	if !ok || !slices.Contains(got, child.Process.Pid) {
+		t.Fatalf("Children = %v, %v; want the child %d among them", got, ok, child.Process.Pid)
+	}
+	_ = stdin.Close()
+	_ = child.Wait()
+	if got, _ := Children(os.Getpid()); slices.Contains(got, child.Process.Pid) {
+		t.Fatalf("Children = %v still lists the child %d once it exited", got, child.Process.Pid)
+	}
+}
+
 // FindSender names a child connecting here, not this process; it pins the platform
 // layouts against a real socket.
 func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
@@ -76,10 +102,12 @@ func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 
 // connectEnv makes the test binary the connecting child: it dials the address and
 // holds the connection until its stdin closes. decoyEnv, "FROM TO", makes it dial TO from
-// FROM, say "bound" or "no" on stdout, and hold that until stdin closes.
+// FROM, say "bound" or "no" on stdout, and hold that until stdin closes. holdEnv makes it
+// run until its stdin closes.
 const (
 	connectEnv = "PROCINFO_TEST_CONNECT"
 	decoyEnv   = "PROCINFO_TEST_DECOY"
+	holdEnv    = "PROCINFO_TEST_HOLD"
 )
 
 // A newer process holding a connection with the sender's two port numbers, between other
@@ -206,6 +234,10 @@ func TestMain(m *testing.M) {
 		fmt.Print("bound")
 		_, _ = io.Copy(io.Discard, os.Stdin)
 		_ = c.Close()
+		os.Exit(0)
+	}
+	if os.Getenv(holdEnv) != "" {
+		_, _ = io.Copy(io.Discard, os.Stdin)
 		os.Exit(0)
 	}
 	if addr := os.Getenv(connectEnv); addr != "" {

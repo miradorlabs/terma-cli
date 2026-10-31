@@ -1,6 +1,7 @@
 // Package procinfo tells the local relay which processes a hook runs under, which
 // process owns the other end of a loopback connection, and whether a process still
-// runs, so a claim covers only the agent process that made it.
+// runs, so a claim covers only the agent process that made it; and which processes
+// another runs, so a wait for the developer sees the agent start the tool they approved.
 package procinfo
 
 import (
@@ -29,6 +30,9 @@ func Ancestors() []int {
 	}
 	return out
 }
+
+// Children are the running processes pid started; ok is false where they cannot be listed.
+func Children(pid int) (pids []int, ok bool) { return children(pid) }
 
 // FindSender returns the process holding the client end of a loopback connection from
 // client to server, asking the kernel (about 3 ms over 900 processes on macOS), never a

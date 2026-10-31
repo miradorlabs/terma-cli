@@ -154,7 +154,7 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 		switch c.Name() {
 		// nate removes the updater's state and the executable; its post-run must not recreate them.
 		// auth's stdout is read by the terma-mcp bridge, which waits on it.
-		case "auth", "hook", "launch", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
+		case "auth", "hook", "launch", "notify", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
 			return false
 		}
 	}

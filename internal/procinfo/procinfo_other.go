@@ -8,3 +8,5 @@ func parentOf(int) (int, bool) { return 0, false }
 const Supported = false
 
 func findSender(conn, int) (int, bool) { return 0, false }
+
+func children(int) ([]int, bool) { return nil, false }

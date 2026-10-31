@@ -140,3 +140,12 @@ func refreshPolicy(env Env) {
 
 // claimPIDs are this hook's ancestors, one of them the agent: a claim covers only their records.
 var claimPIDs = sync.OnceValue(procinfo.Ancestors)
+
+// HookCaller is the process that ran the hook: terma runs under the hook's shell, which it
+// started. 0 when it cannot be told.
+func HookCaller() int {
+	if pids := claimPIDs(); len(pids) > 1 {
+		return pids[1]
+	}
+	return 0
+}

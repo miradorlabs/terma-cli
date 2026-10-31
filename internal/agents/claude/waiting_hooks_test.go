@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/live"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -71,6 +72,25 @@ func (w *waits) run(t *testing.T, hook string, fields map[string]any) string {
 	return out.String()
 }
 
+// transcriptLines is what a session's transcript holds as a wait begins.
+const transcriptLines = `{"type":"assistant"}` + "\n"
+
+// transcript is a session transcript of transcriptLines.
+func (w *waits) transcript(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "sess-wait.jsonl")
+	if err := os.WriteFile(path, []byte(transcriptLines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// unlisted is a machine whose processes cannot be listed: its checks go by the transcript.
+type unlisted struct{}
+
+func (unlisted) Alive(int) bool             { return true }
+func (unlisted) Children(int) ([]int, bool) { return nil, false }
+
 func (w *waits) record(t *testing.T) (live.Wait, bool) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(w.stateDir, claudeWaitingStateDir, hookrun.EvidenceID("sess-wait")+".json"))
@@ -84,17 +104,26 @@ func (w *waits) record(t *testing.T) (live.Wait, bool) {
 	return rec, true
 }
 
-// A permission prompt, or an MCP server's form or link, starts a wait and its check; the
-// other notifications ask nothing of the developer.
+// A permission prompt, or an MCP server's form or link, starts a wait and its check, with the
+// transcript's size and Claude Code's process as they stand; the other notifications ask
+// nothing of the developer.
 func TestNotificationRecordsAWaitOnlyForWhatAsksTheDeveloper(t *testing.T) {
 	for _, kind := range []string{"permission_prompt", "elicitation_dialog", "elicitation_url_dialog"} {
 		w := newWaits(t)
-		if out := w.run(t, "notification", map[string]any{"hook_event_name": "Notification", "notification_type": kind, "message": "Claude needs your permission"}); out != "" {
+		transcript := w.transcript(t)
+		if out := w.run(t, "notification", map[string]any{"hook_event_name": "Notification", "notification_type": kind, "message": "Claude needs your permission",
+			"transcript_path": transcript}); out != "" {
 			t.Fatalf("%s printed %q", kind, out)
 		}
 		rec, ok := w.record(t)
 		if !ok || rec.Agent != "Claude Code" || rec.Checkout != filepath.Base(w.root) || rec.ID == "" || len(w.checks) != 1 || w.checks[0][1] != rec.ID {
 			t.Fatalf("%s: wait %+v (%v), checks %v", kind, rec, ok, w.checks)
+		}
+		if rec.Transcript != transcript || rec.TranscriptSize != int64(len(transcriptLines)) {
+			t.Fatalf("%s: transcript %q at %d, want %q at %d", kind, rec.Transcript, rec.TranscriptSize, transcript, len(transcriptLines))
+		}
+		if _, listed := procinfo.Children(hookrun.HookCaller()); listed && hookrun.HookCaller() > 0 && rec.AgentPID != hookrun.HookCaller() {
+			t.Fatalf("%s: watches process %d, want the hook's caller %d", kind, rec.AgentPID, hookrun.HookCaller())
 		}
 	}
 	for _, kind := range []string{"idle_prompt", "auth_success", "agent_completed", ""} {
@@ -167,29 +196,37 @@ func TestPostToolUseOfAnotherToolRecordsNothing(t *testing.T) {
 }
 
 // From the hook to the check: a wait still going on after two minutes nudges the developer
-// once, naming the agent and the checkout; one the developer answered in time never does.
+// once, naming the agent and the checkout; one the developer answered in time never does,
+// through a hook or by a rejection only the transcript shows.
 func TestWaitNudgesAfterTwoMinutesUnlessAnswered(t *testing.T) {
-	for _, answered := range []bool{false, true} {
+	for _, answer := range []string{"", "post-tool-use", "rejected"} {
 		w := newWaits(t)
+		transcript := w.transcript(t)
 		synctest.Test(t, func(t *testing.T) {
-			w.run(t, "notification", map[string]any{"hook_event_name": "Notification", "notification_type": "permission_prompt"})
+			w.run(t, "notification", map[string]any{"hook_event_name": "Notification", "notification_type": "permission_prompt", "transcript_path": transcript})
 			if len(w.checks) != 1 {
 				t.Fatalf("checks %v", w.checks)
 			}
 			done := make(chan bool, 1)
-			go func() { done <- live.AwaitAnswer(t.Context(), w.checks[0][0], w.checks[0][1], w) }()
+			go func() { done <- live.AwaitAnswer(t.Context(), w.checks[0][0], w.checks[0][1], w, unlisted{}) }()
 			time.Sleep(time.Minute)
-			if answered {
+			switch answer {
+			case "post-tool-use":
 				w.run(t, "post-tool-use", map[string]any{"hook_event_name": "PostToolUse", "tool_name": "AskUserQuestion"})
+			case "rejected":
+				rejection := transcriptLines + `{"type":"user","message":{"content":"[Request interrupted by user for tool use]"}}` + "\n"
+				if err := os.WriteFile(transcript, []byte(rejection), 0o600); err != nil {
+					t.Fatal(err)
+				}
 			}
 			time.Sleep(live.AnswerWait)
 			nudged := <-done
 			want := []string{"Claude Code is waiting for your answer · " + filepath.Base(w.root) + " · 2 min"}
-			if answered {
+			if answer != "" {
 				want = nil
 			}
-			if got := w.nudges(); nudged == answered || strings.Join(got, "\n") != strings.Join(want, "\n") {
-				t.Fatalf("answered %v: nudged %v %q, want %q", answered, nudged, got, want)
+			if got := w.nudges(); nudged != (answer == "") || strings.Join(got, "\n") != strings.Join(want, "\n") {
+				t.Fatalf("answer %q: nudged %v %q, want %q", answer, nudged, got, want)
 			}
 		})
 	}

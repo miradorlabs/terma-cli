@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/rand"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -18,10 +19,18 @@ import (
 // live.AnswerWait nudges them, from a detached `terma notify await-answer`. It is local to
 // the machine, so it runs whether or not the team collects the repository.
 //
-// Accepted risk: Claude Code has no hook for the answer itself, so a tool call approved and
-// still running two minutes after its prompt, a long build, nudges a developer who already
-// answered; and of two prompts waiting at once, the first one answered ends the wait for
-// both. The upgrade path is a hook Claude Code may add for the answer.
+// Claude Code has no hook for the answer itself, and two answers reach none of those hooks:
+// a prompt rejected or dismissed ends the turn as an interrupt, with no PostToolUse or Stop,
+// but is written to the transcript; and an approved tool has no PostToolUse until it ends,
+// but runs as a new child of Claude Code. The wait records the transcript's size and Claude
+// Code's children as it begins, and its check skips the nudge on either change
+// (live.Wait.answered); anything else the session writes or starts meanwhile counts too, so
+// it errs toward silence.
+//
+// Accepted risk: where procinfo cannot list processes, an approved tool still running two
+// minutes after its prompt nudges a developer who already answered; and of two prompts
+// waiting at once, the first one answered ends the wait for both. The upgrade path is a hook
+// Claude Code may add for the answer.
 
 // claudeWaitingStateDir holds the wait of each session waiting for its developer.
 var claudeWaitingStateDir = hookrun.AgentStateDir(name, "waiting")
@@ -44,6 +53,10 @@ func notification(_ context.Context, env hookrun.Env) error {
 		return nil
 	}
 	w := live.Wait{ID: rand.Text(), Since: env.Time(), Agent: displayName, Checkout: checkoutName(cmp.Or(in.Cwd, env.Cwd))}
+	if info, err := os.Stat(in.TranscriptPath); err == nil && in.TranscriptPath != "" {
+		w.Transcript, w.TranscriptSize = in.TranscriptPath, info.Size()
+	}
+	w.Watch(hookrun.HookCaller(), live.Machine{})
 	path := waitPath(env, in.SessionID)
 	if err := live.StartWait(path, w); err != nil {
 		env.Logf("wait: %v", err)

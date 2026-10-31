@@ -28,7 +28,7 @@ func (app *App) newNotifyAwaitAnswerCommand() *cobra.Command {
 		Args:   cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if app.notifier != nil {
-				live.AwaitAnswer(cmd.Context(), args[0], args[1], app.notifier)
+				live.AwaitAnswer(cmd.Context(), args[0], args[1], app.notifier, live.Machine{})
 			}
 			return nil
 		},
