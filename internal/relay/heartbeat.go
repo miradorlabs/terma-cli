@@ -73,6 +73,30 @@ func (r *Relay) heartbeat(ctx context.Context, reason, exit string) error {
 	return nil
 }
 
+// HeartbeatTarget is what a requested beat must prove: that the relay delivers Team's records,
+// with Team's key alone, to Endpoint. Set on a beat's context (WithHeartbeatTarget), it tells
+// HeartbeatSend to send nothing when it cannot.
+type HeartbeatTarget struct {
+	Team, Endpoint string
+}
+
+// ErrElsewhere is HeartbeatSend's answer when it would send a target's beat to another ingest
+// than the target's; nothing was sent.
+var ErrElsewhere = errors.New("the relay sends this team's records to another ingest")
+
+type heartbeatTargetKey struct{}
+
+// WithHeartbeatTarget asks the beat sent with ctx to prove t.
+func WithHeartbeatTarget(ctx context.Context, t HeartbeatTarget) context.Context {
+	return context.WithValue(ctx, heartbeatTargetKey{}, t)
+}
+
+// HeartbeatTargetOf is the target a beat sent with ctx must prove, if it was given one.
+func HeartbeatTargetOf(ctx context.Context) (HeartbeatTarget, bool) {
+	t, ok := ctx.Value(heartbeatTargetKey{}).(HeartbeatTarget)
+	return t, ok
+}
+
 // unclassifiedPrefix starts the counters named after an attribute (Stats.unclassified).
 const unclassifiedPrefix = "unclassified"
 

@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -178,6 +180,57 @@ func TestLastBeatDue(t *testing.T) {
 	} {
 		if got := tc.res.LastBeatDue(); got != tc.want {
 			t.Errorf("%+v.LastBeatDue() = %v, want %v", tc.res, got, tc.want)
+		}
+	}
+}
+
+// A beat for a target names its team and endpoint, and Beat tells the platform's refusal (a
+// refused key too) from a beat the relay would send elsewhere, could not try, or sent without
+// holding it to the target (a relay from before targets).
+func TestBeatForATarget(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	for _, tc := range []struct {
+		status      int
+		body        string
+		notAccepted bool
+		keyRefused  bool
+		elsewhere   bool
+		untargeted  bool
+	}{
+		{status: 200, body: `{"team":"p1"}`},
+		{status: 200, body: `{}`, untargeted: true},
+		{status: 502, body: `{"error":"otlp ingest returned 401: bad key","key_refused":true}`, notAccepted: true, keyRefused: true},
+		{status: 502, body: `{"error":"otlp ingest returned 503: busy"}`, notAccepted: true},
+		{status: 502, body: `{"error":"the relay sends this team's records to another ingest: https://a, not https://b"}`, elsewhere: true},
+		{status: 401, body: "unauthorized\n"},
+	} {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(ln.Addr().String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		var query string
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			query = r.URL.RawQuery
+			w.WriteHeader(tc.status)
+			fmt.Fprint(w, tc.body)
+		})}
+		go func() { _ = srv.Serve(ln) }()
+		err = Beat(t.Context(), stateDir, semconv.TermaRelayHeartbeatReasonDoctor, relay.HeartbeatTarget{Team: "p1", Endpoint: "https://b"}, 0)
+		_ = srv.Close()
+		if want := "endpoint=https%3A%2F%2Fb&reason=doctor&team=p1"; query != want {
+			t.Errorf("%d: asked %q, want %q", tc.status, query, want)
+		}
+		undelivered, isUndelivered := errors.AsType[*UndeliveredError](err)
+		switch {
+		case tc.status == 200 && !tc.untargeted && err != nil,
+			errors.Is(err, ErrUntargeted) != tc.untargeted,
+			isUndelivered != tc.notAccepted,
+			isUndelivered && undelivered.KeyRefused() != tc.keyRefused,
+			errors.Is(err, relay.ErrElsewhere) != tc.elsewhere:
+			t.Errorf("%d %s: Beat = %v", tc.status, tc.body, err)
 		}
 	}
 }

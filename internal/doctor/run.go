@@ -39,10 +39,10 @@ type Probes struct {
 	Spool func() SpoolState
 	// Deliver flushes every project's queued events, retry windows ignored.
 	Deliver func(ctx context.Context) (Delivery, error)
-	// Heartbeat asks the running relay to send a heartbeat now, with the team's key to its
-	// ingest: nil once the backend accepts it, ErrNoHeartbeat (wrapped, saying why) when
-	// none could be sent.
-	Heartbeat func(ctx context.Context) error
+	// Heartbeat asks the running relay to send a heartbeat now, with projectID's key alone,
+	// to endpoint alone: nil once the backend accepts it, ErrNoHeartbeat (wrapped, saying why)
+	// when none could be sent there, and any other error when the backend refused it.
+	Heartbeat func(ctx context.Context, projectID, endpoint string) error
 	Endpoint  func(projectID string) string
 	// Relay is the local relay as the machine finds it.
 	Relay func() Relay
@@ -375,13 +375,15 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if res.Sent > 0 {
 		return Check{Status: Pass, Detail: detail}
 	}
-	// An empty queue proves nothing, so a heartbeat through the relay stands in for an event.
-	if p.Heartbeat == nil {
+	// An empty queue proves nothing, so a heartbeat through the relay stands in for an event:
+	// with this team's key, to the host this team's events go to.
+	if p.Heartbeat == nil || projectID == "" {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail}
 	}
-	switch err := p.Heartbeat(ctx); {
+	endpoint := p.Endpoint(projectID)
+	switch err := p.Heartbeat(ctx, projectID, endpoint); {
 	case err == nil:
-		beat := "a test heartbeat through the relay was accepted"
+		beat := "a test heartbeat with team " + projectID + "'s key was accepted by " + endpoint
 		if len(undelivered) == 0 {
 			beat = "nothing queued; " + beat
 		}
@@ -389,8 +391,9 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	case errors.Is(err, ErrNoHeartbeat):
 		return Check{Status: Skip, Inconclusive: true, Detail: detail + "; " + err.Error()}
 	default:
-		return Check{Status: Fail, Detail: "nothing queued, and a test heartbeat was not accepted: " + err.Error(),
-			Fix: "check the network, then run `terma doctor` again"}
+		var refused interface{ KeyRefused() bool }
+		f := Failure{ProjectID: projectID, Endpoint: endpoint, KeyRefused: errors.As(err, &refused) && refused.KeyRefused()}
+		return Check{Status: Fail, Detail: "nothing queued, and a test heartbeat was not accepted: " + err.Error(), Fix: failureFix(f)}
 	}
 }
 

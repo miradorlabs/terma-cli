@@ -2,8 +2,12 @@ package relay
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"maps"
+	"net/http"
+	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -400,3 +404,47 @@ func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
 		t.Errorf("a relay told neither sent one: %v", bare)
 	}
 }
+
+// A beat asked for over /heartbeat with a team carries its target to HeartbeatSend and, once
+// delivered, names the team back; one the ingest refused says whether it refused the key.
+func TestTheHeartbeatEndpointCarriesItsTarget(t *testing.T) {
+	t.Parallel()
+	var got []HeartbeatTarget
+	refuse := false
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, HeartbeatEvery: time.Hour,
+		HeartbeatSend: func(ctx context.Context, _ *logspb.LogsData) error {
+			target, _ := HeartbeatTargetOf(ctx)
+			got = append(got, target)
+			if refuse {
+				return keyRefusal{}
+			}
+			return nil
+		}})
+	beat := func(query string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/heartbeat?"+query, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		r.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := beat("reason=doctor&team=p1&endpoint=https%3A%2F%2Fotlp.example"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"team":"p1"`) {
+		t.Fatalf("beat for a team = %d %s, want it to name the team", rec.Code, rec.Body)
+	}
+	if rec := beat("reason=setup"); rec.Code != http.StatusOK {
+		t.Fatalf("beat = %d %s", rec.Code, rec.Body)
+	}
+	if want := []HeartbeatTarget{{Team: "p1", Endpoint: "https://otlp.example"}, {}}; !slices.Equal(got, want) {
+		t.Fatalf("targets = %+v, want %+v", got, want)
+	}
+	refuse = true
+	rec := beat("reason=doctor&team=p1")
+	var failure HeartbeatAnswer
+	if err := json.NewDecoder(rec.Body).Decode(&failure); err != nil || rec.Code != http.StatusBadGateway || !failure.KeyRefused {
+		t.Fatalf("refused key = %d %+v (%v)", rec.Code, failure, err)
+	}
+}
+
+type keyRefusal struct{}
+
+func (keyRefusal) Error() string    { return "otlp ingest returned 401" }
+func (keyRefusal) KeyRefused() bool { return true }

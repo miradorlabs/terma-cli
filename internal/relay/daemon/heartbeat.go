@@ -32,7 +32,7 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 			wait = 0
 		}
 	}
-	switch err := Beat(ctx, stateDir, semconv.TermaRelayHeartbeatReasonSetup, wait); {
+	switch err := Beat(ctx, stateDir, semconv.TermaRelayHeartbeatReasonSetup, relay.HeartbeatTarget{}, wait); {
 	case err == nil:
 		return true, "this machine reported to your organization"
 	case errors.Is(err, relay.ErrNoKey):
@@ -47,10 +47,32 @@ func CheckIn(ctx context.Context, stateDir string) (ok bool, what string) {
 // ErrNoAnswer is Beat's error when no relay answers on its address.
 var ErrNoAnswer = errors.New("the relay did not answer")
 
+// ErrUntargeted is Beat's error when the running relay sent a beat without holding it to its
+// target: it is older than targets, so the beat proves nothing about the target's delivery.
+var ErrUntargeted = errors.New("the running relay is older than this terma and cannot send a beat for one team")
+
+// UndeliveredError is Beat's error when the relay sent the beat and the platform did not
+// accept it; every other error means it could not be tried.
+type UndeliveredError struct {
+	Detail string
+	// Refused says the ingest refused the key.
+	Refused bool
+}
+
+func (e *UndeliveredError) Error() string {
+	return "the relay could not reach your organization: " + e.Detail
+}
+
+// KeyRefused reports whether the ingest refused the key rather than the request.
+func (e *UndeliveredError) KeyRefused() bool { return e.Refused }
+
 // Beat asks the running relay to send a heartbeat for reason now, waiting up to wait for one
-// that is still starting. It is nil once the platform accepted the beat, and relay.ErrNoKey
-// when this machine holds no team key to send it with.
-func Beat(ctx context.Context, stateDir, reason string, wait time.Duration) error {
+// that is still starting; a target with a team makes it prove that team's delivery
+// (relay.HeartbeatTarget). It is nil once the platform accepted the beat; relay.ErrNoKey when
+// this machine holds no key to send it with; relay.ErrElsewhere when the relay would send the
+// target's beat to another ingest; ErrUntargeted when the relay ignored the target; and an
+// *UndeliveredError when the platform refused it.
+func Beat(ctx context.Context, stateDir, reason string, target relay.HeartbeatTarget, wait time.Duration) error {
 	dir, err := Dir(stateDir)
 	if err != nil {
 		return err
@@ -60,10 +82,15 @@ func Beat(ctx context.Context, stateDir, reason string, wait time.Duration) erro
 		return err
 	}
 	addr := Addr(dir)
+	q := url.Values{"reason": {reason}}
+	if target.Team != "" {
+		q.Set("team", target.Team)
+		q.Set("endpoint", target.Endpoint)
+	}
 	client := &http.Client{Timeout: 20 * time.Second}
 	var resp *http.Response
 	for deadline := time.Now().Add(wait); ; time.Sleep(250 * time.Millisecond) {
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/heartbeat?reason="+url.QueryEscape(reason), nil)
+		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/heartbeat?"+q.Encode(), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err = client.Do(req)
 		if err == nil || time.Now().After(deadline) || ctx.Err() != nil {
@@ -74,17 +101,21 @@ func Beat(ctx context.Context, stateDir, reason string, wait time.Duration) erro
 		return fmt.Errorf("%w on %s", ErrNoAnswer, addr)
 	}
 	defer resp.Body.Close()
-	var body struct {
-		Error string `json:"error"`
-	}
+	var body relay.HeartbeatAnswer
 	_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&body)
 	switch {
+	case resp.StatusCode == http.StatusOK && body.Team != target.Team:
+		// A relay from before targets sent the beat with its own pick of key and ingest.
+		return ErrUntargeted
 	case resp.StatusCode == http.StatusOK:
 		return nil
 	case strings.Contains(body.Error, relay.ErrNoKey.Error()):
 		return relay.ErrNoKey
+	case strings.Contains(body.Error, relay.ErrElsewhere.Error()):
+		_, where, _ := strings.Cut(body.Error, relay.ErrElsewhere.Error())
+		return fmt.Errorf("%w%s", relay.ErrElsewhere, where)
 	case body.Error != "":
-		return errors.New("the relay could not reach your organization: " + body.Error)
+		return &UndeliveredError{Detail: body.Error, Refused: body.KeyRefused}
 	}
 	return fmt.Errorf("the relay answered %d", resp.StatusCode)
 }

@@ -236,7 +236,8 @@ func (r *Relay) routes() *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(r.stats.Snapshot())
 	})
-	// `terma setup` asks for a beat as it finishes, proving the relay, credential and endpoint work.
+	// `terma setup` asks for a beat as it finishes, proving the relay, credential and endpoint
+	// work; `terma doctor` asks for one with nothing queued to deliver, for its team and ingest.
 	mux.HandleFunc("/heartbeat", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(w, "POST only", http.StatusMethodNotAllowed)
@@ -250,15 +251,30 @@ func (r *Relay) routes() *http.ServeMux {
 		if reason == "" || len(reason) > 32 {
 			reason = "request"
 		}
+		ctx := req.Context()
+		team := req.URL.Query().Get("team")
+		if team != "" {
+			ctx = WithHeartbeatTarget(ctx, HeartbeatTarget{Team: team, Endpoint: req.URL.Query().Get("endpoint")})
+		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := r.heartbeat(req.Context(), reason, ""); err != nil {
+		if err := r.heartbeat(ctx, reason, ""); err != nil {
+			// A refused key is the developer's to replace, not the network's to retry.
+			var refused interface{ KeyRefused() bool }
 			w.WriteHeader(http.StatusBadGateway)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			_ = json.NewEncoder(w).Encode(HeartbeatAnswer{Error: err.Error(), KeyRefused: errors.As(err, &refused) && refused.KeyRefused()})
 			return
 		}
-		_, _ = w.Write([]byte("{}"))
+		_ = json.NewEncoder(w).Encode(HeartbeatAnswer{Team: team})
 	})
 	return mux
+}
+
+// HeartbeatAnswer is the /heartbeat answer: why the beat was not delivered, or the team of a
+// delivered beat's target, which a relay from before targets ignores and never names.
+type HeartbeatAnswer struct {
+	Error      string `json:"error,omitempty"`
+	KeyRefused bool   `json:"key_refused,omitempty"`
+	Team       string `json:"team,omitempty"`
 }
 
 func (r *Relay) authorized(req *http.Request) bool {

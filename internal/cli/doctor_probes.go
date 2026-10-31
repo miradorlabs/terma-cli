@@ -59,15 +59,12 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			}
 			return d, nil
 		},
-		Heartbeat: func(ctx context.Context) error {
+		Heartbeat: func(ctx context.Context, projectID, endpoint string) error {
 			if !daemon.Running(claim.Dir(app.stateDir)) {
 				return fmt.Errorf("%w: the relay is not running", doctor.ErrNoHeartbeat)
 			}
-			err := daemon.Beat(ctx, app.stateDir, semconv.TermaRelayHeartbeatReasonDoctor, 0)
-			if errors.Is(err, relay.ErrNoKey) || errors.Is(err, daemon.ErrNoAnswer) {
-				return fmt.Errorf("%w: %w", doctor.ErrNoHeartbeat, err)
-			}
-			return err
+			return doctorHeartbeat(daemon.Beat(ctx, app.stateDir, semconv.TermaRelayHeartbeatReasonDoctor,
+				relay.HeartbeatTarget{Team: projectID, Endpoint: endpoint}, 0))
 		},
 		Relay:    app.relayFacts,
 		Endpoint: func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
@@ -87,6 +84,15 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 		},
 		Keys: app.storedKeys,
 	}
+}
+
+// doctorHeartbeat is doctor's reading of a beat's outcome: only the platform's refusal fails
+// its check; a beat that could not be sent where doctor asked proves nothing either way.
+func doctorHeartbeat(err error) error {
+	if _, undelivered := errors.AsType[*daemon.UndeliveredError](err); err == nil || undelivered {
+		return err
+	}
+	return fmt.Errorf("%w: %w", doctor.ErrNoHeartbeat, err)
 }
 
 // serverKeyCredential is what a profile set up with a server key signs in with: its team's
