@@ -38,8 +38,12 @@ type Env struct {
 type Probes struct {
 	Spool func() SpoolState
 	// Deliver flushes every project's queued events, retry windows ignored.
-	Deliver  func(ctx context.Context) (Delivery, error)
-	Endpoint func(projectID string) string
+	Deliver func(ctx context.Context) (Delivery, error)
+	// Heartbeat asks the running relay to send a heartbeat now, with the team's key to its
+	// ingest: nil once the backend accepts it, ErrNoHeartbeat (wrapped, saying why) when
+	// none could be sent.
+	Heartbeat func(ctx context.Context) error
+	Endpoint  func(projectID string) string
 	// Relay is the local relay as the machine finds it.
 	Relay func() Relay
 	// Credential is the signed-in developer, or the team server key a profile set up with
@@ -368,11 +372,30 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if len(others) > 0 {
 		return Check{Status: Warn, Detail: detail, Fix: othersFix}
 	}
-	if res.Sent == 0 {
+	if res.Sent > 0 {
+		return Check{Status: Pass, Detail: detail}
+	}
+	// An empty queue proves nothing, so a heartbeat through the relay stands in for an event.
+	if p.Heartbeat == nil {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail}
 	}
-	return Check{Status: Pass, Detail: detail}
+	switch err := p.Heartbeat(ctx); {
+	case err == nil:
+		beat := "a test heartbeat through the relay was accepted"
+		if len(undelivered) == 0 {
+			beat = "nothing queued; " + beat
+		}
+		return Check{Status: Pass, Detail: strings.Join(append([]string{beat}, undelivered...), "; ")}
+	case errors.Is(err, ErrNoHeartbeat):
+		return Check{Status: Skip, Inconclusive: true, Detail: detail + "; " + err.Error()}
+	default:
+		return Check{Status: Fail, Detail: "nothing queued, and a test heartbeat was not accepted: " + err.Error(),
+			Fix: "check the network, then run `terma doctor` again"}
+	}
 }
+
+// ErrNoHeartbeat is a Heartbeat probe's error when no heartbeat could be sent at all.
+var ErrNoHeartbeat = errors.New("no test heartbeat could be sent")
 
 // describeFailure names the host, which a developer with projects in two environments cannot guess.
 func describeFailure(f Failure) string {

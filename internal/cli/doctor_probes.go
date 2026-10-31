@@ -15,10 +15,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
@@ -56,6 +58,16 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 					Refused: refused, KeyRefused: refused && ingest.KeyRefused()})
 			}
 			return d, nil
+		},
+		Heartbeat: func(ctx context.Context) error {
+			if !daemon.Running(claim.Dir(app.stateDir)) {
+				return fmt.Errorf("%w: the relay is not running", doctor.ErrNoHeartbeat)
+			}
+			err := daemon.Beat(ctx, app.stateDir, semconv.TermaRelayHeartbeatReasonDoctor, 0)
+			if errors.Is(err, relay.ErrNoKey) || errors.Is(err, daemon.ErrNoAnswer) {
+				return fmt.Errorf("%w: %w", doctor.ErrNoHeartbeat, err)
+			}
+			return err
 		},
 		Relay:    app.relayFacts,
 		Endpoint: func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },

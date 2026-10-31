@@ -745,6 +745,10 @@ attributes:
           value: setup
           brief: Setup finished; the platform reads it as installed and working.
           stability: development
+        - id: doctor
+          value: doctor
+          brief: terma doctor found nothing queued to deliver and asked for a beat to prove delivery instead.
+          stability: development
         - id: exit
           value: exit
           brief: The relay is about to stop, saying why it stopped.

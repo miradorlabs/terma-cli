@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -374,6 +375,40 @@ func TestTheBackendCheckPassesOnAnAcceptedFlush(t *testing.T) {
 	}
 	if c := BackendCheck(t.Context(), probes(0), "p1"); c.Status != Skip || !c.Inconclusive {
 		t.Fatalf("empty queue = %+v", c)
+	}
+}
+
+// With nothing queued, a heartbeat the backend accepts is the proof instead; one that could
+// not be sent leaves the check inconclusive, and one the backend refused fails it.
+func TestTheBackendCheckSendsAHeartbeatWhenNothingIsQueued(t *testing.T) {
+	t.Parallel()
+	keys := Keys(func(string, string) string { return "ter_srv_…" })
+	for _, tc := range []struct {
+		name    string
+		sent    int
+		beat    error
+		status  Status
+		beats   int
+		says    string
+		inconcl bool
+	}{
+		{"accepted", 0, nil, Pass, 1, "test heartbeat through the relay was accepted", false},
+		{"no relay", 0, fmt.Errorf("%w: the relay is not running", ErrNoHeartbeat), Skip, 1, "the relay is not running", true},
+		{"refused", 0, errors.New("the relay could not reach your organization: otlp ingest returned 401"), Fail, 1, "401", false},
+		{"flushed events", 2, nil, Pass, 0, "flushed", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			beats := 0
+			p := Probes{Keys: keys, Endpoint: func(string) string { return "https://otlp.example" },
+				Deliver: func(context.Context) (Delivery, error) {
+					return Delivery{Sent: tc.sent, Delivered: fmt.Sprintf("%d events", tc.sent)}, nil
+				},
+				Heartbeat: func(context.Context) error { beats++; return tc.beat }}
+			c := BackendCheck(t.Context(), p, "p1")
+			if c.Status != tc.status || c.Inconclusive != tc.inconcl || !strings.Contains(c.Detail, tc.says) || beats != tc.beats {
+				t.Fatalf("check = %+v after %d beats", c, beats)
+			}
+		})
 	}
 }
 
