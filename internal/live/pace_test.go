@@ -87,12 +87,12 @@ func TestPaceNoteAndMessage(t *testing.T) {
 	}
 }
 
-// A window warns once, by its name and reset, however many processes see it at once; the
-// next window warns again.
+// A window warns once, by its name and reset to the hour, however many processes see it at once
+// and however its reported reset drifts; the next window warns again.
 func TestFirstWarningOncePerWindow(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "pace-warnings")
-	now := time.Now()
+	now := time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC) // a reset 48 h on sits on the hour
 	p := Pace{Name: "seven_day", Length: week, UsedPercent: 80, ResetsAt: now.Add(48 * time.Hour), RunsOut: now.Add(24 * time.Hour)}
 	var wg sync.WaitGroup
 	var first atomic.Int32
@@ -110,6 +110,11 @@ func TestFirstWarningOncePerWindow(t *testing.T) {
 	if FirstWarning(dir, p, now.Add(time.Hour)) {
 		t.Fatal("the same window warned again")
 	}
+	drifted := p
+	drifted.ResetsAt = p.ResetsAt.Add(7 * time.Second)
+	if FirstWarning(dir, drifted, now.Add(time.Minute)) {
+		t.Fatal("the same window warned again when its reported reset drifted by seconds")
+	}
 	next := p
 	next.ResetsAt = p.ResetsAt.Add(week)
 	if !FirstWarning(dir, next, now) {
@@ -120,7 +125,7 @@ func TestFirstWarningOncePerWindow(t *testing.T) {
 	if !FirstWarning(dir, other, now) {
 		t.Fatal("another window with the same reset did not warn")
 	}
-	if _, err := os.Stat(filepath.Join(dir, "seven-day-"+strconv.FormatInt(p.ResetsAt.Unix(), 10)+".json")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "seven-day-"+strconv.FormatInt(p.ResetsAt.Round(time.Hour).Unix(), 10)+".json")); err != nil {
 		t.Fatalf("record: %v", err)
 	}
 }

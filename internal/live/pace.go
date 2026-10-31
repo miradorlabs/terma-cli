@@ -63,12 +63,13 @@ func (p Pace) Message(agent string, now time.Time) string {
 }
 
 // FirstWarning reports whether p is the first warning of its window, recording it in dir: a
-// window warns once, however many sessions and redraws see it.
+// window warns once, however many sessions and redraws see it. A window is keyed by its reset to
+// the hour: the reset a status line reports drifts by seconds between redraws of one window.
 func FirstWarning(dir string, p Pace, now time.Time) bool {
 	if os.MkdirAll(dir, 0o700) != nil {
 		return false
 	}
-	name := strings.ReplaceAll(p.Name, "_", "-") + "-" + strconv.FormatInt(p.ResetsAt.Unix(), 10) + ".json"
+	name := strings.ReplaceAll(p.Name, "_", "-") + "-" + strconv.FormatInt(p.ResetsAt.Round(time.Hour).Unix(), 10) + ".json"
 	f, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return false
