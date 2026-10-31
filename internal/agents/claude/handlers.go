@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -40,6 +41,8 @@ type claudeHookInput struct {
 	// ToolResponse is opened only for the Agent tool, into claudeAgentResult: for an edit it holds
 	// file content.
 	ToolResponse json.RawMessage `json:"tool_response"`
+	// NotificationType is a Notification's kind; its message and title are not decoded.
+	NotificationType string `json:"notification_type"`
 }
 
 func readClaudeInput(r io.Reader) (*claudeHookInput, error) {
@@ -71,13 +74,15 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// sessionEnd clears the active session and spools the end; manifests stay for uncommitted work.
+// sessionEnd ends the session's wait, clears the active session and spools the end; manifests
+// stay for uncommitted work.
 func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
 	}
+	endWait(env, in.SessionID)
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
@@ -92,14 +97,15 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// stop refreshes account evidence, the session's title and its calls' responses before the
-// dispatcher starts delivery.
+// stop ends the session's wait, and refreshes account evidence, the session's title and its
+// calls' responses before the dispatcher starts delivery.
 func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
 	}
+	endWait(env, in.SessionID)
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
@@ -118,6 +124,10 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
+		return nil
+	}
+	endWait(env, in.SessionID)
+	if !slices.Contains(claudeRecordedTools, in.ToolName) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)

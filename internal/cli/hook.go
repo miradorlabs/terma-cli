@@ -72,9 +72,10 @@ func (app *App) hookDeps() dispatch.Deps {
 				fmt.Fprintf(os.Stderr, "terma hook: this repository's commit hooks: %v\n", err)
 			}
 		},
-		Flush:     spawnFlush,
-		AwaitPush: func(path string) { spawnDetached("spool", "await-push", path) },
-		Notifier:  app.notifier,
+		Flush:       spawnFlush,
+		AwaitPush:   func(path string) { spawnDetached("spool", "await-push", path) },
+		AwaitAnswer: func(path, id string) { spawnDetached("notify", "await-answer", path, id) },
+		Notifier:    app.notifier,
 	}
 }
 

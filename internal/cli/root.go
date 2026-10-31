@@ -92,11 +92,13 @@ Every command is safe to run again.`,
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
 		// Hidden. Other programs run these: agents and git run hook, the relay service runs
-		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version,
-		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth.
+		// relay, hooks run spool and notify, the Homebrew cask runs completion and install.sh
+		// version, the shell functions setup writes run launch, and the terma-mcp bridge runs
+		// auth.
 		app.newAuthCommand(),
 		app.newHookCommand(),
 		app.newLaunchCommand(),
+		app.newNotifyCommand(),
 		app.newRelayCommand(),
 		app.newSpoolCommand(),
 		app.newVersionCommand(),
@@ -159,9 +161,9 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 	return true
 }
 
-// quietCommand reports whether args run a hook or a spool flush, which print nothing.
+// quietCommand reports whether args run a hook, or what a hook detaches, which print nothing.
 func quietCommand(args []string) bool {
-	return len(args) > 0 && slices.Contains([]string{"hook", "spool"}, args[0])
+	return len(args) > 0 && slices.Contains([]string{"hook", "notify", "spool"}, args[0])
 }
 
 // App is terma's command line: what every command reads, held for one run.

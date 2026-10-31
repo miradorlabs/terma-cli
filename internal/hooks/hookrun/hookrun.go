@@ -62,6 +62,8 @@ type Env struct {
 	// Notifier tells the developer about a live finding; nil while desktop notifications are
 	// off, or hooks are.
 	Notifier live.Notifier
+	// AwaitAnswer, when set, starts a detached live.AwaitAnswer for wait id recorded at path.
+	AwaitAnswer func(path, id string)
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.
