@@ -382,7 +382,7 @@ func TestOnlyAnInstallByHandUnclaims(t *testing.T) {
 	stateDir := t.TempDir()
 	began := time.Now()
 	SaveCache(stateDir, Cache{Current: "1.0.0", Latest: "1.0.1",
-		Attempt: Attempt{AttemptAt: began, Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: began, InterruptedLast: began}})
+		AttemptAt: began, Attempted: "1.0.1", AttemptedBy: "1.0.0", Stopped: true, Interrupted: began, InterruptedLast: began})
 	Checked(stateDir, "1.0.0", &Release{TagName: "v1.0.1", PublishedAt: time.Now()})
 	if cache := LoadCache(stateDir); !cache.landed("1.0.1", began.Add(time.Minute)) {
 		t.Fatalf("terma update --check took the claim off: %+v", cache.Attempt)
