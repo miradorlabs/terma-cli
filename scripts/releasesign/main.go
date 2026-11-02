@@ -79,7 +79,7 @@ func keygen(path string) error {
 // privateKeys are TERMA_SIGNING_KEY's seeds, hex, one or more.
 func privateKeys() ([]ed25519.PrivateKey, error) {
 	var keys []ed25519.PrivateKey
-	for _, h := range strings.Fields(os.Getenv("TERMA_SIGNING_KEY")) {
+	for h := range strings.FieldsSeq(os.Getenv("TERMA_SIGNING_KEY")) {
 		seed, err := hex.DecodeString(h)
 		if err != nil || len(seed) != ed25519.SeedSize {
 			return nil, errors.New("TERMA_SIGNING_KEY must hold the private key's 32-byte seed as hex (releasesign keygen), or several separated by whitespace")

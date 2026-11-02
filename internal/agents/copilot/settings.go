@@ -43,8 +43,8 @@ func (d *settingsDoc) pack() []byte { return d.root.Pack() }
 
 // find is the member VS Code reads for key: the last of that name.
 func (d *settingsDoc) find(key string) int {
-	for i := len(d.obj.Members) - 1; i >= 0; i-- {
-		if lit, ok := d.obj.Members[i].Name.Value.(hujson.Literal); ok && lit.String() == key {
+	for i, v := range slices.Backward(d.obj.Members) {
+		if lit, ok := v.Name.Value.(hujson.Literal); ok && lit.String() == key {
 			return i
 		}
 	}
@@ -162,8 +162,8 @@ func (d *settingsDoc) unignoreNames(names []string) {
 	if !ok {
 		return
 	}
-	for at := len(list.Elements) - 1; at >= 0; at-- {
-		e := list.Elements[at]
+	for at, e := range slices.Backward(list.Elements) {
+
 		if !slices.ContainsFunc(names, func(name string) bool { return named(e, name) }) {
 			continue
 		}

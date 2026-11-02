@@ -94,7 +94,7 @@ func CheckPath(root, relative string) error {
 		return err
 	}
 	path := root
-	for _, part := range strings.Split(filepath.Clean(relative), string(filepath.Separator)) {
+	for part := range strings.SplitSeq(filepath.Clean(relative), string(filepath.Separator)) {
 		path = filepath.Join(path, part)
 		info, err := os.Lstat(path)
 		if errors.Is(err, os.ErrNotExist) {

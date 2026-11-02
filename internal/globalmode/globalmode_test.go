@@ -18,7 +18,7 @@ func sandbox(t *testing.T) (Machine, string) {
 	hooks := filepath.Join(t.TempDir(), "hooks.json")
 	m := Machine{
 		ConfigDir:   t.TempDir(),
-		Agents:      agents.New(agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake", Label: "fake-cli"}, Path: hooks}, agentstest.Agent{ID: "plain"}),
+		Agents:      agents.New(agentstest.UserHooked{ID: "fake", Label: "fake-cli", Path: hooks}, agentstest.Agent{ID: "plain"}),
 		Terma:       func() (string, error) { return "/opt/terma/bin/terma", nil },
 		ManagedRoot: t.TempDir(),
 	}

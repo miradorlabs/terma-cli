@@ -133,11 +133,9 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 	now := time.Now()
 	var wg sync.WaitGroup
 	for i := range 16 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{1000 + i}}, now)
-		}()
+		})
 	}
 	wg.Wait()
 	c, ok := Read(dir, "s", now)

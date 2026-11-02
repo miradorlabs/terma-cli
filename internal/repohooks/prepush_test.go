@@ -35,16 +35,16 @@ func TestPrePushScriptGivesBothReadersGitsInput(t *testing.T) {
 			// prevGot and termaGot are the stdin each should have read; nil for not run.
 			prevGot, termaGot *string
 		}{
-			{what: "both read the input", input: line + line, prev: 0, terma: 0, status: 0, prevGot: ptr(line + line), termaGot: ptr(line + line)},
-			{what: "an empty input stays empty", input: "", prev: 0, terma: 0, status: 0, prevGot: ptr(""), termaGot: ptr("")},
+			{what: "both read the input", input: line + line, prev: 0, terma: 0, status: 0, prevGot: new(line + line), termaGot: new(line + line)},
+			{what: "an empty input stays empty", input: "", prev: 0, terma: 0, status: 0, prevGot: new(""), termaGot: new("")},
 			{what: "no final newline", input: strings.TrimSuffix(line, "\n"), prev: 0, terma: 0, status: 0,
-				prevGot: ptr(strings.TrimSuffix(line, "\n")), termaGot: ptr(strings.TrimSuffix(line, "\n"))},
-			{what: "terma alone", input: line, prev: -1, terma: 0, status: 0, termaGot: ptr(line)},
-			{what: "the displaced hook's veto", input: line, prev: 3, terma: 0, status: 3, prevGot: ptr(line)},
-			{what: "a failing terma", input: line, prev: 0, terma: 9, status: 0, prevGot: ptr(line), termaGot: ptr(line)},
-			{what: "terma gone", input: line, prev: 0, terma: -1, status: 0, prevGot: ptr(line)},
-			{what: "no temporary file", input: line, prev: 0, terma: 0, tmp: "missing", status: 0, prevGot: ptr(line)},
-			{what: "no temporary file, the veto kept", input: line, prev: 4, terma: 0, tmp: "missing", status: 4, prevGot: ptr(line)},
+				prevGot: new(strings.TrimSuffix(line, "\n")), termaGot: new(strings.TrimSuffix(line, "\n"))},
+			{what: "terma alone", input: line, prev: -1, terma: 0, status: 0, termaGot: new(line)},
+			{what: "the displaced hook's veto", input: line, prev: 3, terma: 0, status: 3, prevGot: new(line)},
+			{what: "a failing terma", input: line, prev: 0, terma: 9, status: 0, prevGot: new(line), termaGot: new(line)},
+			{what: "terma gone", input: line, prev: 0, terma: -1, status: 0, prevGot: new(line)},
+			{what: "no temporary file", input: line, prev: 0, terma: 0, tmp: "missing", status: 0, prevGot: new(line)},
+			{what: "no temporary file, the veto kept", input: line, prev: 4, terma: 0, tmp: "missing", status: 4, prevGot: new(line)},
 		} {
 			t.Run(sh+"/"+tc.what, func(t *testing.T) {
 				dir, out := t.TempDir(), t.TempDir()
@@ -94,4 +94,4 @@ func TestPrePushScriptGivesBothReadersGitsInput(t *testing.T) {
 	}
 }
 
-func ptr(s string) *string { return &s }
+//go:fix inline

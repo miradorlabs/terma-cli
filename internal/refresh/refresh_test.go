@@ -16,9 +16,9 @@ import (
 func TestTheMachineRefreshCarriesOnPastAFailure(t *testing.T) {
 	t.Parallel()
 	r := Refresher{Version: "v1.2.3", Agents: agents.New(
-		agentstest.Refreshing{Agent: agentstest.Agent{ID: "broken"}, Err: errors.New("permission denied")},
-		agentstest.Refreshing{Agent: agentstest.Agent{ID: "fine"}, Path: "/home/dev/.fine/settings.json"},
-		agentstest.Refreshing{Agent: agentstest.Agent{ID: "current"}},
+		agentstest.Refreshing{ID: "broken", Err: errors.New("permission denied")},
+		agentstest.Refreshing{ID: "fine", Path: "/home/dev/.fine/settings.json"},
+		agentstest.Refreshing{ID: "current"},
 	)}
 	changed, err := r.Machine()
 	if len(changed) != 1 || changed[0] != "/home/dev/.fine/settings.json" {
@@ -33,11 +33,11 @@ func TestTheMachineRefreshCarriesOnPastAFailure(t *testing.T) {
 func TestAnUpgradeRefreshesOnceAndRetriesAFailure(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	failing := Refresher{StateDir: dir, Version: "v3.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Err: errors.New("busy")})}
+	failing := Refresher{StateDir: dir, Version: "v3.0.0", Agents: agents.New(agentstest.Refreshing{ID: "a", Err: errors.New("busy")})}
 	if up, err := failing.AfterUpgrade(t.Context()); !up.Due || err == nil {
 		t.Fatalf("AfterUpgrade = %+v, %v", up, err)
 	}
-	fine := Refresher{StateDir: dir, Version: "v3.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"})}
+	fine := Refresher{StateDir: dir, Version: "v3.0.0", Agents: agents.New(agentstest.Refreshing{ID: "a", Path: "/x"})}
 	if up, err := fine.AfterUpgrade(t.Context()); !up.Due || err != nil || len(up.Changed) != 1 {
 		t.Fatalf("the retry = %+v, %v", up, err)
 	}
@@ -51,14 +51,14 @@ func TestAnUpgradeRefreshesOnceAndRetriesAFailure(t *testing.T) {
 func TestARefreshRecordsTheBuildOnlyWhenNothingFailed(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	failing := Refresher{StateDir: dir, Version: "v4.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Err: errors.New("busy")})}
+	failing := Refresher{StateDir: dir, Version: "v4.0.0", Agents: agents.New(agentstest.Refreshing{ID: "a", Err: errors.New("busy")})}
 	if _, err := failing.Run(t.Context()); err == nil {
 		t.Fatal("Run did not report the failure")
 	}
 	if !selfupdate.NeedsRefresh(dir, "v4.0.0") {
 		t.Fatal("a failed refresh was recorded")
 	}
-	fine := Refresher{StateDir: dir, Version: "v4.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"})}
+	fine := Refresher{StateDir: dir, Version: "v4.0.0", Agents: agents.New(agentstest.Refreshing{ID: "a", Path: "/x"})}
 	if changed, err := fine.Run(t.Context()); err != nil || len(changed) != 1 {
 		t.Fatalf("Run = %v, %v", changed, err)
 	}
@@ -73,7 +73,7 @@ func TestARefreshRewritesAStaleRelayService(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	calls := 0
-	stale := Refresher{StateDir: dir, Version: "v5.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"}),
+	stale := Refresher{StateDir: dir, Version: "v5.0.0", Agents: agents.New(agentstest.Refreshing{ID: "a", Path: "/x"}),
 		RelayService: func(context.Context) (string, bool, error) { calls++; return "/svc.plist", true, nil }}
 	changed, err := stale.Run(t.Context())
 	if err != nil || calls != 1 || !slices.Equal(changed, []string{"/x", "/svc.plist"}) {
@@ -91,7 +91,7 @@ func TestARefreshRewritesAStaleRelayService(t *testing.T) {
 func TestAFailedRelayServiceRefreshIsRetried(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	broken := Refresher{StateDir: dir, Version: "v6.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"}),
+	broken := Refresher{StateDir: dir, Version: "v6.0.0", Agents: agents.New(agentstest.Refreshing{ID: "a", Path: "/x"}),
 		RelayService: func(context.Context) (string, bool, error) {
 			return "", false, errors.New("launchctl bootstrap: denied")
 		}}

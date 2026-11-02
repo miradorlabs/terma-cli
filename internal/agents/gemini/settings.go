@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,9 +65,7 @@ func connectRelay(endpoint string, hookCommand []string) (settings, extension st
 		tel = map[string]any{}
 	}
 	// The relay withholds content per project, so the exporter sends it all.
-	for k, v := range map[string]any{"enabled": true, "target": "local", "otlpEndpoint": endpoint, "otlpProtocol": "http", "logPrompts": true, "traces": true} {
-		tel[k] = v
-	}
+	maps.Copy(tel, map[string]any{"enabled": true, "target": "local", "otlpEndpoint": endpoint, "otlpProtocol": "http", "logPrompts": true, "traces": true})
 	doc["telemetry"] = tel
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {

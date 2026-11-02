@@ -22,7 +22,7 @@ func (g gatedAgent) UserHooksTrusted() (bool, bool, error) {
 // with none, or one the developer does not use, adds no line at all.
 func TestUserHooksCheckWarnsWhenAnAgentSkipsThem(t *testing.T) {
 	t.Parallel()
-	reg := agents.New(gatedAgent{Agent: agentstest.Agent{ID: "gated"}, present: true})
+	reg := agents.New(gatedAgent{ID: "gated", present: true})
 	c, ok := UserHooksCheck(reg, nil)
 	if !ok || c.Status != Warn || c.Fix != "approve them" {
 		t.Fatalf("untrusted = %+v, %v", c, ok)
@@ -30,11 +30,11 @@ func TestUserHooksCheckWarnsWhenAnAgentSkipsThem(t *testing.T) {
 	if _, ok := UserHooksCheck(reg, []string{"other"}); ok {
 		t.Fatal("an agent the developer does not use was checked")
 	}
-	reg = agents.New(gatedAgent{Agent: agentstest.Agent{ID: "gated"}, present: true, trusted: true})
+	reg = agents.New(gatedAgent{ID: "gated", present: true, trusted: true})
 	if c, ok := UserHooksCheck(reg, nil); !ok || c.Status != Pass {
 		t.Fatalf("trusted = %+v, %v", c, ok)
 	}
-	reg = agents.New(gatedAgent{Agent: agentstest.Agent{ID: "gated"}})
+	reg = agents.New(gatedAgent{ID: "gated"})
 	if _, ok := UserHooksCheck(reg, nil); ok {
 		t.Fatal("an agent with no machine-wide hooks was checked")
 	}
