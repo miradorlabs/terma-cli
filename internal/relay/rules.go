@@ -15,19 +15,20 @@ import (
 
 // rules compose every agent's telemetry shape once: a key that is content for any agent is content for all.
 type rules struct {
-	sessionKeys          []shape.SessionKey
-	startEvents          []string
-	promptFields         []string
-	promptDropFields     []string
-	promptBodyEvents     []string
-	resourcePromptFields []string
-	toolContentFields    []string
-	toolContentEvents    []string
-	agents               []shape.CaptureRules
-	bodyPrefixes         []string
-	safeKeys             map[string]bool
-	safePrefixes         []string
-	metricSafeKeys       map[string][]string // metric name → keys safe on its data points
+	sessionKeys                  []shape.SessionKey
+	startEvents                  []string
+	promptFields                 []string
+	promptDropFields             []string
+	promptBodyEvents             []string
+	resourcePromptFields         []string
+	toolContentFields            []string
+	toolContentEvents            []string
+	toolContentFieldsByOperation map[string][]string
+	agents                       []shape.CaptureRules
+	bodyPrefixes                 []string
+	safeKeys                     map[string]bool
+	safePrefixes                 []string
+	metricSafeKeys               map[string][]string // metric name → keys safe on its data points
 }
 
 const defaultMarker = "<REDACTED>"
@@ -61,6 +62,7 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 	})
 	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
 	r.metricSafeKeys = map[string][]string{}
+	r.toolContentFieldsByOperation = map[string][]string{}
 	all := []shape.CaptureRules{generic}
 	for _, c := range capturers {
 		all = append(all, c.CaptureRules())
@@ -72,6 +74,9 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 		r.resourcePromptFields = union(r.resourcePromptFields, c.ResourcePromptFields)
 		r.toolContentFields = union(r.toolContentFields, c.ToolContentFields)
 		r.toolContentEvents = union(r.toolContentEvents, c.ToolContentEvents)
+		for operation, keys := range c.ToolContentFieldsByOperation {
+			r.toolContentFieldsByOperation[operation] = union(r.toolContentFieldsByOperation[operation], keys)
+		}
 		r.bodyPrefixes = union(r.bodyPrefixes, c.BodyPrefixes)
 		for _, k := range c.SafeKeys {
 			r.safeKeys[k] = true

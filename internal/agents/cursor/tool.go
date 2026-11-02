@@ -10,14 +10,13 @@ import (
 )
 
 // postToolUse records one finished tool call: the generic pair is the one place a
-// tool_use_id and a duration arrive together. Tool inputs, outputs, error messages and
-// the tool's working directory are never read.
+// tool_use_id and a duration arrive together. A failure carries its error as tool content.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUse")
 }
 
 // postToolUseFailure is postToolUse's record for a failed call, with the failure type
-// and nothing of the error's text.
+// and its error text as tool content.
 func postToolUseFailure(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUseFailure")
 }
@@ -72,6 +71,9 @@ func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool
 		a[semconv.TermaOperationStatusKey] = "completed"
 	case "postToolUseFailure":
 		a[semconv.TermaOperationStatusKey] = "error"
+		if in.ErrorMessage != "" {
+			a[semconv.GenAIToolCallResultKey] = in.ErrorMessage
+		}
 		switch in.FailureType {
 		case "error", "timeout", "permission_denied":
 			a[semconv.ErrorTypeKey] = in.FailureType

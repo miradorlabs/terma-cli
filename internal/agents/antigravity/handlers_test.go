@@ -293,8 +293,11 @@ func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
 		switch e.Name {
 		case semconv.TermaToolCallEvent:
 			got = append(got, "call "+e.Attrs[semconv.GenAIToolCallIDKey].(string)+" "+e.Attrs[semconv.TermaOperationStatusKey].(string)+" "+turn)
+			if e.Attrs[semconv.GenAIToolCallIDKey] == "step-11" && e.Attrs[semconv.GenAIToolCallResultKey] != "tool crashed" {
+				t.Error("tool failure content lost")
+			}
 			if _, ok := e.Attrs["error"]; ok {
-				t.Error("a tool's error text must not travel")
+				t.Error("error text must use result content")
 			}
 		case semconv.TermaSessionObservationEvent:
 			got = append(got, e.Attrs[semconv.TermaHookEventKey].(string)+" "+turn)

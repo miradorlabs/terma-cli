@@ -51,6 +51,7 @@ type cursorHookInput struct {
 	ToolName             string          `json:"tool_name"`
 	ToolUseID            string          `json:"tool_use_id"`
 	Duration             json.RawMessage `json:"duration"`
+	ErrorMessage         string          `json:"error_message"`
 	FailureType          string          `json:"failure_type"`
 	IsInterrupt          json.RawMessage `json:"is_interrupt"`
 	ModelParams          []struct {

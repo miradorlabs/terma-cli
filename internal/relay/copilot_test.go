@@ -202,8 +202,8 @@ func TestRelayKeepsHowACopilotCallFailed(t *testing.T) {
 			t.Errorf("%s left as %q, want %q", kept.where, kept.got, kept.want)
 		}
 	}
-	if got := unclassified(r); !slices.Equal(got, []string{"exception.message"}) {
-		t.Errorf("the relay withheld %q as no rule's, want only the exception's message", got)
+	if got := unclassified(r); len(got) != 0 {
+		t.Errorf("tool exception content is classified, got unclassified %q", got)
 	}
 }
 

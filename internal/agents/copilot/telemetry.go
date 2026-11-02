@@ -13,7 +13,8 @@ func (Agent) Correlation() shape.Correlation {
 // attributes every agent shares: it restates a shell tool's command and a file tool's path.
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
-		ToolContentFields: []string{"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path"},
+		ToolContentFields:            []string{"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path"},
+		ToolContentFieldsByOperation: map[string][]string{"execute_tool": {"exception.message"}},
 		// Strings only: a number or a flag passes whatever its key (a request's AI credits,
 		// its billing multiplier), and a key no rule names is withheld with the content.
 		// Each is one CLI 1.0.96 sends, read from its own export, but for the last three.
@@ -35,7 +36,7 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			"github.copilot.sandbox.enforcement_point", "github.copilot.sandbox.outcome", "github.copilot.sandbox.platform",
 			// How a call failed, as a code and a class (a tool denied its permission sends
 			// "denied" and "ToolError"), and what a permission was asked for and came to. The
-			// failure's own words, exception.message, are no rule's and stay withheld.
+			// failure's own words follow tool content on execute_tool alone.
 			"error.type", "exception.type", "github.copilot.error_code",
 			"github.copilot.permission.kind", "github.copilot.permission.result",
 			// Named by the runtime, on no captured span: an MCP tool's server and tool, which

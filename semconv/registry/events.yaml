@@ -509,6 +509,10 @@ events:
           content, withheld unless the team's policy collects it.
         annotations:
           content: tool
+      - ref: gen_ai.tool.call.result
+        note: The tool output or failure text. Withheld unless the team collects tool content.
+        annotations:
+          content: tool
       - ref: terma.capture.surface
       - ref: terma.turn.id
       - ref: terma.step.index

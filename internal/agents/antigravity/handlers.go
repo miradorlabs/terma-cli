@@ -28,7 +28,7 @@ type antigravityHookInput struct {
 	ConversationID string   `json:"conversationId"`
 	WorkspacePaths []string `json:"workspacePaths"`
 	ModelName      string   `json:"modelName"`
-	// Error is failure text; only its presence is recorded, since the text is content.
+	// Error is failure text; a tool call records it under the tool-content policy.
 	Error string `json:"error"`
 	// PostToolUse.
 	StepIdx  json.RawMessage `json:"stepIdx"`
@@ -218,6 +218,7 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	a[semconv.TermaOperationStatusKey] = "completed"
 	if in.Error != "" {
 		a[semconv.TermaOperationStatusKey] = "error"
+		a[semconv.GenAIToolCallResultKey] = in.Error
 	}
 	return a, true
 }

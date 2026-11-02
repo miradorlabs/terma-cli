@@ -25,13 +25,13 @@ func cursorToolRun(t *testing.T, env hookrun.Env, hook, turn string, fields map[
 }
 
 // Every tool call is one event keyed on Cursor's call id, with name, duration and outcome,
-// and none of tool_input, tool_output or error_message.
-func TestCursorToolCallsAreRecordedWithoutContent(t *testing.T) {
+// with error_message as result content on failures, and none of tool_input or tool_output.
+func TestCursorToolCallsIncludeFailureContent(t *testing.T) {
 	t.Parallel()
 	env := testEnv(t)
 	private := map[string]any{
 		"tool_input": map[string]any{"command": "secret-command"}, "tool_output": "secret-output",
-		"error_message": "secret-error", "agent_message": "secret-note", "cwd": "/secret/cwd",
+		"error_message": "tool failure", "agent_message": "secret-note", "cwd": "/secret/cwd",
 		"model_params": []map[string]string{{"id": "thinking", "value": "high"}, {"id": "secret", "value": "x"}},
 	}
 	with := func(extra map[string]any) map[string]any {
@@ -82,10 +82,16 @@ func TestCursorToolCallsAreRecordedWithoutContent(t *testing.T) {
 	if evs[1].Attrs[semconv.TermaOperationDurationMsKey] != float64(0) || evs[1].Attrs[semconv.GenAIToolNameKey] != "MCP:linear_search" {
 		t.Fatal("explicit zero duration or MCP tool name lost:", evs[1].Attrs)
 	}
+	if first[semconv.GenAIToolCallResultKey] != nil || evs[1].Attrs[semconv.GenAIToolCallResultKey] != nil {
+		t.Fatal("a successful call copied error text")
+	}
 	third := evs[2].Attrs
 	if third[semconv.TermaHookEventKey] != "postToolUseFailure" || third[semconv.TermaOperationStatusKey] != "error" || third[semconv.ErrorTypeKey] != "timeout" ||
 		third[semconv.TermaOperationInterruptedKey] != false || third[semconv.TermaOperationDurationMsKey] != float64(12) {
 		t.Fatal(third)
+	}
+	if third[semconv.GenAIToolCallResultKey] != "tool failure" {
+		t.Fatal("failure text lost", third)
 	}
 	fourth := evs[3].Attrs
 	if fourth[semconv.ErrorTypeKey] != semconv.ErrorTypeOther || fourth[semconv.TermaOperationInterruptedKey] != true || fourth[semconv.TermaTurnIDKey] != "turn-b" {

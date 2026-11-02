@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +27,21 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 		return out
 	}
 	apply := func(attrs []*commonpb.KeyValue) []*commonpb.KeyValue { return applyIn(attrs, false) }
+	applyFor := func(attrs []*commonpb.KeyValue, operation string, toolEvent bool) []*commonpb.KeyValue {
+		var toolAttrs []*commonpb.KeyValue
+		attrs = slices.DeleteFunc(attrs, func(kv *commonpb.KeyValue) bool {
+			if !contains(ru.toolContentFieldsByOperation[operation], kv.GetKey()) {
+				return false
+			}
+			if toolContent {
+				toolAttrs = append(toolAttrs, kv)
+			} else {
+				changed++
+			}
+			return true
+		})
+		return append(applyIn(attrs, toolEvent), toolAttrs...)
+	}
 	// onMetric withholds from a metric's data points, where the keys its agent lists under the
 	// metric are safe too (shape.CaptureRules.MetricSafeKeys).
 	onMetric := func(metric string) func([]*commonpb.KeyValue) []*commonpb.KeyValue {
@@ -113,8 +129,8 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 					sl.Scope.Attributes = apply(sl.Scope.Attributes)
 				}
 				for _, lr := range sl.GetLogRecords() {
-					lr.Attributes = apply(lr.GetAttributes())
-					event := attrString(lr.GetAttributes(), "event.name")
+					event := cmp.Or(lr.GetEventName(), attrString(lr.GetAttributes(), "event.name"), lr.GetBody().GetStringValue())
+					lr.Attributes = applyFor(lr.GetAttributes(), event, false)
 					_, plain := lr.GetBody().GetValue().(*commonpb.AnyValue_StringValue)
 					body := lr.GetBody().GetStringValue()
 					switch {
@@ -142,14 +158,15 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 				}
 				for _, sp := range ss.GetSpans() {
 					// Provider errors can repeat either prompts or tool input/output.
-					if sp.Status != nil && sp.Status.Message != "" {
+					operation := attrString(sp.GetAttributes(), "gen_ai.operation.name")
+					if sp.Status != nil && sp.Status.Message != "" && (!toolContent || len(ru.toolContentFieldsByOperation[operation]) == 0) {
 						sp.Status.Message = ""
 						changed++
 					}
 					for _, link := range sp.Links {
 						link.Attributes = apply(link.Attributes)
 					}
-					sp.Attributes = apply(sp.GetAttributes())
+					sp.Attributes = applyFor(sp.GetAttributes(), operation, false)
 					events := sp.GetEvents()[:0]
 					for _, ev := range sp.GetEvents() {
 						toolEvent := contains(ru.toolContentEvents, ev.GetName())
@@ -158,7 +175,7 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 							continue
 						}
 						// An unnamed key in a tool-content event is the tool's own output.
-						ev.Attributes = applyIn(ev.GetAttributes(), toolEvent)
+						ev.Attributes = applyFor(ev.GetAttributes(), operation, toolEvent)
 						events = append(events, ev)
 					}
 					sp.Events = events

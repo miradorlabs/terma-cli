@@ -49,6 +49,8 @@ type CaptureRules struct {
 	// ToolContentFields and ToolContentEvents are removed when tool content is withheld.
 	ToolContentFields []string
 	ToolContentEvents []string
+	// ToolContentFieldsByOperation classifies keys only on the named log event or span operation.
+	ToolContentFieldsByOperation map[string][]string
 	// MarkerKeys mark the agent's attribute sets: in one carrying any of them, Marker replaces
 	// a prompt field and Principal applies.
 	Marker       string

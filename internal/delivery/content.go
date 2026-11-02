@@ -17,7 +17,7 @@ import (
 // event leaves decides what of it does, as the relay decides for exports. A reply or a
 // thread's name is what was said through and through, so Allowed sends it or not, whole.
 var hookContent = map[string][]string{
-	semconv.TermaToolCallEvent:          {semconv.GenAIToolCallArgumentsKey},
+	semconv.TermaToolCallEvent:          {semconv.GenAIToolCallArgumentsKey, semconv.GenAIToolCallResultKey},
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
 }
 
