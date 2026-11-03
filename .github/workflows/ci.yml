@@ -181,9 +181,10 @@ jobs:
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
       # Copilot CLI runs against GitHub's service on this job's token, in the copilot shard
-      # alone. A fork's pull request gets a read-only one, so there the Copilot tests skip
+      # alone. A fork's pull request gets a read-only one, and so does any run Dependabot
+      # triggers (its `permissions:` cannot be raised), so there the Copilot tests skip
       # rather than fail.
-      COPILOT_GITHUB_TOKEN: ${{ matrix.shard == 'copilot' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.token || '' }}
+      COPILOT_GITHUB_TOKEN: ${{ matrix.shard == 'copilot' && github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.token || '' }}
       TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
       # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
