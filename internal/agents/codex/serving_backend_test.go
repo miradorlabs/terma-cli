@@ -185,6 +185,19 @@ base_url = "https://llm.corp.example/v1"
 		t.Fatalf("a cursor from before the provider was tracked: %+v, want no backend", quotas)
 	}
 
+	appendRollout(resumed("azure"))
+	if quotas = stopOn(); len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != semconv.TermaServingBackendAzureOpenai {
+		t.Fatalf("resumed on azure again: %+v", quotas)
+	}
+	// An unreadable record may have been a move, so what follows sends no backend until the next.
+	appendRollout(`{"timestamp":"2026-10-30T05:00:05Z","type":"event_msg","payload":{"type":"thread_settings_applied"` + "\n" +
+		`{"timestamp":"2026-10-30T05:00:06Z","type":"event_msg","payload":{"type":"token_count","rate_limits":null}}` + "\n")
+	quotas = stopOn()
+	if len(quotas) != 2 || quotas[0].Attrs[semconv.TermaEvidenceStatusKey] != "gap" ||
+		quotas[0].Attrs[semconv.TermaServingBackendKey] != nil || quotas[1].Attrs[semconv.TermaServingBackendKey] != nil {
+		t.Fatalf("after an unreadable record: %+v, want its gap and the next quota with no backend", quotas)
+	}
+
 	appendRollout(resumed("gateway"))
 	quotas = stopOn()
 	raw, _ := json.Marshal(quotas)

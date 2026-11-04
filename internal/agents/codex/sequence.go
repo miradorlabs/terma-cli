@@ -128,6 +128,8 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				}
 				return checkpoint("incomplete", nil)
 			}
+			// The skipped record may move the thread to another provider.
+			cursor.Provider = ""
 			if err := gap(cursor.Offset); err != nil {
 				return checkpoint("append_failed", err)
 			}
@@ -150,6 +152,7 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				} `json:"payload"`
 			}
 			if json.Unmarshal(line, &rec) != nil {
+				cursor.Provider = ""
 				if err := gap(cursor.Offset); err != nil {
 					return checkpoint("append_failed", err)
 				}
