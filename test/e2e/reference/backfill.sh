@@ -11,6 +11,11 @@
 #   test/e2e/reference/backfill.sh codex 100 ../../live/backfill
 #
 # then render the reference from every profile captured (refgen's -profiles, repeated).
+#
+# BACKFILL_VERSIONS names the builds instead of the last <count> (a re-capture of some), and
+# BACKFILL_TESTS the scenarios (a supplement: refgen keeps each scenario's latest capture of a
+# build, so a pass of only the newer scenarios adds to an earlier full one). Stopping the run
+# stops its workers too.
 set -euo pipefail
 
 harness=${1:?usage: backfill.sh <claude|codex|gemini|opencode|copilot> <count> [outdir]}
@@ -31,8 +36,13 @@ copilot) pkg=@github/copilot name=Copilot ;;
 esac
 var="TERMA_E2E_$(tr '[:lower:]' '[:upper:]' <<<"$harness")_VERSIONS"
 
-versions=$(curl -fsSL -H "Accept: application/vnd.npm.install-v1+json" "https://registry.npmjs.org/${pkg//\//%2F}" |
-	jq -r '.versions | keys[]' | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V | tail -n "$count")
+if [ -n "${BACKFILL_VERSIONS:-}" ]; then
+	versions=$(tr ', ' '\n\n' <<<"$BACKFILL_VERSIONS" | grep . | sort -V)
+else
+	versions=$(curl -fsSL -H "Accept: application/vnd.npm.install-v1+json" "https://registry.npmjs.org/${pkg//\//%2F}" |
+		jq -r '.versions | keys[]' | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V | tail -n "$count")
+fi
+tests=${BACKFILL_TESTS:-"^Test${name}(Profile|Probe)"}
 
 # One terma and one test binary for the whole run; a parallel run of another harness
 # builds its own.
@@ -56,7 +66,7 @@ one() {
 	start=$(date +%s)
 	if ! env TERMA_ENV=dev TERMA_E2E=1 TERMA_E2E_BINARY="$bin/terma" TERMA_E2E_REPORT="$dir" "$var=$v" \
 		TERMA_E2E_VERSIONS_DIR="$out/.versions" \
-		"$bin/e2e.test" -test.v -test.timeout 30m -test.run "^Test${name}(Profile|Probe)" -test.skip 'ProfileTelemetry|Offline$' \
+		"$bin/e2e.test" -test.v -test.timeout 30m -test.run "$tests" -test.skip 'ProfileTelemetry|Offline$' \
 		>"$dir/log" 2>&1; then
 		status=fail
 	fi
@@ -66,13 +76,21 @@ one() {
 }
 
 # BACKFILL_JOBS builds at once (default 3): each in its own sandboxes and download folder.
-export harness out bin var name summary
+# Workers outlive a stopped xargs, and two runs of one build remove each other's download:
+# stopping the run stops its workers.
+trap 'pkill -f -- "$bin/e2e.test" 2>/dev/null; pkill -P $$ 2>/dev/null' EXIT INT TERM
+export harness out bin var name summary tests
 export -f one
 echo "$versions" | xargs -P "${BACKFILL_JOBS:-3}" -I{} bash -c 'one "$1"' _ {}
 # Once more for a build that failed (a binary macOS removed mid-run, a machine too busy): its
 # second result is the one kept.
 for v in $(awk -F'\t' -v h="$harness" '$1 == h && $3 ~ /fail/ {print $2}' "$summary" | sort -u); do
-	[ -n "$(grep -E "^(--- FAIL)" "$out/$harness/$v/log" 2>/dev/null | grep -v ProbeSubagent)" ] || continue
+	# A failure past the expected one (a subagent probe on a build that has none), or a
+	# capture whose binary went missing under it.
+	if [ -z "$(grep -E "^(--- FAIL)" "$out/$harness/$v/log" 2>/dev/null | grep -v ProbeSubagent)" ] &&
+		! grep -q 'no such file or directory' "$out/$harness/$v/profiles.json" 2>/dev/null; then
+		continue
+	fi
 	rm -rf "${out:?}/$harness/$v"
 	echo "$v"
 done | xargs -P "${BACKFILL_JOBS:-3}" -I{} bash -c 'one "$1"' _ {}
