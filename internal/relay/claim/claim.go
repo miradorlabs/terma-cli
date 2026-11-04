@@ -57,6 +57,10 @@ type Claim struct {
 	Remote    string    `json:"remote,omitempty"`
 	Branch    string    `json:"branch,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
+	// EndedAt is when the session's agent reported its end, zero while it runs. The relay
+	// ignores it, since the agent still exports as it exits; an agent hook's later write
+	// clears it, a git hook's keeps it.
+	EndedAt time.Time `json:"ended_at,omitzero"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
 	PIDs []int `json:"pids,omitempty"`
@@ -88,6 +92,10 @@ type Placement struct {
 const maxPIDs = 64
 
 const maxPlacements = 8
+
+// FromAgent reports whether an agent's hook has claimed the session: a git hook's claim
+// names no directory, and keeps the one an agent's hook named.
+func (c Claim) FromAgent() bool { return c.Cwd != "" }
 
 // Covers reports whether pid may send under this claim's latest placement.
 func (c Claim) Covers(pid int) bool {
@@ -178,6 +186,31 @@ func Mark(dir, sessionID, tool string, pids []int, now time.Time) bool {
 	return write(dir, sessionID, Claim{Tool: tool, PIDs: pids}, now)
 }
 
+// End records that sessionID's session under the state directory dir ended now, keeping its
+// fresh claim for what the agent still sends; it reports whether it wrote.
+func End(dir, sessionID string, now time.Time) bool {
+	p, ok := path(dir, sessionID)
+	if !ok {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
+	unlock, err := flock.Lock(ctx, p+".lock")
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
+	c, ok := Read(dir, sessionID, now)
+	if !ok {
+		return false
+	}
+	c.EndedAt = now.UTC()
+	data, err := json.Marshal(c)
+	if err != nil {
+		return false
+	}
+	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
+}
+
 func write(dir, sessionID string, c Claim, now time.Time) bool {
 	refresh := Refresh
 	if c.ProjectID == "" {
@@ -215,8 +248,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		if c.Tool == "" {
 			c.Tool = prev.Tool
 		}
-		if c.Cwd == "" {
-			c.Cwd = prev.Cwd
+		// A git hook's claim is no new run of the agent.
+		if !c.FromAgent() {
+			c.Cwd, c.EndedAt = prev.Cwd, prev.EndedAt
 		}
 		placements = prev.placements()
 		placements = placements[:len(placements)-1]
