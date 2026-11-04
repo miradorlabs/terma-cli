@@ -235,7 +235,8 @@ func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 
 // Once a session has ended, its agent has exited and the nearest running process is its
 // launcher, which is not judged: even where a subagent's claim, which never ends, names the
-// same processes. The same agent process claimed again later, for a new session, is.
+// same processes, and after a commit made by hand. The same agent process claimed again
+// later, for a new session, is.
 func TestAgentEnvCheckSkipsAnEndedSession(t *testing.T) {
 	t.Parallel()
 	reg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
@@ -251,10 +252,15 @@ func TestAgentEnvCheckSkipsAnEndedSession(t *testing.T) {
 	if c := AgentEnvCheck(reg, dir, relay, exited, now); c.Status != Skip {
 		t.Fatalf("check = %+v, want a skip: the agent has exited", c)
 	}
+	// The developer then commits the agent's work from the launcher's shell: hook script 400, git 401.
+	claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{400, 401, hostPID}}, now)
+	if c := AgentEnvCheck(reg, dir, relay, exited, now); c.Status != Skip {
+		t.Fatalf("check after a commit = %+v, want a skip: the agent has exited", c)
+	}
 	// The agent cleared its conversation: one session ended, another runs in the same process.
-	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{101, agentPID, hostPID}}, now)
+	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: []int{101, agentPID, hostPID}}, now.Add(time.Second))
 	running := processes(map[int][]string{agentPID: {"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}, hostPID: {"HOME=/home/dev"}})
-	if c := AgentEnvCheck(reg, dir, relay, running, now); c.Status != Warn || !strings.Contains(c.Detail, "fake (pid 200)") {
+	if c := AgentEnvCheck(reg, dir, relay, running, now.Add(time.Second)); c.Status != Warn || !strings.Contains(c.Detail, "fake (pid 200)") {
 		t.Fatalf("check = %+v, want the running agent judged", c)
 	}
 }

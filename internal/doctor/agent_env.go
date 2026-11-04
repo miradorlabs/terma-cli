@@ -44,10 +44,10 @@ const envFix = "remove those variables where they are set: the process that star
 // launcher. Only variable names are said, never a value: an endpoint or header may hold a
 // credential.
 //
-// Accepted risk: an agent that exits without its end hook (a crash, a kill) leaves its claim
-// fresh for claim.TTL, so its launcher is judged as the agent and a launcher that sets no
-// exporter variable of its own reads as a pass. Telling the agent's own process apart (by
-// its executable) would close it.
+// Accepted risk: an agent that exits without its end hook completing (a crash, a kill, the
+// hook's timeout) leaves its claim fresh for claim.TTL, so its launcher is judged as the
+// agent and a launcher that sets no exporter variable of its own reads as a pass. Telling the
+// agent's own process apart (by its executable) would close it.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	type proc struct {
 		agent string

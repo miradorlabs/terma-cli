@@ -58,7 +58,8 @@ type Claim struct {
 	Branch    string    `json:"branch,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
 	// EndedAt is when the session's agent reported its end, zero while it runs. The relay
-	// ignores it, since the agent still exports as it exits; a later write clears it.
+	// ignores it, since the agent still exports as it exits; an agent hook's later write
+	// clears it, a git hook's keeps it.
 	EndedAt time.Time `json:"ended_at,omitzero"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
@@ -243,8 +244,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		if c.Tool == "" {
 			c.Tool = prev.Tool
 		}
+		// A claim naming no directory is a git hook's, which is no new run of the agent.
 		if c.Cwd == "" {
-			c.Cwd = prev.Cwd
+			c.Cwd, c.EndedAt = prev.Cwd, prev.EndedAt
 		}
 		placements = prev.placements()
 		placements = placements[:len(placements)-1]

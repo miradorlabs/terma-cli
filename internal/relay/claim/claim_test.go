@@ -471,13 +471,14 @@ func TestListReturnsFreshClaims(t *testing.T) {
 	}
 }
 
-// End marks a fresh claim ended and keeps it for the relay; a run in another process clears
-// the mark, and a stale or missing claim is neither marked nor revived.
+// End marks a fresh claim ended and keeps it for the relay; a commit made afterwards (a git
+// hook's claim, naming no directory) keeps the mark, a run of the agent in another process
+// clears it, and a stale or missing claim is neither marked nor revived.
 func TestEndKeepsTheClaimUntilANewRun(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	Write(dir, "sess-1", Claim{ProjectID: "p1", PIDs: []int{101, 201}}, now)
+	Write(dir, "sess-1", Claim{ProjectID: "p1", Cwd: "/work/a", PIDs: []int{101, 201}}, now)
 	if !End(dir, "sess-1", now.Add(time.Second)) {
 		t.Fatal("End did not write")
 	}
@@ -485,8 +486,12 @@ func TestEndKeepsTheClaimUntilANewRun(t *testing.T) {
 	if !ok || !got.EndedAt.Equal(now.Add(time.Second)) || !got.Covers(201) {
 		t.Fatalf("after End: %+v, %v; want the claim kept, ended", got, ok)
 	}
-	Write(dir, "sess-1", Claim{ProjectID: "p1", PIDs: []int{102, 202}}, now.Add(2*time.Second))
-	if got, _ := Read(dir, "sess-1", now.Add(2*time.Second)); !got.EndedAt.IsZero() || !got.Covers(202) {
+	Write(dir, "sess-1", Claim{ProjectID: "p1", PIDs: []int{401, 301}}, now.Add(2*time.Second))
+	if got, _ := Read(dir, "sess-1", now.Add(2*time.Second)); got.EndedAt.IsZero() || !got.Covers(301) {
+		t.Fatalf("after a commit: %+v, want the end kept", got)
+	}
+	Write(dir, "sess-1", Claim{ProjectID: "p1", Cwd: "/work/a", PIDs: []int{102, 202}}, now.Add(3*time.Second))
+	if got, _ := Read(dir, "sess-1", now.Add(3*time.Second)); !got.EndedAt.IsZero() || !got.Covers(202) {
 		t.Fatalf("after a new run: %+v, want the end cleared", got)
 	}
 	if End(dir, "missing", now) {
