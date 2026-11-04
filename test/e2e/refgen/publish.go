@@ -278,16 +278,20 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 // recentLimit bounds the feed.
 const recentLimit = 200
 
-// recentOf is the feed: the newest versions across every harness, newest release first (a
-// version whose release is not known by when it was captured).
+// recentOf is the feed: the newest versions across every harness, newest release first.
 func recentOf(entries []RecentEntry, now time.Time) Recent {
-	when := func(e RecentEntry) time.Time {
-		if e.ReleasedAt != nil {
-			return *e.ReleasedAt
+	// A version whose release date is known goes by it; one whose is not (an app no registry
+	// dates) after them, by when it was captured: a backfill captures old builds tonight.
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		switch {
+		case a.ReleasedAt != nil && b.ReleasedAt != nil:
+			return a.ReleasedAt.After(*b.ReleasedAt)
+		case a.ReleasedAt != nil || b.ReleasedAt != nil:
+			return a.ReleasedAt != nil
 		}
-		return e.CapturedAt
-	}
-	sort.SliceStable(entries, func(i, j int) bool { return when(entries[i]).After(when(entries[j])) })
+		return a.CapturedAt.After(b.CapturedAt)
+	})
 	if len(entries) > recentLimit {
 		entries = entries[:recentLimit]
 	}

@@ -125,7 +125,10 @@ func marshalPlain(v any) []byte {
 }
 
 // keptKeys hold the capture's own values, not the build's: when a request arrived.
-var keptKeys = map[string]bool{"at": true}
+// A signature's certificate fingerprint, serial and dates are facts of the build, not of the
+// run: no id or date of this machine's.
+var keptKeys = map[string]bool{"at": true, "checked_at": true, "signed_at": true, "not_before": true,
+	"not_after": true, "serial": true, "sha256": true}
 
 // walkStrings applies f to every string in v, map keys included, but for the values of
 // keptKeys.

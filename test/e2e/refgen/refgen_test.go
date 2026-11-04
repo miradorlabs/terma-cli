@@ -469,3 +469,28 @@ func TestIsSubagent(t *testing.T) {
 		t.Error("Claude Code's subagent not told")
 	}
 }
+
+// A signature's facts survive normalization, and a new certificate is one change; when each
+// build was signed is none.
+func TestSigningNormalizedAndCompared(t *testing.T) {
+	sig := func(serial, signedAt string) json.RawMessage {
+		data, _ := json.Marshal(map[string]any{"status": "valid", "signed_at": signedAt, "checked_at": "2026-11-04T04:35:53Z",
+			"certificate": map[string]any{"subject": "Developer ID Application: X", "serial": serial,
+				"sha256": "9935b17bbc8e5127656097958e229eaa031c972c2e0da530cdb90f354777cbd5", "not_before": "2024-01-23T06:19:53Z"}})
+		return data
+	}
+	a := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	a.Probes = map[string]json.RawMessage{"signing": sig("68A68AF8A434EE4FDE46F8680B23BDCC", "25 Jan 2026 at 17:11:12")}
+	b := claudeProfile("1.0.1", "Be brief.", []string{"Bash"}, "", "")
+	b.Probes = map[string]json.RawMessage{"signing": sig("1234", "26 Jan 2026 at 10:00:00")}
+	sa := night{now: time.Now(), profiles: []e2e.Profile{a}}.tonight(buildID{"claude", "1.0.0"})
+	sb := night{now: time.Now(), profiles: []e2e.Profile{b}}.tonight(buildID{"claude", "1.0.1"})
+	cert := sa.Binary["signing"].(map[string]any)["certificate"].(map[string]any)
+	if cert["sha256"] != "9935b17bbc8e5127656097958e229eaa031c972c2e0da530cdb90f354777cbd5" || cert["not_before"] != "2024-01-23T06:19:53Z" {
+		t.Errorf("certificate normalized away: %v", cert)
+	}
+	d := refdiff.New(sa, sb, nil, time.Now())
+	if len(d.Changes) != 1 || d.Changes[0].ID != "binary.signing.certificate" || d.Changes[0].Title != "Signed with a different certificate" {
+		t.Errorf("changes = %+v", d.Changes)
+	}
+}

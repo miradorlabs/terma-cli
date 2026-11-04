@@ -226,6 +226,26 @@ model's) is part of the name and stays.
 }
 ```
 
+### live
+
+The published first turn runs with the feature flags the build ships with: it is taken behind
+a local proxy that answers every request but the model's empty, so the build's flag service,
+bootstrap and the like return nothing and it falls back to its defaults (`capture.notes` says
+so). `live` is the same turn as it ran with the vendor's live server-side flags that night:
+
+```json
+"live": { "prompt": { "system": [ … ], "context": [ … ], "chars": 7012, "sha256": "…" },
+          "model": "claude-opus-5-5", "tools": ["Agent", "Bash", "Monitor"], "differs": true }
+```
+
+`differs` says whether the live flags changed the prompt. A rollout changes `live` from night to
+night whatever the build, so it is no section: it is never compared, and a diff never says it.
+Absent where there was no proxied turn to compare it with.
+
+In `binary.signing`, the certificate is compared as one thing (a new certificate is one change),
+and `signed_at`, `checked_at`, `assessment`, `resigned` and `authority` are never read as
+changes: they differ by nature, or say again what `status` and the certificate say.
+
 ## diffs/<from>..<to>.json
 
 ```json

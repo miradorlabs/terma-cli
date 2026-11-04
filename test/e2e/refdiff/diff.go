@@ -18,7 +18,10 @@ import (
 
 // skipKeys are derived from what they sit beside, and would only repeat a text change.
 // checked_at is when a signature was checked, not what it says.
-var skipKeys = map[string]bool{"sha256": true, "chars": true, "checked_at": true}
+// signed_at differs from build to build by nature; assessment, resigned and authority say again
+// what status and the certificate say.
+var skipKeys = map[string]bool{"sha256": true, "chars": true, "checked_at": true, "signed_at": true,
+	"assessment": true, "resigned": true, "authority": true}
 
 // compare is every change from a to b.
 func compare(a, b *Snapshot) []Change {
@@ -95,6 +98,11 @@ func keyOf(v any) string {
 // diffValue appends the changes from a to b at path.
 func diffValue(path []string, a, b any, out *[]Change) {
 	if reflect.DeepEqual(a, b) {
+		return
+	}
+	// A signing certificate is one thing: a new one is one change, whatever of it differs.
+	if len(path) >= 2 && path[len(path)-1] == "certificate" && path[len(path)-2] == "signing" {
+		*out = append(*out, Change{Op: "changed", Path: path, Before: a, After: b})
 		return
 	}
 	switch av := a.(type) {
