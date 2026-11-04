@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.142.0",
+  "to": "0.142.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.142.0...rust-v0.142.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.142.1",
+    "text": "## New Features\n\n- Added opt-in Windows system proxy support for authentication, including PAC, WPAD, static proxies, and bypass rules. (#26708)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.142.0...rust-v0.142.1\n\n- #26708 PAC 3 - Add Windows system proxy resolver @canvrno-oai"
+  },
+  "summary": {
+    "changes": 4,
+    "categories": {
+      "binary": 1,
+      "hooks": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 3
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "hooks.events.PreToolUse.control.exit_2",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "exit_2"
+      ],
+      "title": "PreToolUse hook control (exit_2) removed",
+      "impact": "notable",
+      "before": "blocks the tool; message to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1162,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/analytics/src/events.rs#L1162"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 408,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L408"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.exit_2",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "exit_2"
+      ],
+      "title": "SessionStart hook control (exit_2) removed",
+      "impact": "notable",
+      "before": "message not shown to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1167,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/analytics/src/events.rs#L1167"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 423,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L423"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.exit_2",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "exit_2"
+      ],
+      "title": "Stop hook control (exit_2) removed",
+      "impact": "notable",
+      "before": "keeps the turn going; message to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1171,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/analytics/src/events.rs#L1171"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 435,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L435"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.reqwest",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "reqwest"
+      ],
+      "title": "Binary sdk.reqwest: 0.12.28 → 0.13.4",
+      "impact": "informational",
+      "before": "0.12.28",
+      "after": "0.13.4",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

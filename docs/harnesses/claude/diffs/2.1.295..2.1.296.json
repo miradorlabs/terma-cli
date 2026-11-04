@@ -1,0 +1,518 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.295",
+  "to": "2.1.296",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added a `code` key to the Claude apps gateway's `managed.policies[]`: the same settings as `cli`, also applied in Claude Desktop's Code tab; beside `desktop`, it turns on Claude Desktop's gateway mode\n- Added `autoCompactWindow` to subagent frontmatter and `--agents` definitions, so a subagent can auto-compact earlier than the main conversation's window\n- Added `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` to run every workflow agent on one model while other subagents keep theirs\n- Added `CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS` environment variable to set a longer maximum delay for the backoff when retrying an overloaded (529) request\n- Added a note in `/plugin` on a plugin whose hooks are left out because another enabled plugin has the same name\n- Added an `allow_large` option to the Read tool so Claude can read a text file past the usual size limits in one call when it needs the whole file and the context has room\n- Fixed managed-settings `PreToolUse` hooks that deny a tool call with `\"continue\": false`, and managed `prompt` hooks that block one, refusing the call but not ending the turn\n- Fixed PostToolUse hooks in managed settings not applying `updatedMCPToolOutput` in some sessions\n- Fixed headless sessions starting a folder's `.mcp.json` or plugin MCP server that was switched off for that folder, after changing directory or reloading plugins\n- Fixed a Claude apps gateway that serves `allowedProviders` with `\"gateway\"` locking out laptops that name that gateway in user settings\n- Fixed a saved Claude apps gateway sign-in being ignored on machines whose managed settings set `forceLoginMethod` to `gateway` with no `forceLoginGatewayUrl` (regression in 2.1.295)\n- Fixed `--teleport` opening an empty conversation when the session's history could not be read\n- Fixed token counts for Haiku 5.5 and other models that take only adaptive thinking, which failed behind some gateways and were counted with budget thinking elsewhere\n- Fixed resumed subagents being told that the user rejected a tool call that a session shutdown had interrupted\n- Fixed hook output being altered when it contained text resembling a plugin hint tag\n- Fixed secret redaction in shared transcripts and debug logs missing some values that follow a key with no value, including in JSON written inside a shell string\n- Fixed a stray `52;c;…` escape sequence printed on screen after copying in older VTE-based terminals such as MATE Terminal\n- Fixed toasts and notifications waiting unseen for as long as the `/diff` panel or dialog was open\n- Fixed Esc or an interrupt during a `UserPromptSubmit` hook or a mod's `prompt.submit` hook ending headless sessions, clearing the typed prompt, or letting the unchecked prompt through\n- Fixed SessionStart hooks of a plugin loaded after a headless session starts being skipped when a different plugin with the same name, or another spelling of it, had already run\n- Fixed `claude self-hosted-runner` printing misleading errors when registration is refused: it now names the org admin setting, or says a restarted on-demand runner needs a fresh work order\n- Fixed a self-hosted runner session's git fetch, pull and push failing while another session of the same repository starts on a runner with `--capacity` above 1\n- Fixed workflow scripts silently truncating results, agent options and other values nested deeper than about 20,000 levels, and deeply nested results writing huge task output files\n- Fixed a plugin's served `$` methods running in the main session's working directory instead of the calling agent's, and ignoring the turn their calling hook holds\n- Fixed `$.agent.register` succeeding from a mod's hook that was still running after the mod was reloaded or removed; the call is now refused\n- Fixed `$.http.fetch` in mods refusing a `HEAD` request when the response declares a `Content-Length` over the 4 MiB body limit\n- Fixed `claude plugin marketplace add`, `marketplace update` and `plugin install` failing with an internal error for a marketplace named like `constructor`; `add` now refuses such names clearly\n- Fixed a plugin secret named `constructor` or `prototype` being deleted by the next save of that plugin's options\n- Fixed cloud sessions skipping auto mode's checks on Claude in Chrome actions that a saved permission allows when their feature flags had not loaded\n- Fixed `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` re-running a finished turn after a restart when an MCP tool result had ended that turn\n- Fixed Bash permission checks auto-approving some commands that assign the `BASH_ARGV0` shell variable and then use it; these now prompt for approval\n- Fixed Edit and NotebookEdit replacing every non-ASCII character in files that are not valid UTF-8 (Windows-1252, Shift-JIS, GBK); such edits are now refused\n- Fixed a prompt sent just after `←` being run twice, once unseen in the foreground, when the background service was slow to answer\n- Fixed a prompt sent while SessionStart hooks were still running vanishing when `←` moved the session to the background; it is still not sent, but `↑` now brings it back\n- Fixed a late-loading plugin's SessionStart hook output reaching the new conversation after `/clear` in headless sessions\n- Fixed PowerShell commands not seeing variables that hooks write to CLAUDE_ENV_FILE (when the file holds only plain assignments)\n- Fixed Claude calling cloud sessions non-interactive and suggesting `/mcp` or `claude mcp` when an MCP server needs authentication\n- Fixed `/code-review` ending on a raw JSON array in cloud sessions, the Agent SDK and IDE integrations; the findings now print as a numbered list\n- Fixed auto mode occasionally refusing one update to your own artifact, saying its sharing had changed when it had not\n- Fixed skills synced from claude.ai never finishing their install, and being downloaded again at every sync, when several sessions share a config directory\n- Fixed a plugin synced from claude.ai being disabled when the marketplace dependency it declares was also synced from claude.ai\n- Fixed a startup hang on macOS when plugin paths copied from a Linux machine pointed under /home\n- Fixed the Workflow tool refusing script files with CRLF line endings, such as files checked out on Windows\n- Fixed OpenTelemetry `tool_result` events missing `git_commit_id` after `git commit -q` or `git -C <dir> commit`\n- Fixed `CLAUDE_CODE_TRANSCRIPT_LOCAL_GC` dropping a message from the saved transcript when its text held a Unicode line or paragraph separator (U+2028, U+2029)\n- Fixed `claude purge` leaving a prompt in the history file when its text held a Unicode line or paragraph separator (U+2028, U+2029)\n- Windows: Fixed PowerShell commands longer than about 1 KB always asking for permission, so allow rules and read-only detection now apply up to 32 KB\n- Windows: Fixed stdio MCP servers being force-killed at shutdown; stdin now closes first and the process tree is killed only if the server is still running after 300 ms\n- Windows: Fixed `claude plugin install` failing for GitHub `owner/repo` plugin sources on machines with no GitHub SSH key; the clone is now retried over HTTPS\n- Windows: Fixed `rm -rf /c/Users/<name>` in Git Bash not asking in bypass permissions mode\n- Improved fullscreen mode: the link under the mouse pointer is now underlined to show it can be opened\n- Improved transcript toggle (ctrl+o) responsiveness in code-heavy conversations by caching syntax-highlighted code blocks\n- Improved Claude Desktop's Code tab behind a Claude apps gateway: when a session can't start, including on a machine not set up for the gateway's `code` settings, the reason shows as a reply\n- Improved the errors for a refused cloud session: they now say why your organization's policy couldn't be loaded, and name an API key or auth token that overrides your claude.ai login\n- Improved `--debug` output to name unrecognized frontmatter fields in custom agent files, with a hint for likely typos\n- Improved auto mode: a tool call that wasn't run because auto mode's check had no usable answer now shows as a dim \"Not run\" row instead of a red error\n- Improved `--debug` output for hooks: command hooks on tool calls, prompts, SessionStart and Stop now log their command, plugin, outcome and duration when they finish, so a slow hook is identifiable\n- Improved `CLAUDE_CODE_TRANSCRIPT_LOCAL_GC`: a large transcript file is no longer rewritten when that would free under 10% of it\n- Updated `/cost`, the status line, `--max-budget-usd` and the SDK's cost figures to price Sonnet 5.5 cache reads at $0.10 per million tokens (was $0.20)\n- Updated the bundled dataviz skill: lighter violet for the seventh series in light mode, softer primary text in dark mode, and compact y-axis labels like 1K\n- Changed the default limit on MCP tool descriptions sent up front and on MCP server instructions from 2,048 to 4,096 characters\n- Changed `←`: a turn or `!` command started while the session moves to the background is now stopped instead of finishing out of sight\n- [VSCode] Fixed `claudeCode.spinnerVerbs` missing from the extension's settings, so settings.json now completes and validates it; a malformed value no longer breaks the chat panel\n- [VSCode] Changed Claude in Chrome to ask before browser actions in every session, including one connected with `@browser`, as the terminal does; allowing a site for the session stops repeat asks\n- [VSCode] Fixed chat links written as a full Windows path, such as C:\\repo\\file.ts or file:///C:/repo/file.ts, not opening the file on Windows\n- [VSCode] Fixed the working indicator still animating when reduced motion is turned on in your OS, in VS Code, or with the `prefersReducedMotion` setting\n- [VSCode] Fixed the prompt cache clock reading warm after the panel caught up on messages late, such as after the display was off or a remote window reconnected\n- [Cloud sessions] Added a status filter to the Sessions and Runners lists on a self-hosted environment's Activity tab in admin settings; you can pick several statuses at once\n- [Cloud sessions] Fixed every cloud session waiting for a self-hosted runner showing the same queue position; each now shows how many sessions are ahead of it\n- [Cloud sessions] Fixed a message you send while Claude is still replying in a cloud session jumping above that reply when it finishes; it now stays below it, including after a reload\n- [Claude Tag] Changed Claude in Slack to show the footer with the session link, model and cost only on its newest reply in a thread; the reply before it drops the footer\n- [Claude Tag] Fixed links to URLs that contain parentheses breaking in some of Claude's Slack replies and task checklists, which showed stray bracket text and opened the wrong page\n- [Claude Tag] Fixed Claude's Slack replies drawing color swatches beside codes that only look like hex colors, such as six-digit pull request numbers\n- [Claude Tag] Added creating, editing and deleting workspace and channel memory files on the Activity page's Memory tab for members with the Claude Tag Admin permission\n- [Claude Tag] Fixed the plugin confirmation card Claude posts in a Slack channel showing a plugin's ID instead of its name\n- [Claude Tag] Fixed Claude in Slack posting a card to remove a plugin the channel's own settings don't include; it now explains where the plugin comes from instead\n- [Claude Tag] Fixed Claude in Slack sometimes losing its reply when a session in a self-hosted environment moved to a new runner partway through a task\n- [Code Review] Fixed the Code Review check sometimes staying \"in progress\" on a pull request after the review finished; it now shows the review's result\n- [Code Review] Improved Code Review admin settings to say why a setting couldn't be saved, such as a policy restriction, instead of a generic failure message"
+  },
+  "summary": {
+    "changes": 25,
+    "categories": {
+      "config": 23,
+      "model": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 11,
+      "notable": 14
+    },
+    "undocumented": 20
+  },
+  "changes": [
+    {
+      "id": "model.prices.claude-sonnet-5-5.cache_read",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5-5",
+        "cache_read"
+      ],
+      "title": "Built-in price for claude-sonnet-5-5 changed",
+      "impact": "notable",
+      "before": 0.2,
+      "after": 0.1,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Read.input_schema.properties.allow_large",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "Read",
+        "input_schema",
+        "properties",
+        "allow_large"
+      ],
+      "title": "Read tool parameter allow_large added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Set to true to read a text file, or a line range of one, that is over the usual size limits, up to what still fits in your context. Only use this when you genuinely need all of it or the user asked for the whole file; otherwise read it in parts with offset and limit, or search it.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.detail",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "detail"
+      ],
+      "title": "Setting no longer read: detail",
+      "impact": "notable",
+      "before": {
+        "type": "null|string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.entries",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "entries"
+      ],
+      "title": "New setting: entries",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.filePath",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "filePath"
+      ],
+      "title": "New setting: filePath",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting preferredNotifChannel lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.iterm2",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "iterm2"
+      ],
+      "title": "Setting preferredNotifChannel lost value iterm2",
+      "impact": "notable",
+      "before": "iterm2",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.terminal_bell",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "terminal_bell"
+      ],
+      "title": "Setting preferredNotifChannel lost value terminal_bell",
+      "impact": "notable",
+      "before": "terminal_bell",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.iterm2_with_bell",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "iterm2_with_bell"
+      ],
+      "title": "Setting preferredNotifChannel lost value iterm2_with_bell",
+      "impact": "notable",
+      "before": "iterm2_with_bell",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.kitty",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "kitty"
+      ],
+      "title": "Setting preferredNotifChannel lost value kitty",
+      "impact": "notable",
+      "before": "kitty",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.ghostty",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "ghostty"
+      ],
+      "title": "Setting preferredNotifChannel lost value ghostty",
+      "impact": "notable",
+      "before": "ghostty",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.notifications_disabled",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "notifications_disabled"
+      ],
+      "title": "Setting preferredNotifChannel lost value notifications_disabled",
+      "impact": "notable",
+      "before": "notifications_disabled",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.session_id",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "session_id"
+      ],
+      "title": "Setting no longer read: session_id",
+      "impact": "notable",
+      "before": {
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.subtype",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "subtype"
+      ],
+      "title": "Setting no longer read: subtype",
+      "impact": "notable",
+      "before": {
+        "enum": [
+          "task_summary"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.type.enum.transcript_mirror",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "type",
+        "enum",
+        "transcript_mirror"
+      ],
+      "title": "Setting type gained value transcript_mirror",
+      "impact": "informational",
+      "before": null,
+      "after": "transcript_mirror",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.type.enum.system",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "type",
+        "enum",
+        "system"
+      ],
+      "title": "Setting type lost value system",
+      "impact": "notable",
+      "before": "system",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.uuid",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "uuid"
+      ],
+      "title": "Setting no longer read: uuid",
+      "impact": "notable",
+      "before": {
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AGENT_PROGRESS_SUMMARIES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AGENT_PROGRESS_SUMMARIES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AGENT_PROGRESS_SUMMARIES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AGENT_PROGRESS_SUMMARIES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RESUME_SESSIONSTART_HOOKS_WAIT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RESUME_SESSIONSTART_HOOKS_WAIT_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RESUME_SESSIONSTART_HOOKS_WAIT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RESUME_SESSIONSTART_HOOKS_WAIT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SLEEP_COMPACT_AFTER_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SLEEP_COMPACT_AFTER_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SLEEP_COMPACT_AFTER_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SLEEP_COMPACT_AFTER_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SNAPPY_PELICAN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SNAPPY_PELICAN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SNAPPY_PELICAN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SNAPPY_PELICAN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WEBSEARCH_CITATIONS_DECLARED",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WEBSEARCH_CITATIONS_DECLARED"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WEBSEARCH_CITATIONS_DECLARED",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WEBSEARCH_CITATIONS_DECLARED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_TEXT_VARIANT",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_TEXT_VARIANT"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ARTIFACT_TEXT_VARIANT",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ARTIFACT_TEXT_VARIANT",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

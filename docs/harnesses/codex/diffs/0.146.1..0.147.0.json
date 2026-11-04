@@ -1,0 +1,1855 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.146.1",
+  "to": "0.147.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.146.1...rust-v0.147.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.147.0",
+    "text": "## New Features\n- Install portable Agent Plugins and search across local, personal, workspace, and remote plugin catalogs. (#36544, #36409, #36919, #36796)\n- Organize conversations into persistent, manually ordered sections and browse long transcripts incrementally. (#35722, #36007, #36380, #36948, #36950)\n- Enable automatically reviewed approvals with the new `--approve-for-me` CLI flag. (#36373)\n- Import Cursor-managed skills and synchronize changes to imported Claude and Cursor conversations without creating duplicates. (#36361, #36356, #35623)\n- Support the opt-in MCP 2026-07-28 protocol, including paginated discovery, multi-round requests, and non-blocking server startup. (#35724, #35725, #35590, #35742)\n- Enable cached web search and remote conversation compaction for Amazon Bedrock. (#36938, #36981)\n\n## Bug Fixes\n- Redact secrets and complete bearer tokens from displayed commands and replayed conversation history. (#36893, #36908)\n- Prevent lost or stalled terminal input when focus returns, MCP servers initialize, or Ghostty handles keyboard shortcuts. (#35649, #35957, #36834)\n- Correct rendering and cursor positioning for Japanese characters, emoji, hyperlinks, and text near viewport boundaries. (#35960, #35962, #37166)\n- Properly interrupt Windows background processes and handle Windows filesystem paths consistently. (#35655, #35851, #37129)\n- Require explicit trust for unfamiliar local projects and enforce managed authentication restrictions before credentials are used. (#36960, #37132)\n- Harden plugin isolation and deny network access when policy updates fail. (#37027, #36967, #36037)\n\n## Documentation\n- Improve the bundled OpenAI documentation skill with targeted official-source lookup and clearer guidance for Codex, model selection, and API workflows. (#36014)\n\n## Chores\n- Upgrade the MCP SDK to 3.0.0, Ratatui to 0.30.2, and V8 to 150.4.0. (#36001, #35959, #35831)\n- Secure macOS release notarization using Azure Key Vault instead of exporting private signing keys. (#37154)\n- Remove the deprecated `codex exec --full-auto` flag; use `--sandbox workspace-write` instead. (#36054)\n- Stop publishing redundant Linux bundle archives; use the standard `codex-package-<target>` release archives. (#36342)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.146.0...rust-v0.147.0\n\n- #35590 Expose cached MCP tools before server startup @copyberry\n- #35594 Recommend longer waits in the v2 wait_agent schema @copyberry\n- #35595 Allow alpha hotfix versions in R2 releases @copyberry\n- #35597 Add metrics for extension-rendered skill catalogs @copyberry\n- #35607 Record metrics for empty skill catalogs @copyberry\n- #35608 Support model-owned token budget defaults @copyberry\n- #35621 Skip restored token usage replay for exec resumes @copyberry\n- #35623 Parse Claude and Cursor session records separately @copyberry\n- #35642 Make OpenTelemetry provider shutdown idempotent @copyberry\n- #35644 Preserve thread metadata when rollout files are missing @copyberry\n- #35649 Preserve TUI input when terminal focus returns @copyberry\n- #35652 Enable network policy callbacks for remote exec @copyberry\n- #35653 Test developer instruction inheritance for multi-agent workers @copyberry\n- #35655 Terminate Windows non-TTY processes on interrupt @copyberry\n- #35656 Preserve multi-agent settings across config representations @copyberry\n- #35661 Place host skills before permission instructions @copyberry\n- #35663 Evaluate character matching over skill routing metadata @copyberry\n- #35665 Fix the async watcher test harness on Windows @copyberry\n- #35668 Expose the network proxy spec constructor @copyberry\n- #35670 Raise the Windows exec yield floor to 10 seconds @copyberry\n- #35671 Route curated plugins by authentication mode @copyberry\n- #35675 Prepare MCP and plugin recommendations concurrently @copyberry\n- #35678 Preserve paginated thread metadata across resumes @copyberry\n- #35685 Load cloud-managed profiles for `codex sandbox` @copyberry\n- #35688 Point crossterm patch to the OpenAI OSS fork @copyberry\n- #35689 Preserve item timestamps in thread history projections @copyberry\n- #35691 Include empty-preview threads in relationship listings @copyberry\n- #35693 Refresh the subagent picker in the background @copyberry\n- #35695 Honor the configured SQLite home in the logs client @copyberry\n- #35708 Add configurable developer instructions for v2 subagents @copyberry\n- #35715 Support streaming bodies in route-aware HTTP requests @copyberry\n- #35717 Reuse route-aware clients for OpenAI file uploads @copyberry\n- #35720 Upgrade rmcp to 3.0.0-beta.3 @copyberry\n- #35721 Honor disabled code mode fallback without a process host @copyberry\n- #35722 Add persisted sections for organizing threads @copyberry\n- #35724 Add MCP 2026-07-28 discovery support @copyberry\n- #35725 Complete MCP 2026 client support @copyberry\n- #35738 Add bounded metadata for executed tool calls @copyberry\n- #35742 Avoid blocking turns on optional MCP startup @copyberry\n- #35744 Keep agent registry identities consistent @copyberry\n- #35766 Emit host skill budget warnings from world state @copyberry\n- #35769 Share the skills budget across host and executor catalogs @copyberry\n- #35772 Throttle models cache TTL renewals @copyberry\n- #35773 Scale skill metadata budgets with context windows @copyberry\n- #35777 Resolve MCP tool catalogs concurrently @copyberry\n- #35779 Load thread titles concurrently during session startup @copyberry\n- #35785 Support self-serve Business ProLite accounts @copyberry\n- #35787 Gate paginated thread history on the state database @copyberry\n- #35794 Wait for MCP readiness in the curated sync test @copyberry\n- #35802 Tag reports with the selected turn's model and effort @copyberry\n- #35806 Route MCP OAuth through configured HTTP clients @copyberry\n- #35814 Use configured HTTP clients for all MCP OAuth requests @copyberry\n- #35818 Advance latest-alpha-cli after release publishing completes @copyberry\n- #35821 Use the shared HTTP client for TUI network checks @copyberry\n- #35825 Use the shared HTTP client for announcement tips @copyberry\n- #35828 Enforce centralized SQLite connection creation @copyberry\n- #35830 Route WebRTC sideband joins to the Realtime API @copyberry\n- #35831 Update rusty_v8 to 150.4.0 @copyberry\n- #35835 Track parent turns for nested Codex requests @copyberry\n- #35836 Clean up cancelled MCP elicitation requests @copyberry\n- #35837 Expose plugin eligibility metadata in app-server summaries @copyberry\n- #35839 Decouple recommended plugins from tool suggestions @copyberry\n- #35840 Handle legacy MCP discovery prevalidation errors @copyberry\n- #35843 Tie remote exec servers to their parent stdin @copyberry\n- #35845 Support plaintext collaboration tool messages @copyberry\n- #35850 Preserve foreign paths in background terminal listings @copyberry\n- #35851 Normalize Windows namespace paths in path URIs @copyberry\n- #35854 Box app-server event payloads @copyberry\n- #35856 Resolve imported connectors by MCP server name @copyberry\n- #35857 Add Bazel unit test targets for Rust binaries @copyberry\n- #35859 Expose plugin installation timestamps in app-server summaries @copyberry\n- #35870 Include session titles in external agent import history @copyberry\n- #35874 Mark the primary environment in model context @copyberry\n- #35875 Allow environment readiness updates in place @copyberry\n- #35878 Use step environments for MCP file uploads @copyberry\n- #35886 Show blocked goals as stalled in the TUI @copyberry\n- #35887 Clean up side conversations in the background @copyberry\n- #35895 Inherit ready step environments when spawning agents @copyberry\n- #35937 Let unrelated tools run while MCP servers start @copyberry\n- #35941 Bound MCP namespace descriptions @copyberry\n- #35942 Update tests for current tool call and app-server event types @copyberry\n- #35944 Report direct input capability for listed subagents @copyberry\n- #35957 Fix TUI input queue handling during MCP startup @copyberry\n- #35959 Upgrade Ratatui to 0.30.2 @copyberry\n- #35960 Preserve hyperlink cell widths during terminal diffing @copyberry\n- #35962 Fix TUI layout for halfwidth Japanese sound marks @copyberry\n- #35982 Avoid cloning rollout history when truncating forks @copyberry\n- #35989 Display title-only reasoning summaries in the TUI @copyberry\n- #35990 Test exec-server compatibility across Codex versions @copyberry\n- #35992 Group external agent config migration into a module @copyberry\n- #35997 Remove obsolete rusty_v8 146.4.0 Bazel targets @copyberry\n- #36001 Upgrade rmcp to 3.0.0 @copyberry\n- #36002 Resolve MCP file uploads with environment-native paths @copyberry\n- #36006 Reduce response serialization and rollout scan overhead @copyberry\n- #36007 Add persisted manual ordering for thread sections @copyberry\n- #36008 Route pet asset downloads through the shared HTTP client @copyberry\n- #36011 Share optional MCP startup grace across connection sets @copyberry\n- #36014 Refine OpenAI docs skill source routing @copyberry\n- #36020 Avoid cloning ignored analytics notifications @copyberry\n- #36030 Increase the app-server tracing test stack size @copyberry\n- #36031 Load cloud-managed servers in MCP CLI commands @copyberry\n- #36033 Use the shared HTTP client in codex-protocol @copyberry\n- #36035 Exit the stdio app-server when its connection closes @copyberry\n- #36036 Allow naming forked chats from the TUI @copyberry\n- #36037 Deny network access when an allow amendment fails @copyberry\n- #36039 Limit MCP catalog pagination @copyberry\n- #36043 Document the Responses API proxy reqwest exception @copyberry\n- #36045 Distinguish unknown MCP authentication status @copyberry\n- #36047 Extract MCP environment headers into a local variable @copyberry\n- #36049 Keep tool-call metrics out of Statsig exports @copyberry\n- #36051 Avoid overwriting symlinked migration targets @copyberry\n- #36054 Remove legacy `--full-auto` handling from `codex exec` @copyberry\n- #36055 Expose MCP read-only hints in tool call items @copyberry\n- #36076 Remove codex-core's direct reqwest dependency @copyberry\n- #36078 Route Ollama through the shared HTTP client @copyberry\n- #36083 Handle fractional rate limits in thread history projection @copyberry\n- #36092 Correlate image requests and explicit interrupts with turns @copyberry\n- #36119 Unify tool runtime assembly before router construction @copyberry\n- #36120 Delegate readiness waits to tool runtimes @copyberry\n- #36121 Sandbox executor skill resource reads @copyberry\n- #36124 Respect filesystem permissions during capability discovery @copyberry\n- #36127 Centralize tool registration and protect host tools @copyberry\n- #36128 Preserve delegated tasks across remote compaction @copyberry\n- #36129 Resolve normalized tool name collisions in code mode @copyberry\n- #36133 Preserve executor workspace permissions for apply_patch @copyberry\n- #36138 Isolate apply-patch permission test variants @copyberry\n- #36139 Bound the code mode output termination test @copyberry\n- #36140 Wait for memory consolidation shutdown before finishing jobs @copyberry\n- #36146 Stabilize approval scenario tests @copyberry\n- #36148 Harden the file change approval integration test @copyberry\n- #36149 Strengthen session file change approval coverage @copyberry\n- #36165 Stabilize file approval replay test @copyberry\n- #36166 Make pending realtime sideband test deterministic @copyberry\n- #36167 Harden the auto-review model override test @copyberry\n- #36168 Make tool telemetry tag collection synchronous @copyberry\n- #36171 Test workspace-root patch protection for metadata @copyberry\n- #36177 Test remote Guardian network approval scoping @copyberry\n- #36181 Record attempted tool calls in response metadata @copyberry\n- #36183 Use permission profiles throughout sandbox execution @copyberry\n- #36184 Coalesce concurrent remote metadata requests @copyberry\n- #36187 Refresh environment dates from the configured clock @copyberry\n- #36188 Make thread history projection resilient to malformed rollouts @copyberry\n- #36191 Label explicit skill injection metrics @copyberry\n- #36194 Avoid shifting bytes in streaming output buffers @copyberry\n- #36207 Record normalized sandbox violation events @copyberry\n- #36212 Precompute app-server protocol exports @copyberry\n- #36217 Run code mode exclusively through the standalone host @copyberry\n- #36218 Expose connector candidates in external agent detection @copyberry\n- #36221 Ignore passthrough metadata when reconciling rollout items @copyberry\n- #36223 Preserve executor paths in read command actions @copyberry\n- #36228 Support Enterprise automation account plans @copyberry\n- #36237 Ignore symbolic slash-tmp permissions on Windows @copyberry\n- #36239 Refresh precomputed app-server protocol exports @copyberry\n- #36264 Prefer the bundled resource for the code mode host @copyberry\n- #36271 Derive report prompt hashes from persisted rollouts @copyberry\n- #36306 Restrict hosted MCP credentials to local environments @copyberry\n- #36309 Use the host skill provider catalog in world state @copyberry\n- #36310 Isolate MCP OAuth credentials by environment @copyberry\n- #36311 Include skills in debug prompt input output @copyberry\n- #36327 Preserve discovery order for host skill path aliases @copyberry\n- #36329 Restrict `shell_command` to a single local environment @copyberry\n- #36336 Detect connectors used in external agent sessions @copyberry\n- #36339 Enable skills in the MCP server @copyberry\n- #36342 Stop publishing legacy Linux bundle archives @copyberry\n- #36350 Require explicit sandbox permissions with shell justifications @copyberry\n- #36351 Use model catalog collaboration mode messages @copyberry\n- #36354 Pass sessions directly to session tasks @copyberry\n- #36355 Keep MCP tool calls bound to their thread @copyberry\n- #36356 Sync updates to imported external agent sessions @copyberry\n- #36357 Use the step-scoped router for tool execution @copyberry\n- #36359 Consolidate MCP config editing in codex-core @copyberry\n- #36360 Use MCP bindings as the step tool catalog @copyberry\n- #36361 Migrate Cursor-managed skills into Codex @copyberry\n- #36364 Move skill catalog rendering out of core @copyberry\n- #36365 Add strict automatic review for MCP elicitations @copyberry\n- #36367 Keep effective tool exposure in the registry @copyberry\n- #36372 Run native Windows Bazel tests with MSVC @copyberry\n- #36373 Add an `--approve-for-me` CLI flag @copyberry\n- #36374 Enable sandboxed V8 for code mode @copyberry\n- #36378 Load local session pickers from the state DB first @copyberry\n- #36380 Add thread section management APIs @copyberry\n- #36384 Load turn summaries with paginated queries @copyberry\n- #36385 Add acknowledged user message submission to core @copyberry\n- #36388 Track image preparation details in turn analytics @copyberry\n- #36389 Enforce single-writer ownership for all thread histories @copyberry\n- #36393 Avoid redundant filesystem probes @copyberry\n- #36402 Declare the experimental plugin search API @copyberry\n- #36408 Allow custom Codex instructions for realtime transitions @copyberry\n- #36409 Implement remote plugin search @copyberry\n- #36410 Make user input blocking behavior explicit @copyberry\n- #36411 Use Git repositories as pre-tool hook test markers @copyberry\n- #36413 Add a realtime delegation acknowledgement control @copyberry\n- #36440 Extract exec-server request dispatching @copyberry\n- #36482 Avoid querying terminal size on every TUI redraw @copyberry\n- #36485 Increase remote plugin bundle size limits @copyberry\n- #36507 Retain attempted tool metadata across prompts @copyberry\n- #36511 Support two-stroke TUI key chords @copyberry\n- #36534 Raise the MCP catalog item limit to 2,048 @copyberry\n- #36544 Support portable Agent Plugins throughout installation @copyberry\n- #36632 Preserve SQLite thread metadata during goal mutations @copyberry\n- #36635 Expose onboarding hints in login completion notifications @copyberry\n- #36641 Capture rollout budget units from response usage @copyberry\n- #36715 Use provider-reported rollout budget units @copyberry\n- #36716 Deduplicate MCP resource operation handling @copyberry\n- #36727 Simplify turn metadata state ownership @copyberry\n- #36729 Correlate code mode tool analytics with model responses @copyberry\n- #36732 Stabilize the cloud environment HTTP test @copyberry\n- #36734 Deduplicate MCP resource list handling @copyberry\n- #36740 Store turn skill state in extension data @copyberry\n- #36742 Simplify contextual user fragment registration @copyberry\n- #36744 Store the extension registry directly in its builder @copyberry\n- #36745 Consolidate apply_patch runtime execution @copyberry\n- #36757 Wait for patch events before reading shell snapshots @copyberry\n- #36759 Harden the TUI focus palette regression test @copyberry\n- #36764 Avoid building code-mode definitions during registration @copyberry\n- #36769 Stabilize the startup Git enrichment integration test @copyberry\n- #36770 Stabilize deferred goal fork testing @copyberry\n- #36771 Harden Linux managed proxy helper lifecycles @copyberry\n- #36772 Raise the host-owned Codex Apps catalog limit @copyberry\n- #36773 Derive the active user config layer from the layer stack @copyberry\n- #36774 Clarify config layer iteration APIs @copyberry\n- #36779 Stabilize network policy event capture in concurrent tests @copyberry\n- #36781 Add per-surface MCP tool exposure controls @copyberry\n- #36782 Add Guardian session reuse and interruption tests @copyberry\n- #36787 Consolidate model instructions in `ModelMessages` @copyberry\n- #36792 Gate plugin usage instructions by model capability @copyberry\n- #36793 Terminate timed-out Git process trees @copyberry\n- #36796 Add Agent Plugins MCP config parsing @copyberry\n- #36797 Normalize rusty_v8 checksum manifest line endings @copyberry\n- #36800 Avoid reinjecting permissions after command approvals @copyberry\n- #36807 Extract audio preparation into a utility crate @copyberry\n- #36808 Prefer SQLite names for local session archive commands @copyberry\n- #36809 Prefer the state database for `exec resume --last` @copyberry\n- #36810 Add MCP client conformance regression gates @copyberry\n- #36811 Honor per-environment login shell policy @copyberry\n- #36812 Add a dual-WebSocket transport for code mode @copyberry\n- #36815 Identify agents by name in token budget context @copyberry\n- #36822 Fix typo in approval resolver name @copyberry\n- #36825 Consolidate approval telemetry context @copyberry\n- #36830 Time out stalled code-mode host requests @copyberry\n- #36834 Avoid requesting key-release events in Ghostty @copyberry\n- #36840 Keep API request metrics out of Statsig exports @copyberry\n- #36856 Support deferred loading for freeform tools @copyberry\n- #36857 Support custom tools in namespaces @copyberry\n- #36862 Consolidate thread spawning behind a request object @copyberry\n- #36871 Parallelize R2 asset publishing with DotSlash @copyberry\n- #36877 Move executor skill bundle loading into the skills extension @copyberry\n- #36880 Move direct executor skill discovery into the skills extension @copyberry\n- #36882 Preserve complete MCP namespace descriptions @copyberry\n- #36884 Add host skill root loading @copyberry\n- #36892 Support leaf models in multi-agent v2 @copyberry\n- #36893 Redact secrets from app-server command execution items @copyberry\n- #36895 Handle late MCP startup results after lag timeout @copyberry\n- #36898 Avoid redundant filesystem metadata probes @copyberry\n- #36900 Register app tools independently of the connector list @copyberry\n- #36901 Propagate updated permissions to review threads @copyberry\n- #36903 Load skill interface metadata in the host loader @copyberry\n- #36904 Limit RMCP logs persisted to SQLite @copyberry\n- #36906 Preserve model providers when reloading v2 agents @copyberry\n- #36908 Improve bearer token secret redaction @copyberry\n- #36910 Negotiate MCP extensions per app-server session @copyberry\n- #36912 Read approval policy from the current turn configuration @copyberry\n- #36913 Move skill policy resolution into `codex-skills` @copyberry\n- #36916 Centralize app enabled-state evaluation @copyberry\n- #36917 Test explicit plugin mentions with disabled apps @copyberry\n- #36919 Merge local plugins into plugin search results @copyberry\n- #36921 Move the host skills service into the skills extension @copyberry\n- #36924 Reject implicitly discovered bare Git repositories @copyberry\n- #36930 Read turn permissions from the current configuration @copyberry\n- #36935 Trust undecided local projects automatically @copyberry\n- #36938 Enable cached web search for Amazon Bedrock @copyberry\n- #36939 Include policy approval reasons in Guardian reviews @copyberry\n- #36941 Use current session settings for review threads @copyberry\n- #36943 Move host skill root resolution into the skills extension @copyberry\n- #36945 Grant the blob size policy job read access to contents @copyberry\n- #36947 Accept user input when starting idle turns @copyberry\n- #36948 Paginate transcript history in the TUI @copyberry\n- #36949 Improve paginated TUI history loading @copyberry\n- #36950 Paginate TUI transcript history @copyberry\n- #36951 Harden paginated history handling in the TUI @copyberry\n- #36952 Add durable per-thread user submission queues @copyberry\n- #36954 Add tool registry collision policy configuration @copyberry\n- #36956 Keep image resize notices attached during remote compaction @copyberry\n- #36959 Track connectors detected in external agent sessions @copyberry\n- #36960 Prompt before trusting local project directories @copyberry\n- #36963 Link Codex attribution in pull request bodies @copyberry\n- #36964 Preserve working directories when importing external sessions @copyberry\n- #36966 Allow disabling the built-in image viewer @copyberry\n- #36967 Skip symlinks when installing plugins @copyberry\n- #36970 Make token budget context identity configurable @copyberry\n- #36976 Honor explicit-only orchestrator skills @copyberry\n- #36977 Improve connector detection for migrated sessions @copyberry\n- #36979 Add Fence auditing to the blob size workflow @copyberry\n- #36981 Enable remote compaction for Amazon Bedrock @copyberry\n- #36983 Preserve ChatGPT auth for trusted staging MCP servers @copyberry\n- #36984 Support configured ChatGPT cookies in HTTP clients @copyberry\n- #36986 Add process-scoped PSP routing for ChatGPT requests @copyberry\n- #36987 Add opt-in concurrent exec-server request dispatch @copyberry\n- #36989 Preserve shared bundled skill caches @copyberry\n- #36990 Remove legacy collaboration mode variants @copyberry\n- #36992 Allow injecting model catalog caches @copyberry\n- #36993 Support `includeTurns` reads for paginated threads @copyberry\n- #36998 Support deferred custom tools in tool search @copyberry\n- #37000 Keep shared skill caches fresh across plugin loads @copyberry\n- #37020 Enforce strict tool name collision errors @copyberry\n- #37022 Canonicalize default tools under the `functions` namespace @copyberry\n- #37027 Enforce Agent Plugin runtime boundaries @copyberry\n- #37031 Apply permission profile updates to future turn environments @copyberry\n- #37035 Align registry tests with canonical tool names @copyberry\n- #37038 Use turn environment permissions for tool execution @copyberry\n- #37040 Use turn environment permissions for context and discovery @copyberry\n- #37053 Reject conflicting namespace descriptions in strict tool mode @copyberry\n- #37055 Add safer TUI defaults for cyber models @copyberry\n- #37066 Preserve longer MCP source descriptions in tool search @copyberry\n- #37068 Fall back to per-process MCP cleanup on macOS @copyberry\n- #37083 Consolidate unified exec output state @copyberry\n- #37101 Reuse stable MCP bindings across sampling steps @copyberry\n- #37103 Use Luna for API-key Guardian reviews @copyberry\n- #37109 Bound interactive telemetry shutdown @copyberry\n- #37114 Add per-session code-mode execution limits @copyberry\n- #37128 Centralize tool approval handling in `Session` @copyberry\n- #37129 Make Windows path URI comparisons ASCII-case-insensitive @copyberry\n- #37132 Enforce managed authentication requirements locally @copyberry\n- #37134 Report prompt image resizing to the model @copyberry\n- #37144 Preserve discovery paths for symlinked skills @copyberry\n- #37145 Gate Apps usage instructions by model capability @copyberry\n- #37147 Track provisioned environment state across registration @copyberry\n- #37149 Project orchestrator skills through world state @copyberry\n- #37151 Coalesce concurrent Git status scans @copyberry\n- #37154 Use Azure Key Vault for macOS notarization @copyberry\n- #37156 Test remote environments reported ready before selection @copyberry\n- #37157 Harden named session lookup in the TUI @copyberry\n- #37162 Load host skill roots through the skills extension @copyberry\n- #37166 Keep textarea cursors and rendering inside the viewport @copyberry\n- #37167 Expose session sources to MCP contributors @copyberry\n- #37168 Bound remote MCP handshake HTTP requests @copyberry\n- #37169 Move plugin skill snapshot integration tests into core @copyberry\n- #37174 Centralize skill invocation helpers in `codex-skills` @copyberry\n- #37175 Add legacy rollout migration to paginated history @copyberry\n- #37177 Move explicit skill selection into the skills crate @copyberry\n- #37178 Preserve image transparency metadata in app-server items @copyberry\n- #37188 Reserve the `tool_search` namespace for the search tool @copyberry\n- #37189 Track multi-agent usage hints in world state @copyberry"
+  },
+  "summary": {
+    "changes": 67,
+    "categories": {
+      "behavior": 5,
+      "binary": 2,
+      "cli": 39,
+      "config": 11,
+      "hooks": 4,
+      "prompt": 3,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 56,
+      "notable": 11
+    },
+    "undocumented": 18
+  },
+  "changes": [
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+2815 −498 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,25 @@\n-<permissions instructions>\n-Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n-Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n- The writable roots are `/private/tmp`, `<tmp> `<repo>`.\n-</permissions instructions>\n+<skills_instructions>\n+## Skills\n+A skill is a set of instructions provided through a `SKILL.md` source.\n+Below is the list of skills that can be used.\n+Each entry includes a name, description, and source locator.\n+`file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n+### Available skills\n+- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n+Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n+Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n+(file: <codex-home>/skills/.system/imagegen/SKILL.md)\n+- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex—and for OpenAI APIs/products and ChatGPT Work.\n+Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons.\n+Do not use for generic app/software tasks that merely mention Codex.\n+(file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n+- plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n+Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n+(file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n+- skill-creator: Guide for creating effective skills.\n+This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n+(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n+- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n+Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n+(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n+</skills_instructions>\n",
+      "stats": {
+        "added_chars": 2815,
+        "removed_chars": 498
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/catalog_prompt.rs",
+            "line": 1,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/ext/skills/src/catalog_prompt.rs#L1"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+498 −2850 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,23 +1,5 @@\n-<skills_instructions>\n-## Skills\n-A skill is a set of instructions provided through a `SKILL.md` source.\n-Below is the list of skills that can be used.\n-Each entry includes a name, description, and source locator.\n-`file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n-### Available skills\n-- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n-Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n-Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n-(file: <codex-home>/skills/.system/imagegen/SKILL.md)\n-- openai-docs: Use when the user asks how to build with OpenAI products or APIs, asks about Codex itself or choosing Codex surfaces, needs up-to-date official documentation with citations, help choosing the latest model for a use case, latest/current/default-model prompting guidance, or model upgrade and prompt-upgrade guidance; use OpenAI docs MCP tools for non-Codex docs questions, use the Codex manual helper first for broad Codex self-knowledge, and restrict fallback browsing to official OpenAI domains.\n-(file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n-- plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n-Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n-(file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n-- skill-creator: Guide for creating effective skills.\n-This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n-(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n-- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n-Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n-(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n-</skills_instructions>\n+<permissions instructions>\n+Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n+Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n+ The writable roots are `/private/tmp`, `<tmp> `<repo>`.\n+</permissions instructions>\n",
+      "stats": {
+        "added_chars": 498,
+        "removed_chars": 2850
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/prompts/templates/permissions/sandbox_mode/workspace_write.md",
+            "line": 1,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/prompts/templates/permissions/sandbox_mode/workspace_write.md#L1"
+          },
+          {
+            "path": "codex-rs/prompts/templates/permissions/approval_policy/never.md",
+            "line": 1,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/prompts/templates/permissions/approval_policy/never.md#L1"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "prompt.system.3.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "3",
+        "text"
+      ],
+      "title": "System prompt changed (+79 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,6 +27,8 @@\n - All agents use the same current working directory.\n - As a result, edits made by one agent are immediately visible to all other agents.\n \n+When calling `wait_agent`, prefer longer waits (minutes) to avoid busy polling.\n+\n There are 4 available concurrency slots, meaning that up to 4 agents can be active at once, including you.\n \n Full-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides.\n",
+      "stats": {
+        "added_chars": 79,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 259,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/config/mod.rs#L259"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.request_user_input.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "request_user_input",
+        "description"
+      ],
+      "title": "request_user_input tool description changed (+120 −348 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-Request user input for one to three short questions and wait for the response.\n-Set autoResolutionMs, from 60000 to 240000 milliseconds, only when the question is useful but non-blocking and continuing with best judgment is acceptable if the user does not answer; omit it when explicit user input is required.\n-This tool is only available in Plan mode.\n+Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.\n",
+      "stats": {
+        "added_chars": 120,
+        "removed_chars": 348
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/request_user_input_spec.rs",
+            "line": 126,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/request_user_input_spec.rs#L126"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.request_user_input.input_schema.properties.autoResolutionMs",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "request_user_input",
+        "input_schema",
+        "properties",
+        "autoResolutionMs"
+      ],
+      "title": "request_user_input tool parameter autoResolutionMs removed",
+      "impact": "notable",
+      "before": {
+        "description": "Optional auto-resolution window in milliseconds, from 60000 to 240000. Include this only when the question is useful but non-blocking and continuing with best judgment is acceptable if the user does not answer; omit it when explicit user input is required before continuing. Use 60000 for lightly helpful context and up to 240000 when the answer would materially unblock better work.",
+        "type": "number"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/request_user_input_spec.rs",
+            "line": 77,
+            "url": "https://github.com/openai/codex/blob/rust-v0.146.1/codex-rs/core/src/tools/handlers/request_user_input_spec.rs#L77"
+          },
+          {
+            "path": "codex-rs/protocol/src/request_user_input.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.146.1/codex-rs/protocol/src/request_user_input.rs#L34"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.collaboration/spawn_agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "collaboration/spawn_agent",
+        "description"
+      ],
+      "title": "collaboration/spawn_agent tool description changed (+426 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -2,6 +2,9 @@\n         Available model overrides (optional; inherited parent model is preferred):\n - `gpt-5.6-sol`: Latest frontier agentic coding model. Reasoning efforts: low (default), medium, high, xhigh, max, ultra. Service tiers: priority.\n - `gpt-5.6-terra`: Balanced agentic coding model for everyday work. Reasoning efforts: low, medium (default), high, xhigh, max, ultra. Service tiers: priority.\n+- `gpt-5.6-luna`: Fast and affordable agentic coding model. Reasoning efforts: low, medium (default), high, xhigh, max. Service tiers: priority.\n+- `gpt-5.5`: Frontier model for complex coding, research, and real-world work. Reasoning efforts: low, medium (default), high, xhigh. Service tiers: priority.\n+- `gpt-5.2`: Optimized for professional work and long-running agents. Reasoning efforts: low, medium (default), high, xhigh.\n         Spawns an agent to work on the specified task. If your current task is `/root/task1` and you spawn_agent with task_name \"task_3\" the agent will have canonical task name `/root/task1/task_3`.\n You are then able to refer to this agent as `task_3` or `/root/task1/task_3` interchangeably. However an agent `/root/task2/task_3` would only be able to communicate with this agent via its canonical name `/root/task1/task_3`.\n The spawned agent will have the same tools as you and the ability to spawn its own subagents.\n",
+      "stats": {
+        "added_chars": 426,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.1.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 1 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,25 @@\n-<permissions instructions>\n-Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n-Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n- The writable roots are `/private/tmp`, `<tmp> `<repo>`.\n-</permissions instructions>\n+<skills_instructions>\n+## Skills\n+A skill is a set of instructions provided through a `SKILL.md` source.\n+Below is the list of skills that can be used.\n+Each entry includes a name, description, and source locator.\n+`file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n+### Available skills\n+- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n+Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n+Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n+(file: <codex-home>/skills/.system/imagegen/SKILL.md)\n+- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex—and for OpenAI APIs/products and ChatGPT Work.\n+Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons.\n+Do not use for generic app/software tasks that merely mention Codex.\n+(file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n+- plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n+Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n+(file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n+- skill-creator: Guide for creating effective skills.\n+This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n+(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n+- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n+Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n+(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n+</skills_instructions>\n",
+      "stats": {
+        "added_chars": 2815,
+        "removed_chars": 498
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.2.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 2 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,23 +1,5 @@\n-<skills_instructions>\n-## Skills\n-A skill is a set of instructions provided through a `SKILL.md` source.\n-Below is the list of skills that can be used.\n-Each entry includes a name, description, and source locator.\n-`file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n-### Available skills\n-- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n-Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n-Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n-(file: <codex-home>/skills/.system/imagegen/SKILL.md)\n-- openai-docs: Use when the user asks how to build with OpenAI products or APIs, asks about Codex itself or choosing Codex surfaces, needs up-to-date official documentation with citations, help choosing the latest model for a use case, latest/current/default-model prompting guidance, or model upgrade and prompt-upgrade guidance; use OpenAI docs MCP tools for non-Codex docs questions, use the Codex manual helper first for broad Codex self-knowledge, and restrict fallback browsing to official OpenAI domains.\n-(file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n-- plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n-Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n-(file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n-- skill-creator: Guide for creating effective skills.\n-This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n-(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n-- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n-Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n-(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n-</skills_instructions>\n+<permissions instructions>\n+Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n+Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n+ The writable roots are `/private/tmp`, `<tmp> `<repo>`.\n+</permissions instructions>\n",
+      "stats": {
+        "added_chars": 498,
+        "removed_chars": 2850
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.4.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "4",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 4 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -26,6 +26,8 @@\n - All agents use the same current working directory.\n - As a result, edits made by one agent are immediately visible to all other agents.\n \n+When calling `wait_agent`, prefer longer waits (minutes) to avoid busy polling.\n+\n There are 4 available concurrency slots, meaning that up to 4 agents can be active at once, including you.\n \n Full-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides.\n",
+      "stats": {
+        "added_chars": 79,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.5",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "5"
+      ],
+      "title": "Behaviour: subagents system 5 added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "chars": 2237,
+        "sha256": "af4940bc6da67fab366fdbdb98c9979b37d10d05e703aaf3784a0a3f2cf6264f",
+        "text": "You are an agent in a team of agents collaborating to complete a task.\n\nYou can spawn sub-agents to handle subtasks, and those sub-agents can spawn their own sub-agents. All agents in the team, including the agents that you can assign tasks to, are equally intelligent and capable, and have access to the same set of tools.\n\nYou can use `spawn_agent` to create a new agent, `followup_task` to give an existing agent a new task and trigger a turn, and `send_message` to pass a message to a running agent.\nChild agents can also spawn their own sub-agents.\n\nWhen you provide a response in the final channel, that content is immediately delivered back to your parent agent.\n\nYou will receive messages in the analysis channel in the form:\n```\nMessage Type: NEW_TASK | MESSAGE | FINAL_ANSWER\nTask name: <recipient>\nSender: <author>\nPayload:\n<payload text>\n```\nYou may also see them addressed as to=/root/..., which indicates your identity is /root/...\n\nNote that collaboration tools cannot be called from inside `functions.exec`. Call `spawn_agent`, `send_message`, `followup_task`, `wait_agent`, `interrupt_agent`, and `list_agents` only as direct tool calls using the recipient shown in their tool definitions, such as `to=functions.collaboration.spawn_agent`, since they are intentionally absent from the `functions.exec` `tools.*` namespace. Available tools in `functions.exec` are explicitly described with a `tools` namespace in the developer message.\n\nAll agents share the same directory. In detail:\n- All agents have access to the same container and filesystem as you.\n- All agents use the same current working directory.\n- As a result, edits made by one agent are immediately visible to all other agents.\n\nWhen calling `wait_agent`, prefer longer waits (minutes) to avoid busy polling.\n\nThere are 4 available concurrency slots, meaning that up to 4 agents can be active at once, including you.\n\nFull-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides. Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"` or a positive integer string."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.6",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "6"
+      ],
+      "title": "Behaviour: subagents system 6 added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "chars": 271,
+        "sha256": "6ded806e3cdbb35599ecaf8742574bc5274908472b1729090010c404c2151e8e",
+        "text": "<multi_agent_mode>Any earlier instruction enabling proactive multi-agent delegation no longer applies. Do not spawn sub-agents unless the user or applicable AGENTS.md/skill instructions explicitly ask for sub-agents, delegation, or parallel agent work.</multi_agent_mode>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "blocks the tool; message to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1267,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/analytics/src/events.rs#L1267"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 453,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L453"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1272,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/analytics/src/events.rs#L1272"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 468,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L468"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "keeps the turn going; message to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1277,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/analytics/src/events.rs#L1277"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 483,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L483"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "exit_2"
+      ],
+      "title": "UserPromptSubmit hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "blocks the prompt; message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1274,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/analytics/src/events.rs#L1274"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 474,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L474"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 3010,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/analytics/src/reducer.rs#L3010"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/managed_install.rs",
+            "line": 88,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-daemon/src/managed_install.rs#L88"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex archive.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex archive",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex archive --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 916,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L916"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1497,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1497"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex delete.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex delete",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex delete --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_delete.rs",
+            "line": 140,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server/src/request_processors/thread_delete.rs#L140"
+          },
+          {
+            "path": "codex-rs/config/src/tui_keymap.rs",
+            "line": 547,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/config/src/tui_keymap.rs#L547"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex exec --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/doctor/thread_inventory.rs",
+            "line": 671,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/doctor/thread_inventory.rs#L671"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1034,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/main.rs#L1034"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--concurrent-requests",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--concurrent-requests"
+      ],
+      "title": "New flag `codex exec-server --concurrent-requests`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "1",
+        "description": "Maximum number of requests to process concurrently on each connection",
+        "names": [
+          "--concurrent-requests"
+        ],
+        "value": "<COUNT>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1629,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/main.rs#L1629"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--exit-on-stdin-close",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--exit-on-stdin-close"
+      ],
+      "title": "New flag `codex exec-server --exit-on-stdin-close`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Exit when the parent-owned standard-input pipe closes",
+        "env": "CODEX_EXEC_SERVER_EXIT_ON_STDIN_CLOSE",
+        "names": [
+          "--exit-on-stdin-close"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1629,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/main.rs#L1629"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex fork --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app.rs",
+            "line": 990,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/tui/src/app.rs#L990"
+          },
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 39,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/tui/src/cwd_prompt.rs#L39"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex resume --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/hooks/src/events/session_start.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/hooks/src/events/session_start.rs#L36"
+          },
+          {
+            "path": "codex-rs/hooks/src/schema.rs",
+            "line": 813,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/hooks/src/schema.rs#L813"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex unarchive.options.--approve-for-me",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex unarchive",
+        "options",
+        "--approve-for-me"
+      ],
+      "title": "New flag `codex unarchive --approve-for-me`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route approval requests through automatic review using the workspace-write sandbox",
+        "names": [
+          "--approve-for-me"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1793,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1793"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+114 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -88,6 +88,9 @@\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n \n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n+\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 114,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+114 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -67,6 +67,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 114,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app --help"
+      ],
+      "title": "Full help text of `app --help` changed (+104 −104 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,6 +9,9 @@\n           [default: .]\n \n Options:\n+      --download-url <DOWNLOAD_URL_OVERRIDE>\n+          Override the app installer download URL (advanced)\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -16,9 +19,6 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n-\n-      --download-url <DOWNLOAD_URL_OVERRIDE>\n-          Override the app installer download URL (advanced)\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 104,
+        "removed_chars": 104
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app -h"
+      ],
+      "title": "Full help text of `app -h` changed (+104 −104 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,12 +6,12 @@\n   [PATH]  Workspace path to open in the Desktop app [default: .]\n \n Options:\n+      --download-url <DOWNLOAD_URL_OVERRIDE>\n+          Override the app installer download URL (advanced)\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n-      --download-url <DOWNLOAD_URL_OVERRIDE>\n-          Override the app installer download URL (advanced)\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>\n",
+      "stats": {
+        "added_chars": 104,
+        "removed_chars": 104
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.archive --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "archive --help"
+      ],
+      "title": "Full help text of `archive --help` changed (+325 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,19 +12,19 @@\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n   -m, --model <MODEL>\n           Model the agent should use\n \n@@ -42,6 +42,9 @@\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n+\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 325,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.archive -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "archive -h"
+      ],
+      "title": "Full help text of `archive -h` changed (+325 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,15 +8,15 @@\n Options:\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n@@ -29,6 +29,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 325,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.delete --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "delete --help"
+      ],
+      "title": "Full help text of `delete --help` changed (+325 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,19 +12,19 @@\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n   -m, --model <MODEL>\n           Model the agent should use\n \n@@ -42,6 +42,9 @@\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n+\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 325,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.delete -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "delete -h"
+      ],
+      "title": "Full help text of `delete -h` changed (+325 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,15 +8,15 @@\n Options:\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n@@ -29,6 +29,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 325,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.doctor --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "doctor --help"
+      ],
+      "title": "Full help text of `doctor --help` changed (+165 −165 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,6 +3,9 @@\n Usage: codex doctor [OPTIONS]\n \n Options:\n+      --json\n+          Emit a redacted machine-readable report\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -11,17 +14,14 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --json\n-          Emit a redacted machine-readable report\n-\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-\n       --summary\n           Only show grouped check rows and the final count summary\n \n       --all\n           Expand long lists in detailed human output\n+\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.doctor -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "doctor -h"
+      ],
+      "title": "Full help text of `doctor -h` changed (+165 −165 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,14 +3,14 @@\n Usage: codex doctor [OPTIONS]\n \n Options:\n+      --json                Emit a redacted machine-readable report\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n-      --json                Emit a redacted machine-readable report\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --summary             Only show grouped check rows and the final count summary\n       --all                 Expand long lists in detailed human output\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --no-color            Disable ANSI color in human output\n       --ascii               Use ASCII status labels and separators in human output\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+221 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -26,13 +26,13 @@\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-\n       --strict-config\n           Error out when config.toml contains fields that are not recognized by this version of\n           Codex\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n@@ -53,6 +53,9 @@\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n+\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 221,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+221 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -20,11 +20,11 @@\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --strict-config\n           Error out when config.toml contains fields that are not recognized by this version of\n           Codex\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n@@ -39,6 +39,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 221,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+432 −131 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,6 +3,10 @@\n Usage: codex exec-server [OPTIONS]\n \n Options:\n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -11,9 +15,10 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --strict-config\n-          Error out when config.toml contains fields that are not recognized by this version of\n-          Codex\n+      --concurrent-requests <COUNT>\n+          Maximum number of requests to process concurrently on each connection\n+          \n+          [default: 1]\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n@@ -35,6 +40,11 @@\n \n       --use-agent-identity-auth\n           Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote registration\n+\n+      --exit-on-stdin-close\n+          Exit when the parent-owned standard-input pipe closes\n+          \n+          [env: CODEX_EXEC_SERVER_EXIT_ON_STDIN_CLOSE=]\n \n   -h, --help\n           Print help (see a summary with '-h')\n",
+      "stats": {
+        "added_chars": 432,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+1897 −1458 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,23 +3,28 @@\n Usage: codex exec-server [OPTIONS]\n \n Options:\n-  -c, --config <key=value>       Override a configuration value that would otherwise be loaded from\n-                                 `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to\n-                                 override nested values. The `value` portion is parsed as TOML. If\n-                                 it fails to parse as TOML, the raw string is used as a literal\n-      --strict-config            Error out when config.toml contains fields that are not recognized\n-                                 by this version of Codex\n-      --enable <FEATURE>         Enable a feature (repeatable). Equivalent to `-c\n-                                 features.<name>=true`\n-      --listen <URL>             Transport endpoint URL. Supported values: `ws://IP:PORT` (default),\n-                                 `stdio`, `stdio://`\n-      --disable <FEATURE>        Disable a feature (repeatable). Equivalent to `-c\n-                                 features.<name>=false`\n-      --remote <URL>             Register this exec-server as a remote environment using the given\n-                                 base URL\n-      --environment-id <ID>      Environment id to attach to when registering remotely\n-      --name <NAME>              Human-readable environment name\n-      --use-agent-identity-auth  Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote\n-                                 registration\n-  -h, --help                     Print help (see more with '--help')\n+      --strict-config                Error out when config.toml contains fields that are not\n+                                     recognized by this version of Codex\n+  -c, --config <key=value>           Override a configuration value that would otherwise be loaded\n+                                     from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`)\n+                                     to override nested values. The `value` portion is parsed as\n+                                     TOML. If it fails to parse as TOML, the raw string is used as a\n+                                     literal\n+      --concurrent-requests <COUNT>  Maximum number of requests to process concurrently on each\n+                                     connection [default: 1]\n+      --enable <FEATURE>             Enable a feature (repeatable). Equivalent to `-c\n+                                     features.<name>=true`\n+      --listen <URL>                 Transport endpoint URL. Supported values: `ws://IP:PORT`\n+                                     (default), `stdio`, `stdio://`\n+      --disable <FEATURE>            Disable a feature (repeatable). Equivalent to `-c\n+                                     features.<name>=false`\n+      --remote <URL>                 Register this exec-server as a remote environment using the\n+                                     given base URL\n+      --environment-id <ID>          Environment id to attach to when registering remotely\n+      --name <NAME>                  Human-readable environment name\n+      --use-agent-identity-auth      Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote\n+                                     registration\n+      --exit-on-stdin-close          Exit when the parent-owned standard-input pipe closes [env:\n+                                     CODEX_EXEC_SERVER_EXIT_ON_STDIN_CLOSE=]\n+  -h, --help                         Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 1897,
+        "removed_chars": 1458
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+382 −268 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,6 +11,12 @@\n           Optional user prompt to start the session\n \n Options:\n+      --last\n+          Fork the most recent session without showing the picker\n+\n+      --all\n+          Show all sessions (disables cwd filtering and shows CWD column)\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -19,23 +25,17 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --last\n-          Fork the most recent session without showing the picker\n-\n-      --all\n-          Show all sessions (disables cwd filtering and shows CWD column)\n-\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint.\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n@@ -64,6 +64,9 @@\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n+\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 382,
+        "removed_chars": 268
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+531 −417 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,20 +8,20 @@\n   [PROMPT]      Optional user prompt to start the session\n \n Options:\n-  -c, --config <key=value>\n-          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n-          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n-          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n       --last\n           Fork the most recent session without showing the picker\n       --all\n           Show all sessions (disables cwd filtering and shows CWD column)\n+  -c, --config <key=value>\n+          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n+          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n+          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n@@ -42,6 +42,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 531,
+        "removed_chars": 417
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.login --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login --help"
+      ],
+      "title": "Full help text of `login --help` changed (+330 −330 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,6 +7,9 @@\n   help    Print this message or the help of the given subcommand(s)\n \n Options:\n+      --with-api-key\n+          Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`)\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -15,21 +18,18 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --with-api-key\n-          Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`)\n-\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-\n       --with-access-token\n           Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login\n           --with-access-token`)\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n       --device-auth\n           \n+\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -h, --help\n           Print help (see a summary with '-h')\n",
+      "stats": {
+        "added_chars": 330,
+        "removed_chars": 330
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 470,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/main.rs#L470"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+342 −342 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,16 +7,16 @@\n   help    Print this message or the help of the given subcommand(s)\n \n Options:\n+      --with-api-key        Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login\n+                            --with-api-key`)\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n-      --with-api-key        Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login\n-                            --with-api-key`)\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --with-access-token   Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN |\n                             codex login --with-access-token`)\n-      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --device-auth         \n+      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 342,
+        "removed_chars": 342
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 470,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/main.rs#L470"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server --help"
+      ],
+      "title": "Full help text of `mcp-server --help` changed (+131 −131 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,6 +3,10 @@\n Usage: codex mcp-server [OPTIONS]\n \n Options:\n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -10,10 +14,6 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n-\n-      --strict-config\n-          Error out when config.toml contains fields that are not recognized by this version of\n-          Codex\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 131,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server -h"
+      ],
+      "title": "Full help text of `mcp-server -h` changed (+146 −146 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,12 +3,12 @@\n Usage: codex mcp-server [OPTIONS]\n \n Options:\n+      --strict-config       Error out when config.toml contains fields that are not recognized by\n+                            this version of Codex\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n-      --strict-config       Error out when config.toml contains fields that are not recognized by\n-                            this version of Codex\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 146,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control --help"
+      ],
+      "title": "Full help text of `remote-control --help` changed (+48 −48 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,6 +9,9 @@\n   help   Print this message or the help of the given subcommand(s)\n \n Options:\n+      --json\n+          Emit machine-readable JSON\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -16,9 +19,6 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n-\n-      --json\n-          Emit machine-readable JSON\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 48,
+        "removed_chars": 48
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control -h"
+      ],
+      "title": "Full help text of `remote-control -h` changed (+54 −54 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,11 +9,11 @@\n   help   Print this message or the help of the given subcommand(s)\n \n Options:\n+      --json                Emit machine-readable JSON\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n-      --json                Emit machine-readable JSON\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 54,
+        "removed_chars": 54
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+386 −272 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,6 +11,12 @@\n           Optional user prompt to start the session\n \n Options:\n+      --last\n+          Continue the most recent session without showing the picker\n+\n+      --all\n+          Show all sessions (disables cwd filtering and shows CWD column)\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -19,21 +25,15 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --last\n-          Continue the most recent session without showing the picker\n-\n-      --all\n-          Show all sessions (disables cwd filtering and shows CWD column)\n-\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-\n       --include-non-interactive\n           Include non-interactive sessions in the resume picker and --last selection\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint.\n           \n@@ -67,6 +67,9 @@\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n+\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 386,
+        "removed_chars": 272
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+531 −417 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,20 +8,20 @@\n   [PROMPT]      Optional user prompt to start the session\n \n Options:\n-  -c, --config <key=value>\n-          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n-          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n-          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n       --last\n           Continue the most recent session without showing the picker\n       --all\n           Show all sessions (disables cwd filtering and shows CWD column)\n+  -c, --config <key=value>\n+          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n+          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n+          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --include-non-interactive\n           Include non-interactive sessions in the resume picker and --last selection\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n       --remote-auth-token-env <ENV_VAR>\n@@ -44,6 +44,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 531,
+        "removed_chars": 417
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.review --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "review --help"
+      ],
+      "title": "Full help text of `review --help` changed (+342 −342 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,6 +7,10 @@\n           Custom review instructions. If `-` is used, read from stdin\n \n Options:\n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -15,24 +19,20 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --strict-config\n-          Error out when config.toml contains fields that are not recognized by this version of\n-          Codex\n-\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-\n       --uncommitted\n           Review staged, unstaged, and untracked changes\n \n       --base <BRANCH>\n           Review changes against the given base branch\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n       --commit <SHA>\n           Review the changes introduced by a commit\n+\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n       --title <TITLE>\n           Optional commit title to display in the review summary\n",
+      "stats": {
+        "added_chars": 342,
+        "removed_chars": 342
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.review -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "review -h"
+      ],
+      "title": "Full help text of `review -h` changed (+344 −344 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,17 +6,17 @@\n   [PROMPT]  Custom review instructions. If `-` is used, read from stdin\n \n Options:\n+      --strict-config       Error out when config.toml contains fields that are not recognized by\n+                            this version of Codex\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n-      --strict-config       Error out when config.toml contains fields that are not recognized by\n-                            this version of Codex\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --uncommitted         Review staged, unstaged, and untracked changes\n       --base <BRANCH>       Review changes against the given base branch\n-      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --commit <SHA>        Review the changes introduced by a commit\n+      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --title <TITLE>       Optional commit title to display in the review summary\n   -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 344,
+        "removed_chars": 344
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+360 −360 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,6 +7,9 @@\n           Full command args to run under seatbelt\n \n Options:\n+      --sandbox-state-json <JSON>\n+          JSON value from `codex/sandbox-state-meta` to apply directly\n+\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -15,20 +18,17 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --sandbox-state-json <JSON>\n-          JSON value from `codex/sandbox-state-meta` to apply directly\n+      --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n+          Add a readable root to the supplied sandbox state. Repeat for multiple roots\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n-          Add a readable root to the supplied sandbox state. Repeat for multiple roots\n+      --sandbox-state-disable-network\n+          Disable direct network access in the supplied sandbox state\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-\n-      --sandbox-state-disable-network\n-          Disable direct network access in the supplied sandbox state\n \n   -P, --permission-profile <NAME>\n           Named permissions profile to apply from the active configuration stack\n",
+      "stats": {
+        "added_chars": 360,
+        "removed_chars": 360
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+314 −314 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,20 +6,20 @@\n   [COMMAND]...  Full command args to run under seatbelt\n \n Options:\n+      --sandbox-state-json <JSON>\n+          JSON value from `codex/sandbox-state-meta` to apply directly\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n-      --sandbox-state-json <JSON>\n-          JSON value from `codex/sandbox-state-meta` to apply directly\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n           Add a readable root to the supplied sandbox state. Repeat for multiple roots\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --sandbox-state-disable-network\n           Disable direct network access in the supplied sandbox state\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -P, --permission-profile <NAME>\n           Named permissions profile to apply from the active configuration stack\n   -p, --profile <CONFIG_PROFILE>\n",
+      "stats": {
+        "added_chars": 314,
+        "removed_chars": 314
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.unarchive --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "unarchive --help"
+      ],
+      "title": "Full help text of `unarchive --help` changed (+325 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,19 +12,19 @@\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n   -m, --model <MODEL>\n           Model the agent should use\n \n@@ -42,6 +42,9 @@\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n+\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 325,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.unarchive -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "unarchive -h"
+      ],
+      "title": "Full help text of `unarchive -h` changed (+325 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,15 +8,15 @@\n Options:\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n@@ -29,6 +29,8 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n+      --approve-for-me\n+          Route approval requests through automatic review using the workspace-write sandbox\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n",
+      "stats": {
+        "added_chars": 325,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.features.code_mode_host.disable_in_process_fallback.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_host.disable_in_process_fallback",
+        "description"
+      ],
+      "title": "features.code_mode_host.disable_in_process_fallback description changed (+67 −76 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Fail instead of running embedded V8 when the standalone host is unavailable.\n+Keep code mode fail-closed when the standalone host is unavailable.\n",
+      "stats": {
+        "added_chars": 67,
+        "removed_chars": 76
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.executed_tool_call_metadata",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.executed_tool_call_metadata"
+      ],
+      "title": "New setting: features.executed_tool_call_metadata",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 911,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/features/src/lib.rs#L911"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.image_resize_notice",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.image_resize_notice"
+      ],
+      "title": "New setting: features.image_resize_notice",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1275,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/features/src/lib.rs#L1275"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.subagent_developer_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2.subagent_developer_instructions"
+      ],
+      "title": "New setting: features.multi_agent_v2.subagent_developer_instructions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Overrides inherited developer instructions for subagents without role-specific instructions.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.recommended_plugins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.recommended_plugins"
+      ],
+      "title": "New setting: features.recommended_plugins",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1191,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/features/src/lib.rs#L1191"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.token_budget.mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.token_budget.mode"
+      ],
+      "title": "New setting: features.token_budget.mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Select whether context-window metadata identifies the thread or agent name.",
+        "enum": [
+          "thread",
+          "name"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 1876,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/export.rs#L1876"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/mcp.rs",
+            "line": 662,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/protocol/v2/mcp.rs#L662"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.tool_registry",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.tool_registry"
+      ],
+      "title": "New setting: features.tool_registry",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/schema.rs",
+            "line": 118,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/config/src/schema.rs#L118"
+          },
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 661,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/features/src/lib.rs#L661"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.tool_registry.error_on_tool_collisions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.tool_registry.error_on_tool_collisions"
+      ],
+      "title": "New setting: features.tool_registry.error_on_tool_collisions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Fail the turn when multiple tools share the same effective name.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.view_image",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.view_image"
+      ],
+      "title": "New setting: features.view_image",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/view_image.rs",
+            "line": 68,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/view_image.rs#L68"
+          },
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 863,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/features/src/lib.rs#L863"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.omit_tools_from",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.omit_tools_from"
+      ],
+      "title": "New setting: mcp_servers.<name>.omit_tools_from",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 115,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/config/edit/document_helpers.rs#L115"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_CODE_MODE_HOST_PATH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_CODE_MODE_HOST_PATH"
+      ],
+      "title": "Environment variable no longer read: CODEX_CODE_MODE_HOST_PATH",
+      "impact": "informational",
+      "before": "CODEX_CODE_MODE_HOST_PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode/src/remote_session.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.146.1/codex-rs/code-mode/src/remote_session.rs#L34"
+          },
+          {
+            "path": "codex-rs/code-mode/src/remote_session.rs",
+            "line": 574,
+            "url": "https://github.com/openai/codex/blob/rust-v0.146.1/codex-rs/code-mode/src/remote_session.rs#L574"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.rmcp",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "rmcp"
+      ],
+      "title": "Binary sdk.rmcp: 1.8.0 → 3.0.0",
+      "impact": "informational",
+      "before": "1.8.0",
+      "after": "3.0.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 270973936 → 219997536",
+      "impact": "informational",
+      "before": 270973936,
+      "after": 219997536,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

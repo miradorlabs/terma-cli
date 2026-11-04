@@ -1,0 +1,478 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.220",
+  "to": "2.1.221",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- [VSCode] Added Focus view: a chat-menu toggle that hides tool activity behind an expandable per-turn summary with a live running-tool indicator, toggled with `Ctrl+Alt+F` or the \"Claude Code: Toggle Focus view\" command\n- Added `mode: \"mask\"` for sandbox credential files on Linux and WSL — sandboxed commands read a sentinel copy (the whole file, or just the spans captured by an `extract` regex) while the sandbox proxy substitutes the real value on egress; on macOS file masking falls back to `deny`\n- Added warnings to `claude plugin validate` when a marketplace or plugin name would be rejected by Claude Desktop's managed marketplace sync\n- Added a `prompt-audit` subcommand to the `claude-api` skill for auditing prompts and tool descriptions for patterns written for older models\n- Fixed a Bash tool permission-check bypass where zsh could execute hidden commands in `[[ ]]` regex conditionals; affected commands now prompt for permission\n- Fixed PowerShell permission checks mishandling paths containing quote characters on Windows; such paths now prompt for approval\n- Fixed the thinking toggle having no effect for the rest of a session that started with thinking off; disabling an MCP server mid-connect no longer silently reverts\n- Fixed MCP servers from `--mcp-config` not being connected before the first turn in print mode (`-p`), which made the model emit tool calls as literal text\n- Fixed @-mentioned files being silently dropped when pressing Esc to retract a prompt and resubmitting it\n- Fixed a crash when preparing API requests for SDK MCP tools named after built-in object properties such as `constructor`\n- Fixed WebSearch failing with a 400 error at effort `xhigh`/`max` when thinking is disabled\n- Fixed sandboxed large uploads failing with TLS errors through the sandbox proxy\n- Fixed Team and Enterprise spend-limit message incorrectly blaming the org's monthly limit instead of your individual spend limit\n- Fixed Bedrock authentication with AWS SSO named profiles failing in desktop-managed sessions on Windows machines that set a stray `HOME` environment variable\n- Fixed `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=0` not disabling interrupted-turn auto-resume; falsy values are now honored\n- Fixed a rare wake-from-sleep race where two Claude Code processes could both refresh the same MCP connector or WIF OAuth token at once, forcing re-authentication\n- Fixed renaming a session from Claude Code Desktop or claude.ai not updating the CLI's session name; session names from every rename surface are now sanitized\n- Fixed plugin- and org-delivered skills named after terminal-only built-ins (e.g. `/help`, `/feedback`) being un-invocable in non-interactive sessions\n- Fixed the \"Plugins changed\" notification lingering after plugins were reloaded instead of clearing\n- Fixed Vim mode: the yank register now survives dialogs, history search, and the transcript view instead of being silently emptied\n- Fixed Vim mode: undoing back to an empty prompt now arms the \"press ← again\" confirm before returning to the agent view\n- Improved tool search on Google Vertex AI: re-enabled for Claude 4.5-generation and newer models\n- Improved auto mode: permission checks for parallel tool calls are now cache-efficient, and switching modes while a check is pending reliably prompts instead of applying the stale result\n- Reduced prompt-cache costs for auto-mode permission checks by reusing the cached conversation prefix across decisions\n- Improved Stats panel to count cache tokens in its token totals, with a breakdown by input, output, cache read, and cache write\n- Improved `/ultrareview` error messages when a repo shares no history with its base: a checkout with no branches is now refused up front with advice to create one, and refusal hints no longer suggest `git fetch --unshallow` on clones that are already complete\n- Improved Windows startup: process creation times are now read via a native kernel32 call instead of spawning PowerShell, so endpoint security tools that gate `powershell.exe` no longer prompt\n- Changed background sessions to commit and push to preserve work, open a draft PR only when the task calls for one, follow your CLAUDE.md git instructions, and always end by reporting where the work lives\n- Changed `/plugin install` to refresh a stale marketplace catalog and retry before reporting a plugin not found\n- Changed plugins installed from `/plugin` to activate immediately when safe, instead of always requiring `/reload-plugins`\n- Changed plugins to accept `\".\"` as a `skills` path, and the root-level `SKILL.md` validation error now suggests using the plugin root\n- Changed `/status` to show the session kind: `interactive`, or a background job that is `attached` or `unattended`\n- Changed emoji autocomplete to accept common alternate shortcodes like `:thumbsup:`, `:thumbsdown:`, and `:love:`\n- Changed sessions forked with `/fork` to create a new worktree of their own instead of working in the original session's checkout\n- Changed Claude in Chrome to close the browser tabs it opens once it no longer needs them\n- Changed fast mode to report on the stream when usage credits run out mid-session, instead of failing silently\n- Changed Monitor: a watch that exits without producing any output now says so instead of reporting \"stream ended\"\n- Changed the Gateway `model` field validation: non-string values are rejected with a 400 instead of being forwarded\n- Removed the repeated \"Permission mode changed while the auto-mode classifier call was queued\" notice from approval prompts"
+  },
+  "summary": {
+    "changes": 23,
+    "categories": {
+      "binary": 1,
+      "cli": 2,
+      "config": 18,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 21,
+      "notable": 2
+    },
+    "undocumented": 20
+  },
+  "changes": [
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+169 −173 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -66,7 +66,7 @@\n  - Assistant knowledge cutoff is May 2026.\n  - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5: 'claude-fable-5', Opus 5: 'claude-opus-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n- - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8/4.7.\n+ - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8.\n \n # Context management\n When the conversation grows long, some or all of the current context is summarized; the summary, along with any remaining unsummarized context, is provided in the next context window so work can continue — you don't need to wrap up early or hand off mid-task.\n",
+      "stats": {
+        "added_chars": 169,
+        "removed_chars": 173
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+169 −173 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -65,7 +65,7 @@\n  - Assistant knowledge cutoff is May 2026.\n  - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5: 'claude-fable-5', Opus 5: 'claude-opus-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n- - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8/4.7.\n+ - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8.\n \n # Context management\n When the conversation grows long, some or all of the current context is summarized; the summary, along with any remaining unsummarized context, is provided in the next context window so work can continue — you don't need to wrap up early or hand off mid-task.\n",
+      "stats": {
+        "added_chars": 169,
+        "removed_chars": 173
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude.options.--autocompact",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--autocompact"
+      ],
+      "title": "New flag `claude --autocompact`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Auto-compact window size (auto, or 100k–1M tokens)",
+        "names": [
+          "--autocompact"
+        ],
+        "value": "<auto|tokens>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+131 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -24,6 +24,8 @@\n       Edit\")\n   --append-system-prompt <prompt>       Append a system prompt to the default\n                                         system prompt\n+  --autocompact <auto|tokens>           Auto-compact window size (auto, or\n+                                        100k–1M tokens)\n   --ax-screen-reader                    Render screen-reader friendly output\n                                         (flat text, no decorative borders or\n                                         animations).\n",
+      "stats": {
+        "added_chars": 131,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.credentials.files.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.credentials.files",
+        "description"
+      ],
+      "title": "sandbox.credentials.files description changed (+260 −83 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Credential files or directories to protect. `deny` blocks reads inside the sandbox.\n+Credential files or directories to protect. `deny` blocks reads inside the sandbox; `mask` substitutes a sentinel inside the sandbox (whole-file, or per-`extract` capture) and injects the real value at the proxy. On macOS and Windows `mask` degrades to `deny`.\n",
+      "stats": {
+        "added_chars": 260,
+        "removed_chars": 83
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sandbox.credentials.files[].mode.enum.mask",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "sandbox.credentials.files[].mode",
+        "enum",
+        "mask"
+      ],
+      "title": "Setting sandbox.credentials.files[].mode gained value mask",
+      "impact": "informational",
+      "before": null,
+      "after": "mask",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.credentials.files[].mode.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.credentials.files[].mode",
+        "description"
+      ],
+      "title": "sandbox.credentials.files[].mode description changed (+0 −52 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Access mode for this path. Only `deny` is supported.\n+\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 52
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACTS_API_TOKEN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACTS_API_TOKEN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACTS_API_TOKEN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACTS_API_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_COMMENTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_COMMENTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_COMMENTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_COMMENTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_COMMENTS_AUTOREACT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_COMMENTS_AUTOREACT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_COMMENTS_AUTOREACT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_COMMENTS_AUTOREACT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_THRIFTY_SONIC",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_THRIFTY_SONIC"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_THRIFTY_SONIC",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_THRIFTY_SONIC",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.GIT_CONFIG_COUNT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "GIT_CONFIG_COUNT"
+      ],
+      "title": "New environment variable: GIT_CONFIG_COUNT",
+      "impact": "informational",
+      "before": null,
+      "after": "GIT_CONFIG_COUNT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_DISCOVERY_CACHE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_DISCOVERY_CACHE"
+      ],
+      "title": "New environment variable: MCP_DISCOVERY_CACHE",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_DISCOVERY_CACHE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_DISCOVERY_CACHE_MAX_STALE_S",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_DISCOVERY_CACHE_MAX_STALE_S"
+      ],
+      "title": "New environment variable: MCP_DISCOVERY_CACHE_MAX_STALE_S",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_DISCOVERY_CACHE_MAX_STALE_S",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_DISCOVERY_CACHE_TTL_S",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_DISCOVERY_CACHE_TTL_S"
+      ],
+      "title": "New environment variable: MCP_DISCOVERY_CACHE_TTL_S",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_DISCOVERY_CACHE_TTL_S",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_PROTOCOL_NEGOTIATION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_PROTOCOL_NEGOTIATION"
+      ],
+      "title": "New environment variable: MCP_PROTOCOL_NEGOTIATION",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_PROTOCOL_NEGOTIATION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_ENVInternal",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVInternal"
+      ],
+      "title": "New environment variable: NODE_ENVInternal",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVInternal",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_TEST_WORKER_ID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_TEST_WORKER_ID"
+      ],
+      "title": "New environment variable: NODE_TEST_WORKER_ID",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_TEST_WORKER_ID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_SIBLING_CONTEXT",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_SIBLING_CONTEXT"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_AUTO_MODE_SIBLING_CONTEXT",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_AUTO_MODE_SIBLING_CONTEXT",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_ENVdevelopment",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVdevelopment"
+      ],
+      "title": "Environment variable no longer read: NODE_ENVdevelopment",
+      "impact": "informational",
+      "before": "NODE_ENVdevelopment",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.failed",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "failed"
+      ],
+      "title": "Environment variable no longer read: failed",
+      "impact": "informational",
+      "before": "failed",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 256908272 → 270518240",
+      "impact": "informational",
+      "before": 256908272,
+      "after": 270518240,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

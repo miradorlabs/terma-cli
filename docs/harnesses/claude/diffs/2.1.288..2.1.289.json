@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.288",
+  "to": "2.1.289",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Fixed a deny or ask rule on a nested part of a compound shell command not holding over a user-installed mod's approval on managed machines\n- Fixed the terminal freezing on short code blocks with many unclosed `<script>` tags or deeply nested `${` substitutions\n- Fixed `Read` deny rules not applying to files @-mentioned, changed, or selected in the IDE through a symlink\n- [VSCode] Reverted a 2.1.288 change to `claude auth status` that may have made sign-outs more frequent\n- Improved how quickly large files open in a plugin code pane by laying the highlighted view out once at its final width\n- Fixed `plugin list`, `plugin eval` and `plugin update` showing a stale copy of a plugin installed from a local folder marketplace, and hot reload for a symlinked `--plugin-dir`\n- Fixed installed mods not loading in the first session after an upgrade\n- Fixed a plugin's rows above the prompt showing a stale row while the Background tasks dialog was open in fullscreen\n- Fixed plugin panes drawing nothing when a link used a localhost address, an `@` in its path, an uppercase host or a `file:` path\n- Fixed a user-installed plugin being able to rewrite the descriptions of an organization-managed MCP server's sign-in tools\n- Fixed a freeze or forced quit at launch when a plugin drew a Box with a border style the terminal does not know\n- Fixed supervised and background sessions ending when a plugin's on-screen handler threw asynchronously\n- Fixed sessions ending with an interface error when a plugin region with no height kept growing\n- Fixed Bash deny and ask rules missing a command behind an environment variable prefix with an expanded value (e.g. `TZ=\"$HOME\" rm -rf build`) when the sandbox auto-allows commands\n- Fixed a Bash deny or ask rule being skipped under sandbox auto-allow when a bare variable assignment came before the command\n- Fixed `claude plugin validate` skipping the plugin when the folder also holds a marketplace manifest\n- Added `agent.spawn` for teammates, one agent id across plugin hook events, and idle and waiting states in `$.agent.list()`\n- Fixed sessions ending with \"unrecoverable interface error\" when a value a mod's `ui.render` hook wrote made a row throw while drawn; the engine now draws its own row instead\n- Fixed text with a tab, a stray escape and a C1 control, or a short text with a tab and CRLF line endings, drawing over the rows below it\n- Fixed right-aligned content in a mod's pane or band drawing under the close mark or `[-]`, which now also keep one column in from the terminal's edge\n- Fixed a mod's `Client` that fails while drawn taking down everything the mod drew around it; it now fails alone and raises `ui.fault`\n- Fixed `claude plugin validate` failing an Anthropic marketplace's own plugin and listing a clean `plugin.json` in `--json`\n- Fixed a mod's band that fails to draw briefly telling the cards under it to step aside\n- Fixed a failed plugin component showing `Error` or nothing as its reason when the failure carried no message\n- Improved the line a mod's author sees when its band or pane fails to draw: it names the mod and says nothing was drawn\n- Fixed published artifact pages freezing or crashing the reader's browser tab on short code blocks with many unclosed `<script>` tags\n- Fixed a mod's Client region staying failed for the whole session after the terminal threw while drawing it"
+  },
+  "summary": {
+    "changes": 6,
+    "categories": {
+      "config": 6
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 6,
+      "notable": 0
+    },
+    "undocumented": 6
+  },
+  "changes": [
+    {
+      "id": "config.options.enabledPlugins.<name>.serverCommand.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enabledPlugins.<name>.serverCommand",
+        "description"
+      ],
+      "title": "enabledPlugins.<name>.serverCommand description changed (+75 −75 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Command array [command, ...args] to match exactly for allowed stdio servers\n+Command array [command, ...args] to match exactly for blocked stdio servers\n",
+      "stats": {
+        "added_chars": 75,
+        "removed_chars": 75
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.enabledPlugins.<name>.serverName.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enabledPlugins.<name>.serverName",
+        "description"
+      ],
+      "title": "enabledPlugins.<name>.serverName description changed (+49 −58 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Name of the MCP server that users are allowed to configure\n+Name of the MCP server that is explicitly blocked\n",
+      "stats": {
+        "added_chars": 49,
+        "removed_chars": 58
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.enabledPlugins.<name>.serverUrl.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enabledPlugins.<name>.serverUrl",
+        "description"
+      ],
+      "title": "enabledPlugins.<name>.serverUrl description changed (+98 −98 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-URL pattern with wildcard support (e.g., \"https://*.example.com/*\") for allowed remote MCP servers\n+URL pattern with wildcard support (e.g., \"https://*.example.com/*\") for blocked remote MCP servers\n",
+      "stats": {
+        "added_chars": 98,
+        "removed_chars": 98
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.pluginConfigs.<name>.serverCommand.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "pluginConfigs.<name>.serverCommand",
+        "description"
+      ],
+      "title": "pluginConfigs.<name>.serverCommand description changed (+75 −75 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Command array [command, ...args] to match exactly for allowed stdio servers\n+Command array [command, ...args] to match exactly for blocked stdio servers\n",
+      "stats": {
+        "added_chars": 75,
+        "removed_chars": 75
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.pluginConfigs.<name>.serverName.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "pluginConfigs.<name>.serverName",
+        "description"
+      ],
+      "title": "pluginConfigs.<name>.serverName description changed (+49 −58 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Name of the MCP server that users are allowed to configure\n+Name of the MCP server that is explicitly blocked\n",
+      "stats": {
+        "added_chars": 49,
+        "removed_chars": 58
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.pluginConfigs.<name>.serverUrl.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "pluginConfigs.<name>.serverUrl",
+        "description"
+      ],
+      "title": "pluginConfigs.<name>.serverUrl description changed (+98 −98 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-URL pattern with wildcard support (e.g., \"https://*.example.com/*\") for allowed remote MCP servers\n+URL pattern with wildcard support (e.g., \"https://*.example.com/*\") for blocked remote MCP servers\n",
+      "stats": {
+        "added_chars": 98,
+        "removed_chars": 98
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

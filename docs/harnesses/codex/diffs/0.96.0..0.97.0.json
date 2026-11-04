@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.96.0",
+  "to": "0.97.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.96.0...rust-v0.97.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.97.0",
+    "text": "## New Features\n- Added a session-scoped “Allow and remember” option for MCP/App tool approvals, so repeated calls to the same tool can be auto-approved during the session. (#10584)\n- Added live skill update detection, so skill file changes are picked up without restarting. (#10478)\n- Added support for mixed text and image content in dynamic tool outputs for app-server integrations. (#10567)\n- Added a new `/debug-config` slash command in the TUI to inspect effective configuration. (#10642)\n- Introduced initial memory plumbing (API client + local persistence) to support thread memory summaries. (#10629, #10634)\n- Added configurable `log_dir` so logs can be redirected (including via `-c` overrides) more easily. (#10678)\n\n## Bug Fixes\n- Fixed jitter in the TUI apps/connectors picker by stabilizing description-column rendering. (#10593)\n- Restored and stabilized the TUI “working” status indicator/shimmer during preamble and early exec flows. (#10700, #10701)\n- Improved cloud requirements reliability with higher timeouts, retries, and corrected precedence over MDM settings. (#10631, #10633, #10659)\n- Persisted pending-input user events more consistently for mid-turn injected input handling. (#10656)\n\n## Documentation\n- Documented how to opt in to the experimental app-server API. (#10667)\n- Updated docs/schema coverage for new `log_dir` configuration behavior. (#10678)\n\n## Chores\n- Added a gated Bubblewrap (`bwrap`) Linux sandbox path to improve filesystem isolation options. (#9938)\n- Refactored model client lifecycle to be session-scoped and reduced implicit client state. (#10595, #10664)\n- Added caching for MCP actions from apps to reduce repeated load latency for users with many installed apps. (#10662)\n- Added a `none` personality option in protocol/config surfaces. (#10688)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.96.0...rust-v0.97.0\n\n- #10595 Stop client from being state carrier @pakrym-oai\n- #10584 Add option to approve and remember MCP/Apps tool usage @canvrno-oai\n- #10644 fix: flaky test @jif-oai\n- #10629 feat: add phase 1 mem client @jif-oai\n- #10633 Cloud Requirements: take precedence over MDM @gt-oai\n- #10659 Increase cloud req timeout @gt-oai\n- #9938 feat(linux-sandbox): add bwrap support @viyatb-oai\n- #10656 Persist pending input user events @aibrahim-oai\n- #10634 feat: add phase 1 mem db @jif-oai\n- #10593 Fix jitter in TUI apps/connectors picker  @canvrno-oai\n- #10662 [apps] Cache MCP actions from apps. @mzeng-openai\n- #10649 Fix test_shell_command_interruption flake @gt-oai\n- #10642 Add /debug-config slash command @gt-oai\n- #10478 Added support for live updates to skills @etraut-openai\n- #10688 add none personality option @aibrahim-oai\n- #10567 feat(app-server, core): allow text + image content items for dynamic tool outputs @owenlin0\n- #10667 chore(app-server): document experimental API opt-in @owenlin0\n- #10664 Session-level model client @pakrym-oai\n- #10678 feat(core): add configurable log_dir @joshka-oai\n- #10631 Cloud Requirements: increase timeout and retries @gt-oai\n- #10650 chore(core) personality migration tests @dylan-hurd-oai\n- #10701 fix(tui): restore working shimmer after preamble output @joshka-oai\n- #10700 fix: ensure status indicator present earlier in exec path @sayan-oai"
+  },
+  "summary": {
+    "changes": 3,
+    "categories": {
+      "config": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 1
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "config.options.features.use_linux_sandbox_bwrap",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.use_linux_sandbox_bwrap"
+      ],
+      "title": "New setting: features.use_linux_sandbox_bwrap",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/common/src/config_override.rs",
+            "line": 92,
+            "url": "https://github.com/openai/codex/blob/rust-v0.97.0/codex-rs/common/src/config_override.rs#L92"
+          },
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 472,
+            "url": "https://github.com/openai/codex/blob/rust-v0.97.0/codex-rs/core/src/features.rs#L472"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.log_dir",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "log_dir"
+      ],
+      "title": "New setting: log_dir",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Directory where Codex writes log files, for example `codex-tui.log`. Defaults to `$CODEX_HOME/log`.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.personality.enum.none",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "personality",
+        "enum",
+        "none"
+      ],
+      "title": "Setting personality gained value none",
+      "impact": "informational",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 281,
+            "url": "https://github.com/openai/codex/blob/rust-v0.97.0/codex-rs/core/src/config/edit.rs#L281"
+          },
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 574,
+            "url": "https://github.com/openai/codex/blob/rust-v0.97.0/codex-rs/core/src/features.rs#L574"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    }
+  ]
+}

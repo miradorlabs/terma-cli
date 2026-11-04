@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.153.1",
+  "to": "0.153.2",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.153.1...rust-v0.153.2"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.153.2",
+    "text": "## Bug Fixes\n\n- Corrected the GPT-6-Astra Fast tier description to say “2x speed, increased usage” instead of “1.5x.” This changes only the displayed text, not how requests run. (#42632)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.153.1...rust-v0.153.2\n\n- #42632 Fix GPT-6-Astra Fast tier description for 0.153.2 @anp-oai"
+  },
+  "summary": {
+    "changes": 4,
+    "categories": {
+      "caching": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 4
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns.breakpoints",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns",
+        "breakpoints"
+      ],
+      "title": "Caching across_turns.breakpoints: none → [[],[],[]]",
+      "impact": "notable",
+      "before": null,
+      "after": [
+        [],
+        [],
+        []
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_cache_key",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_cache_key"
+      ],
+      "title": "Caching across_turns.stable_cache_key: none → true",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: none → 972",
+      "impact": "notable",
+      "before": null,
+      "after": 972,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.turns",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "turns"
+      ],
+      "title": "Caching across_turns.turns: 0 → 3",
+      "impact": "notable",
+      "before": 0,
+      "after": 3,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

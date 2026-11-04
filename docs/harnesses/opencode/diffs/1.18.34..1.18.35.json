@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "from": "1.18.34",
+  "to": "1.18.35",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/anomalyco/opencode/compare/v1.18.34...v1.18.35"
+  },
+  "changelog": {
+    "url": "https://github.com/anomalyco/opencode/releases/tag/v1.18.35",
+    "text": "## Core\n\n### Improvements\n- Added canonical redirects and JSON and Markdown data formats for agent-readable stats.\n\n### Bugfixes\n- xAI tool results now include supported images, while unsupported image formats are skipped. (@Jaaneek)\n\n**Thank you to 3 community contributors:**\n- @dc85:\n  - docs(web): add Fledge Alpha Free to Zen docs (#52895)\n- @jm0ney337:\n  - docs(ecosystem): add opencode-supabase to ecosystem plugins (#49848)\n- @Jaaneek:\n  - fix(opencode): bump @ai-sdk/xai to 3.0.139 so tool-result images reach xAI (#53549)"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

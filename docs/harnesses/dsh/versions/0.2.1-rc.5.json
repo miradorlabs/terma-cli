@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "harness": "dsh",
+  "version": "0.2.1-rc.5",
+  "platform": "",
+  "captured_at": "2026-11-04T16:16:16.239171Z",
+  "capture": {
+    "partial": false,
+    "sections": {
+      "support": "2026-11-04T16:16:16.239171Z",
+      "telemetry": "2026-11-04T16:16:16.239171Z"
+    }
+  },
+  "telemetry": {
+    "surfaces": {
+      "logs/dsh.assistant_response": {
+        "keys": {
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "response_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/dsh.user_prompt": {
+        "keys": {
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "resource": {
+        "keys": {
+          "service.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "telemetry.sdk.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/chat {target}": {
+        "keys": {
+          "dsh.purpose": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "dsh.turn": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.usage.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.total_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/execute_tool {target}": {
+        "keys": {
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.arguments": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.result": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.content_allowed",
+        "label": "Prompts and tool content delivered when allowed",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.content_withheld",
+        "label": "Prompts and tool content withheld when the project says so",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.equivalent",
+        "label": "The same telemetry through the relay as exported directly",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.only_opted_in",
+        "label": "Nothing leaves for sessions no repository opted in to",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
+}

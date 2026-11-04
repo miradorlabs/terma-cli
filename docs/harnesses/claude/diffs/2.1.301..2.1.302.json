@@ -1,0 +1,507 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.301",
+  "to": "2.1.302",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `CLAUDE_CODE_AUTO_MODE_MODEL` to choose the model the client-side auto mode classifier uses; it does not change the model for server-side auto mode\n- Added an `Idle compaction` row to `/config` for turning idle compaction off or back on; the notices shown after an idle compaction now say how to turn it off\n- Added a notice to `/design-sync` and `/design-login` that standalone Claude Design (claude.ai/design) closes by December 14, 2026\n- Fixed a \"Prompt is too long\" error when stopping a turn while the conversation was being compacted\n- Fixed requests failing with \"diagnostics: Extra inputs are not permitted\" after switching to Vertex or Bedrock mid-session\n- Fixed the Read tool loading an image file of any size, or a pipe or device named like an image, entirely into memory; image sources over 128 MB are now refused\n- Fixed `/autocompact` and `/effort` saving to the wrong model when a gateway names Opus 4 or 4.1 with a prefix, such as `anthropic/claude-opus-4-1`\n- Fixed a prompt cache miss when a tool added mid-session was loaded again through ToolSearch or after compaction\n- Fixed `claude plugin` and other subcommands sometimes exiting before a queued settings or config write finished, which could lose the change or leave a `.tmp` file behind\n- Fixed plugin marketplaces re-cloning on every refresh, and newly installed git plugins showing version \"unknown\", when git defaults to the reftable ref format\n- Fixed the PowerShell tool not finding commands in a plugin's `bin/` folder, and reporting an error when a search that finds nothing (rg, grep, findstr, git grep) is piped into `Select-Object` or another formatting cmdlet\n- Fixed Claude in the desktop app pointing you to claude.ai settings or `/mcp` to authorize or reconnect an MCP server where that option isn't available\n- Fixed artifact publishes sometimes failing when Claude sent an empty list of edits, and Claude retrying an artifact update the wrong way after a newer version of the artifact turned it away\n- Fixed `classifier_category` missing from OpenTelemetry `tool_decision` events for most auto mode classifier blocks, and new `tool_decision` attributes pushing out `tool_use_id`, `tool_source` and `tool_parameters` when `OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT` is low\n- Fixed rows in the agents view staying blank after moving down a long list or folding a section\n- Fixed `claude remote-control --help` not printing its usage and exiting when not signed in\n- Fixed `/design consent` and `/design revoke` suggesting `/design-login` when they fail in a cloud session, where it isn't available; the message now points to claude.ai/design/settings\n- Fixed MCP servers showing no tools, or every tool call failing, when the server negotiates protocol version 2026-07-28 but omits `resultType`, `ttlMs` or `cacheScope`\n- Fixed prompt suggestions spending usage credits on models your plan pays for only with credits: they are now skipped after a reply billed to credits\n- Fixed URLs written in backticks being clickable only on their first row when they wrap; the whole URL is now one link in terminals that support hyperlinks\n- Fixed `claude plugin details <name>@builtin` suggesting `claude plugin list`, which never shows built-in plugins, when the plugin isn't found; it now points to `/plugin`\n- Fixed an emoji that a link starts inside wrapping one column too wide, which hid it in question previews and turned tables into lists\n- Fixed worktree isolation refusing to create or resume worktrees under git 2.56 or later when a stray `.git` file points at a directory that doesn't exist\n- Fixed a cloud session's cost and usage restarting from zero after the session resumed in a new process\n- Self-hosted runner: Fixed git fetches failing with \"bad object refs/heads\" in sessions that reuse a checkout stored in git's reftable format\n- Windows: Fixed every file write being refused or asked about for projects on exFAT or FAT32 drives, including in sessions started with `--plugin-dir`\n- Improved startup time with many plugins enabled: plugin command and agent files now take far fewer file system calls to load, most of all on Windows\n- Improved auto mode with the server-side classifier: a conversation too long for the safety check is now compacted, instead of every checked tool call being denied\n- Improved the message when a background session reopened from another folder has no LLM gateway: it now says why, instead of \"Not logged in\"\n- Changed `claude -p` and Agent SDK sessions with no permission mode to start in `default` mode on third-party providers, with telemetry off or on a fresh install; `--permission-mode auto` keeps auto\n- Changed fork subagents (`subagent_type: \"fork\"`) to be on by default in `claude -p`, the Agent SDK, the desktop app and VS Code, as they already are in the terminal; `CLAUDE_CODE_FORK_SUBAGENT=0` turns them off, and `claude mcp serve` never offers them\n- Changed the desktop app and VS Code to always run the main conversation's subagents in the background, as the terminal does, rather than let Claude choose; a subagent's own Agent calls in `claude -p`, the Agent SDK, the desktop app and VS Code now run in the foreground by default\n- Changed the `← for agents` footer hint to hide 10 seconds after a session opens; the count of agents waiting on you still shows\n- Changed where the Claude in Chrome instructions sit in the system prompt so that new conversations can read them from the shared prompt cache\n- Changed prompt and agent hooks so that at most 12 of one event run at a time; the rest wait their turn\n- Changed the message shown when your organization's policy turns off `/feedback`: it now points to GitHub issues instead of an organization admin\n- [VSCode] Fixed text after an unclosed code block in a list showing as plain text while a reply streams, then turning into code\n- [VSCode] Fixed MCP server sign-in from the panel opening a broken authorization page when the server URL contains a query string\n- [VSCode] Fixed the `@browser` banner saying \"Browser connected\" when no browser with the Claude extension can be reached\n- [Cloud sessions] Added a banner on a routine's page that says why its last run didn't start, such as your organization reaching its limit on concurrent cloud sessions\n- [Cloud sessions] Fixed \"Rewind to here\" failing on every message except the newest in cloud sessions; self-hosted runners need Claude Code v2.1.246 or later\n- [Cloud sessions] Fixed the pull request status bar in cloud sessions flipping a pull request with merge conflicts back to ready while GitHub rechecked it\n- [Cloud sessions] Fixed routine runs showing as Completed after their cloud session stopped unexpectedly, and as Cancelled when archived before they started, instead of failed\n- [Cloud sessions] Fixed the diff view in cloud sessions missing changes or failing to load after the session's GitHub repository was renamed or moved\n- [Cloud sessions] Fixed a scheduled routine run that failed partway being run again from the start an hour or more later, which could repeat work such as posting the same report twice\n- [Cloud sessions] Fixed an open cloud session sometimes not showing messages sent from another device until you reloaded the page or clicked away and back\n- [Cloud sessions] Improved the error shown when a cloud session fails to start: it now says \"Connection lost\" or \"Server error\" instead of \"Something went wrong\"\n- [Remote Control] Fixed a subagent's pane spinning forever in a Remote Control session after your computer goes offline; it now says Remote Control is disconnected\n- [Claude Tag] Fixed \"is thinking…\" staying up under a mention in a Slack channel or DM after Claude answered it by editing one of its earlier messages\n- [Claude Tag] Fixed URLs in code blocks under a numbered or bulleted step of Claude's Slack replies being wrapped in angle brackets, which broke copied commands\n- [Claude Tag] Fixed HEIC, SVG, TIFF and BMP images attached in Slack never reaching Claude; they now arrive as files in its working files, like other file types\n- [Claude Tag] Fixed new channel managers losing access to Claude in Slack in organizations that restrict Claude Tag by role; the manager role now also grants Claude Tag in Slack\n- [Claude Tag] Fixed custom connectors whose MCP servers share one host showing as a single connector in Claude Tag admin settings; each server is now its own connector\n- [Claude Tag] Fixed Claude in Slack sometimes answering a direct message with \"DMs are temporarily unavailable\" and dropping it when a single Slack lookup stalled; it now retries first\n- [Claude Tag] Fixed direct messages with Claude on a Slack Enterprise Grid ignoring Slack's workspace dropdown; they now run under the connected workspace you last opened Claude in\n- [Claude Tag] Fixed Claude in Slack's notice for a channel's monthly spend limit saying a channel manager can raise it; it now names an organization owner and links the usage page\n- [Claude Tag] Fixed links in Claude's Slack replies absorbing the closing bold or italic marks, or full-width punctuation, right after them, which broke the link and the formatting\n- [Claude Tag] Improved repository search in Claude Tag admin settings to cover up to 100 connected GitHub accounts and find private repositories past the first 5,000 of a GitHub App install\n- [Claude Tag] Improved Add place in Claude Tag admin settings to list a channel you type or paste right away, instead of only after your organization's full channel list has loaded\n- [Claude Tag] Improved Add > Domain on a workspace's or channel's page in Claude Tag admin settings to be available once that page loads, not only after every channel has loaded\n- [Claude Tag] Changed Claude Tag admin settings to organize Claude's access into four tabs: Bundles, Connectors, Skills and plugins, and Channels\n- [Claude Tag] Changed the Roles page in organization settings to group the roles created for Claude Tag channel managers in a collapsed section below your organization's own roles\n- [Code Review] Fixed Code Review setup not resuming after you leave to connect GitHub; back in admin settings, it now reopens at the repository picker"
+  },
+  "summary": {
+    "changes": 21,
+    "categories": {
+      "binary": 2,
+      "config": 6,
+      "model": 1,
+      "prompt": 1,
+      "request": 3,
+      "support": 4,
+      "tools": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 9,
+      "notable": 12
+    },
+    "undocumented": 13
+  },
+  "changes": [
+    {
+      "id": "model.params.safeguards",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "params",
+        "safeguards"
+      ],
+      "title": "Model parameter safeguards removed",
+      "impact": "notable",
+      "before": [
+        {
+          "classifier_context": {
+            "artifact_consent_holdback": false,
+            "auto_mode": {
+              "allow": [],
+              "environment": [],
+              "hard_deny": [],
+              "soft_deny": []
+            },
+            "case_insensitive_paths": false,
+            "classify_all_shell": false,
+            "git_state": {
+              "branch": "main",
+              "cwd": "<repo>",
+              "default_branch": null,
+              "root": "<repo>",
+              "status": null,
+              "visibility": null
+            },
+            "home_dir": "<home>",
+            "is_remote_mode": false,
+            "live_cwd": "<repo>",
+            "permission_mode": "auto",
+            "platform": "macos",
+            "restricted": false,
+            "rule_roots": {
+              "cliArg": "<repo>",
+              "command": "<repo>",
+              "flagSettings": "<repo>",
+              "hostCredential": "<repo>",
+              "localSettings": "<repo>",
+              "mcpServerPolicy": "<repo>",
+              "policySettings": "<repo>",
+              "projectSettings": "<repo>",
+              "session": "<repo>",
+              "toolsNarrowing": "<repo>",
+              "userSettings": "<claude-config>"
+            },
+            "rules": {
+              "allow": [],
+              "ask": [],
+              "deny": []
+            },
+            "trusted_directories": {
+              "additional": [],
+              "block_reads_outside_working_directories": false,
+              "network": [],
+              "primary": {
+                "path": "<repo>",
+                "resolved": [
+                  "<repo>"
+                ]
+              }
+            },
+            "user_identity": "live",
+            "v": 1
+          },
+          "type": "dangerous_tool_use"
+        }
+      ],
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Injected context changed (+0 −476 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -67,11 +67,6 @@\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n \n-While auto mode is active:\n-\n-You can do much of your work through the Bash tool when it is the simpler route: read files with cat, head, or sed -n, search with grep and find, and make small, mechanical file changes with sed, heredocs, or short scripts instead of the dedicated Read, Edit, or Write tools.\n-The choice is yours: prefer Edit or Write when a shell edit would be fragile, such as exact or multi-line replacements, or sed/awk flags that differ between GNU and BSD/macOS.\n-\n <total_tokens>15000000 tokens left</total_tokens>\n \n Today's date is <date>.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 476
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "description"
+      ],
+      "title": "Agent tool description changed (+609 −282 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -2,7 +2,7 @@\n \n Available agent types are listed in <system-reminder> messages in the conversation.\n \n-When using the Agent tool, specify a subagent_type parameter to select which agent type to use. If omitted, the general-purpose agent is used.\n+When using the Agent tool, specify a subagent_type to select an agent: `\"fork\"` forks yourself (the fork inherits your full conversation context and always runs on your model — a `model` override is ignored); any other type — or omitting it — starts a fresh agent (general-purpose by default).\n \n ## When to use\n \n@@ -10,8 +10,10 @@\n For a single-fact lookup where you already know the file, symbol, or value, search directly.\n Once you've delegated a search, don't also run it yourself — wait for the result.\n \n+A fork keeps its tool output out of your context. If you are the fork, execute directly — don't re-delegate.\n+\n - The agent's final report is not shown to the user — relay what matters.\n-- Use SendMessage with the agent's ID or name to continue a previously spawned agent with its context intact; a new Agent call starts fresh.\n+- Use SendMessage with the agent's ID or name to continue a previously spawned agent with its context intact; a new Agent call starts fresh (except subagent_type: \"fork\", which inherits your context).\n - Each agent type's model, reasoning effort, and tools come from its definition (`.claude/agents/*.md` frontmatter or SDK `agents`).\n - `isolation: \"worktree\"` gives the agent its own git worktree (auto-cleaned if unchanged).\n - Subagents run in the background by default; you'll be notified when one completes.\n",
+      "stats": {
+        "added_chars": 609,
+        "removed_chars": 282
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Agent.input_schema.properties.effort.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "input_schema",
+        "properties",
+        "effort",
+        "description"
+      ],
+      "title": "Agent tool parameter effort: description changed (+339 −274 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Reasoning effort for this agent. Set this ONLY when the user, or instructions such as CLAUDE.md or a skill, explicitly ask that this agent or delegated work run at a specific effort level, never on your own judgment; otherwise omit it and the agent runs at its usual effort.\n+Reasoning effort for this agent.\n+Set this ONLY when the user, or instructions such as CLAUDE.md or a skill, explicitly ask that this agent or delegated work run at a specific effort level, never on your own judgment; otherwise omit it and the agent runs at its usual effort.\n+Ignored for subagent_type: \"fork\": a fork runs at your own effort.\n",
+      "stats": {
+        "added_chars": 339,
+        "removed_chars": 274
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Bash.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Bash",
+        "description"
+      ],
+      "title": "Bash tool description changed (+308 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,8 @@\n Executes a bash command and returns its output.\n \n - Working directory persists between calls, but prefer absolute paths — `cd` in a compound command can trigger a permission prompt. Shell state (env vars, functions) does not persist; the shell is initialized from the user's profile.\n+- IMPORTANT: Avoid using this tool to run `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or after you have verified that a dedicated tool cannot accomplish your task.\n+Instead, use the appropriate dedicated tool as this will provide a much better experience for the user.\n - Command output is displayed to you, not reliably to the user.\n - `timeout` is in milliseconds: default 120000, max 600000 for a foreground command.\n - `run_in_background` runs the command detached: it keeps running across turns and re-invokes you when it exits. With it, `timeout` is how long the command may run in the background (default 600000, max 7200000); at that limit it is stopped and you are re-invoked. No `&` needed.\n",
+      "stats": {
+        "added_chars": 308,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.DesignSync.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "DesignSync",
+        "description"
+      ],
+      "title": "DesignSync tool description changed (+250 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,8 @@\n Read and update the user's claude.ai/design design-system projects through their claude.ai login (or, for sessions without one, a dedicated design authorization from /design-login).\n Use this only with the /design-sync skill, which the user starts, to keep a local component library in sync with one of those projects — incrementally, one component at a time, never as a wholesale replace.\n \n+Standalone Claude Design (claude.ai/design) closes by <date>. Claude Design now lives in Claude. If the server refuses a call because standalone Claude Design or the project has closed or moved, give the user the server's message as written and stop.\n+\n The tool dispatches on `method`:\n \n Read methods (no permission prompt once design scopes are granted — the first call may prompt to add design-system access to the claude.ai login):\n",
+      "stats": {
+        "added_chars": 250,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.betas.afk-mode-2026-01-31",
+      "category": "request",
+      "op": "removed",
+      "path": [
+        "request",
+        "betas",
+        "afk-mode-2026-01-31"
+      ],
+      "title": "Beta dropped: afk-mode-2026-01-31",
+      "impact": "notable",
+      "before": "afk-mode-2026-01-31",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.betas.dangerous-tool-use-2026-09-03",
+      "category": "request",
+      "op": "removed",
+      "path": [
+        "request",
+        "betas",
+        "dangerous-tool-use-2026-09-03"
+      ],
+      "title": "Beta dropped: dangerous-tool-use-2026-09-03",
+      "impact": "notable",
+      "before": "dangerous-tool-use-2026-09-03",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.body_keys.safeguards",
+      "category": "request",
+      "op": "removed",
+      "path": [
+        "request",
+        "body_keys",
+        "safeguards"
+      ],
+      "title": "Request field safeguards removed",
+      "impact": "informational",
+      "before": "safeguards",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_BG_GATEWAY_WITHHELD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_BG_GATEWAY_WITHHELD"
+      ],
+      "title": "New environment variable: CLAUDE_BG_GATEWAY_WITHHELD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_BG_GATEWAY_WITHHELD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ALLOW_OTHER_MODELS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ALLOW_OTHER_MODELS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ALLOW_OTHER_MODELS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ALLOW_OTHER_MODELS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_MODEL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_MODEL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_MODEL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_MODEL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DESKTOP_SKILLS_PLUGIN_DIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DESKTOP_SKILLS_PLUGIN_DIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DESKTOP_SKILLS_PLUGIN_DIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DESKTOP_SKILLS_PLUGIN_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_SERVE_WORKSPACE_ROOT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_SERVE_WORKSPACE_ROOT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_SERVE_WORKSPACE_ROOT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_SERVE_WORKSPACE_ROOT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.props",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "props"
+      ],
+      "title": "New environment variable: props",
+      "impact": "informational",
+      "before": null,
+      "after": "props",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.runtime",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "runtime"
+      ],
+      "title": "Binary runtime: bun 1.4.3 → bun 1.4.4",
+      "impact": "informational",
+      "before": "bun 1.4.3",
+      "after": "bun 1.4.4",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 250541840 → 267956720",
+      "impact": "informational",
+      "before": 250541840,
+      "after": 267956720,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "support.capabilities.relay.content_withheld@linux/amd64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "relay.content_withheld@linux/amd64",
+        "result"
+      ],
+      "title": "Terma: Prompts and tool content withheld when the project says so now passes on linux/amd64",
+      "impact": "notable",
+      "before": "fail",
+      "after": "pass",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "relay.content_withheld"
+        ]
+      },
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "support.capabilities.relay.resumed_elsewhere@linux/amd64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "relay.resumed_elsewhere@linux/amd64",
+        "result"
+      ],
+      "title": "Terma: A session resumed outside the repository stays out now passes on linux/amd64",
+      "impact": "notable",
+      "before": "fail",
+      "after": "pass",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "relay.resumed_elsewhere"
+        ]
+      },
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "support.capabilities.relay.telemetry@linux/amd64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "relay.telemetry@linux/amd64",
+        "result"
+      ],
+      "title": "Terma: Telemetry reaches the project through the local relay now passes on linux/amd64",
+      "impact": "notable",
+      "before": "fail",
+      "after": "pass",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "relay.telemetry"
+        ]
+      },
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "support.status",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "status"
+      ],
+      "title": "Terma support: unsupported → supported",
+      "impact": "notable",
+      "before": "unsupported",
+      "after": "supported",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

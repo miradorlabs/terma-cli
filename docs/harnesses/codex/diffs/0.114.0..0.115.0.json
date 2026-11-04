@@ -1,0 +1,1533 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.114.0",
+  "to": "0.115.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.114.0...rust-v0.115.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.115.0",
+    "text": "## New Features\n- Supported models can now request full-resolution image inspection through both `view_image` and `codex.emitImage(..., detail: \"original\")`, which helps with precision visual tasks. (#14175)\n- `js_repl` now exposes `codex.cwd` and `codex.homeDir`, and saved `codex.tool(...)` / `codex.emitImage(...)` references keep working across cells. (#14385, #14503)\n- Realtime websocket sessions gained a dedicated transcription mode, plus v2 handoff support through the `codex` tool, with a unified `[realtime]` session config. (#14554, #14556, #14606)\n- The v2 app-server now exposes filesystem RPCs for file reads, writes, copies, directory operations, and path watching, and there is a new Python SDK for integrating with that API. (#14245, #14435)\n- Smart Approvals can now route review requests through a guardian subagent in core, app-server, and TUI, reducing repeated setup work on follow-up approvals. (#13860, #14668)\n- App integrations now use the Responses API tool-search flow, can suggest missing tools, and fall back cleanly when the active model does not support search-based lookup. (#14274, #14287, #14732)\n\n## Bug Fixes\n- Spawned subagents now inherit sandbox and network rules more reliably, including project-profile layering, persisted host approvals, and symlinked writable roots. (#14619, #14650, #14674, #14807)\n- `js_repl` no longer hangs when dynamic tool responses contain literal U+2028 or U+2029 characters. (#14421)\n- The TUI no longer stalls on exit after creating subagents, and interrupting a turn no longer tears down background terminals by default. (#14816, #14602)\n- `codex exec --profile` once again preserves profile-scoped settings when starting or resuming a thread. (#14524)\n- MCP and elicitation flows are more robust, with safer tool-name normalization and preserved `tool_params` in approval prompts. (#14491, #14605, #14769)\n- The local network proxy now serves CONNECT traffic as explicit HTTP/1, improving compatibility with HTTP proxy clients. (#14395)\n\n## Chores\n- The subagent wait tool is now consistently named `wait_agent`, aligning it with `spawn_agent` and `send_input`. (#14631)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.114.0...rust-v0.115.0\n\n- #14395 fix(network-proxy): serve HTTP proxy listener as HTTP/1 @viyatb-oai\n- #14385 Add js_repl cwd and homeDir helpers @fjord-oai\n- #14376 Keep agent-switch word-motion keys out of draft editing @joshka-oai\n- #14175 Let models opt into original image detail @fjord-oai\n- #14382 check for large binaries in CI @owenlin0\n- #14392 chore(app-server): stop emitting codex/event/ notifications @owenlin0\n- #14274 feat: search_tool migrate to bring you own tool of Responses API @apanasenko-oai\n- #14174 refactor: centralize filesystem permissions precedence @viyatb-oai\n- #14394 chore(app-server): delete unused rpc methods from v1.rs @owenlin0\n- #14171 fix: align core approvals with split sandbox policies @viyatb-oai\n- #14410 Make collab model metadata accurate on completion @aibrahim-oai\n- #14387 feat(app-server): propagate traces across tasks and core ops @owenlin0\n- #14407 chore: use AVAILABLE and ON_INSTALL as default plugin install and auth policies @sayan-oai\n- #14287 [apps] Add tool_suggest tool. @mzeng-openai\n- #14432 Clarify spawn agent authorization @aibrahim-oai\n- #14295 Support waiting for code_mode sessions @pakrym-oai\n- #14427 feat: refactor on openai-curated plugins. @xl-openai\n- #13996 refactor: make bubblewrap the default Linux sandbox @viyatb-oai\n- #14440 fix: follow up on linux sandbox review nits @viyatb-oai\n- #14431 Handle pre-approved permissions in zsh fork @mousseau-oai\n- #14403 [elicitation] User-friendly tool call messages. @mzeng-openai\n- #14429 Use granted permissions when invoking apply_patch @mousseau-oai\n- #14471 Updated out-of-date tip about availability on free and go plans @etraut-openai\n- #14444 fix: move inline codex-rs/core unit tests into sibling files @bolinfest\n- #14437 Dispatch tools when code mode is not awaited directly @pakrym-oai\n- #14435 Add Python app-server SDK @shaqayeq-oai\n- #14473 fix(cli): support legacy use_linux_sandbox_bwrap flag @viyatb-oai\n- #13882 Fix stdio-to-uds peer-close flake @aibrahim-oai\n- #14476 Move code mode tool files under tools/code_mode and split functionality @pakrym-oai\n- #14475 rename spawn_csv feature flag to enable_fanout @daveaitel-openai\n- #14173 fix: preserve split filesystem semantics in linux sandbox @viyatb-oai\n- #14480 Cleanup code_mode tool descriptions @pakrym-oai\n- #14488 Handle malformed agent role definitions nonfatally @gabec-openai\n- #14398 Do not allow unified_exec for sandboxed scenarios on Windows @iceweasel-oai\n- #14419 use scopes_supported for OAuth when present on MCP servers @jgershen-oai\n- #14484 Add default code-mode yield timeout @pakrym-oai\n- #14494 Add parallel tool call test @pakrym-oai\n- #14478 chore(app-server): stop exporting EventMsg schemas @owenlin0\n- #14490 fix turn_start_jsonrpc_span_parents_core_turn_spans flakiness @owenlin0\n- #14496 Reuse tool runtime for code mode worker @pakrym-oai\n- #14421 Fix js_repl hangs on U+2028/U+2029 dynamic tool responses @aaronl-openai\n- #14505 Skip nested tool call parallel test on Windows @pakrym-oai\n- #14491 Fix MCP tool calling @pakrym-oai\n- #14493 memories: focus write prompts on user preferences @andi-oai\n- #14510 Rename exec session IDs to cell IDs @pakrym-oai\n- #14500 Update tool search prompts @mzeng-openai\n- #14426 Decouple request permissions feature and tool @mousseau-oai\n- #14503 Persist js_repl codex helpers across cells @fjord-oai\n- #14517 Expose code-mode tools through globals @pakrym-oai\n- #14502 feat(search_tool): gate search_tool on model supports_search_tool field @apanasenko-oai\n- #14521 Reapply \"Pass more params to compaction\" (#14298) @rasmusrygaard\n- #14524 Fix `codex exec --profile` handling @etraut-openai\n- #14516 Rename reject approval policy to granular @mousseau-oai\n- #14445 feat: add plugin/read. @xl-openai\n- #14178 login: add custom CA support for login flows @joshka-oai\n- #14535 Split multi-agent handlers per tool @pakrym-oai\n- #13329 [js_repl] Hard-stop active js_repl execs on explicit user interrupts @aaronl-openai\n- #14239 client: extend custom CA handling across HTTPS and websocket clients @joshka-oai\n- #14536 Add typed multi-agent tool outputs @pakrym-oai\n- #14514 fix: reopen writable linux carveouts under denied parents @viyatb-oai\n- #14531 Add plugin usage telemetry @alexsong-oai\n- #14511 code_mode: Move exec params from runtime declarations to @pragma @cconger\n- #14504 Refactor cloud requirements error and surface in JSON-RPC error @alexsong-oai\n- #14537 Add realtime v2 event parser behind feature flag @aibrahim-oai\n- #14529 Simplify permissions available in request permissions tool @mousseau-oai\n- #14522 feat: support skill-scoped managed network domain overrides in skill config @celia-oai\n- #14554 Add codex tool support for realtime v2 handoff @aibrahim-oai\n- #14556 Add realtime transcription mode for websocket sessions @aibrahim-oai\n- #14518 Add diagnostics for read_only_unless_trusted timeout flake @aibrahim-oai\n- #14603 Split multi-agent handler into dedicated files @pakrym-oai\n- #14526 code mode: single line tool declarations @pakrym-oai\n- #14400 Use a private desktop for Windows sandbox instead of Winsta0\\Default @iceweasel-oai\n- #14558 sending back imagaegencall response back to responseapi @won-openai\n- #14553 Improve granular approval policy prompt @mousseau-oai\n- #14541 chore: clarify plugin + app copy in model instructions @sayan-oai\n- #14542 [bazel] Bump up cc and rust toolchains @zbarsky-openai\n- #14512 Start TUI on embedded app server @etraut-openai\n- #14606 Unify realtime v1/v2 session config @aibrahim-oai\n- #14527 app-server: Add platform os and family to init response @euroelessar\n- #14618 Use subagents naming in the TUI @aibrahim-oai\n- #14304 Override local apps settings with requirements.toml settings @canvrno-oai\n- #14479 feat(app-server, core): add more spans @owenlin0\n- #13644 fix: preserve zsh-fork escalation fds across unified-exec spawn paths @bolinfest\n- #14617 Add code_mode_only feature @pakrym-oai\n- #13201 Slash copy osc52 wsl support @won-openai\n- #14631 Rename multi-agent wait tool to wait_agent @aibrahim-oai\n- #14622 Stabilize multi-agent feature flag @aibrahim-oai\n- #14245 app-server: add v2 filesystem APIs @euroelessar\n- #14605 Normalize MCP tool names to code-mode safe form @pakrym-oai\n- #14637 Fix wait_agent expectations in core tests @charley-oai\n- #13860 Add Smart Approvals guardian review across core, app-server, and TUI @charley-oai\n- #14639 Fix stale create_wait_tool reference @charley-oai\n- #14532 [hooks] stop continuation & stop_hook_active mechanics @eternal-openai\n- #14635 Fix realtime transcription session.update tools payload @aibrahim-oai\n- #14636 Use parser-specific realtime voice enum @aibrahim-oai\n- #14633 refactor: make unified-exec zsh-fork state explicit @bolinfest\n- #12031 Add openai_base_url config override for built-in provider @etraut-openai\n- #14645 Fix Windows CI assertions for guardian and Smart Approvals @aibrahim-oai\n- #14616 Fix turn context reconstruction after backtracking @charley-oai\n- #14619 fix: persist future network host approvals across sessions @viyatb-oai\n- #14650 fix: sync split sandbox policies for spawned subagents @viyatb-oai\n- #14609 move plugin/skill instructions into dev msg and reorder @sayan-oai\n- #12024 Enforce errors on overriding built-in model providers @etraut-openai\n- #14646 Refresh Python SDK generated types @sayan-oai\n- #14649 make defaultPrompt an array, keep backcompat @sayan-oai\n- #14501 dynamic tool calls: add param `exposeToContext` to optionally hide tool @cconger\n- #14651 Add argument-comment Dylint runner @bolinfest\n- #14674 fix: fix symlinked writable roots in sandbox policies @viyatb-oai\n- #14611 Add auth 401 recovery observability to client bug reports @ccy-oai\n- #14647 [apps] Add tool call meta. @mzeng-openai\n- #14732 [apps] Improve search tool fallback. @mzeng-openai\n- #14602 Preserve background terminals on interrupt and rename cleanup command to /stop @friel-openai\n- #14668 Reuse guardian session across approvals @charley-oai\n- #14769 fix(core): preserve tool_params for elicitations @mzeng-openai\n- #14807 fix: sub-agent role when using profiles @jif-oai\n- #14806 feat: improve skills cache key to take into account config layering @jif-oai\n- #13850 feat: make interrupt state not final for multi-agents @jif-oai\n- #14816 fix: tui freeze when sub-agents are present @jif-oai"
+  },
+  "summary": {
+    "changes": 46,
+    "categories": {
+      "behavior": 2,
+      "caching": 1,
+      "cli": 3,
+      "config": 31,
+      "prompt": 3,
+      "request": 1,
+      "tools": 5
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 21,
+      "notable": 25
+    },
+    "undocumented": 30
+  },
+  "changes": [
+    {
+      "id": "prompt.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Injected context changed (+152 −2940 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,31 +1,6 @@\n-# AGENTS.md instructions for <repo>\n-\n-<INSTRUCTIONS>\n-## Skills\n-A skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and file path so you can open the source for full instructions when using a specific skill.\n-### Available skills\n-- skill-creator: Guide for creating effective skills.\n-This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n-(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n-- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n-Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n-(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n-### How to use skills\n-- Discovery: The list above is the skills available in this session (name + description + file path). Skill bodies live on disk at the listed paths.\n-- Trigger rules: If the user names a skill (with `$SkillName` or plain text) OR the task clearly matches a skill's description shown above, you must use that skill for that turn. Multiple mentions mean use them all. Do not carry skills across turns unless re-mentioned.\n-- Missing/blocked: If a named skill isn't in the list or the path can't be read, say so briefly and continue with the best fallback.\n-- How to use a skill (progressive disclosure):\n-  1) After deciding to use a skill, open its `SKILL.md`. Read only enough to follow the workflow.\n-  2) When `SKILL.md` references relative paths (e.g., `scripts/foo.py`), resolve them relative to the skill directory listed above first, and only consider other paths if needed.\n-  3) If `SKILL.md` points to extra folders such as `references/`, load only the specific files needed for the request; don't bulk-load everything.\n-  4) If `scripts/` exist, prefer running or patching them instead of retyping large code blocks.\n-  5) If `assets/` or templates exist, reuse them instead of recreating from scratch.\n-- Coordination and sequencing:\n-  - If multiple skills apply, choose the minimal set that covers the request and state the order you'll use them.\n-  - Announce which skill(s) you're using and why (one short line). If you skip an obvious skill, say why.\n-- Context hygiene:\n-  - Keep context small: summarize long sections instead of pasting them; only load extra files when needed.\n-  - Avoid deep reference-chasing: prefer opening only files directly linked from `SKILL.md` unless you're blocked.\n-  - When variants exist (frameworks, providers, domains), pick only the relevant reference file(s) and note that choice.\n-- Safety and fallback: If a skill can't be applied cleanly (missing files, unclear instructions), state the issue, pick the next-best approach, and continue.\n-</INSTRUCTIONS>\n+<environment_context>\n+  <cwd><repo></cwd>\n+  <shell>zsh</shell>\n+  <current_date><date></current_date>\n+  <timezone><timezone></timezone>\n+</environment_context>\n",
+      "stats": {
+        "added_chars": 152,
+        "removed_chars": 2940
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.context.1",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "context",
+        "1"
+      ],
+      "title": "Injected context block removed",
+      "impact": "notable",
+      "before": {
+        "chars": 157,
+        "role": "user",
+        "sha256": "c15d471b4f4569119f86285f874dab5a9910d699a776c4f128b49bf44b791fe9",
+        "text": "<environment_context>\n  <cwd><repo></cwd>\n  <shell>zsh</shell>\n  <current_date><date></current_date>\n  <timezone><timezone></timezone>\n</environment_context>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "system",
+        "2"
+      ],
+      "title": "System prompt block added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "chars": 3392,
+        "sha256": "a3ac80ec5a3759a43de45a4544edad9bfe288541ff0ab1d3b62237e6fa94e7f4",
+        "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and file path so you can open the source for full instructions when using a specific skill.\n### Available skills\n- openai-docs: Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or explicit GPT-5.4 upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains. (file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n- skill-creator: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations. (file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n### How to use skills\n- Discovery: The list above is the skills available in this session (name + description + file path). Skill bodies live on disk at the listed paths.\n- Trigger rules: If the user names a skill (with `$SkillName` or plain text) OR the task clearly matches a skill's description shown above, you must use that skill for that turn. Multiple mentions mean use them all. Do not carry skills across turns unless re-mentioned.\n- Missing/blocked: If a named skill isn't in the list or the path can't be read, say so briefly and continue with the best fallback.\n- How to use a skill (progressive disclosure):\n  1) After deciding to use a skill, open its `SKILL.md`. Read only enough to follow the workflow.\n  2) When `SKILL.md` references relative paths (e.g., `scripts/foo.py`), resolve them relative to the skill directory listed above first, and only consider other paths if needed.\n  3) If `SKILL.md` points to extra folders such as `references/`, load only the specific files needed for the request; don't bulk-load everything.\n  4) If `scripts/` exist, prefer running or patching them instead of retyping large code blocks.\n  5) If `assets/` or templates exist, reuse them instead of recreating from scratch.\n- Coordination and sequencing:\n  - If multiple skills apply, choose the minimal set that covers the request and state the order you'll use them.\n  - Announce which skill(s) you're using and why (one short line). If you skip an obvious skill, say why.\n- Context hygiene:\n  - Keep context small: summarize long sections instead of pasting them; only load extra files when needed.\n  - Avoid deep reference-chasing: prefer opening only files directly linked from `SKILL.md` unless you're blocked.\n  - When variants exist (frameworks, providers, domains), pick only the relevant reference file(s) and note that choice.\n- Safety and fallback: If a skill can't be applied cleanly (missing files, unclear instructions), state the issue, pick the next-best approach, and continue.\n</skills_instructions>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.close_agent",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "close_agent"
+      ],
+      "title": "New tool: close_agent",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Close an agent when it is no longer needed and return its last known status. Don't keep agents open for too long if they are not needed anymore.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Agent id to close (from spawn_agent).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "name": "close_agent",
+        "sha256": "35a12d6ea7847ccc68dd48030e3c7fd9c516dcab0d441f6e2b669790041cc5a9"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/close_agent.rs",
+            "line": 109,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/close_agent.rs#L109"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/close_agent.rs",
+            "line": 117,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/close_agent.rs#L117"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.resume_agent",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "resume_agent"
+      ],
+      "title": "New tool: resume_agent",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Resume a previously closed agent by id so it can receive send_input and wait_agent calls.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Agent id to resume.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "name": "resume_agent",
+        "sha256": "c31555d10e9e2e35cf70dc3774085327da0367e0ded06447ba67c4c6d3380576"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/resume_agent.rs",
+            "line": 124,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/resume_agent.rs#L124"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/resume_agent.rs",
+            "line": 132,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/resume_agent.rs#L132"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.send_input",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "send_input"
+      ],
+      "title": "New tool: send_input",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Send a message to an existing agent. Use interrupt=true to redirect work immediately. You should reuse the agent by send_input if you believe your assigned task is highly dependent on the context of a previous task.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Agent id to message (from spawn_agent).",
+              "type": "string"
+            },
+            "interrupt": {
+              "description": "When true, stop the agent's current task and handle this immediately. When false (default), queue this message.",
+              "type": "boolean"
+            },
+            "items": {
+              "description": "Structured input items. Use this to pass explicit mentions (for example app:// connector paths).",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "image_url": {
+                    "description": "Image URL when type is image.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Display name when type is skill or mention.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path when type is local_image/skill, or structured mention target such as app://<connector-id> or plugin://<plugin-name>@<marketplace-name> when type is mention.",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Text content when type is text.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Input item type: text, image, local_image, skill, or mention.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "Legacy plain-text message to send to the agent. Use either message or items.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "name": "send_input",
+        "sha256": "6e99e9620cc96454e1417b5c44a9a401894626ac66a09e6bffd0e89130471d54"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/send_input.rs",
+            "line": 104,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/send_input.rs#L104"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/send_input.rs",
+            "line": 112,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/send_input.rs#L112"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.spawn_agent",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "spawn_agent"
+      ],
+      "title": "New tool: spawn_agent",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "\n        Only use `spawn_agent` if and only if the user explicitly asks for sub-agents, delegation, or parallel agent work.\n        Requests for depth, thoroughness, research, investigation, or detailed codebase analysis do not count as permission to spawn.\n        Agent-role guidance below only helps choose which agent to use after spawning is already authorized; it never authorizes spawning by itself.\n        Spawn a sub-agent for a well-scoped task. Returns the agent id (and user-facing nickname when available) to use to communicate with this agent. This spawn_agent tool provides you access to smaller but more efficient sub-agents. A mini model can solve many tasks faster than the main model. You should follow the rules and guidelines below to use this tool.\n\n- gpt-5.3-codex (`gpt-5.3-codex`): Latest frontier agentic coding model. Default reasoning effort: medium. Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n- gpt-5.4 (`gpt-5.4`): Latest frontier agentic coding model. Default reasoning effort: medium. Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n- gpt-5.2-codex (`gpt-5.2-codex`): Frontier agentic coding model. Default reasoning effort: medium. Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n- gpt-5.1-codex-max (`gpt-5.1-codex-max`): Codex-optimized flagship for deep and fast reasoning. Default reasoning effort: medium. Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n- gpt-5.2 (`gpt-5.2`): Latest frontier model with improvements across knowledge, reasoning and coding Default reasoning effort: medium. Supported reasoning efforts: low (Balances speed with some reasoning; useful for straightforward queries and short explanations), medium (Provides a solid balance of reasoning depth and latency for general-purpose tasks), high (Maximizes reasoning depth for complex or ambiguous problems), xhigh (Extra high reasoning for complex problems).\n- gpt-5.1-codex-mini (`gpt-5.1-codex-mini`): Optimized for codex. Cheaper, faster, but less capable. Default reasoning effort: medium. Supported reasoning efforts: medium (Dynamically adjusts reasoning based on the task), high (Maximizes reasoning depth for complex or ambiguous problems).\n### When to delegate vs. do the subtask yourself\n- First, quickly analyze the overall user task and form a succinct high-level plan. Identify which tasks are immediate blockers on the critical path, and which tasks are sidecar tasks that are needed but can run in parallel without blocking the next local step. As part of that plan, explicitly decide what immediate task you should do locally right now. Do this planning step before delegating to agents so you do not hand off the immediate blocking task to a submodel and then waste time waiting on it.\n- Use the smaller subagent when a subtask is easy enough for it to handle and can run in parallel with your local work. Prefer delegating concrete, bounded sidecar tasks that materially advance the main task without blocking your immediate next local step.\n- Do not delegate urgent blocking work when your immediate next step depends on that result. If the very next action is blocked on that task, the main rollout should usually do it locally to keep the critical path moving.\n- Keep work local when the subtask is too difficult to delegate well and when it is tightly coupled, urgent, or likely to block your immediate next step.\n\n### Designing delegated subtasks\n- Subtasks must be concrete, well-defined, and self-contained.\n- Delegated subtasks must materially advance the main task.\n- Do not duplicate work between the main rollout and delegated subtasks.\n- Avoid issuing multiple delegate calls on the same unresolved thread unless the new delegated task is genuinely different and necessary.\n- Narrow the delegated ask to the concrete output you need next.\n- For coding tasks, prefer delegating concrete code-change worker subtasks over read-only explorer analysis when the subagent can make a bounded patch in a clear write scope.\n- When delegating coding work, instruct the submodel to edit files directly in its forked workspace and list the file paths it changed in the final answer.\n- For code-edit subtasks, decompose work so each delegated task has a disjoint write set.\n\n### After you delegate\n- Call wait_agent very sparingly. Only call wait_agent when you need the result immediately for the next critical-path step and you are blocked until it returns.\n- Do not redo delegated subagent tasks yourself; focus on integrating results or tackling non-overlapping work.\n- While the subagent is running in the background, do meaningful non-overlapping work immediately.\n- Do not repeatedly wait by reflex.\n- When a delegated coding task returns, quickly review the uploaded changes, then integrate or refine them.\n\n### Parallel delegation patterns\n- Run multiple independent information-seeking subtasks in parallel when you have distinct questions that can be answered independently.\n- Split implementation into disjoint codebase slices and spawn multiple agents for them in parallel when the write scopes do not overlap.\n- Delegate verification only when it can run in parallel with ongoing implementation and is likely to catch a concrete risk before final integration.\n- The key is to find opportunities to spawn multiple independent subtasks in parallel within the same round, while ensuring each subtask is well-defined, self-contained, and materially advances the main task.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "agent_type": {
+              "description": "Optional type name for the new agent. If omitted, `default` is used.\nAvailable roles:\ndefault: {\nDefault agent.\n}\nexplorer: {\nUse `explorer` for specific codebase questions.\nExplorers are fast and authoritative.\nThey must be used to ask specific, well-scoped questions on the codebase.\nRules:\n- In order to avoid redundant work, you should avoid exploring the same problem that explorers have already covered. Typically, you should trust the explorer results without additional verification. You are still allowed to inspect the code yourself to gain the needed context!\n- You are encouraged to spawn up multiple explorers in parallel when you have multiple distinct questions to ask about the codebase that can be answered independently. This allows you to get more information faster without waiting for one question to finish before asking the next. While waiting for the explorer results, you can continue working on other local tasks that do not depend on those results. This parallelism is a key advantage of delegation, so use it whenever you have multiple questions to ask.\n- Reuse existing explorers for related questions.\n}\nworker: {\nUse for execution and production work.\nTypical tasks:\n- Implement part of a feature\n- Fix tests or bugs\n- Split large refactors into independent chunks\nRules:\n- Explicitly assign **ownership** of the task (files / responsibility). When the subtask involves code changes, you should clearly specify which files or modules the worker is responsible for. This helps avoid merge conflicts and ensures accountability. For example, you can say \"Worker 1 is responsible for updating the authentication module, while Worker 2 will handle the database layer.\" By defining clear ownership, you can delegate more effectively and reduce coordination overhead.\n- Always tell workers they are **not alone in the codebase**, and they should not revert the edits made by others, and they should adjust their implementation to accommodate the changes made by others. This is important because there may be multiple workers making changes in parallel, and they need to be aware of each other's work to avoid conflicts and ensure a cohesive final product.\n}",
+              "type": "string"
+            },
+            "fork_context": {
+              "description": "When true, fork the current thread history into the new agent before sending the initial prompt. This must be used when you want the new agent to have exactly the same context as you.",
+              "type": "boolean"
+            },
+            "items": {
+              "description": "Structured input items. Use this to pass explicit mentions (for example app:// connector paths).",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "image_url": {
+                    "description": "Image URL when type is image.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Display name when type is skill or mention.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path when type is local_image/skill, or structured mention target such as app://<connector-id> or plugin://<plugin-name>@<marketplace-name> when type is mention.",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Text content when type is text.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Input item type: text, image, local_image, skill, or mention.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "Initial plain-text task for the new agent. Use either message or items.",
+              "type": "string"
+            },
+            "model": {
+              "description": "Optional model override for the new agent. Replaces the inherited model.",
+              "type": "string"
+            },
+            "reasoning_effort": {
+              "description": "Optional reasoning effort override for the new agent. Replaces the inherited reasoning effort.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "spawn_agent",
+        "sha256": "9cc1c59a7398ece2f4523339e641f71638330baab9c21ed1ebfc70d422f302a5"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/spawn.rs",
+            "line": 159,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/spawn.rs#L159"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/spawn.rs",
+            "line": 167,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/spawn.rs#L167"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.wait_agent",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "wait_agent"
+      ],
+      "title": "New tool: wait_agent",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Wait for agents to reach a final status. Completed statuses may include the agent's final message. Returns empty status when timed out. Once the agent reaches a final status, a notification message will be received containing the same completed status.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "ids": {
+              "description": "Agent ids to wait on. Pass multiple ids to wait for whichever finishes first.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "timeout_ms": {
+              "description": "Optional timeout in milliseconds. Defaults to 30000, min 10000, max 3600000. Prefer longer waits (minutes) to avoid busy polling.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "ids"
+          ],
+          "type": "object"
+        },
+        "name": "wait_agent",
+        "sha256": "c1a8f11dfd1c3d65394d4a38b1a9c0754cd0cfb58903e0b6eecf84bf57faaf4c"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/wait.rs",
+            "line": 192,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/wait.rs#L192"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/wait.rs",
+            "line": 200,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/multi_agents/wait.rs#L200"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "caching.across_turns",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns"
+      ],
+      "title": "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "breakpoints": [
+          [],
+          [],
+          []
+        ],
+        "stable_cache_key": true,
+        "stable_prefix_chars": 4669,
+        "turns": 3
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.identifiers.header:x-client-request-id",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "identifiers",
+        "header:x-client-request-id"
+      ],
+      "title": "Now sends identifier header:x-client-request-id",
+      "impact": "notable",
+      "before": null,
+      "after": "header:x-client-request-id",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-api/src/endpoint/responses.rs",
+            "line": 90,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/codex-api/src/endpoint/responses.rs#L90"
+          },
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 614,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/client.rs#L614"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "approval": "never",
+        "model": "gpt-5.3-codex",
+        "models": [
+          "gpt-5.3-codex"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR, <codex-home>/memories]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40220,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "TE…102500 tokens truncated…9",
+        "truncation": "middle"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox linux.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox linux",
+        "description"
+      ],
+      "title": "Description of `codex sandbox linux` changed",
+      "impact": "informational",
+      "before": "Run a command under Landlock+seccomp (Linux only)",
+      "after": "Run a command under the Linux sandbox (bubblewrap by default)",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 161,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/arg0/src/lib.rs#L161"
+          },
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 278,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/arg0/src/lib.rs#L278"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+92 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,7 +4,7 @@\n \n Commands:\n   macos    Run a command under Seatbelt (macOS only) [aliases: seatbelt]\n-  linux    Run a command under Landlock+seccomp (Linux only) [aliases: landlock]\n+  linux    Run a command under the Linux sandbox (bubblewrap by default) [aliases: landlock]\n   windows  Run a command under Windows restricted token (Windows only)\n   help     Print this message or the help of the given subcommand(s)\n \n",
+      "stats": {
+        "added_chars": 92,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+92 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,7 +4,7 @@\n \n Commands:\n   macos    Run a command under Seatbelt (macOS only) [aliases: seatbelt]\n-  linux    Run a command under Landlock+seccomp (Linux only) [aliases: landlock]\n+  linux    Run a command under the Linux sandbox (bubblewrap by default) [aliases: landlock]\n   windows  Run a command under Windows restricted token (Windows only)\n   help     Print this message or the help of the given subcommand(s)\n \n",
+      "stats": {
+        "added_chars": 92,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.agents.<name>.description.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "agents.<name>.description",
+        "description"
+      ],
+      "title": "agents.<name>.description description changed (+120 −60 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Human-facing role documentation used in spawn tool guidance.\n+Human-facing role documentation used in spawn tool guidance. Required unless supplied by the referenced agent role file.\n",
+      "stats": {
+        "added_chars": 120,
+        "removed_chars": 60
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.granular",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.granular"
+      ],
+      "title": "New setting: approval_policy.granular",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/protocol.rs",
+            "line": 580,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/protocol/src/protocol.rs#L580"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.approval_policy.granular.mcp_elicitations",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.granular.mcp_elicitations"
+      ],
+      "title": "New setting: approval_policy.granular.mcp_elicitations",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether to allow MCP elicitation prompts.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.granular.request_permissions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.granular.request_permissions"
+      ],
+      "title": "New setting: approval_policy.granular.request_permissions",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "default": false,
+        "description": "Whether to allow prompts triggered by the `request_permissions` tool.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features/legacy.rs",
+            "line": 33,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/features/legacy.rs#L33"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 1502,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/spec.rs#L1502"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.approval_policy.granular.rules",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.granular.rules"
+      ],
+      "title": "New setting: approval_policy.granular.rules",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether to allow prompts triggered by execpolicy `prompt` rules.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/codex_tests_guardian.rs",
+            "line": 380,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/codex_tests_guardian.rs#L380"
+          },
+          {
+            "path": "codex-rs/core/src/exec_policy.rs",
+            "line": 45,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/exec_policy.rs#L45"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.granular.sandbox_approval",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.granular.sandbox_approval"
+      ],
+      "title": "New setting: approval_policy.granular.sandbox_approval",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Whether to allow shell command approval requests, including inline `with_additional_permissions` and `require_escalated` requests.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.granular.skill_approval",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.granular.skill_approval"
+      ],
+      "title": "New setting: approval_policy.granular.skill_approval",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "default": false,
+        "description": "Whether to allow approval prompts triggered by skill script execution.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.reject",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.reject"
+      ],
+      "title": "Setting no longer read: approval_policy.reject",
+      "impact": "notable",
+      "before": {
+        "type": "object"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.approval_policy.reject.mcp_elicitations",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.reject.mcp_elicitations"
+      ],
+      "title": "Setting no longer read: approval_policy.reject.mcp_elicitations",
+      "impact": "notable",
+      "before": {
+        "description": "Reject MCP elicitation prompts.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.reject.request_permissions",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.reject.request_permissions"
+      ],
+      "title": "Setting no longer read: approval_policy.reject.request_permissions",
+      "impact": "notable",
+      "before": {
+        "default": false,
+        "description": "Reject approval prompts related to built-in permission requests.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 615,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/features.rs#L615"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 1167,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/tools/spec.rs#L1167"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.approval_policy.reject.rules",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.reject.rules"
+      ],
+      "title": "Setting no longer read: approval_policy.reject.rules",
+      "impact": "notable",
+      "before": {
+        "description": "Reject prompts triggered by execpolicy `prompt` rules.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/codex_tests_guardian.rs",
+            "line": 232,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/codex_tests_guardian.rs#L232"
+          },
+          {
+            "path": "codex-rs/core/src/exec_policy.rs",
+            "line": 42,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/exec_policy.rs#L42"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.approval_policy.reject.sandbox_approval",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.reject.sandbox_approval"
+      ],
+      "title": "Setting no longer read: approval_policy.reject.sandbox_approval",
+      "impact": "notable",
+      "before": {
+        "description": "Reject approval prompts related to sandbox escalation.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.approvals_reviewer",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approvals_reviewer"
+      ],
+      "title": "New setting: approvals_reviewer",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Configures who approval requests are routed to for review once they have been escalated. This does not disable separate safety checks such as ARC.",
+        "enum": [
+          "user",
+          "guardian_subagent"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 703,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/config/mod.rs#L703"
+          },
+          {
+            "path": "codex-rs/tui/src/app.rs",
+            "line": 927,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/tui/src/app.rs#L927"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_realtime_start_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "experimental_realtime_start_instructions"
+      ],
+      "title": "New setting: experimental_realtime_start_instructions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Experimental / do not use. Replaces the built-in realtime start instructions inserted into developer messages when realtime becomes active.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.apps_mcp_gateway",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.apps_mcp_gateway"
+      ],
+      "title": "Setting no longer read: features.apps_mcp_gateway",
+      "impact": "notable",
+      "before": {
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 720,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/features.rs#L720"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.code_mode_only",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_only"
+      ],
+      "title": "New setting: features.code_mode_only",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 571,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/features.rs#L571"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.enable_fanout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.enable_fanout"
+      ],
+      "title": "New setting: features.enable_fanout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 722,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/features.rs#L722"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.exec_permission_approvals",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.exec_permission_approvals"
+      ],
+      "title": "New setting: features.exec_permission_approvals",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 644,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/features.rs#L644"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.tool_suggest",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.tool_suggest"
+      ],
+      "title": "New setting: features.tool_suggest",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 738,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/features.rs#L738"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/tool_suggest.rs",
+            "line": 32,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/tools/handlers/tool_suggest.rs#L32"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.use_legacy_landlock",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.use_legacy_landlock"
+      ],
+      "title": "New setting: features.use_legacy_landlock",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 668,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/features.rs#L668"
+          },
+          {
+            "path": "codex-rs/utils/cli/src/config_override.rs",
+            "line": 92,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/utils/cli/src/config_override.rs#L92"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "model_providers",
+        "description"
+      ],
+      "title": "model_providers description changed (+95 −69 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-User-defined provider entries that extend/override the built-in list.\n+User-defined provider entries that extend the built-in list. Built-in IDs cannot be overridden.\n",
+      "stats": {
+        "added_chars": 95,
+        "removed_chars": 69
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.openai_base_url",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "openai_base_url"
+      ],
+      "title": "New setting: openai_base_url",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Base URL override for the built-in `openai` model provider.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.profiles.<name>.approvals_reviewer",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.approvals_reviewer"
+      ],
+      "title": "New setting: profiles.<name>.approvals_reviewer",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `guardian_subagent` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request.",
+        "enum": [
+          "user",
+          "guardian_subagent"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 703,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/config/mod.rs#L703"
+          },
+          {
+            "path": "codex-rs/tui/src/app.rs",
+            "line": 927,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/tui/src/app.rs#L927"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.realtime",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "realtime"
+      ],
+      "title": "New setting: realtime",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Experimental / do not use. Realtime websocket session selection. `version` controls v1/v2 and `type` controls conversational/transcription.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs",
+            "line": 52,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L52"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs",
+            "line": 354,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L354"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.realtime.type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "realtime.type"
+      ],
+      "title": "New setting: realtime.type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "conversational",
+          "transcription"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 460,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/app-server-protocol/src/export.rs#L460"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 1016,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/app-server-protocol/src/export.rs#L1016"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.realtime.version",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "realtime.version"
+      ],
+      "title": "New setting: realtime.version",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "v1",
+          "v2"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/model_provider_info.rs",
+            "line": 240,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/model_provider_info.rs#L240"
+          },
+          {
+            "path": "codex-rs/ollama/src/client.rs",
+            "line": 139,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/ollama/src/client.rs#L139"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.windows.sandbox_private_desktop",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "windows.sandbox_private_desktop"
+      ],
+      "title": "New setting: windows.sandbox_private_desktop",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Defaults to `true`. Set to `false` to launch the final sandboxed child process on `Winsta0\\\\Default` instead of a private desktop.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE"
+      ],
+      "title": "New environment variable: CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 17,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/arc_monitor.rs#L17"
+          },
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 128,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/arc_monitor.rs#L128"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_ARC_MONITOR_TOKEN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_ARC_MONITOR_TOKEN"
+      ],
+      "title": "New environment variable: CODEX_ARC_MONITOR_TOKEN",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_ARC_MONITOR_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 18,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/arc_monitor.rs#L18"
+          },
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 110,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/arc_monitor.rs#L110"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TMUX",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TMUX"
+      ],
+      "title": "New environment variable: TMUX",
+      "impact": "informational",
+      "before": null,
+      "after": "TMUX",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/terminal.rs",
+            "line": 333,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/core/src/terminal.rs#L333"
+          },
+          {
+            "path": "codex-rs/tui/src/clipboard_text.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.115.0/codex-rs/tui/src/clipboard_text.rs#L91"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_DISABLE_CURATED_PLUGIN_SYNC",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_DISABLE_CURATED_PLUGIN_SYNC"
+      ],
+      "title": "Environment variable no longer read: CODEX_DISABLE_CURATED_PLUGIN_SYNC",
+      "impact": "informational",
+      "before": "CODEX_DISABLE_CURATED_PLUGIN_SYNC",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/plugins/manager.rs",
+            "line": 51,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/plugins/manager.rs#L51"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/manager.rs",
+            "line": 382,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/plugins/manager.rs#L382"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

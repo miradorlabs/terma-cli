@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.156.0",
+  "to": "0.156.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.156.0...rust-v0.156.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.156.1",
+    "text": "## New Features\n\n- Choose GPT-6 Sol or GPT-6 Luna from the model picker. The rate-limit switch prompt now recommends GPT-6 Luna. (#47405)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.156.0...rust-v0.156.1\n\n- #47405 [hotfix 0.156.0] Add GPT-6 Sol and Luna to the model catalog (#47332) @imac-oai"
+  },
+  "summary": {
+    "changes": 1,
+    "categories": {
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 1
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "tools.collaboration/spawn_agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "collaboration/spawn_agent",
+        "description"
+      ],
+      "title": "collaboration/spawn_agent tool description changed (+768 −778 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,10 +1,10 @@\n \n         Available model overrides (optional; inherited parent model is preferred):\n-- `gpt-6-astra`: Our most capable model for complex, demanding work. Reasoning efforts: low (default), medium, high, xhigh, max, ultra. Service tiers: priority.\n-- `gpt-5.6-sol`: Latest frontier agentic coding model. Reasoning efforts: low (default), medium, high, xhigh, max, ultra. Service tiers: priority, ultrafast.\n-- `gpt-5.6-terra`: Balanced agentic coding model for everyday work. Reasoning efforts: low, medium (default), high, xhigh, max, ultra. Service tiers: priority.\n-- `gpt-5.6-luna`: Fast and affordable agentic coding model. Reasoning efforts: low, medium (default), high, xhigh, max. Service tiers: priority.\n-- `gpt-5.5`: Frontier model for complex coding, research, and real-world work. Reasoning efforts: low, medium (default), high, xhigh. Service tiers: priority.\n+- `gpt-6-astra`: Frontier intelligence for the most demanding work. Reasoning efforts: low (default), medium, high, xhigh, max, ultra. Service tiers: priority.\n+- `gpt-6-sol`: Workhorse model for coding and everyday work. Reasoning efforts: low, medium (default), high, xhigh, max, ultra. Service tiers: priority.\n+- `gpt-6-luna`: Fast and affordable model for easier tasks. Reasoning efforts: low, medium (default), high, xhigh, max. Service tiers: priority.\n+- `gpt-5.6-sol`: Older coding model for complex work. Reasoning efforts: low (default), medium, high, xhigh, max, ultra. Service tiers: priority, ultrafast.\n+- `gpt-5.6-terra`: Older balanced model for straightforward work. Reasoning efforts: low, medium (default), high, xhigh, max, ultra. Service tiers: priority.\n         Spawns an agent to work on the specified task. If your current task is `/root/task1` and you spawn_agent with task_name \"task_3\" the agent will have canonical task name `/root/task1/task_3`.\n You are then able to refer to this agent as `task_3` or `/root/task1/task_3` interchangeably. However an agent `/root/task2/task_3` would only be able to communicate with this agent via its canonical name `/root/task1/task_3`.\n The spawned agent will have the same tools as you and the ability to spawn its own subagents.\n",
+      "stats": {
+        "added_chars": 768,
+        "removed_chars": 778
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

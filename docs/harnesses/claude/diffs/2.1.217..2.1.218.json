@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.217",
+  "to": "2.1.218",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Changed `/code-review` to run as a background subagent, so review work no longer fills your conversation and keeps stacked slash commands as its review target\n- Added screen-reader announcements of deleted text for word and line deletions (`Option+Delete`, `Ctrl+W`, `Cmd+Backspace`, `Ctrl+U`, `Ctrl+K`) in `--ax-screen-reader` mode\n- Fixed Windows paths with `\\u`-prefixed segments (like `C:\\Users\\unicorn`) being corrupted into CJK characters in tool inputs, which made those files inaccessible\n- Fixed the left arrow key discarding the conversation with no undo: presses right after editing now ask to confirm, and Esc in the agent view returns to the conversation it backgrounded\n- Fixed multi-line paste collapsing into one line with `j` in place of newlines in terminals that encode pasted newlines as Ctrl+J\n- Fixed `/context` reporting stale pre-compact token usage after compacting from the message picker\n- Fixed `/ultrareview` failing on descriptive arguments like \"review my auth changes\" — they now run a review of your current branch with the text applied as a note to the findings\n- Fixed `/code-review ultra` silently running a local review in non-interactive sessions — it now launches the cloud review\n- Fixed gateway spend metering to price Bedrock application-inference-profile ARNs and other config-mapped upstream model IDs at the configured model's rates\n- Fixed mojibake when a long IDE selection was truncated mid-emoji, and a case where a tool executor error could be silently dropped\n- Fixed an engine teardown race that could start and abandon a phantom turn, and made input pushed after close consistently rejected\n- Fixed spurious \"[Request interrupted by user]\" messages after interrupted tool calls, and an unpaired `tool_use` block left in the transcript when a tool aborted mid-response\n- Fixed VoiceOver reading \"new line\" instead of echoing the typed space at the end of the input in `--ax-screen-reader` mode\n- Fixed plugin and settings panels not moving the terminal cursor to the focused row, so screen readers and magnifiers can follow arrow-key navigation\n- Fixed crashes (maximum call stack exceeded) when a deeply nested watched directory tree was deleted or moved, and when rendering deeply nested UI trees\n- Fixed pull request events occasionally being lost when a session exited immediately after creating or linking a PR\n- Fixed the Bedrock setup wizard failing profile verification for assume-role profiles in partitioned AWS regions and on proxy-only networks\n- Fixed rare negative or incorrect turn duration measurements after a system clock adjustment by timing turns with a monotonic clock\n- Fixed the \"N MCP servers need authentication\" startup notice over-counting claude.ai connectors that aren't connected in claude.ai\n- Fixed prompt history entries being dropped or duplicated when history writes raced or failed\n- Fixed a retry loop that re-sent identical doomed requests after a context-overflow error with a large thinking budget; `Ctrl+B` backgrounding now applies the same background-shell caps as other paths\n- Fixed agent frontmatter hooks running from untrusted folders: hooks now require the agent file's own folder to have accepted workspace trust\n- Fixed fork-session lineage being lost after compaction in headless and SDK sessions\n- Fixed a resumed session failing every turn, or crashing on resume, when its history held a malformed delta attachment\n- Improved `/ultrareview` error feedback so Claude can correct an invalid argument instead of retrying it unchanged\n- Improved auto mode: the dangerous-rm, background-`&`, and suspicious-Windows-path checks no longer open permission dialogs; the auto-mode classifier adjudicates them instead\n- Improved sandbox command restrictions for IDE interactions\n- Improved trust dialogs to name the repository root the grant covers\n- Changed `/deep-research` to start only when invoked manually; Claude no longer launches it on its own\n- Changed plan mode with auto to no longer prompt for Bash commands the static analyzer can't prove read-only; the auto-mode classifier judges them instead\n- Added an announcement when fast mode changes as a result of switching models via `/config model=<x>` or Remote Control\n- Changed server-managed settings so benign feature and cost toggles no longer trigger the settings-approval prompt\n- Changed agent markdown files to reject agent names containing `:`, which is reserved for plugin namespacing\n- Changed skills with `context: fork` to run in the background by default; opt out per skill with `background: false`\n- Added `yes`/`no`/`on`/`off`/`1`/`0` (case-insensitive) as accepted values for skill and plugin frontmatter booleans, alongside `true`/`false`\n- Fixed remote sessions continuing to send heartbeats after their worker was replaced, which left long-lived desktop and IDE processes retrying a rejected request every few seconds forever"
+  },
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "config": 8,
+      "hooks": 1,
+      "prompt": 2,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 8,
+      "notable": 4
+    },
+    "undocumented": 11
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+0 −488 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -17,10 +17,6 @@\n \n The following skills are available for use with the Skill tool:\n \n-- deep-research: Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report.\n-- When the user wants a deep, multi-source, fact-checked research report on any topic.\n-BEFORE invoking, check if the question is specific enough to research directly — if underspecified (e.g., \"what car to buy\" without budget/use-case/region), ask 2-3 clarifying questions to narrow scope.\n-Then pass the refined question as args, weaving the answers in.\n - dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard.\n Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 488
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+0 −488 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -20,10 +20,6 @@\n \n The following skills are available for use with the Skill tool:\n \n-- deep-research: Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report.\n-- When the user wants a deep, multi-source, fact-checked research report on any topic.\n-BEFORE invoking, check if the question is specific enough to research directly — if underspecified (e.g., \"what car to buy\" without budget/use-case/region), ask 2-3 clarifying questions to narrow scope.\n-Then pass the refined question as args, weaving the answers in.\n - dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard.\n Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 488
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.Skill.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Skill",
+        "description"
+      ],
+      "title": "Skill tool description changed (+174 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,6 +3,7 @@\n A skill is a packaged set of instructions the user or project has set up for a particular kind of task (deploy steps, a review checklist, a repo-specific workflow).\n Available skills appear in a system-reminder listing with one-line descriptions.\n When the task at hand is one a listed skill covers, call this tool first — the skill's instructions load into the turn for you to follow in place of your default approach; some skills instead run in a subagent and return the finished result.\n+A skill that runs in the background returns only the agent's name — its result arrives later as a task notification, so don't wait on it or invoke it again in the meantime.\n Users may also ask for one by name (`/<name>`, or \"slash command\"); that's a request to invoke it.\n \n - `skill`: exact name from the listing, no leading slash.\n",
+      "stats": {
+        "added_chars": 174,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.showMessageTimestamps.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "showMessageTimestamps",
+        "description"
+      ],
+      "title": "showMessageTimestamps description changed (+40 −50 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Stamp each assistant message with its arrival time\n+Stamp each message with its arrival time\n",
+      "stats": {
+        "added_chars": 40,
+        "removed_chars": 50
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_CLASSIFIER_QUEUE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_MEMORY_MASS_DELETE_HOLD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_MEMORY_MASS_DELETE_HOLD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_MEMORY_MASS_DELETE_HOLD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_MEMORY_MASS_DELETE_HOLD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_GORSE_PLOVER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_GORSE_PLOVER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_GORSE_PLOVER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_GORSE_PLOVER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_JUNIPER_SUNDIAL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_JUNIPER_SUNDIAL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_JUNIPER_SUNDIAL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_JUNIPER_SUNDIAL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_SDK_GENERATION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_SDK_GENERATION"
+      ],
+      "title": "New environment variable: MCP_SDK_GENERATION",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_SDK_GENERATION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_TREE_ID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_TREE_ID"
+      ],
+      "title": "New environment variable: MCP_TREE_ID",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_TREE_ID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ALDER_WICKET",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ALDER_WICKET"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ALDER_WICKET",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ALDER_WICKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

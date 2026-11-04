@@ -1,0 +1,899 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.98.0",
+  "to": "0.99.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.98.0...rust-v0.99.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.99.0",
+    "text": "## New Features\r\n\r\n- Running direct shell commands no longer interrupts an in-flight turn; commands can execute concurrently when a turn is active. (#10513)\r\n- Added `/statusline` to configure which metadata appears in the TUI footer interactively. (#10546)\r\n- The TUI resume picker can now toggle sort order between creation time and last-updated time with an in-picker mode indicator. (#10752)\r\n- App-server clients now get dedicated APIs for steering active turns, listing experimental features, resuming agents, and opting out of specific notifications. (#10721, #10821, #10903, #11319)\r\n- Enterprise/admin requirements can now restrict web search modes and define network constraints through `requirements.toml`. (#10964, #10958)\r\n- Image attachments now accept GIF and WebP inputs in addition to existing formats. (#11237)\r\n- Enable snapshotting of the shell environment and `rc` files (#11172)\r\n\r\n## Bug Fixes\r\n\r\n- Fixed a Windows startup issue where buffered keypresses could cause the TUI sign-in flow to exit immediately. (#10729)\r\n- Required MCP servers now fail fast during start/resume flows instead of continuing in a broken state. (#10902)\r\n- Fixed a file-watcher bug that emitted spurious skills reload events and could generate very large log files. (#11217)\r\n- Improved TUI input reliability: long option labels wrap correctly, Tab submits in steer mode when idle, history recall keeps cursor placement consistent, and stashed drafts restore image placeholders correctly. (#11123, #10035, #11295, #9040)\r\n- Fixed model-modality edge cases by surfacing clearer `view_image` errors on text-only models and stripping unsupported image history during model switches. (#11336, #11349)\r\n- Reduced false approval mismatches for wrapped/heredoc shell commands and guarded against empty command lists in exec policy evaluation. (#10941, #11397)\r\n\r\n## Documentation\r\n\r\n- Expanded app-server docs and protocol references for `turn/steer`, experimental-feature discovery, `resume_agent`, notification opt-outs, and null `developer_instructions` normalization. (#10721, #10821, #10903, #10983, #11319)\r\n- Updated TUI composer docs to reflect draft/image restoration, steer-mode Tab submit behavior, and history-navigation cursor semantics. (#9040, #10035, #11295)\r\n\r\n## Chores\r\n\r\n- Reworked npm release packaging so platform-specific binaries are distributed via `@openai/codex` dist-tags, reducing package-size pressure while preserving platform-specific installs (including `@alpha`). (#11318, #11339)\r\n- Pulled in a security-driven dependency update for `time` (RUSTSEC-2026-0009). (#10876)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.98.0...rust-v0.99.0\r\n\r\n- #10729 fix(tui): flush input buffer on init to prevent early exit on Windows @Ashutosh0x\r\n- #10689 fix: flaky landlock @jif-oai\r\n- #10513 Allow user shell commands to run alongside active turns @jif-oai\r\n- #10738 nit: backfill stronger @jif-oai\r\n- #10246 adding fork information (UI) when forking @pap-openai\r\n- #10748 Update explorer role default model @jif-oai\r\n- #10425 Include real OS info in metrics. @iceweasel-oai\r\n- #10745 feat: resumable backfill @jif-oai\r\n- #10758 feat: wire ephemeral in `codex exec` @jif-oai\r\n- #10756 chore: handle shutdown correctly in tui @jif-oai\r\n- #10637 feat: add memory tool @jif-oai\r\n- #10751 feat: repair DB in case of missing lines @jif-oai\r\n- #10762 nit: add DB version in discrepancy recording @jif-oai\r\n- #10621 Leverage state DB metadata for thread summaries @jif-oai\r\n- #9691 Add hooks implementation and wire up to `notify` @gt-oai\r\n- #10546 feat(tui): add /statusline command for interactive status line configuration @fcoury\r\n- #10752 feat(tui): add sortable resume picker with created/updated timestamp toggle @fcoury\r\n- #10769 fix(tui): fix resume_picker_orders_by_updated_at test @owenlin0\r\n- #10423 fix(auth): isolate chatgptAuthTokens concept to auth manager and app-server @owenlin0\r\n- #10775 nit: gpt-5.3-codex announcement @jif-oai\r\n- #10782 nit: gpt-5.3-codex announcement 2 @jif-oai\r\n- #10711 add sandbox policy and sandbox name to codex.tool.call metrics @iceweasel-oai\r\n- #10660 chore: rm web-search-eligible header @sayan-oai\r\n- #10783 fix: announcement in prio @jif-oai\r\n- #10721 [app-server] Add a method to list experimental features. @mzeng-openai\r\n- #10787 chore: limit update to 0.98.0 NUX to < 0.98.0 ver @sayan-oai\r\n- #10655 Add analytics for /rename and /fork @pap-openai\r\n- #10790 feat: wait for backfill to be ready @jif-oai\r\n- #10693 Add app-server transport layer with websocket support @maxj-oai\r\n- #10818 other announcement @jif-oai\r\n- #10815 Sync app-server requirements API with refreshed cloud loader @xl-openai\r\n- #10820 go back to auto-enabling web_search for azure @sayan-oai\r\n- #10727 Send beta header with websocket connects @pakrym-oai\r\n- #10809 updates: use brew api for version check @magus\r\n- #10793 Add stage field for experimental flags. @mzeng-openai\r\n- #10821 feat(app-server): turn/steer API @owenlin0\r\n- #10792 Print warning when config does not meet requirements @gt-oai\r\n- #10699 feat: expose detailed metrics to runtime metrics @apanasenko-oai\r\n- #10784 Gate app tooltips to macOS @aibrahim-oai\r\n- #10843 Log an event (info only) when we receive a file watcher event @etraut-openai\r\n- #10852 Personality setting is no longer available in experimental menu @etraut-openai\r\n- #10840 Removed the \"remote_compaction\" feature flag @etraut-openai\r\n- #10876 sec: fix version of `time` to prevent vulnerability @jif-oai\r\n- #10892 nit: test an @jif-oai\r\n- #10894 feat: backfill async again @jif-oai\r\n- #10902 Handle required MCP startup failures across components @jif-oai\r\n- #10851 Removed \"exec_policy\" feature flag @etraut-openai\r\n- #10457 Queue nudges while plan generating @charley-oai\r\n- #10822 Add app configs to config.toml @canvrno-oai\r\n- #10420 feat(network-proxy): add structured policy decision to blocked errors @viyatb-oai\r\n- #10814 fix(linux-sandbox): block io_uring syscalls in no-network seccomp policy @viyatb-oai\r\n- #10698 core: preconnect Responses websocket for first turn @joshka-oai\r\n- #10574 core: refresh developer instructions after compaction replacement history @charley-oai\r\n- #10914 chore(app-server): update AGENTS.md for config + optional collection guidance @owenlin0\r\n- #10928 chore(app-server): add experimental annotation to relevant fields @owenlin0\r\n- #10927 Treat compaction failure as failure state @aibrahim-oai\r\n- #10861 Support alternative websocket API @by-openai\r\n- #10826 add originator to otel @alexsong-oai\r\n- #10855 TUI/Core: preserve duplicate skill/app mention selection across submit + resume @daniel-oai\r\n- #10943 app-server: print help message to console when starting websockets server @JaviSoto\r\n- #10938 Mark Config.apps as experimental, correct schema generation issue @canvrno-oai\r\n- #10947 fix(tui): conditionally restore status indicator using message phase @sayan-oai\r\n- #10965 refactor(network-proxy): flatten network config under [network] @viyatb-oai\r\n- #10970 Fixed a flaky test @etraut-openai\r\n- #10710 Process-group cleanup for stdio MCP servers to prevent orphan process storms @etraut-openai\r\n- #10964 feat: add support for allowed_web_search_modes in requirements.toml @bolinfest\r\n- #10977 fix: use expected line ending in codex-rs/core/config.schema.json @bolinfest\r\n- #10973 Do not poll for usage when using API Key auth @etraut-openai\r\n- #10921 Show left/right arrows to navigate in tui request_user_input @charley-oai\r\n- #10988 fix: normalize line endings when reading file on Windows @bolinfest\r\n- #10903 Add resume_agent collab tool @jif-oai\r\n- #10909 Bootstrap shell commands via user shell snapshot @jif-oai\r\n- #10993 Fix flaky windows CI test @etraut-openai\r\n- #10987 Fixed a flaky Windows test that is consistently causing a CI failure @etraut-openai\r\n- #10958 feat(core): add network constraints schema to requirements.toml @viyatb-oai\r\n- #10983 app-server: treat null mode developer instructions as built-in defaults @charley-oai\r\n- #11039 feat: include state of [experimental_network] in /debug-config output @bolinfest\r\n- #11040 Simplify pre-connect @pakrym-oai\r\n- #10966 feat: enable premessage-deflate for websockets @apanasenko-oai\r\n- #9040 fix(tui): rehydrate drafts and restore image placeholders @Chriss4123\r\n- #10824 Fallback to HTTP on UPGRADE_REQUIRED @pakrym-oai\r\n- #11028 Defer persistence of rollout file @etraut-openai\r\n- #10980 fix: remove config.schema.json from tag check @bolinfest\r\n- #11051 Gate view_image tool by model input_modalities @wiltzius-openai\r\n- #11109 [bazel] Upgrade some rulesets in preparation for enabling windows @zbarsky-openai\r\n- #11114 chore: refactor network-proxy so that ConfigReloader is injectable behavior @bolinfest\r\n- #10718 Upgrade rmcp to 0.14 @mzeng-openai\r\n- #11044 feat: include [experimental_network] in <environment_context> @bolinfest\r\n- #10994 [apps] Improve app loading. @mzeng-openai\r\n- #11121 chore: reverse the codex-network-proxy -> codex-core dependency @bolinfest\r\n- #11105 feat: include NetworkConfig through ExecParams @bolinfest\r\n- #11155 tui: avoid no-op status-line redraws @rakan-oai\r\n- #10799 feat: do not close unified exec processes across turns @jif-oai\r\n- #11172 chore: enable shell snapshot @jif-oai\r\n- #11175 fix: do not show closed agents in `/agent` @jif-oai\r\n- #11173 chore: enable sub agents @jif-oai\r\n- #11193 Deflake mixed parallel tools timing test @gt-oai\r\n- #10770 Load requirements on windows @gt-oai\r\n- #11132 core: account for all post-response items in auto-compact token checks @charley-oai\r\n- #11198 tools: remove get_memory tool and tests @jif-oai\r\n- #10937 Translate websocket errors @rasmusrygaard\r\n- #11217 Fixed bug in file watcher that results in spurious skills update events and large log files @etraut-openai\r\n- #11216 Move warmup to the task level @pakrym-oai\r\n- #11203 Try to stop small helper methods @pakrym-oai\r\n- #11197 [bazel] Upgrade some rulesets in preparation for enabling windows, part 2 @zbarsky-openai\r\n- #11158 chore: remove network-proxy-cli crate @viyatb-oai\r\n- #11230 Revert \"chore: enable sub agents\" @jif-oai\r\n- #11123 TUI: fix request_user_input wrapping for long option labels @charley-oai\r\n- #11133 core: add focused diagnostics for remote compaction overflows @charley-oai\r\n- #10657 feat: search_tool @apanasenko-oai\r\n- #11199 state: add memory consolidation lock primitives @jif-oai\r\n- #10835 feat: extend skills/list to support additional roots. @xl-openai\r\n- #10960 skill-creator: Remove invalid reference. @xl-openai\r\n- #11219 feat: use a notify instead of grace to close ue process @jif-oai\r\n- #11231 feat: tie shell snapshot to cwd @jif-oai\r\n- #10962 fix(tui): keep unified exec summary on working line @joshka-oai\r\n- #11232 Add originator to otel metadata tags @alexsong-oai\r\n- #11237 adding image support for gif and webp @natea-oai\r\n- #10924 [apps] Add gated instructions for Apps. @mzeng-openai\r\n- #11228 Use longest remote model prefix matching @aibrahim-oai\r\n- #11242 fix(feature) UnderDevelopment feature must be off @dylan-hurd-oai\r\n- #11185 fix: nix build by adding missing dependencies and fix outputHashes @Philipp-M\r\n- #10035 fix(tui): tab submits when no task running in steer mode @joshka-oai\r\n- #11238 Remove offline fallback for models @aibrahim-oai\r\n- #9739 Update models.json @github-actions\r\n- #11255 Revert \"Update models.json\" @aibrahim-oai\r\n- #11245 deflake linux-sandbox NoNewPrivs timeout @joshka-oai\r\n- #11256 Revert \"Revert \"Update models.json\"\" @aibrahim-oai\r\n- #11262 chore: change ConfigState so it no longer depends on a single config.toml file for reloading @bolinfest\r\n- #11263 test: deflake nextest child-process leak in MCP harnesses @joshka-oai\r\n- #11247 Adjust shell command timeouts for Windows @dylan-hurd-oai\r\n- #11240 fix(app-server): for external auth, replace id_token with chatgpt_acc… @owenlin0\r\n- #11140 chore(deps): bump insta from 1.46.2 to 1.46.3 in /codex-rs @dependabot\r\n- #11139 chore(deps): bump anyhow from 1.0.100 to 1.0.101 in /codex-rs @dependabot\r\n- #11138 chore(deps): bump regex from 1.12.2 to 1.12.3 in /codex-rs @dependabot\r\n- #11239 Disable dynamic model refresh for custom model providers @etraut-openai\r\n- #11269 feat: reserve loopback ephemeral listeners for managed proxy @bolinfest\r\n- #11279 [apps] Add thread_id param to optionally load thread config for apps feature check. @mzeng-openai\r\n- #11244 feat: add SkillPolicy to skill metadata and support allow_implicit_invocation @alexsong-oai\r\n- #10215 chore(tui) cleanup /approvals @dylan-hurd-oai\r\n- #11113 feat(sandbox): enforce proxy-aware network routing in sandbox @viyatb-oai\r\n- #10940 feat: support configurable metric_exporter @alexsong-oai\r\n- #11294 chore: put crypto provider logic in a shared crate @bolinfest\r\n- #11207 feat: retain NetworkProxy, when appropriate @bolinfest\r\n- #11200 memories: add extraction and prompt module foundation @jif-oai\r\n- #11191 feat: add connector capabilities to sub-agents @jif-oai\r\n- #11304 Fix spawn_agent input type @jif-oai\r\n- #11300 feat: align memory phase 1 and make it stronger @jif-oai\r\n- #11311 Extract hooks into dedicated crate @jif-oai\r\n- #11306 feat: phase 2 consolidation @jif-oai\r\n- #11318 chore: split NPM packages @jif-oai\r\n- #11322 Fix pending input test waiting logic @jif-oai\r\n- #11265 Remove ApiPrompt @pakrym-oai\r\n- #11295 tui: keep history recall cursor at line end @joshka-oai\r\n- #11288 fix(protocol): approval policy never prompt @fouad-openai\r\n- #11323 Revert \"Add app-server transport layer with websocket support (#10693)\" @maxj-oai\r\n- #11162 Fix: update parallel tool call exec approval to approve on request id @shijie-oai\r\n- #11249 [apps] Improve app installation flow. @mzeng-openai\r\n- #11319 feat: opt-out of events in the app-server @jif-oai\r\n- #11241 Treat first rollout session_meta as canonical thread identity @guinness-oai\r\n- #11339 # Use `@openai/codex` dist-tags for platform binaries instead of separate package names @bolinfest\r\n- #11330 test(core): stabilize ARM bazel remote-model and parallelism tests @dylan-hurd-oai\r\n- #11345 core: remove stale apply_patch SandboxPolicy TODO in seatbelt @bolinfest\r\n- #11343 Compare full request for websockets incrementality @pakrym-oai\r\n- #11344 fix: reduce usage of `open_if_present`  @jif-oai\r\n- #11336 Always expose view_image and return unsupported image-input error @aibrahim-oai\r\n- #11346 Sanitize MCP image output for text-only models @aibrahim-oai\r\n- #11337 Extract tool building @pakrym-oai\r\n- #10941 fix(core): canonicalize wrapper approvals and support heredoc prefix … @viyatb-oai\r\n- #10946 include sandbox (seatbelt, elevated, etc.) as in turn metadata header @iceweasel-oai\r\n- #11349 Strip unsupported images from prompt history to guard against model switch @aibrahim-oai\r\n- #11348 Use thin LTO for alpha Rust release builds @bolinfest\r\n- #11334 chore: unify memory job flow @jif-oai\r\n- #11364 feat: mem v2 - PR1 @jif-oai\r\n- #11365 feat: mem v2 - PR2 @jif-oai\r\n- #11366 feat: mem v2 - PR3 @jif-oai\r\n- #11274 Update models.json @github-actions\r\n- #11361 # Split command parsing/safety out of `codex-core` into new `codex-command` @bolinfest\r\n- #11369 feat: mem v2 - PR4 @jif-oai\r\n- #11362 Enable SOCKS defaults for common local network proxy use cases @viyatb-oai\r\n- #11359 ci: fall back to local Bazel on forks without BuildBuddy key @joshka-oai\r\n- #11372 feat: mem v2 - PR5 @jif-oai\r\n- #11374 feat: mem v2 - PR6 (consolidation) @jif-oai\r\n- #11377 feat: prevent double backfill @jif-oai\r\n- #11378 chore: rename codex-command to codex-shell-command @bolinfest\r\n- #11376 Update models.json @github-actions\r\n- #11394 Disable very flaky tests @pakrym-oai\r\n- #11386 Prefer websocket transport when model opts in @pakrym-oai\r\n- #11373 tui: queue non-pending rollback trims in app-event order @charley-oai\r\n- #11393 Remove `deterministic_process_ids` feature to avoid duplicate `codex-core` builds @bolinfest\r\n- #11397 fix(exec-policy) No empty command lists @dylan-hurd-oai"
+  },
+  "summary": {
+    "changes": 31,
+    "categories": {
+      "binary": 2,
+      "caching": 1,
+      "cli": 4,
+      "config": 21,
+      "prompt": 2,
+      "request": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 26,
+      "notable": 5
+    },
+    "undocumented": 17
+  },
+  "changes": [
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+5606 −4070 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,7 +1,67 @@\n-You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's computer.\n+You are Codex, a coding agent based on GPT-5. You and the user share the same workspace and collaborate to achieve the user's goals.\n \n-## General\n+# Personality\n+You are a deeply pragmatic, effective software engineer.\n+You take engineering quality seriously, and collaboration is a kind of quiet joy: as real progress happens, your enthusiasm shows briefly and specifically.\n+You communicate efficiently, keeping the user clearly informed about ongoing actions without unnecessary detail.\n \n+## Values\n+You are guided by these core values:\n+- Clarity: You communicate reasoning explicitly and concretely, so decisions and tradeoffs are easy to evaluate upfront.\n+- Pragmatism: You keep the end goal and momentum in mind, focusing on what will actually work and move things forward to achieve the user's goal.\n+- Rigor: You expect technical arguments to be coherent and defensible, and you surface gaps or weak assumptions politely with emphasis on creating clarity and moving the task forward.\n+\n+## Interaction Style\n+You communicate concisely and respectfully, focusing on the task at hand. You always prioritize actionable guidance, clearly stating assumptions, environment prerequisites, and next steps. Unless explicitly asked, you avoid excessively verbose explanations about your work.\n+\n+Great work and smart decisions are acknowledged, while avoiding cheerleading, motivational language, or artificial reassurance. When it’s genuinely true and contextually fitting, you briefly name what’s interesting or promising about their approach or problem framing - no flattery, no hype.\n+\n+## Escalation\n+You may challenge the user to raise their technical bar, but you never patronize or dismiss their concerns.\n+When presenting an alternative approach or solution to the user, you explain the reasoning behind the approach, so your thoughts are demonstrably correct.\n+You maintain a pragmatic mindset when discussing these tradeoffs, and so are willing to work with the user after concerns have been noted.\n+\n+\n+# Working with the user\n+\n+You interact with the user through a terminal. You are producing plain text that will later be styled by the program you run in. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value. Follow the formatting rules exactly. \n+\n+## Final answer formatting rules\n+- You may format with GitHub-flavored Markdown.\n+- Structure your answer if necessary, the complexity of the answer should match the task. If the task is simple, your answer should be a one-liner. Order sections from general to specific to supporting.\n+- Never use nested bullets.\n+Keep lists flat (single level).\n+If you need hierarchy, split into separate lists or sections or if you use : just include the line you might usually render using a nested bullet immediately after it.\n+For numbered lists, only use the `1.\n+2.\n+3.` style markers (with a period), never `1)`.\n+- Headers are optional, only use them when you think they are necessary. If you do use them, use short Title Case (1-3 words) wrapped in **…**. Don't add a blank line.\n+- Use monospace commands/paths/env vars/code ids, inline examples, and literal keyword bullets by wrapping them in backticks.\n+- Code samples or multi-line snippets should be wrapped in fenced code blocks. Include an info string as often as possible.\n+- File References: When referencing files in your response follow the below rules:\n+  * Use inline code to make file paths clickable.\n+  * Each reference should have a stand alone path. Even if it's the same file.\n+  * Accepted: absolute, workspace‑relative, a/ or b/ diff prefixes, or bare filename/suffix.\n+  * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n+  * Do not use URIs like file://, vscode://, or https://.\n+  * Do not provide range of lines\n+  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5\n+- Don’t use emojis.\n+\n+\n+## Presenting your work\n+- Balance conciseness to not overwhelm the user with appropriate detail for the request. Do not narrate abstractly; explain what you are doing and why.\n+- The user does not see command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.\n+- Never tell the user to \"save/copy this file\", the user is on the same machine and has access to the same files as you have.\n+- If the user asks for a code explanation, structure your answer with code references.\n+- When given a simple task, just provide the outcome in a short answer without strong formatting.\n+- When you make big or complex changes, state the solution first, then walk the user through what you did and why.\n+- For casual chit-chat, just chat.\n+- If you weren't able to do something, for example run tests, tell the user.\n+- If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps. When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.\n+\n+# General\n+\n - When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)\n \n ## Editing constraints\n@@ -21,6 +81,7 @@\n - Do not amend a commit unless explicitly requested to do so.\n - While you are working, you might notice unexpected changes that you didn't make. If this happens, STOP IMMEDIATELY and ask the user how they would like to proceed.\n - **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.\n+- You struggle using the git interactive console. **ALWAYS** prefer using non-interactive git commands.\n \n ## Plan tool\n \n@@ -32,12 +93,14 @@\n ## Special user requests\n \n - If the user makes a simple request (such as asking for the time) which you can fulfill by running a terminal command (such as `date`), you should do so.\n-- If the user asks for a \"review\", default to a code review mindset: prioritise identifying bugs, risks, behavioural regressions, and missing tests.\n-Findings must be the primary focus of the response - keep summaries or overviews brief and only after enumerating the issues.\n-Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail.\n-If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.\n+- When the user asks for a review, you default to a code-review mindset.\n+Your response prioritizes identifying bugs, risks, behavioral regressions, and missing tests.\n+You present findings first, ordered by severity and including file or line references where possible.\n+Open questions or assumptions follow.\n+You state explicitly if no findings exist and call out any residual risks or test gaps.\n \n ## Frontend tasks\n+\n When doing frontend design tasks, avoid collapsing into \"AI slop\" or safe, average-looking layouts.\n Aim for interfaces that feel intentional, bold, and a bit surprising.\n - Typography: Use expressive, purposeful fonts and avoid default stacks (Inter, Roboto, Arial, system).\n@@ -48,41 +111,4 @@\n - Ensure the page loads properly on both desktop and mobile\n \n Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.\n-\n-## Presenting your work and final message\n-\n-You are producing plain text that will later be styled by the CLI. Follow these rules exactly. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value.\n-\n-- Default: be very concise; friendly coding teammate tone.\n-- Ask only when needed; suggest ideas; mirror the user's style.\n-- For substantial work, summarize clearly; follow final‑answer formatting.\n-- Skip heavy formatting for simple confirmations.\n-- Don't dump large files you've written; reference paths only.\n-- No \"save/copy this file\" - User is on the same machine.\n-- Offer logical next steps (tests, commits, build) briefly; add verify steps if you couldn't do something.\n-- For code changes:\n-  * Lead with a quick explanation of the change, and then give more details on the context covering where and why a change was made. Do not start this explanation with \"summary\", just jump right in.\n-  * If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps.\n-  * When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.\n-- The user does not command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.\n-\n-### Final answer structure and style guidelines\n-\n-- Plain text; CLI handles styling. Use structure only when it helps scanability.\n-- Headers: optional; short Title Case (1-3 words) wrapped in **…**; no blank line before the first bullet; add only if they truly help.\n-- Bullets: use - ; merge related points; keep to one line when possible; 4–6 per list ordered by importance; keep phrasing consistent.\n-- Monospace: backticks for commands/paths/env vars/code ids and inline examples; use for literal keyword bullets; never combine with **.\n-- Code samples or multi-line snippets should be wrapped in fenced code blocks; include an info string as often as possible.\n-- Structure: group related bullets; order sections general → specific → supporting; for subsections, start with a bolded keyword bullet, then items; match complexity to the task.\n-- Tone: collaborative, concise, factual; present tense, active voice; self‑contained; no \"above/below\"; parallel wording.\n-- Don'ts: no nested bullets/hierarchies; no ANSI codes; don't cram unrelated keywords; keep keyword lists short—wrap/reformat if long; avoid naming formatting styles in answers.\n-- Adaptation: code explanations → precise, structured with code refs; simple tasks → lead with outcome; big changes → logical walkthrough + rationale + next actions; casual one-offs → plain sentences, no headers/bullets.\n-- File References: When referencing files in your response follow the below rules:\n-  * Use inline code to make file paths clickable.\n-  * Each reference should have a stand alone path. Even if it's the same file.\n-  * Accepted: absolute, workspace‑relative, a/ or b/ diff prefixes, or bare filename/suffix.\n-  * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n-  * Do not use URIs like file://, vscode://, or https://.\n-  * Do not provide range of lines\n-  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5\n \n",
+      "stats": {
+        "added_chars": 5606,
+        "removed_chars": 4070
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/templates/model_instructions/gpt-5.2-codex_instructions_template.md",
+            "line": 1,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/templates/model_instructions/gpt-5.2-codex_instructions_template.md#L1-L23"
+          },
+          {
+            "path": "codex-rs/core/templates/personalities/gpt-5.2-codex_pragmatic.md",
+            "line": 3,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/templates/personalities/gpt-5.2-codex_pragmatic.md#L3-L18"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+119 −711 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,11 +1,5 @@\n <permissions instructions>\n Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n- Approvals are your mechanism to get user consent to run shell commands without the sandbox.\n-`approval_policy` is `never`: This is a non-interactive mode where you may NEVER ask the user for approval to run commands.\n-Instead, you must always persist and work around constraints to solve the task for the user.\n-You MUST do your utmost best to finish the task and validate your work before yielding.\n-If this mode is paired with `danger-full-access`, take advantage of it to deliver the best outcome for the user.\n-Further, in this mode, your default testing philosophy is overridden: Even if you don't see local patterns for testing, you may add tests and scripts to validate your work.\n-Just remove them before yielding.\n+Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n  The writable roots are `<repo>`, `/tmp`, `<tmp>\n </permissions instructions>\n",
+      "stats": {
+        "added_chars": 119,
+        "removed_chars": 711
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/prompts/permissions/approval_policy/never.md",
+            "line": 1,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/protocol/src/prompts/permissions/approval_policy/never.md#L1"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 4722 → 4124",
+      "impact": "notable",
+      "before": 4722,
+      "after": 4124,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "request.headers.x-oai-web-search-eligible",
+      "category": "request",
+      "op": "removed",
+      "path": [
+        "request",
+        "headers",
+        "x-oai-web-search-eligible"
+      ],
+      "title": "Header x-oai-web-search-eligible removed",
+      "impact": "informational",
+      "before": "true",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 85,
+            "url": "https://github.com/openai/codex/blob/rust-v0.98.0/codex-rs/core/src/client.rs#L85"
+          },
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 792,
+            "url": "https://github.com/openai/codex/blob/rust-v0.98.0/codex-rs/core/src/client.rs#L792"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex exec.options.--ephemeral",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--ephemeral"
+      ],
+      "title": "New flag `codex exec --ephemeral`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Run without persisting session files to disk",
+        "names": [
+          "--ephemeral"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 572,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/cli/src/main.rs#L572"
+          },
+          {
+            "path": "codex-rs/exec/src/event_processor_with_human_output.rs",
+            "line": 316,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/exec/src/event_processor_with_human_output.rs#L316"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+71 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -65,6 +65,9 @@\n       --add-dir <DIR>\n           Additional directories that should be writable alongside the primary workspace\n \n+      --ephemeral\n+          Run without persisting session files to disk\n+\n       --output-schema <FILE>\n           Path to a JSON Schema file describing the model's final response shape\n \n",
+      "stats": {
+        "added_chars": 71,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+71 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -46,6 +46,8 @@\n           Allow running Codex outside a Git repository\n       --add-dir <DIR>\n           Additional directories that should be writable alongside the primary workspace\n+      --ephemeral\n+          Run without persisting session files to disk\n       --output-schema <FILE>\n           Path to a JSON Schema file describing the model's final response shape\n       --color <COLOR>\n",
+      "stats": {
+        "added_chars": 71,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server -h"
+      ],
+      "title": "Full help text of `mcp-server -h` changed (+97 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not update PATH: No such file or directory (os error 2)\n [experimental] Run the Codex MCP server (stdio transport)\n \n Usage: codex mcp-server [OPTIONS]\n",
+      "stats": {
+        "added_chars": 97,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 76,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/arg0/src/lib.rs#L76"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.apps",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "apps"
+      ],
+      "title": "New setting: apps",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Settings for app-specific controls.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 534,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/features.rs#L534"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.apps.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "apps.<name>"
+      ],
+      "title": "New setting: apps.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Config values for a single app/connector.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 534,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/features.rs#L534"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.apps.<name>.disabled_reason",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "apps.<name>.disabled_reason"
+      ],
+      "title": "New setting: apps.<name>.disabled_reason",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Reason this app was disabled.",
+        "enum": [
+          "unknown",
+          "user"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 453,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/cli/src/mcp_cmd.rs#L453"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 689,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/cli/src/mcp_cmd.rs#L689"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.apps.<name>.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "apps.<name>.enabled"
+      ],
+      "title": "New setting: apps.<name>.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": true,
+        "description": "When `false`, Codex does not surface this app.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 452,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/cli/src/mcp_cmd.rs#L452"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 688,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/cli/src/mcp_cmd.rs#L688"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.exec_policy",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.exec_policy"
+      ],
+      "title": "Setting no longer read: features.exec_policy",
+      "impact": "notable",
+      "before": {
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 466,
+            "url": "https://github.com/openai/codex/blob/rust-v0.98.0/codex-rs/core/src/features.rs#L466"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.memory_tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.memory_tool"
+      ],
+      "title": "New setting: features.memory_tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 458,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/features.rs#L458"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.remote_compaction",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.remote_compaction"
+      ],
+      "title": "Setting no longer read: features.remote_compaction",
+      "impact": "notable",
+      "before": {
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 496,
+            "url": "https://github.com/openai/codex/blob/rust-v0.98.0/codex-rs/core/src/features.rs#L496"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.responses_websockets_v2",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.responses_websockets_v2"
+      ],
+      "title": "New setting: features.responses_websockets_v2",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 580,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/features.rs#L580"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.search_tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.search_tool"
+      ],
+      "title": "New setting: features.search_tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 439,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/features.rs#L439"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.required",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.required"
+      ],
+      "title": "New setting: mcp_servers.<name>.required",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 395,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/app-server-protocol/src/export.rs#L395"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 1092,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/app-server-protocol/src/export.rs#L1092"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.otel.metrics_exporter",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter"
+      ],
+      "title": "New setting: otel.metrics_exporter",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Optional metrics exporter",
+        "enum": [
+          "none",
+          "statsig"
+        ],
+        "type": "object|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-grpc",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-grpc"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-grpc",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-grpc.endpoint",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-grpc.endpoint"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-grpc.endpoint",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-grpc.headers",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-grpc.headers"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-grpc.headers",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/rmcp-client/src/oauth.rs",
+            "line": 531,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/rmcp-client/src/oauth.rs#L531"
+          },
+          {
+            "path": "codex-rs/codex-client/src/default_client.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/codex-client/src/default_client.rs#L122"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-grpc.tls",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-grpc.tls"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-grpc.tls",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-http",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-http"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-http",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-http.endpoint",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-http.endpoint"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-http.endpoint",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-http.headers",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-http.headers"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-http.headers",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/rmcp-client/src/oauth.rs",
+            "line": 531,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/rmcp-client/src/oauth.rs#L531"
+          },
+          {
+            "path": "codex-rs/codex-client/src/default_client.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/codex-client/src/default_client.rs#L122"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-http.protocol",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-http.protocol"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-http.protocol",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "binary",
+          "json"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/windows-sandbox-rs/src/firewall.rs",
+            "line": 138,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/windows-sandbox-rs/src/firewall.rs#L138"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.otel.metrics_exporter.otlp-http.tls",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.metrics_exporter.otlp-http.tls"
+      ],
+      "title": "New setting: otel.metrics_exporter.otlp-http.tls",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.status_line",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.status_line"
+      ],
+      "title": "New setting: tui.status_line",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Ordered list of status line item identifiers.\n\nWhen set, the TUI renders the selected items as the status line.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 61,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/config/edit.rs#L61"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 71,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/config/edit.rs#L71"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "binary.sdk.rmcp",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "rmcp"
+      ],
+      "title": "Binary sdk.rmcp: 0.12.0 → 0.14.0",
+      "impact": "informational",
+      "before": "0.12.0",
+      "after": "0.14.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 54013488 → 63836976",
+      "impact": "informational",
+      "before": 54013488,
+      "after": 63836976,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

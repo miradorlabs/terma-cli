@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.269",
+  "to": "2.1.270",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Fixed read-only git commands in Bash unexpectedly asking for permission after a session had been running for a while (regression in 2.1.269)"
+  },
+  "summary": {
+    "changes": 1,
+    "categories": {
+      "hooks": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 1
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "hooks.events.PostModelSwitch.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "PostModelSwitch hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

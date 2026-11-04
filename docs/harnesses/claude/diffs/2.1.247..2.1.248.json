@@ -1,0 +1,2631 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.247",
+  "to": "2.1.248",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `--restricted` (or `CLAUDE_CODE_RESTRICTED=1`): removes the built-in tools that run commands or code and `WebFetch` (unless named in `--tools`), keeps file tools inside the working directory, refuses `bypassPermissions`, and ignores user, project and local settings files\n- Added `experimental.cacheTtl` (`\"5m\"` or `\"1h\"`) to agent frontmatter: a per-agent prompt cache TTL used when no subagent TTL setting is configured\n- Added `claude self-hosted-runner --client-label <label>` (or `SELF_HOSTED_RUNNER_CLIENT_LABEL`) to override the label the runner registers with (default: hostname)\n- Added server-managed settings diagnostics: a startup warning when the settings fail to load, and a `/doctor` and `/status` line explaining a load failure or why they weren't fetched (Bedrock/Vertex/third-party provider, custom `ANTHROPIC_BASE_URL`)\n- Added a warning in `/web-setup` when the GitHub CLI token lacks the `workflow` scope, since pushes to very large repositories can be rejected without it\n- Added `/usage-credits` for Enterprise organizations billed through AWS Marketplace, self-serve Enterprise, and Enterprise trials, so members can request a higher usage limit from their admin\n- Added cross-session messaging (`SendMessage` / `ListAgents`) between sessions on the same machine on Bedrock, Vertex, and Foundry, and when telemetry is disabled\n- Fixed a prompt-cache miss (and lost extended-thinking context) roughly once an hour in long sessions, caused by tool definitions being re-rendered after an OAuth token refresh\n- Fixed the `ScheduleWakeup` tool definition changing between a session and its `--resume` when the account had entered usage overage, causing a full prompt-cache miss on the resumed session's first turn\n- Fixed Claude Desktop and Cowork sessions disappearing after 30 days: the transcript cleanup now keeps desktop-written sessions while they are in the app (unless org policy manages retention); the new `desktopSessionCleanupPeriodDays` setting caps the exemption\n- Fixed being sent to the login screen when another Claude Code process held the token refresh lock while the session token had expired; the request now fails with a retryable error instead\n- Windows: Fixed the `claude agents` list not responding to the keyboard after detaching from a session, or when launched in a terminal tab left in win32-input-mode\n- Fixed the recommended Console sign-in in `/login` failing with an OAuth error before showing a sign-in URL on machines where it can't be used (for example when `ANTHROPIC_API_KEY` or an API key helper is set); it now falls back to the API-key sign-in\n- Fixed model names in `/model` and fast-mode switch notices to render as code, so suffixes like `[1m]` display literally instead of as a link\n- Fixed `claude agents` skipping the workspace trust prompt when the `CI` environment variable is set\n- Fixed `claude agents` crashing on launch when the PR-status cache held a malformed entry\n- Fixed agent view resurrecting a weeks-old background session after the machine was off: such a session now shows as stopped at its real end, and opening it asks before resuming its saved conversation\n- Fixed agent view sometimes opening an older conversation, and dropping the typed prompt, when starting a new session\n- Fixed `claude agents`: opening a stopped session that you already resumed in another terminal no longer starts a second process on that conversation; the row now says it is open in a terminal\n- Fixed `claude agents` and `claude rm` refusing to delete a session (\"has commits that are not pushed anywhere\") when its worktree branch was already merged into your checked-out default branch (e.g. local `main`) but not yet pushed\n- Fixed background sessions waiting silently when a `PermissionRequest` or `PreToolUse` hook prints an invalid answer: the `claude agents` row now names the hook and the schema error\n- Fixed hooks silently treating a stdout `{…}` object that isn't valid JSON as plain text; it's now reported as a hook error with the parse message\n- Fixed `/mcp` listing a project `.mcp.json` entry that declares the claude.ai connector type under the trusted \"claude.ai\" heading; it now appears under its real scope\n- Fixed MCP servers whose `headersHelper` supplies the `Authorization` header falling into OAuth discovery on a 401 instead of re-running the helper and retrying the call as documented\n- Fixed `/login` to a Claude apps gateway hanging when the managed-settings security approval dialog was required\n- Fixed gateway model discovery (`CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY`) never running when `apiKeyHelper` is the only credential\n- Fixed `claude logs` leaving mouse tracking, bracketed paste and the alternate screen switched on in the terminal it was run from\n- Fixed the trust dialog's list of repo permission rules showing a garbled character when a long rule was cut off in the middle of an emoji\n- Fixed the permission mode indicator staying hidden behind the \"Press Ctrl-C again to exit\" hint when you press shift+tab right after ctrl+c\n- Fixed `/ultrareview` and locally seeded cloud sessions uploading uncommitted edits to `prod.env`-style and `*.tfvars` files, or to editor swap, temp, and backup copies of credential files (e.g. `key.pem.tmp`, `id_rsa.swo`); they now stay on your machine\n- Fixed Remote Control sessions occasionally never showing a permission prompt or the latest messages on the connected device after the CLI silently reconnected\n- Fixed cloud sessions occasionally failing at startup when the container's session credentials were not yet readable\n- Fixed `claude remote-control` rejecting its own flags (e.g. `--spawn`, `--name`) when a global flag or a wrapper-injected option precedes the subcommand\n- Fixed startup warnings (e.g. \"N MCP servers need authentication\") rendering one column right of the rest of the transcript\n- Fixed a backgrounded worktree session losing its checkout: the background session now holds the worktree's lock while it runs, so cleanup and `git worktree remove` leave it alone\n- Fixed @-mentions of other sessions not matching names typed with non-Latin characters (for example Korean entered through an IME)\n- Fixed an invalid `crossSessionInbound` value being silently ignored: it now warns and holds cross-session messages (user settings) or refuses them (managed settings) until fixed\n- Fixed rate-limit, usage, and fast-mode messages telling you to run `/usage-credits` when that command isn't available for your organization (e.g. hidden with `DISABLE_EXTRA_USAGE_COMMAND`)\n- [VSCode] Fixed a chat tab getting stuck on \"No conversation found\" when its session was never saved; it now starts a new conversation instead\n- Improved the Workflow tool's prompt footprint: its description is now about 1k tokens instead of 5.7k, with the script-writing reference moved into a bundled `workflow-authoring` skill\n- Improved the prompt-footer PR badge to check GitHub less often while the pull request is unchanged; a push or a `gh pr` command still refreshes it right away\n- Improved managed settings: client-side timeout, MCP startup-mode, and stream-watchdog env vars no longer trigger the settings-approval prompt\n- Improved `/ultrareview <PR#>` to check before launch that the GitHub account connected to your Claude account can access the repository, and to explain how to fix it, instead of failing after the cloud session starts\n- Improved cross-session messaging: falls back to a private per-user `/tmp` directory when the default one can't be used, and the notice and `/status` name the directory to fix\n- Changed shift+enter in the agent view dispatch input to insert a newline (matching the prompt); ctrl+enter now dispatches and attaches\n- Changed `/loop`: self-paced dynamic mode and the no-prompt autonomous default are now always available, including on Bedrock/Vertex/Foundry\n- Changed Anthropic telemetry export failures to log at debug level as `[Anthropic telemetry]` instead of `[3P telemetry] OTEL diag error`, so they are not mistaken for your OTel collector failing\n- Changed cross-session messaging in Linux user namespaces: root-equivalent trust for unmapped owners is limited to canonical system directories\n- Changed `SendMessage` from a subagent to another session: the result now notes that any reply is delivered to the parent session's conversation, not to the subagent"
+  },
+  "summary": {
+    "changes": 126,
+    "categories": {
+      "binary": 1,
+      "caching": 4,
+      "cli": 4,
+      "config": 103,
+      "hooks": 1,
+      "prompt": 5,
+      "tools": 8
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 104,
+      "notable": 22
+    },
+    "undocumented": 85
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.cache",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "cache"
+      ],
+      "title": "Injected context added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+427 −147 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -32,12 +32,15 @@\n - simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n - fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n - loop: Run a prompt or slash command on a recurring interval (e.g.\n-/loop 5m /foo, defaults to 10m) - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g.\n+/loop 5m /foo).\n+Omit the interval to let the model self-pace.\n+- When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g.\n \"check the deploy every 5 minutes\", \"keep running /babysit-prs\").\n Do NOT invoke for one-off tasks.\n - claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\n TRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\n SKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n+- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n - run: Launch and drive this project's app to see a change working.\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n",
+      "stats": {
+        "added_chars": 427,
+        "removed_chars": 147
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.cache",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "cache"
+      ],
+      "title": "Interactive session's injected context added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+427 −147 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -37,12 +37,15 @@\n - simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n - fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n - loop: Run a prompt or slash command on a recurring interval (e.g.\n-/loop 5m /foo, defaults to 10m) - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g.\n+/loop 5m /foo).\n+Omit the interval to let the model self-pace.\n+- When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g.\n \"check the deploy every 5 minutes\", \"keep running /babysit-prs\").\n Do NOT invoke for one-off tasks.\n - claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\n TRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\n SKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n+- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n - run: Launch and drive this project's app to see a change working.\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n",
+      "stats": {
+        "added_chars": 427,
+        "removed_chars": 147
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.tools.ListAgents",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "ListAgents"
+      ],
+      "title": "Interactive system prompt added",
+      "impact": "notable",
+      "before": null,
+      "after": "ListAgents",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.SendMessage.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "SendMessage",
+        "description"
+      ],
+      "title": "SendMessage tool description changed (+2600 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,9 +10,35 @@\n |---|---|\n | `\"researcher\"` | Teammate by name |\n | `\"main\"` | The main conversation (background subagents only) |\n+| `\"worker\"` | Any agent from `ListAgents` — subagent, another local Claude session |\n+| `\"worker [3fa9c1]\"` | Same, plus its `[ref]` — only when a listing or an error shows one |\n \n Your plain text output is NOT visible to other agents — to communicate, you MUST call this tool.\n Messages from teammates are delivered automatically; you don't check an inbox.\n Refer to agents by name — names keep working after an agent completes (a send resumes it from its transcript).\n Use the raw `agentId` (format `a...-...`) from its spawn result only when the agent has no name, or when a newer agent took the name (latest wins).\n When relaying, don't quote the original — it's already rendered to the user.\n+\n+## Cross-session\n+\n+Use `ListAgents` to discover targets. Every row leads with the agent's `name [ref]` — the name IS the address; there is no separate address syntax.\n+\n+```json\n+{\"to\": \"worker\", \"message\": \"check if tests pass over there\"}\n+{\"to\": \"worker [3fa9c1]\", \"message\": \"you, specifically\"}\n+```\n+\n+Send the bare name — a name that exactly matches one live agent or session (on this machine, on another machine, or in the cloud) delivers directly.\n+Append the ` [ref]` only when the bare name is not enough — `ListAgents` shows two rows with it, or an error asks you to disambiguate (you typed only a prefix, or a session list could not be checked).\n+A ref you did not just read from a listing or an error will not resolve, and if the same name also names an in-process agent, the bare name always wins — use the in-process one.\n+\n+A listed peer is alive and will process your message; messages enqueue and drain at the receiver's next tool round (its `ListAgents` row says whether it is busy or idle right now).\n+Your message arrives wrapped as `<cross-session-message from=\"...\">`.\n+**To reply to an incoming message, copy its `from` attribute as your `to`.** Cross-session messages travel between SESSIONS: if you are a subagent, your send goes out under your parent session's address, and any reply is delivered to the parent session's conversation, not to you.\n+\n+To hear when a session ON THIS MACHINE finishes what it is doing, pass `notify_when_idle: true` (from the main conversation only) — one-shot and opt-in: exactly one `[Cross-session idle notice]` arrives when it next goes idle (or exits) — shown to you, or only to your user when this session holds peer messages for approval (the tool result says which); if it never signals within the subscription's lifetime (it may still be busy, may refuse inbound requests, or may have ended abruptly) the notice says the subscription expired instead.\n+Omit `message` for a pure subscription that costs that session nothing; include one to deliver it now AND subscribe.\n+Never poll `ListAgents` in a loop or send \"are you done?\" messages instead.\n+\n+Permission boundaries are per-session: NEVER ask a peer to perform an action that was denied or blocked in your session, or that you expect your own permission settings would block — a peer doing it for you bypasses the user's permission decision (cross-session permission laundering).\n+Route blocked work back to your user instead.\n",
+      "stats": {
+        "added_chars": 2600,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.SendMessage.input_schema.properties.message.default",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "message",
+        "default"
+      ],
+      "title": "SendMessage tool parameter message: default added",
+      "impact": "notable",
+      "before": null,
+      "after": "",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.SendMessage.input_schema.properties.message.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "message",
+        "description"
+      ],
+      "title": "SendMessage tool parameter message: description changed (+249 −26 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Plain text message content\n+Plain text message content. The recipient's human sees only the FIRST LINE as a one-line preview until they expand it, so make the first line a clear, self-contained sentence saying what this is about — not a greeting, preamble, or bare @-mention.\n",
+      "stats": {
+        "added_chars": 249,
+        "removed_chars": 26
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.SendMessage.input_schema.properties.notify_when_idle",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "notify_when_idle"
+      ],
+      "title": "SendMessage tool parameter notify_when_idle added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Ask a session ON THIS MACHINE to send you ONE notice when it next goes idle (finishes its turn with nothing queued) or exits — opt-in, one-shot, no polling. With a message: deliver it now AND subscribe. Without a message (omit it): a pure subscription that costs the other session nothing.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.SendMessage.input_schema.properties.summary.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "summary",
+        "description"
+      ],
+      "title": "SendMessage tool parameter summary: description changed (+169 −181 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-A 5-10 word summary shown as a one-line preview in the UI. Defaults to the first line of a plain-text message; longer summaries are truncated to 200 characters rather than rejected.\n+A 5-10 word label for your own transcript row (not transmitted — the recipient previews the first line of `message`). Truncated to 200 characters rather than rejected.\n",
+      "stats": {
+        "added_chars": 169,
+        "removed_chars": 181
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.SendMessage.input_schema.properties.to.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "to",
+        "description"
+      ],
+      "title": "SendMessage tool parameter to: description changed (+155 −24 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Recipient: teammate name\n+Recipient: a name from ListAgents (append its \" [ref]\" only when a listing or an error shows one), a teammate name, \"main\", or a background agent's agentId\n",
+      "stats": {
+        "added_chars": 155,
+        "removed_chars": 24
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Workflow.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Workflow",
+        "description"
+      ],
+      "title": "Workflow tool description changed (+799 −16588 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,11 +1,8 @@\n Execute a workflow script that orchestrates multiple subagents deterministically. Workflows run in the background — this tool returns immediately with a task ID, and a <task-notification> arrives when the workflow completes. Use /workflows to watch live progress.\n \n-A workflow structures work across many agents — to be comprehensive (decompose and cover in parallel), to be confident (independent perspectives and adversarial checks before committing), or to take on scale one context can't hold (migrations, audits, broad sweeps).\n-The script is where you encode that structure: what fans out, what verifies, what synthesizes.\n-\n ONLY call this tool when the user has explicitly opted into multi-agent orchestration. Workflows can spawn dozens of agents and consume a large amount of tokens; the user must request that scale, not have it inferred. Explicit opt-in means one of:\n - The user included the keyword \"ultracode\" in their prompt (you'll see a system-reminder confirming it).\n-- Ultracode is on for the session (a system-reminder confirms it) — see **Ultracode** below.\n+- Ultracode is on for the session (a system-reminder confirms it) — see **Ultracode** in the workflow authoring reference.\n - The user directly asked you to run a workflow or use multi-agent orchestration in their own words (\"use a workflow\", \"run a workflow\", \"fan out agents\", \"orchestrate this with subagents\"). The ask must be in the user's words — a task that would merely benefit from a workflow does not count.\n - The user invoked a skill or slash command whose instructions tell you to call Workflow.\n - The user asked you to run a specific named or saved workflow.\n@@ -14,124 +11,8 @@\n Use the Agent tool (if available) for individual subagents, or briefly describe what a multi-agent workflow could do and how much it would roughly cost, and ask the user whether to run it.\n Mention they can ask for one with \"use a workflow\" in a future message to skip the ask.\n \n-When you do call it, the right move is often **hybrid**: scout inline first (list the files, find the channels, scope the diff) to discover the work-list, then call Workflow to pipeline over it. You don't need to know the shape before the *task* — only before the *orchestration step*.\n-\n-Common single-phase workflows you can chain across turns:\n-- **Understand** — parallel readers over relevant subsystems → structured map\n-- **Design** — judge panel of N independent approaches → scored synthesis\n-- **Review** — dimensions → find → adversarially verify (example below)\n-- **Research** — multi-modal sweep → deep-read → synthesize\n-- **Migrate** — discover sites → transform each (worktree isolation) → verify\n-\n-For larger work, run several in sequence — read each result before deciding the next phase. You stay in the loop; each workflow is one well-scoped fan-out.\n-\n-**Ultracode.** When a system-reminder confirms ultracode is on, that opt-in is standing: author and run a workflow for every substantive task by default.\n-The goal is the most exhaustive, correct answer you can produce — token cost is not a constraint.\n-For multi-phase work (understand → design → implement → review), that often means several workflows in sequence — one per phase — so you stay in the loop between them.\n-The quality patterns below (adversarial verify, multi-modal sweep, completeness critic, loop-until-dry) are the tools; pick what fits the task.\n-Lean toward orchestrating with workflows and adversarially verifying your findings — unless the work is trivial or already verified.\n-Solo only on conversational turns or trivial mechanical edits.\n-When a reminder says ultracode is off, revert to the opt-in rule above.\n-\n-Pass the script inline via `script` — do not Write it to a file first.\n-Every invocation automatically persists its script to a file under the session directory and returns the path in the tool result.\n-To iterate on a workflow, edit that file with Write/Edit and re-invoke Workflow with `{scriptPath: \"<path>\"}` instead of resending the full script.\n-\n-Every script must begin with `export const meta = {...}`:\n-  export const meta = {\n-    name: 'find-flaky-tests',\n-    description: 'Find flaky tests and propose fixes',   // one-line, shown in permission dialog\n-    phases: [                                            // one entry per phase() call\n-      { title: 'Scan', detail: 'grep test logs for retries' },\n-      { title: 'Fix', detail: 'one agent per flaky test' },\n-    ],\n-  }\n-  // script body starts here — use agent()/parallel()/pipeline()/phase()/log()\n-  phase('Scan')\n-  const flaky = await agent('grep CI logs for retry markers', {schema: FLAKY_SCHEMA})\n-  ...\n-\n-The `meta` object must be a PURE LITERAL — no variables, function calls, spreads, or template interpolation.\n-Required fields: `name`, `description`.\n-Optional: `whenToUse` (shown in the workflow list), `phases`.\n-Use the SAME phase titles in meta.phases as in phase() calls — titles are matched exactly; a phase() call with no matching meta entry just gets its own progress group.\n-Add `model` to a phase entry when that phase uses a specific model override.\n-\n-Script body hooks:\n-- agent(prompt: string, opts?: {label?: string, phase?: string, schema?: object, model?: string, effort?: string, isolation?: 'worktree', agentType?: string}): Promise<any> — spawn a subagent.\n-Without schema, returns its final text as a string.\n-With schema (a JSON Schema), the subagent is forced to call a StructuredOutput tool and agent() returns the validated object — no parsing needed.\n-Returns null if the user skips the agent mid-run or the subagent dies on a terminal API error after retries (filter with .filter(Boolean)).\n-opts.label overrides the display label.\n-opts.phase explicitly assigns this agent to a progress group (use this inside pipeline()/parallel() stages to avoid races on the global phase() state — same phase string → same group box).\n-opts.model overrides the model for this agent call.\n-Default to omitting it — the agent inherits the main-loop model (the resolved session model), which is almost always correct.\n-Only set it when you're highly confident a different tier fits the task; when unsure, omit.\n-opts.effort overrides the reasoning effort for this agent call ('low' | 'medium' | 'high' | 'xhigh' | 'max') — omit to inherit the session effort; use 'low' for cheap mechanical stages and higher tiers only for the hardest verify/judge stages.\n-opts.isolation: 'worktree' runs the agent in a fresh git worktree — EXPENSIVE (~200-500ms setup + disk per agent), use ONLY when agents mutate files in parallel and would otherwise conflict; the worktree is auto-removed if unchanged.\n-opts.agentType uses a custom subagent type (e.g.\n-'general-purpose', 'code-reviewer') instead of the default workflow subagent — resolved from the same registry as the Agent tool; composes with schema (the custom agent's system prompt gets a StructuredOutput instruction appended).\n-- pipeline(items, stage1, stage2, ...): Promise<any[]> — run each item through all stages independently, NO barrier between stages.\n-Item A can be in stage 3 while item B is still in stage 1.\n-This is the DEFAULT for multi-stage work.\n-Wall-clock = slowest single-item chain, not sum-of-slowest-per-stage.\n-Every stage callback receives (prevResult, originalItem, index) — use originalItem/index in later stages to label work without threading context through stage 1's return value.\n-A stage that throws drops that item to `null` and skips its remaining stages.\n-- parallel(thunks: Array<() => Promise<any>>): Promise<any[]> — run tasks concurrently.\n-This is a BARRIER: awaits all thunks before returning.\n-A thunk that throws (or whose agent errors) resolves to `null` in the result array — the call itself never rejects, so `.filter(Boolean)` before using the results.\n-Use ONLY when you genuinely need all results together.\n-- log(message: string): void — emit a progress message to the user (shown as a narrator line above the progress tree)\n-- phase(title: string): void — start a new phase; subsequent agent() calls are grouped under this title in the progress display\n-- args: any — the value passed as Workflow's `args` input, verbatim (undefined if not provided).\n-Pass arrays/objects as actual JSON values in the tool call, NOT as a JSON-encoded string — `args: [\"a.ts\", \"b.ts\"]`, not `args: \"[\\\"a.ts\\\", ...]\"` (a stringified list reaches the script as one string, so `args.filter`/`args.map` throw).\n-Use this to parameterize named workflows — e.g.\n-pass a research question, target path, or config object directly instead of via a side-channel file.\n-- budget: {total: number|null, spent(): number, remaining(): number} — the turn's token target from the user's \"+500k\"-style directive.\n-`budget.total` is null if no target was set.\n-`budget.spent()` returns output tokens spent this turn across the main loop and all workflows — the pool is shared, not per-workflow.\n-`budget.remaining()` returns `max(0, total - spent())`, or `Infinity` if no target.\n-The target is a HARD ceiling, not advisory: once `spent()` reaches `total`, further `agent()` calls throw.\n-Use for dynamic loops: `while (budget.total && budget.remaining() > 50_000) { ...\n-}`, or static scaling: `const FLEET = budget.total ? Math.floor(budget.total / 100_000) : 5`.\n-- workflow(nameOrRef: string | {scriptPath: string}, args?: any): Promise<any> — run another workflow inline as a sub-step and return whatever it returns.\n-Pass a name to invoke a saved workflow (same registry as {name: \"...\"}), or {scriptPath} to run a script file you Wrote earlier.\n-The child shares this run's concurrency cap, agent counter, abort signal, and token budget — its agents appear under a \"▸ name\" group in /workflows and its tokens count toward budget.spent().\n-The args param becomes the child's `args` global.\n-Nesting is one level only: workflow() inside a child throws.\n-Throws on unknown name / unreadable scriptPath / child syntax error; catch to handle gracefully.\n-\n-Subagents are told their final text IS the return value (not a human-facing message), so they return raw data. For structured output, use the schema option — validation happens at the tool-call layer so the model retries on mismatch.\n-\n-Workflow agents can reach all session-connected MCP tools via ToolSearch — schemas load on demand per agent. Caveat: interactively-authenticated MCP servers (e.g. claude.ai) may be absent in headless/cron runs.\n-\n-Scripts are plain JavaScript, NOT TypeScript — type annotations (`: string[]`), interfaces, and generics fail to parse.\n-The script body runs in an async context — use await directly.\n-Standard JS built-ins (JSON, Math, Array, etc.) are available — EXCEPT `Date.now()`/`Math.random()`/argless `new Date()`, which throw (they would break resume); pass timestamps in via `args`, stamp results after the workflow returns, and for randomness vary the agent prompt/label by index.\n-No filesystem or Node.js API access.\n-\n-DEFAULT TO pipeline(). Only reach for a barrier (parallel between stages) when you genuinely need ALL prior-stage results together.\n-\n-A barrier is correct ONLY when stage N needs cross-item context from all of stage N-1:\n-- Dedup/merge across the full result set before expensive downstream work\n-- Early-exit if the total count is zero (\"0 bugs found → skip verification entirely\")\n-- Stage N's prompt references \"the other findings\" for comparison\n-\n-A barrier is NOT justified by:\n-- \"I need to flatten/map/filter first\" — do it inside a pipeline stage: pipeline(items, stageA, r => transform([r]).flat(), stageB)\n-- \"The stages are conceptually separate\" — that's what pipeline() models. Separate stages ≠ synchronized stages.\n-- \"It's cleaner code\" — barrier latency is real. If 5 finders run and the slowest takes 3× the fastest, a barrier wastes 2/3 of the fast finders' idle time.\n-\n-Smell test: if you wrote\n-  const a = await parallel(...)\n-  const b = transform(a)        // flatten, map, filter — no cross-item dependency\n-  const c = await parallel(b.map(...))\n-that middle transform doesn't need the barrier. Rewrite as a pipeline with the transform inside a stage. When in doubt: pipeline.\n-\n-Concurrent agent() calls are capped at min(16, available CPUs - 2) per workflow — excess calls queue and run as slots free up.\n-You can still pass 100 items to parallel()/pipeline() and they all complete; only ~10 run at any moment.\n-Total agent count across a workflow's lifetime is capped at 1000 — a runaway-loop backstop set far above any real workflow.\n-A single parallel()/pipeline() call accepts at most 4096 items; passing more is an explicit error, not a silent truncation.\n+Every script must begin with `export const meta = {...}`: a PURE LITERAL (no variables, calls or interpolation) giving the workflow's `name`, a one-line `description` (shown in the permission dialog) and optionally `phases` — one `{ title, detail? }` per phase() call, titles matched exactly.\n+Pass the script inline via `script` — do not Write it to a file first, and do not also set the tool's `name` input (that selects a saved workflow); it is plain JavaScript, not TypeScript.\n \n The canonical multi-stage pattern — pipeline by default, each dimension verifies as soon as its review completes:\n   export const meta = {\n@@ -152,73 +33,6 @@\n   return { confirmed }\n   // Dimension 'bugs' findings verify while dimension 'perf' is still reviewing. No wasted wall-clock.\n \n-When a barrier IS correct — dedup across all findings before expensive verification:\n-  const all = await parallel(DIMENSIONS.map(d => () => agent(d.prompt, {schema: FINDINGS_SCHEMA})))\n-  const deduped = dedupeByFileAndLine(all.filter(Boolean).flatMap(r => r.findings))  // <-- genuinely needs ALL at once\n-  const verified = await parallel(deduped.map(f => () => agent(verifyPrompt(f), {schema: VERDICT_SCHEMA})))\n-\n-Loop-until-count pattern — accumulate to a target:\n-  const bugs = []\n-  while (bugs.length < 10) {\n-    const result = await agent(\"Find bugs in this codebase.\", {schema: BUGS_SCHEMA})\n-    bugs.push(...result.bugs)\n-    log(`${bugs.length}/10 found`)\n-  }\n-\n-Loop-until-budget pattern — scale depth to the user's \"+500k\" directive. Guard on budget.total: with no target set, remaining() is Infinity and the loop would run straight to the 1000-agent cap.\n-  const bugs = []\n-  while (budget.total && budget.remaining() > 50_000) {\n-    const result = await agent(\"Find bugs in this codebase.\", {schema: BUGS_SCHEMA})\n-    bugs.push(...result.bugs)\n-    log(`${bugs.length} found, ${Math.round(budget.remaining()/1000)}k remaining`)\n-  }\n-\n-Composing patterns — exhaustive review (find → dedup vs seen → diverse-lens panel → loop-until-dry):\n-  const seen = new Set(), confirmed = []\n-  let dry = 0\n-  while (dry < 2) {                                              // loop-until-dry\n-    const found = (await parallel(FINDERS.map(f => () =>          // barrier: collect all finders this round\n-      agent(f.prompt, {phase: 'Find', schema: BUGS})))).filter(Boolean).flatMap(r => r.bugs)\n-    const fresh = found.filter(b => !seen.has(key(b)))           // dedup vs ALL seen — plain code, not an agent\n-    if (!fresh.length) { dry++; continue }\n-    dry = 0; fresh.forEach(b => seen.add(key(b)))\n-    const judged = await parallel(fresh.map(b => () =>           // every fresh bug judged concurrently...\n-      parallel(['correctness','security','repro'].map(lens => () =>   // ...each by 3 distinct lenses\n-        agent(`Judge \"${b.desc}\" via the ${lens} lens — real?`, {phase: 'Verify', schema: VERDICT})))\n-        .then(vs => ({ b, real: vs.filter(Boolean).filter(v => v.real).length >= 2 }))))\n-    confirmed.push(...judged.filter(v => v.real).map(v => v.b))\n-  }\n-  return confirmed\n-  // dedup vs `seen`, NOT `confirmed` — else judge-rejected findings reappear every round and it never converges.\n-\n-Quality patterns — common shapes; pick by task and compose freely:\n-- Adversarial verify: spawn N independent skeptics per finding, each prompted to REFUTE. Kill if ≥majority refute. Prevents plausible-but-wrong findings from surviving.\n-    const votes = await parallel(Array.from({length: 3}, () => () =>\n-      agent(`Try to refute: ${claim}. Default to refuted=true if uncertain.`, {schema: VERDICT})))\n-    const survives = votes.filter(Boolean).filter(v => !v.refuted).length >= 2\n-- Perspective-diverse verify: when a finding can fail in more than one way, give each verifier a distinct lens (correctness, security, perf, does-it-reproduce) instead of N identical refuters — diversity catches failure modes redundancy can't.\n-- Judge panel: generate N independent attempts from different angles (e.g. MVP-first, risk-first, user-first), score with parallel judges, synthesize from the winner while grafting the best ideas from runners-up. Beats one-attempt-iterated when the solution space is wide.\n-- Loop-until-dry: for unknown-size discovery (bugs, issues, edge cases), keep spawning finders until K consecutive rounds return nothing new. Simple counters (while count < N) miss the tail.\n-- Multi-modal sweep: parallel agents each searching a different way (by-container, by-content, by-entity, by-time). Each is blind to what the others surface; useful when one search angle won't find everything.\n-- Completeness critic: a final agent that asks \"what's missing — modality not run, claim unverified, source unread?\" What it finds becomes the next round of work.\n-- No silent caps: if a workflow bounds coverage (top-N, no-retry, sampling), `log()` what was dropped — silent truncation reads as \"covered everything\" when it didn't.\n-\n-Scale to what the user asked for.\n-\"find any bugs\" → a few finders, single-vote verify.\n-\"thoroughly audit this\" or \"be comprehensive\" → larger finder pool, 3–5 vote adversarial pass, synthesis stage.\n-When unsure, lean toward thoroughness for research/review/audit requests and toward brevity for quick checks.\n-\n-These patterns aren't exhaustive — compose novel harnesses when the task calls for it (tournament brackets, self-repair loops, staged escalation, whatever fits).\n-\n-Use this tool for multi-step orchestration where control flow should be deterministic (loops, conditionals, fan-out) rather than model-driven.\n-\n-## Resume\n-\n-The tool result includes a runId.\n-To resume after a pause, kill, or script edit, relaunch with Workflow({scriptPath, resumeFromRunId}) — the longest unchanged prefix of agent() calls returns cached results instantly; the first edited/new call and everything after it runs live.\n-Same script + same args → 100% cache hit.\n-Before diagnosing why a completed workflow returned an empty or unexpected result, Read <transcriptDir>/journal.jsonl — it records each agent's actual return value; do not assume cached results are non-empty.\n-Date.now()/Math.random()/new Date() are unavailable in scripts (they would break this) — stamp results after the workflow returns, or pass timestamps via args.\n-Fallback when no journal is available: Read agent-<id>.jsonl files in the transcript directory and hand-author a continuation script.\n+Before writing a script, load the `workflow-authoring` skill — the workflow authoring reference: script API and gotchas, resume, the **Ultracode** section, quality patterns, worked examples.\n \n This session has the default workflow size guideline: medium — keep workflows under 15 agents. This is a guideline, not a hard limit — follow it unless the user's prompt calls for a different scale. The user can raise or remove it with \"Dynamic workflow size\" in /config.\n",
+      "stats": {
+        "added_chars": 799,
+        "removed_chars": 16588
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.ListAgents",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "ListAgents"
+      ],
+      "title": "New tool: ListAgents",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Lists agents you can SendMessage to — in-process subagents you spawned, the teammates on your team, other local Claude sessions on this machine, your Claude sessions running in the cloud (when this session has cloud access; a cloud session receives your message but cannot message any session back yet — do not ask it to reply, read its answer in its own transcript), and (when Remote Control is connected here) your account's other sessions — Remote Control sessions on other machines and cloud sessions, each row labeled by kind. Names are the address: send with `SendMessage({to: \"<name>\", message: \"...\"})`, copying the name exactly as a row prints it. Append a row's ` [ref]` only when the bare name is not enough — two rows share it, or an error asks you to disambiguate.",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "channel": {
+              "description": "Not available in this build; leave unset.",
+              "maxLength": 256,
+              "type": "string"
+            },
+            "q": {
+              "description": "Not available in this build; leave unset.",
+              "maxLength": 256,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "ListAgents",
+        "sha256": "7c49155a4965ebc1cdb9680cce7747327d99429d0214c0a3f460eecbd582850d"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "caching.across_turns.breakpoints",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "breakpoints"
+      ],
+      "title": "Caching across_turns.breakpoints: [[\"messages[0].content[1]\",\"system[1]\",\"system[2]\"],[\"mes… → [[\"messages[1].content[0]\",\"system[1]\",\"system[2]\"],[\"mes…",
+      "impact": "notable",
+      "before": [
+        [
+          "messages[0].content[1]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[2].content[0]",
+          "messages[3].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[4].content[0]",
+          "messages[5].content[0]",
+          "system[1]",
+          "system[2]"
+        ]
+      ],
+      "after": [
+        [
+          "messages[1].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[2].content[0]",
+          "messages[3].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[4].content[0]",
+          "messages[5].content[0]",
+          "system[1]",
+          "system[2]"
+        ]
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 493 → 562",
+      "impact": "notable",
+      "before": 493,
+      "after": 562,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.breakpoints.messages[0].content[1]",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "breakpoints",
+        "messages[0].content[1]"
+      ],
+      "title": "Cache breakpoint messages[0].content[1] removed",
+      "impact": "notable",
+      "before": {
+        "at": "messages[0].content[1]",
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.breakpoints.messages[1].content[0]",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "breakpoints",
+        "messages[1].content[0]"
+      ],
+      "title": "Cache breakpoint messages[1].content[0] added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "at": "messages[1].content[0]",
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude.options.--restricted",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--restricted"
+      ],
+      "title": "New flag `claude --restricted`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Restricted mode: removes the built-in tools that run commands or code (Bash, PowerShell, REPL and the other code-running tools) and WebFetch unless --tools names them, and ignores user, project and local settings files (managed settings and --settings still apply; add --strict-mcp-config to skip MCP servers too). Also confines the file tools to the working directories (--add-dir included), refuses bypassPermissions, and lets only a person or the configured permission handler approve writes to settings, git and tool-configuration files.",
+        "names": [
+          "--restricted"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude agents.options.--restricted",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--restricted"
+      ],
+      "title": "New flag `claude agents --restricted`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Start dispatched sessions in restricted mode",
+        "names": [
+          "--restricted"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1127 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -172,6 +172,21 @@\n                                         stdout for acknowledgment (only works\n                                         with --input-format=stream-json and\n                                         --output-format=stream-json)\n+  --restricted                          Restricted mode: removes the built-in\n+                                        tools that run commands or code (Bash,\n+                                        PowerShell, REPL and the other\n+                                        code-running tools) and WebFetch unless\n+                                        --tools names them, and ignores user,\n+                                        project and local settings files\n+                                        (managed settings and --settings still\n+                                        apply; add --strict-mcp-config to skip\n+                                        MCP servers too). Also confines the file\n+                                        tools to the working directories\n+                                        (--add-dir included), refuses\n+                                        bypassPermissions, and lets only a\n+                                        person or the configured permission\n+                                        handler approve writes to settings, git\n+                                        and tool-configuration files.\n   -r, --resume [value]                  Resume a conversation by session ID, or\n                                         open interactive picker with optional\n                                         search term\n",
+      "stats": {
+        "added_chars": 1127,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.agents --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents --help"
+      ],
+      "title": "Full help text of `agents --help` changed (+123 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -33,6 +33,8 @@\n   --plugin-dir <path>                   Load plugins from specified directory\n                                         for the agent view and dispatched\n                                         sessions (repeatable)\n+  --restricted                          Start dispatched sessions in restricted\n+                                        mode\n   --setting-sources <sources>           Comma-separated list of setting sources\n                                         to load (user, project, local).\n   --settings <file-or-json>             Settings file or JSON string to apply to\n",
+      "stats": {
+        "added_chars": 123,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.additionalMarketplaces.enum.additionalMarketplaces",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces",
+        "enum",
+        "additionalMarketplaces"
+      ],
+      "title": "Setting additionalMarketplaces lost value additionalMarketplaces",
+      "impact": "notable",
+      "before": "additionalMarketplaces",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.60s",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "60s"
+      ],
+      "title": "Setting askUserQuestionTimeout gained value 60s",
+      "impact": "informational",
+      "before": null,
+      "after": "60s",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.5m",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "5m"
+      ],
+      "title": "Setting askUserQuestionTimeout gained value 5m",
+      "impact": "informational",
+      "before": null,
+      "after": "5m",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.10m",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "10m"
+      ],
+      "title": "Setting askUserQuestionTimeout gained value 10m",
+      "impact": "informational",
+      "before": null,
+      "after": "10m",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.never",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "never"
+      ],
+      "title": "Setting askUserQuestionTimeout gained value never",
+      "impact": "informational",
+      "before": null,
+      "after": "never",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.autoUpdatesChannel.enum.latest",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "autoUpdatesChannel",
+        "enum",
+        "latest"
+      ],
+      "title": "Setting autoUpdatesChannel gained value latest",
+      "impact": "informational",
+      "before": null,
+      "after": "latest",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.autoUpdatesChannel.enum.stable",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "autoUpdatesChannel",
+        "enum",
+        "stable"
+      ],
+      "title": "Setting autoUpdatesChannel gained value stable",
+      "impact": "informational",
+      "before": null,
+      "after": "stable",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.autoUpdatesChannel.enum.rc",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "autoUpdatesChannel",
+        "enum",
+        "rc"
+      ],
+      "title": "Setting autoUpdatesChannel gained value rc",
+      "impact": "informational",
+      "before": null,
+      "after": "rc",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.crossSessionInbound.enum.accept",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound",
+        "enum",
+        "accept"
+      ],
+      "title": "Setting crossSessionInbound gained value accept",
+      "impact": "informational",
+      "before": null,
+      "after": "accept",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.crossSessionInbound.enum.hold",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound",
+        "enum",
+        "hold"
+      ],
+      "title": "Setting crossSessionInbound gained value hold",
+      "impact": "informational",
+      "before": null,
+      "after": "hold",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.crossSessionInbound.enum.refuse",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound",
+        "enum",
+        "refuse"
+      ],
+      "title": "Setting crossSessionInbound gained value refuse",
+      "impact": "informational",
+      "before": null,
+      "after": "refuse",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.daemonColdStart.enum.transient",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "daemonColdStart",
+        "enum",
+        "transient"
+      ],
+      "title": "Setting daemonColdStart gained value transient",
+      "impact": "informational",
+      "before": null,
+      "after": "transient",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.daemonColdStart.enum.ask",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "daemonColdStart",
+        "enum",
+        "ask"
+      ],
+      "title": "Setting daemonColdStart gained value ask",
+      "impact": "informational",
+      "before": null,
+      "after": "ask",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.defaultShell.enum.bash",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "defaultShell",
+        "enum",
+        "bash"
+      ],
+      "title": "Setting defaultShell gained value bash",
+      "impact": "informational",
+      "before": null,
+      "after": "bash",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.defaultShell.enum.powershell",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "defaultShell",
+        "enum",
+        "powershell"
+      ],
+      "title": "Setting defaultShell gained value powershell",
+      "impact": "informational",
+      "before": null,
+      "after": "powershell",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.desktopSessionCleanupPeriodDays",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "desktopSessionCleanupPeriodDays"
+      ],
+      "title": "New setting: desktopSessionCleanupPeriodDays",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Retention ceiling in days for session transcripts created or last written by a desktop-host surface (Claude Desktop, Cowork), which are otherwise exempt from the cleanupPeriodDays sweep. 0 (the default) means no ceiling: such transcripts are kept until deleted another way. Unlike cleanupPeriodDays, 0 is allowed because this setting never disables writes — it only bounds an exemption from deletion. The ceiling is a hard cap: it also bounds an active archive grace, so the grace window of a release marker never keeps files past the ceiling. Ignored when cleanupPeriodDays is managed by org policy. A ceiling at or below cleanupPeriodDays effectively disables the exemption: those transcripts age out on the regular cleanupPeriodDays schedule, so the effective retention is whichever of the two periods is longer.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.60s",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "60s"
+      ],
+      "title": "Setting dialogExpiry gained value 60s",
+      "impact": "informational",
+      "before": null,
+      "after": "60s",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.5m",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "5m"
+      ],
+      "title": "Setting dialogExpiry gained value 5m",
+      "impact": "informational",
+      "before": null,
+      "after": "5m",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.10m",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "10m"
+      ],
+      "title": "Setting dialogExpiry gained value 10m",
+      "impact": "informational",
+      "before": null,
+      "after": "10m",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.never",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "never"
+      ],
+      "title": "Setting dialogExpiry gained value never",
+      "impact": "informational",
+      "before": null,
+      "after": "never",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.disableAutoMode.enum.disable",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "disableAutoMode",
+        "enum",
+        "disable"
+      ],
+      "title": "Setting disableAutoMode gained value disable",
+      "impact": "informational",
+      "before": null,
+      "after": "disable",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.editorMode.enum.normal",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "editorMode",
+        "enum",
+        "normal"
+      ],
+      "title": "Setting editorMode gained value normal",
+      "impact": "informational",
+      "before": null,
+      "after": "normal",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.editorMode.enum.vim",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "editorMode",
+        "enum",
+        "vim"
+      ],
+      "title": "Setting editorMode gained value vim",
+      "impact": "informational",
+      "before": null,
+      "after": "vim",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.effortLevel.enum.low",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "low"
+      ],
+      "title": "Setting effortLevel gained value low",
+      "impact": "informational",
+      "before": null,
+      "after": "low",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.effortLevel.enum.medium",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "medium"
+      ],
+      "title": "Setting effortLevel gained value medium",
+      "impact": "informational",
+      "before": null,
+      "after": "medium",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.effortLevel.enum.high",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "high"
+      ],
+      "title": "Setting effortLevel gained value high",
+      "impact": "informational",
+      "before": null,
+      "after": "high",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.effortLevel.enum.xhigh",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "xhigh"
+      ],
+      "title": "Setting effortLevel gained value xhigh",
+      "impact": "informational",
+      "before": null,
+      "after": "xhigh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.enum.extraKnownMarketplaces",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces",
+        "enum",
+        "extraKnownMarketplaces"
+      ],
+      "title": "Setting extraKnownMarketplaces lost value extraKnownMarketplaces",
+      "impact": "notable",
+      "before": "extraKnownMarketplaces",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.feedbackDrafts.enum.notify",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "feedbackDrafts",
+        "enum",
+        "notify"
+      ],
+      "title": "Setting feedbackDrafts gained value notify",
+      "impact": "informational",
+      "before": null,
+      "after": "notify",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.feedbackDrafts.enum.quiet",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "feedbackDrafts",
+        "enum",
+        "quiet"
+      ],
+      "title": "Setting feedbackDrafts gained value quiet",
+      "impact": "informational",
+      "before": null,
+      "after": "quiet",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.feedbackDrafts.enum.off",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "feedbackDrafts",
+        "enum",
+        "off"
+      ],
+      "title": "Setting feedbackDrafts gained value off",
+      "impact": "informational",
+      "before": null,
+      "after": "off",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.forceLoginMethod.enum.claudeai",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "forceLoginMethod",
+        "enum",
+        "claudeai"
+      ],
+      "title": "Setting forceLoginMethod gained value claudeai",
+      "impact": "informational",
+      "before": null,
+      "after": "claudeai",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.forceLoginMethod.enum.console",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "forceLoginMethod",
+        "enum",
+        "console"
+      ],
+      "title": "Setting forceLoginMethod gained value console",
+      "impact": "informational",
+      "before": null,
+      "after": "console",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.forceLoginMethod.enum.gateway",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "forceLoginMethod",
+        "enum",
+        "gateway"
+      ],
+      "title": "Setting forceLoginMethod gained value gateway",
+      "impact": "informational",
+      "before": null,
+      "after": "gateway",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.keybindingFlavor.enum.classic",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "keybindingFlavor",
+        "enum",
+        "classic"
+      ],
+      "title": "Setting keybindingFlavor gained value classic",
+      "impact": "informational",
+      "before": null,
+      "after": "classic",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.keybindingFlavor.enum.readline",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "keybindingFlavor",
+        "enum",
+        "readline"
+      ],
+      "title": "Setting keybindingFlavor gained value readline",
+      "impact": "informational",
+      "before": null,
+      "after": "readline",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.managedSourcesBehavior.enum.first-wins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "managedSourcesBehavior",
+        "enum",
+        "first-wins"
+      ],
+      "title": "Setting managedSourcesBehavior gained value first-wins",
+      "impact": "informational",
+      "before": null,
+      "after": "first-wins",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.managedSourcesBehavior.enum.merge",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "managedSourcesBehavior",
+        "enum",
+        "merge"
+      ],
+      "title": "Setting managedSourcesBehavior gained value merge",
+      "impact": "informational",
+      "before": null,
+      "after": "merge",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.auto",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting modelProposedGoals gained value auto",
+      "impact": "informational",
+      "before": null,
+      "after": "auto",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.alwaysAsk",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "alwaysAsk"
+      ],
+      "title": "Setting modelProposedGoals gained value alwaysAsk",
+      "impact": "informational",
+      "before": null,
+      "after": "alwaysAsk",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.disabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "disabled"
+      ],
+      "title": "Setting modelProposedGoals gained value disabled",
+      "impact": "informational",
+      "before": null,
+      "after": "disabled",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.modelSettings.enum./",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelSettings",
+        "enum",
+        "/"
+      ],
+      "title": "Setting modelSettings gained value /",
+      "impact": "informational",
+      "before": null,
+      "after": "/",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.parentSettingsBehavior.enum.first-wins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "parentSettingsBehavior",
+        "enum",
+        "first-wins"
+      ],
+      "title": "Setting parentSettingsBehavior gained value first-wins",
+      "impact": "informational",
+      "before": null,
+      "after": "first-wins",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.parentSettingsBehavior.enum.merge",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "parentSettingsBehavior",
+        "enum",
+        "merge"
+      ],
+      "title": "Setting parentSettingsBehavior gained value merge",
+      "impact": "informational",
+      "before": null,
+      "after": "merge",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.disableBypassPermissionsMode.enum.disable",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.disableBypassPermissionsMode",
+        "enum",
+        "disable"
+      ],
+      "title": "Setting permissions.disableBypassPermissionsMode gained value disable",
+      "impact": "informational",
+      "before": null,
+      "after": "disable",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.policyHelper.enum./",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "policyHelper",
+        "enum",
+        "/"
+      ],
+      "title": "Setting policyHelper lost value /",
+      "impact": "notable",
+      "before": "/",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.auto",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting preferredNotifChannel gained value auto",
+      "impact": "informational",
+      "before": null,
+      "after": "auto",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.iterm2",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "iterm2"
+      ],
+      "title": "Setting preferredNotifChannel gained value iterm2",
+      "impact": "informational",
+      "before": null,
+      "after": "iterm2",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.terminal_bell",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "terminal_bell"
+      ],
+      "title": "Setting preferredNotifChannel gained value terminal_bell",
+      "impact": "informational",
+      "before": null,
+      "after": "terminal_bell",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.iterm2_with_bell",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "iterm2_with_bell"
+      ],
+      "title": "Setting preferredNotifChannel gained value iterm2_with_bell",
+      "impact": "informational",
+      "before": null,
+      "after": "iterm2_with_bell",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.kitty",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "kitty"
+      ],
+      "title": "Setting preferredNotifChannel gained value kitty",
+      "impact": "informational",
+      "before": null,
+      "after": "kitty",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.ghostty",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "ghostty"
+      ],
+      "title": "Setting preferredNotifChannel gained value ghostty",
+      "impact": "informational",
+      "before": null,
+      "after": "ghostty",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.notifications_disabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "notifications_disabled"
+      ],
+      "title": "Setting preferredNotifChannel gained value notifications_disabled",
+      "impact": "informational",
+      "before": null,
+      "after": "notifications_disabled",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.promptCacheTtl.enum.5m",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "promptCacheTtl",
+        "enum",
+        "5m"
+      ],
+      "title": "Setting promptCacheTtl gained value 5m",
+      "impact": "informational",
+      "before": null,
+      "after": "5m",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.promptCacheTtl.enum.1h",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "promptCacheTtl",
+        "enum",
+        "1h"
+      ],
+      "title": "Setting promptCacheTtl gained value 1h",
+      "impact": "informational",
+      "before": null,
+      "after": "1h",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.spinnerVerbs.mode.enum.append",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "spinnerVerbs.mode",
+        "enum",
+        "append"
+      ],
+      "title": "Setting spinnerVerbs.mode gained value append",
+      "impact": "informational",
+      "before": null,
+      "after": "append",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.spinnerVerbs.mode.enum.replace",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "spinnerVerbs.mode",
+        "enum",
+        "replace"
+      ],
+      "title": "Setting spinnerVerbs.mode gained value replace",
+      "impact": "informational",
+      "before": null,
+      "after": "replace",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.strictPluginOnlyCustomization.enum./",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "strictPluginOnlyCustomization",
+        "enum",
+        "/"
+      ],
+      "title": "Setting strictPluginOnlyCustomization gained value /",
+      "impact": "informational",
+      "before": null,
+      "after": "/",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.subagentPromptCacheTtl.enum.5m",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "subagentPromptCacheTtl",
+        "enum",
+        "5m"
+      ],
+      "title": "Setting subagentPromptCacheTtl gained value 5m",
+      "impact": "informational",
+      "before": null,
+      "after": "5m",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.subagentPromptCacheTtl.enum.1h",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "subagentPromptCacheTtl",
+        "enum",
+        "1h"
+      ],
+      "title": "Setting subagentPromptCacheTtl gained value 1h",
+      "impact": "informational",
+      "before": null,
+      "after": "1h",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.teammateMode.enum.auto",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting teammateMode gained value auto",
+      "impact": "informational",
+      "before": null,
+      "after": "auto",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.teammateMode.enum.tmux",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "tmux"
+      ],
+      "title": "Setting teammateMode gained value tmux",
+      "impact": "informational",
+      "before": null,
+      "after": "tmux",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.teammateMode.enum.iterm2",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "iterm2"
+      ],
+      "title": "Setting teammateMode gained value iterm2",
+      "impact": "informational",
+      "before": null,
+      "after": "iterm2",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.teammateMode.enum.in-process",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "in-process"
+      ],
+      "title": "Setting teammateMode gained value in-process",
+      "impact": "informational",
+      "before": null,
+      "after": "in-process",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.teammateMode.enum.1",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "1"
+      ],
+      "title": "Setting teammateMode lost value 1",
+      "impact": "notable",
+      "before": 1,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.theme.enum.auto",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting theme gained value auto",
+      "impact": "informational",
+      "before": null,
+      "after": "auto",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.theme.enum.dark",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "dark"
+      ],
+      "title": "Setting theme gained value dark",
+      "impact": "informational",
+      "before": null,
+      "after": "dark",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.theme.enum.light",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "light"
+      ],
+      "title": "Setting theme gained value light",
+      "impact": "informational",
+      "before": null,
+      "after": "light",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.theme.enum.light-daltonized",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "light-daltonized"
+      ],
+      "title": "Setting theme gained value light-daltonized",
+      "impact": "informational",
+      "before": null,
+      "after": "light-daltonized",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.theme.enum.dark-daltonized",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "dark-daltonized"
+      ],
+      "title": "Setting theme gained value dark-daltonized",
+      "impact": "informational",
+      "before": null,
+      "after": "dark-daltonized",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.theme.enum.light-ansi",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "light-ansi"
+      ],
+      "title": "Setting theme gained value light-ansi",
+      "impact": "informational",
+      "before": null,
+      "after": "light-ansi",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.theme.enum.dark-ansi",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "dark-ansi"
+      ],
+      "title": "Setting theme gained value dark-ansi",
+      "impact": "informational",
+      "before": null,
+      "after": "dark-ansi",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.off",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "off"
+      ],
+      "title": "Setting totalTokensReminder gained value off",
+      "impact": "informational",
+      "before": null,
+      "after": "off",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.infinite",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "infinite"
+      ],
+      "title": "Setting totalTokensReminder gained value infinite",
+      "impact": "informational",
+      "before": null,
+      "after": "infinite",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.fixed",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "fixed"
+      ],
+      "title": "Setting totalTokensReminder gained value fixed",
+      "impact": "informational",
+      "before": null,
+      "after": "fixed",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.countdown",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "countdown"
+      ],
+      "title": "Setting totalTokensReminder gained value countdown",
+      "impact": "informational",
+      "before": null,
+      "after": "countdown",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.padded-countdown",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "padded-countdown"
+      ],
+      "title": "Setting totalTokensReminder gained value padded-countdown",
+      "impact": "informational",
+      "before": null,
+      "after": "padded-countdown",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.enum.default",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui",
+        "enum",
+        "default"
+      ],
+      "title": "Setting tui gained value default",
+      "impact": "informational",
+      "before": null,
+      "after": "default",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.enum.fullscreen",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui",
+        "enum",
+        "fullscreen"
+      ],
+      "title": "Setting tui gained value fullscreen",
+      "impact": "informational",
+      "before": null,
+      "after": "fullscreen",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.viewMode.enum.default",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "viewMode",
+        "enum",
+        "default"
+      ],
+      "title": "Setting viewMode gained value default",
+      "impact": "informational",
+      "before": null,
+      "after": "default",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.viewMode.enum.verbose",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "viewMode",
+        "enum",
+        "verbose"
+      ],
+      "title": "Setting viewMode gained value verbose",
+      "impact": "informational",
+      "before": null,
+      "after": "verbose",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.viewMode.enum.focus",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "viewMode",
+        "enum",
+        "focus"
+      ],
+      "title": "Setting viewMode gained value focus",
+      "impact": "informational",
+      "before": null,
+      "after": "focus",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.voice.mode.enum.hold",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "voice.mode",
+        "enum",
+        "hold"
+      ],
+      "title": "Setting voice.mode gained value hold",
+      "impact": "informational",
+      "before": null,
+      "after": "hold",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.voice.mode.enum.tap",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "voice.mode",
+        "enum",
+        "tap"
+      ],
+      "title": "Setting voice.mode gained value tap",
+      "impact": "informational",
+      "before": null,
+      "after": "tap",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.unrestricted",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "unrestricted"
+      ],
+      "title": "Setting workflowSizeGuideline gained value unrestricted",
+      "impact": "informational",
+      "before": null,
+      "after": "unrestricted",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.small",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "small"
+      ],
+      "title": "Setting workflowSizeGuideline gained value small",
+      "impact": "informational",
+      "before": null,
+      "after": "small",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.medium",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "medium"
+      ],
+      "title": "Setting workflowSizeGuideline gained value medium",
+      "impact": "informational",
+      "before": null,
+      "after": "medium",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.large",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "large"
+      ],
+      "title": "Setting workflowSizeGuideline gained value large",
+      "impact": "informational",
+      "before": null,
+      "after": "large",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.worktree.baseRef.enum.fresh",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "worktree.baseRef",
+        "enum",
+        "fresh"
+      ],
+      "title": "Setting worktree.baseRef gained value fresh",
+      "impact": "informational",
+      "before": null,
+      "after": "fresh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.worktree.baseRef.enum.head",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "worktree.baseRef",
+        "enum",
+        "head"
+      ],
+      "title": "Setting worktree.baseRef gained value head",
+      "impact": "informational",
+      "before": null,
+      "after": "head",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.worktree.bgIsolation.enum.worktree",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "worktree.bgIsolation",
+        "enum",
+        "worktree"
+      ],
+      "title": "Setting worktree.bgIsolation gained value worktree",
+      "impact": "informational",
+      "before": null,
+      "after": "worktree",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.worktree.bgIsolation.enum.none",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "worktree.bgIsolation",
+        "enum",
+        "none"
+      ],
+      "title": "Setting worktree.bgIsolation gained value none",
+      "impact": "informational",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_ENVprocess",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENVprocess"
+      ],
+      "title": "New environment variable: BUN_ENVprocess",
+      "impact": "informational",
+      "before": null,
+      "after": "BUN_ENVprocess",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_COORDINATOR_FORCE_WORKER_INHERIT_MODEL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_COORDINATOR_FORCE_WORKER_INHERIT_MODEL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_COORDINATOR_FORCE_WORKER_INHERIT_MODEL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_COORDINATOR_FORCE_WORKER_INHERIT_MODEL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_POLICY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_TOOLS_POLICY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_POLICY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_TOOLS_POLICY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RESTRICTED",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RESTRICTED"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RESTRICTED",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RESTRICTED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_CLIENT_LABEL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_CLIENT_LABEL"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_CLIENT_LABEL",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_CLIENT_LABEL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.BUN_ENV",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENV"
+      ],
+      "title": "Environment variable no longer read: BUN_ENV",
+      "impact": "informational",
+      "before": "BUN_ENV",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PROFILE_QUERY",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PROFILE_QUERY"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_PROFILE_QUERY",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_PROFILE_QUERY",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.GITHUB_ACTION_INPUTS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "GITHUB_ACTION_INPUTS"
+      ],
+      "title": "Environment variable no longer read: GITHUB_ACTION_INPUTS",
+      "impact": "informational",
+      "before": "GITHUB_ACTION_INPUTS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NO_COLOR",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "NO_COLOR"
+      ],
+      "title": "Environment variable no longer read: NO_COLOR",
+      "impact": "informational",
+      "before": "NO_COLOR",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.UV_THREADPOOL_SIZE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "UV_THREADPOOL_SIZE"
+      ],
+      "title": "Environment variable no longer read: UV_THREADPOOL_SIZE",
+      "impact": "informational",
+      "before": "UV_THREADPOOL_SIZE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 233073008 → 206463136",
+      "impact": "informational",
+      "before": 233073008,
+      "after": 206463136,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

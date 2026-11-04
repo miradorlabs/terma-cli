@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.91.0",
+  "to": "0.92.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.91.0...rust-v0.92.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.92.0",
+    "text": "## New Features\n- API v2 threads can now inject dynamic tools at startup and route their calls/responses end-to-end through the server and core tool pipeline. (#9539)\n- Added filtering on the thread list in the app server to make large thread sets easier to browse. (#9897)\n- Introduced a `thread/unarchive` RPC to restore archived rollouts back into active sessions. (#9843)\n- MCP servers can now define OAuth scopes in `config.toml`, reducing the need to pass `--scopes` on each login. (#9647)\n- Multi-agent collaboration is more capable and safer, with an explorer role, better collab event mapping, and max-depth guardrails. (#9817, #9818, #9918, #9899)\n- Cached `web_search` is now the default client behavior. (#9974)\n\n## Bug Fixes\n- Fixed a TUI deadlock/freeze under high streaming throughput by avoiding blocking sends on the main Tokio thread. (#9951)\n- The `web_search` tool now handles and displays all action types, and shows in-progress activity instead of appearing stuck. (#9960)\n- Reduced high CPU usage in collaboration flows by eliminating busy-waiting on subagents. (#9776)\n- Fixed `codex resume --last --json` so prompts parse correctly without conflicting argument errors. (#9475)\n- Windows sandbox logging now handles UTF-8 safely, preventing failures when truncating multibyte content. (#8647)\n- `request_user_input` is now rejected outside Plan/Pair modes to prevent invalid tool calls. (#9955)\n\n## Documentation\n- Updated the contribution guidelines for clearer onboarding and workflow expectations. (#9933)\n- Refreshed protocol/MCP docs to reflect `thread/unarchive` and the updated `request_user_input` question shape. (#9843, #9890)\n\n## Chores\n- Self-update via Homebrew now uses an explicit cask upgrade command to avoid warnings and ambiguity. (#9823)\n- Release packaging now consistently writes the bundle zip to `dist/`. (#9934)\n- Updated key dependencies in the Rust workspace (including `axum`, `tracing`, `globset`, and `tokio-test`). (#9880, #9882, #9883, #9884)\n- Aligned feature stage naming with public maturity stages and added clearer warnings for underdevelopment features. (#9929, #9954)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.91.0...rust-v0.92.0\n\n- #9850 chore: remove extra newline in println @SohailRaoufi\n- #9868 Adjust modes masks @aibrahim-oai\n- #9874 Prompt @aibrahim-oai\n- #9877 Plan prompt @aibrahim-oai\n- #9718 feat(tui) /personality @dylan-hurd-oai\n- #9871 chore(core) move model_instructions_template config @dylan-hurd-oai\n- #9539 feat: dynamic tools injection @jif-oai\n- #9818 feat: rebase multi-agent tui on `config_snapshot` @jif-oai\n- #9789 Fix flakey resume test @gt-oai\n- #9784 Fix flakey conversation flow test @gt-oai\n- #9918 feat: explorer collab @jif-oai\n- #9899 feat: disable collab at max depth @jif-oai\n- #9916 Fix up config disabled err msg @gt-oai\n- #9890 Feat: add isOther to question returned by request user input tool @shijie-oai\n- #9817 feat: codex exec mapping of collab tools @jif-oai\n- #9919 Fix flakey shell snapshot test @gt-oai\n- #9776 fix: attempt to reduce high cpu usage when using collab @eugeneoden\n- #9928 prompt @aibrahim-oai\n- #9925 chore: update interrupt message @jif-oai\n- #9843 Add thread/unarchive to restore archived rollouts @charley-oai\n- #9929 Aligned feature stage names with public feature maturity stages @etraut-openai\n- #9934 ensure codex bundle zip is created in dist/ @iceweasel-oai\n- #9897 [app-server] feat: add filtering on thread list  @jif-oai\n- #9647 Add MCP server `scopes` config and use it as fallback for OAuth login @blevy-oai\n- #9943 plan prompt @aibrahim-oai\n- #8647 fix: handle utf-8 in windows sandbox logs @davidgilbertson\n- #9891 Add composer config and shared menu surface helpers @aibrahim-oai\n- #9880 chore(deps): bump tracing from 0.1.43 to 0.1.44 in /codex-rs @dependabot\n- #9882 chore(deps): bump tokio-test from 0.4.4 to 0.4.5 in /codex-rs @dependabot\n- #9883 chore(deps): bump axum from 0.8.4 to 0.8.8 in /codex-rs @dependabot\n- #9884 chore(deps): bump globset from 0.4.16 to 0.4.18 in /codex-rs @dependabot\n- #9901 fix: remove cli tooltip references to custom prompts @mattridley\n- #9823 fix: use `brew upgrade --cask codex` to avoid warnings and ambiguity @JBallin\n- #9951 fix: try to fix freezes 2 @jif-oai\n- #9955 Reject request_user_input outside Plan/Pair @charley-oai\n- #9933 Updated contribution guidelines @etraut-openai\n- #9892 Reuse ChatComposer in request_user_input overlay @aibrahim-oai\n- #9957 NIT larger buffer @jif-oai\n- #9953 feat: load interface metadata from SKILL.json @alexsong-oai\n- #9954 Warn users on enabling underdevelopment features @aibrahim-oai\n- #9961 Use test_codex more @pakrym-oai\n- #9960 fix: handle all web_search actions and in progress invocations @sayan-oai\n- #9966 plan prompt v7 @aibrahim-oai\n- #9968 Improve plan mode prompt @aibrahim-oai\n- #9969 prompt final @aibrahim-oai\n- #9475 Fix `resume --last` with `--json` option @etraut-openai\n- #9970 prompt @aibrahim-oai\n- #9975 plan prompt @aibrahim-oai\n- #9974 make cached web_search client-side default @sayan-oai\n- #9971 tui: wrapping user input questions @aibrahim-oai\n- #9977 make plan prompt less detailed @aibrahim-oai\n- #9980 Fixing main and make plan mode reasoning effort medium @aibrahim-oai\n- #9759 Fix: cap aggregated exec output consistently @Kbediako"
+  },
+  "summary": {
+    "changes": 3,
+    "categories": {
+      "config": 2,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 1
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "tools.web_search",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "web_search"
+      ],
+      "title": "New tool: web_search",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "name": "web_search",
+        "sha256": "1d9c991fc239fc9a65f2aeb94fa317263f3d05be9abd863185c170988db53bff",
+        "type": "web_search"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 682,
+            "url": "https://github.com/openai/codex/blob/rust-v0.92.0/codex-rs/cli/src/main.rs#L682"
+          },
+          {
+            "path": "codex-rs/core/src/client_common.rs",
+            "line": 176,
+            "url": "https://github.com/openai/codex/blob/rust-v0.92.0/codex-rs/core/src/client_common.rs#L176"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.scopes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.scopes"
+      ],
+      "title": "New setting: mcp_servers.<name>.scopes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 173,
+            "url": "https://github.com/openai/codex/blob/rust-v0.92.0/codex-rs/core/src/config/edit.rs#L173"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 354,
+            "url": "https://github.com/openai/codex/blob/rust-v0.92.0/codex-rs/cli/src/mcp_cmd.rs#L354"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.suppress_unstable_features_warning",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "suppress_unstable_features_warning"
+      ],
+      "title": "New setting: suppress_unstable_features_warning",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Suppress warnings about unstable (under development) features.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

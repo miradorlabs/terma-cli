@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "from": "1.19.3",
+  "to": "1.19.4",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/anomalyco/opencode/compare/v1.19.3...v1.19.4"
+  },
+  "changelog": {
+    "url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.4",
+    "text": "## Core\n\n### Improvements\n- Upgraded the bundled Bun runtime to 1.4.4, which includes [security fixes](https://bun.com/blog/bun-v1.4.4#security) for Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, and `fetch`, and updates root certificates to NSS 3.131.1."
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

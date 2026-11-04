@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.275",
+  "to": "2.1.276",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Fixed every request failing with `400 … Input tag 'advisor_20260301'` when `ANTHROPIC_BASE_URL` points at a proxy or gateway (2.1.275 regression)"
+  },
+  "summary": {
+    "changes": 2,
+    "categories": {
+      "behavior": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 2
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "behavior.compaction_command.tools",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "tools"
+      ],
+      "title": "Behaviour: compaction_command tools changed: 25 → 24",
+      "impact": "notable",
+      "before": 25,
+      "after": 24,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.tools.advisor",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "advisor"
+      ],
+      "title": "Behaviour: subagents tools advisor removed",
+      "impact": "notable",
+      "before": "advisor",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

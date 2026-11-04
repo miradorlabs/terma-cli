@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "dsh",
+    "name": "DeepSeek Harness",
+    "vendor": "DeepSeek",
+    "homepage": "https://github.com/deepseek-ai/deepseek-harness",
+    "source": {
+      "repo": "deepseek-ai/deepseek-harness",
+      "url": "https://github.com/deepseek-ai/deepseek-harness",
+      "language": "typescript"
+    },
+    "changelog": "https://github.com/deepseek-ai/deepseek-harness/releases",
+    "latest": "0.2.1-rc.5",
+    "support": "supported",
+    "versions_tracked": 3,
+    "first_tracked": "2026-09-29",
+    "last_change": {
+      "from": "0.2.1-rc.2",
+      "to": "0.2.1-rc.5",
+      "at": "2026-11-04T16:16:16.239171Z",
+      "released_at": "2026-10-29T14:15:23.355Z",
+      "changes": 0,
+      "categories": {}
+    }
+  },
+  "versions": [
+    {
+      "version": "0.2.1-rc.5",
+      "released_at": "2026-10-29T14:15:23.355Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.1-rc.2",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.2.1-rc.2",
+      "released_at": "2026-10-17T08:36:31.655Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.0-rc.2",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.2.0-rc.2",
+      "released_at": "2026-09-29T09:56:27.792Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    }
+  ]
+}

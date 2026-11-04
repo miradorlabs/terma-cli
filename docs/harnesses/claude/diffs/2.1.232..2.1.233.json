@@ -1,0 +1,972 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.232",
+  "to": "2.1.233",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added GitLab merge request URL support to the `--worktree` flag and the `claude agents` view (where MRs display as `!N`)\n- Added an opt-in `forward_user_identity` apps gateway setting on Anthropic upstreams that sends the signed-in user's identity as headers, so a proxy behind the gateway can attribute spend per user\n- Added opt-in memory cgroup support for Bash tool commands on Linux (`CLAUDE_CODE_TOOL_MEMORY_LIMIT`) so a runaway build can't stall the session\n- Added `CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS` environment variable to configure the WebFetch session URL cache TTL (default unchanged: 15 minutes)\n- Fixed cloud sessions occasionally being marked as lost when the environment shut down while Claude was waiting on a permission prompt\n- Fixed MCP v2 connections endlessly reopening the subscriptions/listen stream against servers that terminate long-held streams on a fixed timeout (e.g. serverless hosts)\n- Fixed Notification hooks not firing for permission prompts when running under Claude Desktop or VS Code\n- Fixed idle sessions on Linux sometimes keeping one CPU core at 100% when sandboxing is enabled\n- Fixed bundled skill aliases like `/checkup` and `/review` reporting \"Unknown command\" in `-p` mode or with plugins/MCP loaded when a user or project skill shadows the bundled skill\n- Fixed skill/command argument substitution to prevent argument values from being re-expanded as template markers\n- Fixed Windows paths spelled with the NT `\\??\\` device prefix bypassing UNC path validation, closing an NTLM credential-leak vector\n- Improved `claude self-hosted-runner` session start time: the session branch is now created without rewriting the working tree, and two server round trips no longer block the agent's launch\n- Improved apps gateway error forwarding: 400/413 errors from Vertex, Foundry, and Claude Platform on AWS upstreams now carry the upstream's own message; fixes a bug with auto-compact on apps gateway\n- Improved `claude plugin validate` to check a bare `.claude/skills` directory, reporting SKILL.md files whose frontmatter fails to parse\n- Improved screen reader mode: the `/effort` selector renders as a numbered list with a typed-number prompt, and hint and dialog text is no longer clipped\n- Improved print mode diagnostics: a `[claude-code:unrecognized_model]` line is written to stderr when a request goes out for a model ID Claude Code doesn't recognize; map it with `modelOverrides` to silence\n- Changed the GitHub app setup tip to no longer appear in repositories whose origin remote is on gitlab.com or bitbucket.org; the enterprise marketplace tip now covers non-GitHub internal git hosts\n- Todo/task-tracking tools (TaskCreate/Get/Update/List, TodoWrite) are no longer available on Opus 4.8, Sonnet 5, Fable 5, Mythos 5, and newer models; set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` to bring them back\n- Windows: fixed auto mode repeatedly stopping for manual approval on ordinary `cd <dir> && <command> > file` Bash commands (a 2.1.232 regression)\n- Reverted the 2.1.232 Bash permission changes for Cygwin-style symlinks on Windows and for input redirections (`< file`); a narrower version will return in a later release"
+  },
+  "summary": {
+    "changes": 41,
+    "categories": {
+      "behavior": 1,
+      "cli": 2,
+      "config": 9,
+      "hooks": 17,
+      "prompt": 8,
+      "tools": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 12,
+      "notable": 29
+    },
+    "undocumented": 34
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+49 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -41,3 +41,5 @@\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n+\n+<total_tokens>15000000 tokens left</total_tokens>\n",
+      "stats": {
+        "added_chars": 49,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+934 −732 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Available agent types for the Agent tool:\n - claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n-- claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`.\n+- claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI, early-access enablement) and the `/skill-doctor` report.\n **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.\n (Tools: Bash, Read, WebFetch, WebSearch)\n - Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps.\n@@ -46,3 +46,5 @@\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n+\n+<total_tokens>15000000 tokens left</total_tokens>\n",
+      "stats": {
+        "added_chars": 934,
+        "removed_chars": 732
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+49 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -110,6 +110,8 @@\n Do not call the AgentTool unless the user requested it\n Do not use workflows or deep-research unless the user requested it\n \n+<total_tokens>15000000 tokens left</total_tokens>\n+\n gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n Current branch: main\n",
+      "stats": {
+        "added_chars": 49,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.tools.TaskCreate",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "TaskCreate"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "TaskCreate",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.tools.TaskGet",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "TaskGet"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "TaskGet",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.tools.TaskList",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "TaskList"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "TaskList",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.tools.TaskUpdate",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "TaskUpdate"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "TaskUpdate",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+49 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -109,6 +109,8 @@\n Do not call the AgentTool unless the user requested it\n Do not use workflows or deep-research unless the user requested it\n \n+<total_tokens>15000000 tokens left</total_tokens>\n+\n gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n Current branch: main\n",
+      "stats": {
+        "added_chars": 49,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.TaskCreate",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "TaskCreate"
+      ],
+      "title": "Tool removed: TaskCreate",
+      "impact": "notable",
+      "before": {
+        "description": "Use this tool to create a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.\nIt also helps the user understand the progress of the task and overall progress of their requests.\n\n## When to Use This Tool\n\nUse this tool proactively in these scenarios:\n\n- Complex multi-step tasks - When a task requires 3 or more distinct steps or actions\n- Non-trivial and complex tasks - Tasks that require careful planning or multiple operations\n- Plan mode - When using plan mode, create a task list to track the work\n- User explicitly requests todo list - When the user directly asks you to use the todo list\n- User provides multiple tasks - When users provide a list of things to be done (numbered or comma-separated)\n- After receiving new instructions - Immediately capture user requirements as tasks\n- When you start working on a task - Mark it as in_progress BEFORE beginning work\n- After completing a task - Mark it as completed and add any new follow-up tasks discovered during implementation\n\n## When NOT to Use This Tool\n\nSkip using this tool when:\n- There is only a single, straightforward task\n- The task is trivial and tracking it provides no organizational benefit\n- The task can be completed in less than 3 trivial steps\n- The task is purely conversational or informational\n\nNOTE that you should not use this tool if there is only one trivial task to do. In this case you are better off just doing the task directly.\n\n## Task Fields\n\n- **subject**: A brief, actionable title in imperative form (e.g., \"Fix authentication bug in login flow\")\n- **description**: What needs to be done\n- **activeForm** (optional): Present continuous form shown in the spinner when the task is in_progress (e.g., \"Fixing authentication bug\"). If omitted, the spinner shows the subject instead.\n\nAll tasks are created with status `pending`.\n\n## Tips\n\n- Create tasks with clear, specific subjects that describe the outcome\n- After creating tasks, use TaskUpdate to set up dependencies (blocks/blockedBy) if needed\n- Check TaskList first to avoid creating duplicate tasks\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "activeForm": {
+              "description": "Present continuous form shown in spinner when in_progress (e.g., \"Running tests\")",
+              "type": "string"
+            },
+            "description": {
+              "description": "What needs to be done",
+              "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": {},
+              "description": "Arbitrary metadata to attach to the task",
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "subject": {
+              "description": "A brief title for the task",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subject",
+            "description"
+          ],
+          "type": "object"
+        },
+        "name": "TaskCreate",
+        "sha256": "33749aa1759968fd3e3d70419e7a5c71d46f8dd78b7cab3f73b33ec3662826d3"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.TaskGet",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "TaskGet"
+      ],
+      "title": "Tool removed: TaskGet",
+      "impact": "notable",
+      "before": {
+        "description": "Use this tool to retrieve a task by its ID from the task list.\n\n## When to Use This Tool\n\n- When you need the full description and context before starting work on a task\n- To understand task dependencies (what it blocks, what blocks it)\n- After being assigned a task, to get complete requirements\n\n## Output\n\nReturns full task details:\n- **subject**: Task title\n- **description**: Detailed requirements and context\n- **status**: 'pending', 'in_progress', or 'completed'\n- **blocks**: Tasks waiting on this one to complete\n- **blockedBy**: Tasks that must complete before this one can start\n\n## Tips\n\n- After fetching a task, verify its blockedBy list is empty before beginning work.\n- Use TaskList to see all tasks in summary form.\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "taskId": {
+              "description": "The ID of the task to retrieve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "taskId"
+          ],
+          "type": "object"
+        },
+        "name": "TaskGet",
+        "sha256": "48fc8f8b9d065eba687d0e4334db180d60744e4fba9614d447b8bc1c3e2493a6"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.TaskList",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "TaskList"
+      ],
+      "title": "Tool removed: TaskList",
+      "impact": "notable",
+      "before": {
+        "description": "Use this tool to list all tasks in the task list.\n\n## When to Use This Tool\n\n- To see what tasks are available to work on (status: 'pending', no owner, not blocked)\n- To check overall progress on the project\n- To find tasks that are blocked and need dependencies resolved\n- After completing a task, to check for newly unblocked work or claim the next available task\n- **Prefer working on tasks in ID order** (lowest ID first) when multiple tasks are available, as earlier tasks often set up context for later ones\n\n## Output\n\nReturns a summary of each task:\n- **id**: Task identifier (use with TaskGet, TaskUpdate)\n- **subject**: Brief description of the task\n- **status**: 'pending', 'in_progress', or 'completed'\n- **owner**: Agent ID if assigned, empty if available\n- **blockedBy**: List of open task IDs that must be resolved first (tasks with blockedBy cannot be claimed until dependencies resolve)\n\nUse TaskGet with a specific task ID to view full details including description and comments.\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "name": "TaskList",
+        "sha256": "315dd2f40c1cdcd0665a9d397385db9bc61a8e47136bb1c96e89c54f6283348b"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.TaskUpdate",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "TaskUpdate"
+      ],
+      "title": "Tool removed: TaskUpdate",
+      "impact": "notable",
+      "before": {
+        "description": "Use this tool to update a task in the task list.\n\n## When to Use This Tool\n\n**Mark tasks as resolved:**\n- When you have completed the work described in a task\n- When a task is no longer needed or has been superseded\n- IMPORTANT: Always mark your assigned tasks as resolved when you finish them\n- After resolving, call TaskList to find your next task\n\n- ONLY mark a task as completed when you have FULLY accomplished it\n- If you encounter errors, blockers, or cannot finish, keep the task as in_progress\n- When blocked, create a new task describing what needs to be resolved\n- Never mark a task as completed if:\n  - Tests are failing\n  - Implementation is partial\n  - You encountered unresolved errors\n  - You couldn't find necessary files or dependencies\n\n**Delete tasks:**\n- When a task is no longer relevant or was created in error\n- Setting status to `deleted` permanently removes the task\n\n**Update task details:**\n- When requirements change or become clearer\n- When establishing dependencies between tasks\n\n## Fields You Can Update\n\n- **status**: The task status (see Status Workflow below)\n- **subject**: Change the task title (imperative form, e.g., \"Run tests\")\n- **description**: Change the task description\n- **activeForm**: Present continuous form shown in spinner when in_progress (e.g., \"Running tests\")\n- **owner**: Change the task owner (agent name)\n- **metadata**: Merge metadata keys into the task (set a key to null to delete it)\n- **addBlocks**: Mark tasks that cannot start until this one completes\n- **addBlockedBy**: Mark tasks that must complete before this one can start\n\n## Status Workflow\n\nStatus progresses: `pending` → `in_progress` → `completed`\n\nUse `deleted` to permanently remove a task.\n\n## Staleness\n\nMake sure to read a task's latest state using `TaskGet` before updating it.\n\n## Examples\n\nMark task as in progress when starting work:\n```json\n{\"taskId\": \"1\", \"status\": \"in_progress\"}\n```\n\nMark task as completed after finishing work:\n```json\n{\"taskId\": \"1\", \"status\": \"completed\"}\n```\n\nDelete a task:\n```json\n{\"taskId\": \"1\", \"status\": \"deleted\"}\n```\n\nClaim a task by setting owner:\n```json\n{\"taskId\": \"1\", \"owner\": \"my-name\"}\n```\n\nSet up task dependencies:\n```json\n{\"taskId\": \"2\", \"addBlockedBy\": [\"1\"]}\n```\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "activeForm": {
+              "description": "Present continuous form shown in spinner when in_progress (e.g., \"Running tests\")",
+              "type": "string"
+            },
+            "addBlockedBy": {
+              "description": "Task IDs that block this task",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "addBlocks": {
+              "description": "Task IDs that this task blocks",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "description": "New description for the task",
+              "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": {},
+              "description": "Metadata keys to merge into the task. Set a key to null to delete it.",
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "owner": {
+              "description": "New owner for the task",
+              "type": "string"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "in_progress",
+                    "completed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "const": "deleted",
+                  "type": "string"
+                }
+              ],
+              "description": "New status for the task"
+            },
+            "subject": {
+              "description": "New subject for the task",
+              "type": "string"
+            },
+            "taskId": {
+              "description": "The ID of the task to update",
+              "type": "string"
+            }
+          },
+          "required": [
+            "taskId"
+          ],
+          "type": "object"
+        },
+        "name": "TaskUpdate",
+        "sha256": "767f19e1b6bca1adb0a661fb6bdf8f3d2927321075a0fb63801a379784f5fbbc"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction_command.tools",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "tools"
+      ],
+      "title": "Behaviour: compaction_command tools changed: 28 → 24",
+      "impact": "notable",
+      "before": 28,
+      "after": 24,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.message",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.message"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.message removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.message",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.status",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.status"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.status removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.status",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude plugin validate.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude plugin validate",
+        "description"
+      ],
+      "title": "Description of `claude plugin validate` changed",
+      "impact": "informational",
+      "before": "Validate a plugin or marketplace manifest",
+      "after": "Validate a plugin or marketplace manifest, or the skills, agents, and commands in a directory",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.plugin --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "plugin --help"
+      ],
+      "title": "Full help text of `plugin --help` changed (+208 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -35,5 +35,7 @@\n   uninstall|remove [options] <plugin>  Uninstall an installed plugin\n   update [options] <plugin>            Update a plugin to the latest version\n                                        (restart required to apply)\n-  validate [options] <path>            Validate a plugin or marketplace manifest\n+  validate [options] <path>            Validate a plugin or marketplace\n+                                       manifest, or the skills, agents, and\n+                                       commands in a directory\n \n",
+      "stats": {
+        "added_chars": 208,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.totalTokensReminderAfterUserTurn.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminderAfterUserTurn",
+        "description"
+      ],
+      "title": "totalTokensReminderAfterUserTurn description changed (+15 −16 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n @internal When true, emit the totalTokensReminder block after each regular user prompt and (for 'padded-countdown') re-anchor the task budget to the full configured value at the start of each user turn.\n When false, the reminder appears only in the system prompt and after each tool-result batch, and 'padded-countdown' counts down over the whole session.\n-Defaults to off.\n+Defaults to on.\n Env var CLAUDE_CODE_TOTAL_TOKENS_REMINDER_AFTER_USER_TURN overrides; server-controlled via GrowthBook tengu_lapis_anchor_user_turn.\n",
+      "stats": {
+        "added_chars": 15,
+        "removed_chars": 16
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_AX_PREPARK_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_AX_PREPARK_MS"
+      ],
+      "title": "New environment variable: CLAUDE_AX_PREPARK_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_AX_PREPARK_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_PERMISSION_PROMPT_NOTIFY_HOOKS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_PERMISSION_PROMPT_NOTIFY_HOOKS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_PERMISSION_PROMPT_NOTIFY_HOOKS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_PERMISSION_PROMPT_NOTIFY_HOOKS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_TODO_TOOLS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_TODO_TOOLS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ENABLE_TODO_TOOLS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ENABLE_TODO_TOOLS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_EVAL_INTERVIEW_SESSION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_EVAL_INTERVIEW_SESSION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_EVAL_INTERVIEW_SESSION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_EVAL_INTERVIEW_SESSION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RETIRE_UNANSWERED_PARKED_PERMISSION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RETIRE_UNANSWERED_PARKED_PERMISSION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RETIRE_UNANSWERED_PARKED_PERMISSION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RETIRE_UNANSWERED_PARKED_PERMISSION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SKILL_PROPOSALS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SKILL_PROPOSALS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SKILL_PROPOSALS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SKILL_PROPOSALS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TOOL_MEMORY_LIMIT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TOOL_MEMORY_LIMIT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TOOL_MEMORY_LIMIT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TOOL_MEMORY_LIMIT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

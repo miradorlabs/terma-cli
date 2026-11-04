@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.282",
+  "to": "2.1.283",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `x-claude-code-prompt-id` to the gateway hint headers so LLM gateways can group the requests that serve one user prompt; opt in with `CLAUDE_CODE_GATEWAY_HINT_HEADERS=1`\n- Added `availableModelsMatch` managed setting: with `\"exact\"`, an `availableModels` entry allows only the model version it names, so new releases stay blocked until listed\n- Added `deniedModels` managed setting to block specific models, even when `availableModels` allows them\n- Added MCP tool, WebFetch and WebSearch outputs to the `tool.output` OpenTelemetry span event when `OTEL_LOG_TOOL_CONTENT=1`\n- Added `/doctor prompt-audit` (also `/checkup prompt-audit`) to audit your CLAUDE.md files, skills, agents and commands for prompting patterns written for older models\n- Added click-to-expand for truncated messages from your other sessions in fullscreen mode\n- Added `path` to `--plugin-dir` load-failure entries in the stream-json `system/init` `plugin_errors`, naming the directory that did not load\n- Added an opt-in `load_test_mode` block to the Claude apps gateway config: requests are built and signed but not sent upstream, and clients get a canned reply, so a deployment can be load tested\n- Added a `mantle` upstream provider to the Claude apps gateway for Amazon Bedrock's Mantle endpoint\n- Fixed SDK sessions losing a deferred tool call or finished tool result when a turn ended early, a held approval prompt after a worker restart, and a non-streaming fallback's `result.usage`\n- Fixed MCP progress notifications being discarded once a long-running tool call moved to the background; the background task now shows the latest progress\n- Fixed stdio MCP servers being left running when the session ended while they were still starting\n- Fixed a brief HTTP 404 from a stateless remote MCP server (for example a proxy mid-redeploy) leaving that server unusable for the rest of the session while still shown as connected\n- Fixed MCP sign-in for a server with no valid URL failing with an opaque SDK error; `/mcp` no longer offers Authenticate for such servers\n- Fixed the weekly Fable limit not appearing in `/usage` and the VS Code usage meters when telemetry is disabled\n- Fixed `/model` accepting Sonnet 4.6 or Sonnet 5 with `[1m]` when the id carried a date or `-v1:0` suffix, in the cases where the plain id was refused\n- Fixed `/model` picker showing a hardcoded Haiku version and price when `ANTHROPIC_DEFAULT_HAIKU_MODEL` pins a different model\n- Fixed dynamic workflows started during a model fallback running every agent on the fallback model instead of retrying the configured model\n- Fixed `DISABLE_PROMPT_CACHING_HAIKU` having no effect when Haiku is the session's main model\n- Fixed `claude plugin validate` saying Claude Code accepts a plugin or marketplace name it cannot install; such names in `marketplace.json` now fail validation\n- Fixed `claude plugin validate` passing plugins whose `outputStyles`, `themes`, `monitors`, or `lspServers` paths are missing or point outside the plugin directory\n- Fixed `claude plugin details` showing 0 MCP servers for plugins that declare their servers in `plugin.json`\n- Fixed `claude plugin marketplace remove` not saying which installed plugins it uninstalled with the marketplace; it now lists them\n- Fixed `claude plugin uninstall` removing the other of two installed plugins whose ids differ only in case, with its options and secrets, when the one named had no `enabledPlugins` entry at that scope\n- Fixed plugins that declare no version being silently restored at their source's newest commit, not the installed one, when their cached files were missing\n- Fixed user-installed plugins and marketplaces failing to load with \"cache-miss\" after the home or config directory was moved, for example in bind-mounted devcontainers\n- Fixed `installed_plugins.json` showing no plugins when it holds a record under an invalid plugin id; such a file loads again\n- Fixed `installed_plugins.json` being rewritten, losing records, when it holds a record this version cannot read; `claude plugin` commands now name the record and say how to recover\n- Fixed permission dialogs in screen-reader mode reading quoted commands and paths as if they were the dialog's own text\n- Fixed `/context` not counting MCP server instructions: they now appear as their own row and count toward the total\n- Fixed markdown links in the Warp terminal rendering as plain text instead of clickable hyperlinks\n- Fixed `claude mcp add`, `add-json`, and `remove` reporting success when the user or local config file could not be written, for example inside a sandbox\n- Fixed the first words of a reply in a cloud session sometimes appearing late instead of streaming as Claude writes them\n- Fixed Claude's built-in keybindings guide saying chords time out after 1 second instead of 3, and calling `cmd` an alias of `meta`, which could produce `cmd+` shortcuts most terminals never send\n- Fixed `keybindings.json` silently accepting a misspelled modifier such as `ctl+k`; it now warns in the debug log and suggests the fix\n- Fixed footer hints still saying \"Enter to view\" after `footer:openSelected` was rebound or unbound in `keybindings.json`\n- Fixed keys typed quickly together (type-ahead, key repeat, bursts over ssh or tmux) sometimes being handled against stale state\n- Fixed worktree checkouts failing certificate verification (for example on Git LFS downloads) when the CA certificate is passed to git as `GIT_CONFIG_COUNT` environment pairs\n- Fixed sandboxed `git` asking credential helpers to store the sandbox proxy's login, which printed \"failed to store\"\n- Fixed managed `sandbox` settings being ignored entirely when one nested value was invalid; the invalid value now fails closed and the rest of the block still applies\n- Fixed Claude's edits to its own auto-memory notes being blocked as sensitive-file writes when Claude Code was started in a subdirectory of a git repository\n- Fixed Remote Control being unavailable on paid plans when telemetry is turned off with `DISABLE_TELEMETRY` or `DO_NOT_TRACK`\n- Fixed the `/remote-control` menu cutting its QR-code hint mid-word in narrow terminals\n- Fixed vim mode `.` dropping a Shift+Enter newline, leaving the cursor inside an accented letter, and repeating an older change after `3J` or Visual-mode `J` on the last line\n- Fixed vim mode cursor placement: recalling a prompt over 10,000 characters in normal mode no longer leaves the cursor past the end, and `V` then `p` now lands on the first non-blank\n- Fixed vim mode `J` joining lines with different spacing than Vim (such as a space before `)` or after a tab), and `3J` or Visual-mode `J` on the last line not moving the cursor as Vim does\n- Windows: Fixed the PowerShell tool letting `cmd /c rd`, `rmdir`, `del` or `erase` delete drive roots, the home folder and other folders that `Remove-Item` refuses\n- Improved the `/mcp` tool list: it shows more tools at once, scrolls with the page keys and mouse, and marks tools your organization blocked with a warning icon\n- Improved MCP tool results: images returned by MCP tools are now also saved to a file, so Bash, Read and other tools can open them\n- Improved `/tasks`: rows show a status icon, the name and whole facts, the title and key hints stay on screen with many tasks, and the list gains paging keys, the mouse wheel and clicks\n- Improved lists in `/help`, `/hooks`, `/copy`, `/chrome`, `/memory`, `/ide`, `/release-notes`, `/rewind`, `/diff`, `/remote-env`, `/plugin` and other pickers with page keys, mouse wheel and clicks\n- Improved lists beside a search box, such as `/skills` and `/artifacts`, to draw their pointer dim while the search box has the keys, so only one pointer is highlighted\n- Improved the compaction spinner: its timer now starts when compaction begins and it counts the summary's tokens as they stream, replacing the percentage bar\n- Improved the browser page shown after signing in to an MCP server: centered layout, dark mode, and new artwork\n- Improved the Skill tool's reply when a skill belongs to a plugin that failed to load, so Claude tells you the plugin could not be loaded instead of calling the skill uninstalled\n- Improved `prompt-audit` on Claude Code configuration: stale paths, stale commands and contradicting instruction files now lead the report, and thinking keywords that Claude Code documents are kept\n- Improved recovery from an `installed_plugins.json` that cannot be read at all: its contents are kept in a file beside it before it is rebuilt, and `claude plugin list` names that file\n- Improved artifact database reads: an ordered query that returns a full page now says it is one page and how to read the rest\n- Improved first-reply latency: a pattern-compile step that ran at the end of a session's first reply now runs while the reply streams in\n- Improved first-request latency by reusing the preconnected API connection\n- Improved startup: `claude -p` and Claude Code Remote no longer load the interactive UI, and the auto-mode classifier's rules and the Artifact tool load on first use instead of at launch\n- Improved startup for claude.ai accounts whose Artifact tool features aren't known yet, as on a first run: the prompt no longer waits up to 1.5 s to check them; the first message waits if needed\n- Changed interactive sessions on third-party providers or with telemetry off to start in auto mode when no permission mode is configured; `permissions.defaultMode` still overrides it\n- Changed the `/ultrareview` launch dialog to say that reviewing a local branch may upload uncommitted changes to tracked files\n- Changed the `/model` picker's Opus row and the Default model's name to drop \"(1M context)\" where Opus already has a 1M context window; the window is unchanged\n- Changed prompt suggestions in the terminal to appear less often after 20 in a row go unused; using one brings them back\n- Changed `--system-prompt` and `--append-system-prompt` to accept their text and `-file` forms together; the file's text comes first\n- Changed `Skill(anthropic-skills:<name>)` deny rules to also block that skill when Claude Desktop delivers it as a plugin, and `Skill(skill:<name>)` denies to match the skill's alias and display name\n- Changed `/rewind` and `/diff` lists to move on the same keybinding actions as every other list (`select:*`); `messageSelector:*`/`diff:*` rebinds still work\n- Changed the `/workflows` run list to size itself like other lists: half the terminal inline, and it keeps its title on screen when the prompt shows below\n- Changed `claude plugin eval` to require git 2.31 or later when git is installed; a run on an older git is refused with a message naming the version\n- Changed artifact watching: a watch that was armed automatically (not one you asked for) now ends after 3.5 hours with no activity; publishing or watching the artifact again re-arms it\n- Self-hosted runner: Changed lifecycle hooks' git to skip a repository's Git LFS `pre-push` hook, ignore a writable system `core.hooksPath`, and not sign commits without `--configure-git`\n- Self-hosted runner: Changed `GIT_SSL_CAINFO` and `GIT_SSL_NO_VERIFY` under Anthropic-managed git: the runner's own git always verifies Anthropic's git route, and warning lines say what applies where\n- Reverted the 2.1.282 reservation of the `claude-ai` name: skills, commands, workflows and MCP servers' skills and prompts so named load again, and `Skill(claude-ai:*)` rules are ordinary prefix rules\n- [VSCode] Fixed the permission mode indicator showing Default while the session kept running in auto or bypass mode after an automatic switch out of it failed; the switch is now retried until it lands\n- [VSCode] Fixed a session teleported from the web dropping the messages sent while Claude was working\n- [VSCode] Fixed a Web session staying hidden from the session list, and an empty chat opening in its place, when an older version had saved an empty local copy of it\n- [VSCode] Fixed a reopened session splitting a turn at a message Claude received mid-turn, such as an automatic continuation\n- [VSCode] Fixed a reloaded session showing a rewound-away turn, or only the rows before a compaction\n- [VSCode] Fixed the footer's agents pill drawing its icon off-center, with the status dot against the edge, in narrow panels\n- [VSCode] Fixed the chat input showing its text slightly below the cursor and selection after pasting lines that end with a line break into a long prompt\n- [Cloud sessions] Improved adding a repository to a running cloud session: a private repository your GitHub account can read but not push to now attaches for reading\n- [Cloud sessions] Fixed cloud sessions occasionally redoing an already-finished step, such as posting a duplicate comment or push, after recovering from a server-side restart\n- [Cloud sessions] Changed new routine schedules to default to a few minutes past the hour, with a note that routines set exactly on the hour can start several minutes late\n- [Claude Tag] Added a \"Channels Claude can search\" admin setting that limits Claude's Slack search to public channels it has been added to, set per organization, workspace or channel\n- [Claude Tag] Added a Back to Slack button on the page shown after connecting your Claude account, returning you to the thread you started from\n- [Claude Tag] Fixed a channel's configure page listing no connectors or plugins when the channel gets its access bundle through an attach rule; rule-attached bundles are now shown\n- [Claude Tag] Fixed access-bundle repository search missing repositories on GitHub App installs that are limited to a large list of selected repositories\n- [Claude Tag] Fixed Claude occasionally posting the same reply twice when a new message interrupted it mid-reply\n- [Claude Tag] Fixed channel routines that stopped running in older private channels whose Slack channel ID changed, for example after a Slack Connect share\n- [Claude Tag] Fixed conversations in a channel set to \"Channel only\" all ending when a non-guest member joined and Slack was slow to confirm their membership\n- [Code Review] Fixed \"@claude review\" requests going silent when GitHub failed to return the pull request: the request is retried once, and a comment explains if it still fails\n- [Code Review] Fixed billing for a review that stopped at its time limit with nothing verified: it now shows as incomplete, isn't charged, and is retried once"
+  },
+  "summary": {
+    "changes": 18,
+    "categories": {
+      "cli": 2,
+      "config": 15,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 16,
+      "notable": 2
+    },
+    "undocumented": 12
+  },
+  "changes": [
+    {
+      "id": "prompt.interactive.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+476 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -63,6 +63,11 @@\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n \n+While auto mode is active:\n+\n+You can do much of your work through the Bash tool when it is the simpler route: read files with cat, head, or sed -n, search with grep and find, and make small, mechanical file changes with sed, heredocs, or short scripts instead of the dedicated Read, Edit, or Write tools.\n+The choice is yours: prefer Edit or Write when a shell edit would be fragile, such as exact or multi-line replacements, or sed/awk flags that differ between GNU and BSD/macOS.\n+\n <total_tokens>15000000 tokens left</total_tokens>\n \n Today's date is <date>.\n",
+      "stats": {
+        "added_chars": 476,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--client-data-url",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--client-data-url"
+      ],
+      "title": "New flag `claude --client-data-url`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "URL for a signed configuration document. Claude Code exits if it cannot load it or it does not cover the selected model. Setting CLAUDE_CODE_CLIENT_DATA_URL instead keeps the URL out of the process list",
+        "names": [
+          "--client-data-url"
+        ],
+        "value": "<url>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+437 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -61,6 +61,12 @@\n   --brief                               Enable SendUserMessage tool for\n                                         agent-to-user communication\n   --chrome                              Enable Claude in Chrome integration\n+  --client-data-url <url>               URL for a signed configuration document.\n+                                        Claude Code exits if it cannot load it\n+                                        or it does not cover the selected model.\n+                                        Setting CLAUDE_CODE_CLIENT_DATA_URL\n+                                        instead keeps the URL out of the process\n+                                        list\n   --cloud [description|session_id|url]  Create a cloud session with the given\n                                         description, or attach to an existing\n                                         one by session ID or claude.ai/code URL\n",
+      "stats": {
+        "added_chars": 437,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.availableModels.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "availableModels",
+        "description"
+      ],
+      "title": "availableModels description changed (+210 −132 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n Allowlist of models that users can select.\n-Accepts family aliases (\"opus\" allows any opus version), version prefixes (\"opus-4-5\" allows only that version), and full model IDs.\n+Accepts family aliases (\"opus\" allows any opus version), version prefixes (\"opus-4-5\" allows that version and any model ID that extends it, so \"claude-opus-5\" also allows \"claude-opus-5-5\"), and full model IDs.\n If undefined, all models are available.\n If empty array, only the default model is available.\n Typically set in managed settings by enterprise administrators.\n",
+      "stats": {
+        "added_chars": 210,
+        "removed_chars": 132
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.availableModelsMatch",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "availableModelsMatch"
+      ],
+      "title": "New setting: availableModelsMatch",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "How availableModels entries match model IDs. \"prefix\" (the default) lets an entry also allow any model ID that extends it, so \"claude-opus-5\" allows \"claude-opus-5-5\". \"exact\" keeps that matching but stops a model ID entry from allowing other versions: \"claude-opus-5\" allows Opus 5 and its dated and -fast IDs, but not Opus 5.5 or a later release until it is listed, and a -latest ID needs a -latest entry. Family aliases (\"opus\") still allow the whole family; aliases whose model depends on the release or settings (best, opusplan, default) are ignored. With \"exact\" and a list that names at least one model, the Default option also uses only a listed model; if none can be used, Claude Code will not start. Haiku background models, and hooks and other helper requests that pick their own model, are not restricted (deniedModels covers them; allowManagedHooksOnly limits hooks). Read from managed settings only.",
+        "enum": [
+          "prefix",
+          "exact"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.deniedModels",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "deniedModels"
+      ],
+      "title": "New setting: deniedModels",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Models users cannot select, even when availableModels allows them. A family alias (\"opus\") blocks that family. A model ID blocks that version in every spelling: dates, -fast and provider prefixes are ignored, so \"claude-opus-5-5\" blocks every Opus 5.5 ID but not Opus 5. An ID with no minor version (\"claude-opus-5\") also blocks later minor versions, as it allows them in availableModels. Aliases whose model depends on the release or settings (best, opusplan, default) are ignored. The Default option steps down past a blocked model; if the Default has no allowed model to step down to, Claude Code will not start. Read from managed settings only.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AGENT_PROXY_GIT_HOSTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AGENT_PROXY_GIT_HOSTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AGENT_PROXY_GIT_HOSTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AGENT_PROXY_GIT_HOSTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CLIENT_DATA_URL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CLIENT_DATA_URL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CLIENT_DATA_URL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CLIENT_DATA_URL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_CMD_RM_DENY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_POWERSHELL_CMD_RM_DENY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_POWERSHELL_CMD_RM_DENY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_POWERSHELL_CMD_RM_DENY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MEMORY_SUBAGENT_APPEND",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MEMORY_SUBAGENT_APPEND"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MEMORY_SUBAGENT_APPEND",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MEMORY_SUBAGENT_APPEND",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_CALLER_SESSIONS_MAX",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_TOOLS_CALLER_SESSIONS_MAX"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_CALLER_SESSIONS_MAX",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_TOOLS_CALLER_SESSIONS_MAX",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_FORWARD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_TOOLS_FORWARD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_FORWARD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_TOOLS_FORWARD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_PIN_STORED_LOGIN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_TOOLS_PIN_STORED_LOGIN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_PIN_STORED_LOGIN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_TOOLS_PIN_STORED_LOGIN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WORKER_CHECKIN_SCHEDULE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WORKER_CHECKIN_SCHEDULE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WORKER_CHECKIN_SCHEDULE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WORKER_CHECKIN_SCHEDULE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DIR_SYNC_CHAIN",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DIR_SYNC_CHAIN"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_DIR_SYNC_CHAIN",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_DIR_SYNC_CHAIN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WEBSEARCH_CCR_PROXY_FAST",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WEBSEARCH_CCR_PROXY_FAST"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_WEBSEARCH_CCR_PROXY_FAST",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_WEBSEARCH_CCR_PROXY_FAST",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

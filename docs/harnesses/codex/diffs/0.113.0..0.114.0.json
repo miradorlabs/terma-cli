@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.113.0",
+  "to": "0.114.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.113.0...rust-v0.114.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.114.0",
+    "text": "## New Features\n- Added an experimental code mode for more isolated coding workflows. (#13418)\n- Added an experimental hooks engine with `SessionStart` and `Stop` hook events. (#13276)\n- WebSocket app-server deployments now expose `GET /readyz` and `GET /healthz` on the same listener for easier health checks. (#13782)\n- Added a config switch to disable bundled system skills entirely. (#13792)\n- Handoffs now carry realtime transcript context, which improves continuity when work is transferred between turns. (#14132)\n- Improved the `$` mention picker by clearly labeling Skills, Apps, and Plugins, and by surfacing plugins first. (#14147, #14163)\n\n## Bug Fixes\n- Fixed a Linux `tmux` crash caused by concurrent user-shell lookups. (#13900)\n- Fixed apps being enabled in unsupported sessions by tightening the enablement check. (#14011)\n- Fixed reopened threads getting stuck as in-progress after quitting mid-run and then resuming later. (#14125)\n- Fixed permission handling so legacy `workspace-write` behavior is preserved and newer permission profiles degrade more safely on older builds. (#13957, #14107)\n- Fixed approval flows so granted permissions persist across turns, work with reject-style configs, and are honored by `apply_patch`. (#14009, #14055, #14118, #14165)\n\n## Chores\n- Laid the groundwork for the Python SDK’s generated v2 schema types and pinned platform-specific runtime binaries. (#13953)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.113.0...rust-v0.114.0\n\n- #14009 feat(core) Persist request_permission data across turns @dylan-hurd-oai\n- #14136 fix(core): use dedicated types for responsesapi web search tool config @owenlin0\n- #13782 codex-rs/app-server: add health endpoints for --listen websocket server @maxj-oai\n- #14055 fix(core) RequestPermissions + ApplyPatch @dylan-hurd-oai\n- #14118 feat(approvals) RejectConfig for request_permissions @dylan-hurd-oai\n- #13957 fix(protocol): preserve legacy workspace-write semantics @viyatb-oai\n- #14107 fix: keep permissions profiles forward compatible @viyatb-oai\n- #14147 make dollar-mention always clarify item category (skill, app, plugin) @sayan-oai\n- #14152 Refactor tool output into trait implementations @pakrym-oai\n- #14163 sort plugins first in  menu @sayan-oai\n- #13418 Add code_mode experimental feature @pakrym-oai\n- #13276 start of hooks engine @eternal-openai\n- #14135 tui: only show fast status for gpt-5.4 @pash-openai\n- #14157 Enforce single tool output type in codex handlers @pakrym-oai\n- #14165 fix(core) default RejectConfig.request_permissions @dylan-hurd-oai\n- #14167 Export tools module into code mode runner @pakrym-oai\n- #13792 feat: support disabling bundled system skills @xl-openai\n- #14169 Move exec command truncation into ExecCommandToolOutput @pakrym-oai\n- #14011 [apps] Fix apps enablement condition. @mzeng-openai\n- #14000 Delay pending cleanup until task aborts @aibrahim-oai\n- #12296 Implemented thread-level atomic elicitation counter for stopwatch pausing @cconger\n- #14132 Use realtime transcript for handoff context @aibrahim-oai\n- #13879 Stabilize incomplete SSE retry test @aibrahim-oai\n- #14184 Fix unified exec test output assertion @aibrahim-oai\n- #14002 Stabilize websocket test server binding @aibrahim-oai\n- #13939 Stabilize app-server notify initialize test @aibrahim-oai\n- #13953 python-sdk: generated type foundation (all v2 schemas) @shaqayeq-oai\n- #13603 Fix release-mode integration test compiler failure @etraut-openai\n- #13900 Fix Linux tmux segfault in user shell lookup @etraut-openai\n- #13901 Log ChatGPT user ID for feedback tags @etraut-openai\n- #14183 Expose strongly-typed result for exec_command @pakrym-oai\n- #14003 Stabilize split PTY output on Windows @aibrahim-oai\n- #14229 Reuse McpToolOutput in McpHandler @pakrym-oai\n- #14125 Mark incomplete resumed turns interrupted when idle @guinness-oai"
+  },
+  "summary": {
+    "changes": 10,
+    "categories": {
+      "config": 8,
+      "hooks": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 7,
+      "notable": 3
+    },
+    "undocumented": 3
+  },
+  "changes": [
+    {
+      "id": "hooks.supported.SessionStart",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "SessionStart"
+      ],
+      "title": "New hook event: SessionStart",
+      "impact": "notable",
+      "before": null,
+      "after": "SessionStart",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec/src/event_processor_with_human_output.rs",
+            "line": 990,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/exec/src/event_processor_with_human_output.rs#L990"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/config.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/hooks/src/engine/config.rs#L11"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.supported.Stop",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "Stop"
+      ],
+      "title": "New hook event: Stop",
+      "impact": "notable",
+      "before": null,
+      "after": "Stop",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec/src/event_processor_with_human_output.rs",
+            "line": 991,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/exec/src/event_processor_with_human_output.rs#L991"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/config.rs",
+            "line": 13,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/hooks/src/engine/config.rs#L13"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.approval_policy.reject.request_permissions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approval_policy.reject.request_permissions"
+      ],
+      "title": "New setting: approval_policy.reject.request_permissions",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "default": false,
+        "description": "Reject approval prompts related to built-in permission requests.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 615,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/features.rs#L615"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 1167,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/tools/spec.rs#L1167"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.code_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode"
+      ],
+      "title": "New setting: features.code_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 542,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/features.rs#L542"
+          },
+          {
+            "path": "codex-rs/core/src/tools/code_mode.rs",
+            "line": 277,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/tools/code_mode.rs#L277"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.codex_hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.codex_hooks"
+      ],
+      "title": "New setting: features.codex_hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 621,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/features.rs#L621"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.skills.bundled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "skills.bundled"
+      ],
+      "title": "New setting: skills.bundled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.skills.bundled.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "skills.bundled.enabled"
+      ],
+      "title": "New setting: skills.bundled.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": true,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 461,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/cli/src/mcp_cmd.rs#L461"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 699,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/cli/src/mcp_cmd.rs#L699"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CODEX_E2E_MODEL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_E2E_MODEL"
+      ],
+      "title": "New environment variable: CODEX_E2E_MODEL",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_E2E_MODEL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 272,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/app-server-test-client/src/lib.rs#L272"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COMSPEC",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "COMSPEC"
+      ],
+      "title": "New environment variable: COMSPEC",
+      "impact": "informational",
+      "before": null,
+      "after": "COMSPEC",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/hooks/src/engine/command_runner.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/hooks/src/engine/command_runner.rs#L122"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/utils.rs",
+            "line": 112,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/rmcp-client/src/utils.rs#L112"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SHELL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SHELL"
+      ],
+      "title": "New environment variable: SHELL",
+      "impact": "informational",
+      "before": null,
+      "after": "SHELL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/exec_env.rs",
+            "line": 42,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/exec_env.rs#L42"
+          },
+          {
+            "path": "codex-rs/core/src/skills/injection.rs",
+            "line": 444,
+            "url": "https://github.com/openai/codex/blob/rust-v0.114.0/codex-rs/core/src/skills/injection.rs#L444"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    }
+  ]
+}

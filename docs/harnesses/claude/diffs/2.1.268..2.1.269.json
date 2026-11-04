@@ -1,0 +1,1131 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.268",
+  "to": "2.1.269",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `claude plugin eval`: run a plugin's eval suite against Claude Code and get scored, reproducible results (JSON + HTML report); see `claude plugin eval --help`\n- Added `/output-style [name]` to list and switch output styles, including over Remote Control and in cloud and other headless sessions\n- Added a diff of the files a Bash command changed to the Bash tool result when the Bash tool handles file edits (setting `bashEditDiffEnabled`)\n- Added `OTEL_METRICS_INCLUDE_REPOSITORY` to tag OpenTelemetry metrics and events with `vcs.*` repository attributes; commit events get `vcs.ref.head.*` with `OTEL_LOG_TOOL_DETAILS`\n- Added `CLAUDE_CODE_GATEWAY_MODEL_DISCOVERY_TIMEOUT_MS` to extend the LLM gateway `/v1/models` discovery timeout (default 3s)\n- Added a spinner tip suggesting `/focus` for a view with just your prompt, a one-line work summary, and the response\n- Added `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS` (1–256) to raise the Workflow tool's per-run concurrent agent limit for inference-bound fan-outs\n- Fixed the prompt cache being partially invalidated on the turn after a response was cut off at the output-token limit and automatically resumed\n- Fixed a case where resuming a session after interrupting Claude mid-thought could change how earlier context was re-sent, hurting prompt-cache reuse\n- Fixed F1/F2/F4 not working in kitty-protocol terminals and Delete in st, Alt+arrows acting as Escape in rxvt-unicode, and Shift+punctuation typing the unshifted key in WezTerm (regression in 2.1.247)\n- Fixed remote and headless sessions reporting \"waiting for your input\" while background agents were still running (set `CLAUDE_CODE_BG_TASKS_REPORT_RUNNING=0` to restore the old behavior)\n- Fixed the terminal's replies to capability queries (`^[[?1;2c`) appearing as stray text at startup in some terminals\n- Fixed rows at the top or bottom of the transcript going blank in fullscreen after resizing the terminal\n- Fixed a deny or ask permission rule starting with `!` applying beyond the settings source that wrote it; such a rule now applies only within its own source, and a bare `!` negation is ignored\n- Fixed the git status Claude is told after a compaction: it is now the current status, not the one from the start of the session\n- Fixed synced plugin MCP servers not connecting when a remote session resumes\n- Fixed resumed headless sessions losing a turn's replies when the model was switched or a request was retried mid-turn\n- Fixed terminal escape codes, line breaks and oversized text from a background task's on-disk record reaching the task list and task notifications when work is resumed\n- Fixed CMYK JPEG images failing to attach with \"cannot decode\"; they are now converted and resized like other JPEGs\n- Fixed the managed settings approval dialog not naming the collector for a gRPC telemetry endpoint set without a scheme\n- Fixed plugin `headersHelper` consent prompts showing a URL path that could be misread as a different host\n- Fixed plugin errors showing `[redacted URL]` in place of a relative Windows path with a folder name that starts with `@`\n- Fixed missing cursor in the permission-rule, auto-mode-rule, add-directory, session-rename and feedback-review text fields when the terminal's native cursor is enabled\n- Fixed repeated clicks on a `/fork` receipt, each under a second apart, never backgrounding the session right away while it waited for the current tool to finish\n- Fixed plugin LSP servers that reject `shutdown` params (e.g. rust-analyzer) being left running at session end; `exit` is now sent even if `shutdown` fails\n- Fixed the attribution reminder overriding a CLAUDE.md or memory rule against commit and pull request attribution; lines set by managed settings still apply\n- Fixed prompt suggestions being dropped for text in Japanese, Chinese, Thai and other languages written without spaces between words\n- Fixed synchronized output being assumed from the terminal's name in GNOME Terminal and Konsole versions that do not support it\n- Fixed `permission_denials` in `--output-format stream-json` results omitting Read, Edit and Write calls blocked by a path-scoped deny rule\n- Fixed sessions run through the SDK or the desktop app showing an unknown status in other sessions' agent list\n- Fixed `/insights` failing on Bedrock, Vertex, Foundry, and gateway deployments whose account can't reach the default Opus model by using the session model there instead\n- Fixed organization policy limits not loading for the session when another Claude Code process refreshed the login at the same moment\n- Fixed Claude Desktop sessions using Bedrock, Vertex, or a gateway not getting the contextual \"what Claude needs\" turn-end notification text\n- Fixed MCP servers reconnecting when an updated config only changed the order of the server URL's query parameters\n- Fixed the prompt box's top border splitting into extra lines when viewing a background agent whose name or description has line breaks or is wider than the terminal\n- Fixed sessions getting permanently stuck on \"Prompt is too long\" when auto-compaction had no complete earlier exchange to summarize (mostly Agent SDK sessions with very large prompts)\n- Fixed `/goal` runs silently stalling after API errors, network drops, or token limits: the goal now retries with backoff, or pauses and says why, including until a usage limit resets\n- Fixed prompt cache misses in cloud sessions by waiting briefly for server configuration before the first request\n- Fixed `/btw` answers that contained made-up tool calls and output: the side question is now told not to write them, and any that appear are flagged as not executed\n- Fixed `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` re-running a turn that had failed with an API error over 6 hours earlier, or longer ago than `CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS` when set\n- Fixed organization plugins enabled through managed settings not loading in headless sessions and on Claude Desktop (once Desktop bundles this CLI version); they load from the next session\n- Fixed plugin archives extracted for a session being readable by other local users, extracted files keeping world-writable bits from the archive, and stale files surviving re-extraction\n- Fixed `Edit()` deny rules and the write-path check not applying to the file a Bash `tee` command writes; a `Bash(tee:*)` allow rule no longer covers destinations outside the working directories\n- Fixed stray characters like `22c`, or a terminal's color or version reply, being typed into the prompt at startup over slow connections (ssh, browser terminals)\n- Fixed the terminal's block cursor showing under the interface in rxvt-unicode after leaving or re-entering fullscreen\n- Fixed the cursor block staying visible after returning from an external editor in fullscreen mode on rxvt-unicode\n- Fixed the interface being drawn twice after returning from an external editor (Ctrl+G) outside fullscreen mode\n- Fixed the interface being drawn twice in Konsole after returning from an external editor\n- Windows: Fixed PowerShell tool commands sent to the background stopping when Claude Code exits\n- Improved the `/diff` panel to open fully rendered in one step instead of showing a loading state first\n- Improved prompt suggestion filtering for Japanese, Chinese and Korean text: mixed-script and single-word suggestions are kept, and meta or evaluative text is dropped as it is for English\n- Improved the Skill tool's \"Unknown skill\" error to name the plugin skill's full name when a bare name matches exactly one plugin skill\n- Improved keyboard support over SSH and in unrecognized terminals: terminals that answer the kitty keyboard query (such as foot and Alacritty 0.16+) now get Shift+Enter and Ctrl+Shift shortcuts\n- Improved responsiveness in long sessions: transcript updates no longer re-process the whole conversation to build the collapsed tool-use summaries\n- Improved first-party sessions with telemetry disabled: an `alwaysLoad` MCP server that finishes connecting mid-conversation is usable on the next turn without a tool-search round trip\n- Changed `/ultrareview --post` to post the PR comment directly when the findings arrive and print the comment link, instead of starting a second cloud session to post it\n- Changed artifact database reads that save into the session scratchpad so they no longer stop for working-folder approval\n- Changed skills synced from claude.ai in cloud sessions to be named `anthropic-skills:<name>`, matching Claude Desktop; the bare name still works when nothing else uses it\n- [VSCode] Added an agent map: an \"N agents\" footer pill opens a map of the session's sub-agents with per-agent cards, Stop agent, and read-only transcripts\n- [VSCode] Added a Hooks dialog to the command menu for viewing hooks and adding, editing, or removing them in user, project, and local settings; managed, plugin, and session hooks stay read-only\n- [VSCode] Added live progress rows for running subagents under the tool-call groups in Focus view\n- [VSCode] Added a Permission rules dialog that lists permission rules and adds or removes them in user, project, and local settings; startup-option, session-only, and managed rules stay read-only\n- [VSCode] Added a Cancel button to the Switch account screen that returns to your session as the current account\n- [VSCode] Fixed Focus view showing a turn started by a delivered plain-text prompt, such as a scheduled task's, as part of the previous turn\n- [VSCode] Fixed the footer's prompt cache clock hiding its minutes when the panel is narrow\n- [VSCode] Fixed the session list keeping sessions from the default folder when `CLAUDE_CONFIG_DIR` is set in a settings file or the `environmentVariables` setting\n- [VSCode] Fixed a plan preview that finished loading late sometimes hiding its comment box or showing an older plan\n- [VSCode] Fixed a plan preview accepting comments that went nowhere after its Claude tab closed\n- [VSCode] Fixed the prompt cache clock and reopen notice for a session compacted after its last reply and then closed, which now reads as cold when reopened\n- [VSCode] Fixed a session renamed in the extension while Remote Control is on keeping its old name on claude.ai/code\n- [VSCode] Fixed the \"Enable Remote Control for all sessions\" toggle keeping its last position after the setting was reset to default from a terminal\n- [VSCode] Fixed restored Claude tabs not counting as open in the session list after a window reload until clicked, and their row opening a second tab\n- [VSCode] Fixed Switch account making a tab forget its dismissed usage-limit warnings when you sign back in as the same account\n- [VSCode] Fixed a session rename being replaced by the generated name after a window reload when the session was renamed during a long turn\n- [VSCode] Fixed the sidebar usage meter keeping a stale per-model weekly limit row after the account loses that limit\n- [VSCode] Fixed a rare case where an @-mention sent with the keyboard shortcut while a new chat view was still starting could be inserted into the input long after the keystroke\n- [VSCode] Fixed the session list jumping down when the Account & usage header appeared a moment after opening the Claude side bar\n- [VSCode] Improved documents and messages written for someone other than the user: Claude now writes them for that audience and names it at the top of its reply\n- [VSCode] Improved screen reader and keyboard accessibility in the slash-command menu, @-mention menu, output-style picker, Send/Stop button, permission and question cards, and onboarding checklist\n- [VSCode] Changed the current-file chip in the message box: an X now removes it, replacing the Hide toggle\n- [VSCode] Removed the Claude Code items from a session tab's right-click menu and the editor title bar's \"...\" menu; they could not act on the tab the menu was opened on\n- [Claude Code on the web] Added taking back a queued message in a cloud session before Claude reads it: remove it from the queue, or press Esc or Up, and the text returns to the message box\n- [Claude Code on the web] Fixed `/model default` in a cloud session leaving every later message failing in organizations that restrict which models Claude Code can use\n- [Claude Code on the web] Fixed one-off scheduled routines occasionally running a second time after a transient server error\n- [Claude Code on the web] Fixed routine runs that use subagents sometimes being treated as finished too early, which could skip the retry after a real failure or start a duplicate run\n- [Claude Code on the web] Fixed file links in cloud session transcripts opening a GitHub 404 when Claude was working from a subfolder of the repository\n- [Claude Code on the web] Changed the Cloud environments admin page to list every environment instead of capping each table at five rows behind a Show more control that could be unreachable\n- [Claude Code on the web] Changed claude.ai/code for Free-plan users to open the plans page with a path to upgrade, instead of a \"Disabled by org admin\" page with no way forward\n- [Claude Tag] Added a confirmation dialog before Connect all or Disconnect on a GitHub installation in admin settings, to guard against accidental organization-wide changes\n- [Claude Tag] Fixed threads occasionally going silent after a failed turn because the failure notice was dropped when Slack briefly rate-limited it; the notice is now retried\n- [Claude Tag] Fixed Claude accepting a switch to a model your organization hasn't enabled and then quietly answering with a fallback model; it now declines and says an admin can enable it\n- [Claude Tag] Fixed a table posting as raw pipe text when Claude attached files to the same message; the table now posts as a normal reply and the files follow with a plain caption\n- [Claude Tag] Fixed `@Claude !restart` at the top level of a channel where Claude isn't active starting an unrelated conversation; it now privately says there is nothing to restart\n- [Claude Tag] Fixed plugin rows in Slack access settings showing an unlabeled raw ID with no way to turn the plugin off; they now show its name and link to the bundle that manages it\n- [Claude Tag] Fixed the shared-session banner and Share dialog on sessions started from Slack claiming the whole organization could open the link; they now name the Slack channel's audience\n- [Claude Tag] Improved load time of the admin settings page and its Slack channel picker, most noticeably for organizations with many channels or several connected workspaces\n- [Claude Tag] Improved scheduled routines in Slack channels: a routine run can now reply in an existing thread instead of always posting a new top-level channel message\n- [Claude Tag] Improved the timestamp on Claude's live progress checklists to show each reader's local time and how long ago it was updated, instead of a fixed UTC time"
+  },
+  "summary": {
+    "changes": 56,
+    "categories": {
+      "behavior": 6,
+      "binary": 1,
+      "caching": 1,
+      "cli": 2,
+      "config": 17,
+      "hooks": 24,
+      "network": 1,
+      "prompt": 3,
+      "request": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 44,
+      "notable": 12
+    },
+    "undocumented": 45
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+353 −119 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n <system-reminder>\n-Attribution for git commits and pull requests you create from here on (this replaces any earlier attribution guidance):\n+Attribution for git commits and pull requests you create from here on (this replaces Claude Code's own earlier attribution guidance, such as a previous copy of this reminder; the user's own instructions about these lines, such as a CLAUDE.md or memory rule, take precedence over this reminder, but do not add attribution lines this reminder leaves out):\n - End git commit messages with:\n Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n - End pull request descriptions with:\n",
+      "stats": {
+        "added_chars": 353,
+        "removed_chars": 119
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+353 −119 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n <system-reminder>\n-Attribution for git commits and pull requests you create from here on (this replaces any earlier attribution guidance):\n+Attribution for git commits and pull requests you create from here on (this replaces Claude Code's own earlier attribution guidance, such as a previous copy of this reminder; the user's own instructions about these lines, such as a CLAUDE.md or memory rule, take precedence over this reminder, but do not add attribution lines this reminder leaves out):\n - End git commit messages with:\n Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n - End pull request descriptions with:\n",
+      "stats": {
+        "added_chars": 353,
+        "removed_chars": 119
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+860 −885 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,7 +10,7 @@\n \n Available agent types for the Agent tool:\n - claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n-- claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI, early-access enablement) and the `/skill-doctor` report.\n+- claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI) and the `/skill-doctor` report.\n **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.\n (Tools: Bash, Read, WebFetch, WebSearch)\n - Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps.\n",
+      "stats": {
+        "added_chars": 860,
+        "removed_chars": 885
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 1255 → 1489",
+      "impact": "notable",
+      "before": 1255,
+      "after": 1489,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.betas.mid-conversation-tool-changes-2026-07-01",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "betas",
+        "mid-conversation-tool-changes-2026-07-01"
+      ],
+      "title": "New beta: mid-conversation-tool-changes-2026-07-01",
+      "impact": "notable",
+      "before": null,
+      "after": "mid-conversation-tool-changes-2026-07-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction.model",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "compaction",
+        "model"
+      ],
+      "title": "Behaviour: compaction model added",
+      "impact": "notable",
+      "before": null,
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction.outcome",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction",
+        "outcome"
+      ],
+      "title": "Behaviour: compaction outcome changed: \"refused\" → \"compacted\"",
+      "impact": "notable",
+      "before": "refused",
+      "after": "compacted",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction.prompt",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "compaction",
+        "prompt"
+      ],
+      "title": "Behaviour: compaction prompt added",
+      "impact": "notable",
+      "before": null,
+      "after": "CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.\n\n- Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.\n- You already have all the context you need in the conversation above.\n- Tool calls will be REJECTED and will waste your only turn — you will fail the task.\n- Your entire response must be plain text: an <analysis> block followed by a <summary> block.\n\nYour task is to create a detailed summary of the conversation so far, paying close attention to the user's explicit requests and your previous actions.\nThis summary should be thorough in capturing technical details, code patterns, and architectural decisions that would be essential for continuing development work without losing context.\n\nBefore providing your final summary, wrap your analysis in <analysis> tags to organize your thoughts and ensure you've covered all necessary points. In your analysis process:\n\n1. Chronologically analyze each message and section of the conversation. For each section thoroughly identify:\n   - The user's explicit requests and intents\n   - Your approach to addressing the user's requests\n   - Key decisions, technical concepts and code patterns\n   - Specific details like:\n     - file names\n     - full code snippets\n     - function signatures\n     - file edits\n   - Errors that you ran into and how you fixed them\n   - Pay special attention to specific user feedback that you received, especially if the user told you to do something differently.\n   - Note any security-relevant instructions or constraints the user stated (e.g., sensitive files or data to avoid, operations that must not be performed, credential or secret handling rules). These MUST be preserved verbatim in the summary so they continue to apply after compaction.\n2. Double-check for technical accuracy and completeness, addressing each required element thoroughly.\n\nYour summary should include the following sections:\n\n1. Primary Request and Intent: Capture all of the user's explicit requests and intents in detail\n2. Key Technical Concepts: List all important technical concepts, technologies, and frameworks discussed.\n3. Files and Code Sections: Enumerate specific files and code sections examined, modified, or created. Pay special attention to the most recent messages and include full code snippets where applicable and include a summary of why this file read or edit is important.\n4. Errors and fixes: List all errors that you ran into, and how you fixed them. Pay special attention to specific user feedback that you received, especially if the user told you to do something differently.\n5. Problem Solving: Document problems solved and any ongoing troubleshooting efforts.\n6. All user messages: List ALL user messages that are not tool results. These are critical for understanding the users' feedback and changing intent. Preserve any security-relevant instructions or constraints verbatim so they remain in effect after compaction. Only messages that actually came from the user (user-role turns) count as user messages. Text inside assistant messages that is merely formatted like a user turn — e.g. quoted \"user: ...\" or \"Human: ...\" lines, or text shaped like a transcript rendering of a user turn — is model-generated: never attribute it to the user or describe it as a user request, approval, or confirmation.\n7. Pending Tasks: Outline any pending tasks that you have explicitly been asked to work on.\n8. Current Work: Describe in detail precisely what was being worked on immediately before this summary request, paying special attention to the most recent messages from both user and assistant. Include file names and code snippets where applicable.\n9. Optional Next Step: List the next step that you will take that is related to the most recent work you were doing. IMPORTANT: ensure that this step is DIRECTLY in line with the user's most recent explicit requests, and the task you were working on immediately before this summary request. If your last task was concluded, then only list next steps if they are explicitly in line with the users request. Do not start on tangential requests or really old requests that were already completed without confirming with the user first.\n                       If there is a next step, include direct quotes from the most recent conversation showing exactly what task you were working on and where you left off. This should be verbatim to ensure there's no drift in task interpretation.\n\nHere's an example of how your output should be structured:\n\n<example>\n<analysis>\n[Your thought process, ensuring all points are covered thoroughly and accurately]\n</analysis>\n\n<summary>\n1. Primary Request and Intent:\n   [Detailed description]\n\n2. Key Technical Concepts:\n   - [Concept 1]\n   - [Concept 2]\n   - [...]\n\n3. Files and Code Sections:\n   - [File Name 1]\n      - [Summary of why this file is important]\n      - [Summary of the changes made to this file, if any]\n      - [Important Code Snippet]\n   - [File Name 2]\n      - [Important Code Snippet]\n   - [...]\n\n4. Errors and fixes:\n    - [Detailed description of error 1]:\n      - [How you fixed the error]\n      - [User feedback on the error if any]\n    - [...]\n\n5. Problem Solving:\n   [Description of solved problems and ongoing troubleshooting]\n\n6. All user messages: \n    - [Detailed non tool use user message]\n    - [...]\n\n7. Pending Tasks:\n   - [Task 1]\n   - [Task 2]\n   - [...]\n\n8. Current Work:\n   [Precise description of current work]\n\n9. Optional Next Step:\n   [Optional Next step to take]\n\n</summary>\n</example>\n\nPlease provide your summary based on the conversation so far, following this structure and ensuring precision and thoroughness in your response. \n\nThere may be additional summarization instructions provided in the included context. If so, remember to follow these instructions when creating the above summary. Examples of instructions include:\n<example>\n## Compact Instructions\nWhen summarizing the conversation focus on typescript code changes and also remember the mistakes you made and how you fixed them.\n</example>\n\n<example>\n# Summary instructions\nWhen you are using compact - please focus on test output and code changes. Include file reads verbatim.\n</example>\n\n\nREMINDER: Do NOT call any tools. Respond with plain text only — an <analysis> block followed by a <summary> block. Tool calls will be rejected and you will fail the task.",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction.reason",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "compaction",
+        "reason"
+      ],
+      "title": "Behaviour: compaction reason removed",
+      "impact": "notable",
+      "before": "Prompt is too long",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction.tools",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "compaction",
+        "tools"
+      ],
+      "title": "Behaviour: compaction tools added",
+      "impact": "notable",
+      "before": null,
+      "after": 24,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction_command.prompt",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "prompt"
+      ],
+      "title": "Behaviour: compaction_command prompt changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,12 +1,3 @@\n-<system-reminder>\n-Attribution for git commits and pull requests you create from here on (this replaces any earlier attribution guidance):\n-- End git commit messages with:\n-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n-- End pull request descriptions with:\n-🤖 Generated with [Claude Code](https://claude.com/claude-code)\n-</system-reminder>\n-<prompt-2>\n-Continue from where you left off.\n CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.\n \n - Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 383
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.InstructionsLoaded.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "InstructionsLoaded",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "InstructionsLoaded hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "MessageDisplay",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "MessageDisplay hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PermissionDenied.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionDenied",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PermissionDenied hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PermissionRequest.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PermissionRequest hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostCompact.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostCompact",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PostCompact hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostModelSwitch.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PostModelSwitch hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostModelSwitch.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "PostModelSwitch hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PostToolBatch hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreCompact.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreCompact",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PreCompact hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreModelSwitch.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreModelSwitch",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PreModelSwitch hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "PreToolUse hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "SessionStart hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Setup.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Setup",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "Setup hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "Stop hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStop.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStop",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "SubagentStop hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptExpansion.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptExpansion",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "UserPromptExpansion hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_SESSION_ATTENDED added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude plugin eval.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude plugin eval",
+        "description"
+      ],
+      "title": "Description of `claude plugin eval` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,2 +1,4 @@\n Run eval cases (<eval dir>/**/case.yaml or prompt.md + graders/*.md; the eval dir is evals/ unless --eval-dir or the manifest says otherwise) against a plugin and report scored results.\n-Target is a path, a plugin name, or a `plugin@marketplace` id — installed and skills-dir plugins both resolve (and add a no-plugin baseline arm)\n+Target is a path, a plugin name, or a `plugin@marketplace` id — installed and skills-dir plugins both resolve (and add a no-plugin baseline arm).\n+It loads the plugin and runs its eval suite (prompts, graders; scaffold scripts and real MCP servers only when you opt in) on your machine, as you: only evaluate plugins you trust — the run's sandboxing limits what a malicious plugin can reach but is not a guarantee, and a bundled suite passing is not a security vetting.\n+The first run in an untrusted plugin directory asks you to confirm (--trust-plugin answers for CI)\n",
+      "stats": {
+        "added_chars": 569,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.plugin --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "plugin --help"
+      ],
+      "title": "Full help text of `plugin --help` changed (+907 −64 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -18,7 +18,18 @@\n                                        path, a plugin name, or a\n                                        `plugin@marketplace` id — installed and\n                                        skills-dir plugins both resolve (and add\n-                                       a no-plugin baseline arm)\n+                                       a no-plugin baseline arm). It loads the\n+                                       plugin and runs its eval suite (prompts,\n+                                       graders; scaffold scripts and real MCP\n+                                       servers only when you opt in) on your\n+                                       machine, as you: only evaluate plugins\n+                                       you trust — the run's sandboxing limits\n+                                       what a malicious plugin can reach but is\n+                                       not a guarantee, and a bundled suite\n+                                       passing is not a security vetting. The\n+                                       first run in an untrusted plugin\n+                                       directory asks you to confirm\n+                                       (--trust-plugin answers for CI)\n   help [command]                       display help for command\n   init|new [options] <name>            Scaffold a new plugin at\n                                        ~/.claude/skills/<name>/ (auto-loads next\n",
+      "stats": {
+        "added_chars": 907,
+        "removed_chars": 64
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.bashEditDiffEnabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "bashEditDiffEnabled"
+      ],
+      "title": "New setting: bashEditDiffEnabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether the Bash tool shows a diff of the files a Bash command changed (PostToolUse Bash hooks get the changed-file list in tool_response). Set to false to turn that off. Default: on when the Bash tool handles file edits. Only user, flag or policy settings can turn it on outside auto and bypassPermissions modes.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BASH_EDIT_DIFF",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BASH_EDIT_DIFF"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BASH_EDIT_DIFF",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BASH_EDIT_DIFF",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BRIDGE_CHILD_ARTIFACT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BRIDGE_CHILD_ARTIFACT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BRIDGE_CHILD_ARTIFACT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BRIDGE_CHILD_ARTIFACT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BRIDGE_CHILD_AUTO_DEFAULT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BRIDGE_CHILD_AUTO_DEFAULT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BRIDGE_CHILD_AUTO_DEFAULT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BRIDGE_CHILD_AUTO_DEFAULT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_WINDOWS_SHELL_LAUNCHER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_WINDOWS_SHELL_LAUNCHER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_WINDOWS_SHELL_LAUNCHER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_WINDOWS_SHELL_LAUNCHER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FLAG_FETCH_WAIT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FLAG_FETCH_WAIT_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FLAG_FETCH_WAIT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FLAG_FETCH_WAIT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FORCE_WINDOWS_CREDMAN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_GATEWAY_MODEL_DISCOVERY_TIMEOUT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_GATEWAY_MODEL_DISCOVERY_TIMEOUT_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_GATEWAY_MODEL_DISCOVERY_TIMEOUT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_GATEWAY_MODEL_DISCOVERY_TIMEOUT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_POST_TURN_MEMORY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_POST_TURN_MEMORY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_POST_TURN_MEMORY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_POST_TURN_MEMORY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_POST_TURN_MEMORY_CONFIG",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_POST_TURN_MEMORY_CONFIG"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_POST_TURN_MEMORY_CONFIG",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_POST_TURN_MEMORY_CONFIG",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_POST_TURN_MEMORY_SYNC",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_POST_TURN_MEMORY_SYNC"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_POST_TURN_MEMORY_SYNC",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_POST_TURN_MEMORY_SYNC",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SESSION_ATTENDED",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SESSION_ATTENDED"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SESSION_ATTENDED",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ATTENDED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.NODE_ENVdefaultInternal",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVdefaultInternal"
+      ],
+      "title": "New environment variable: NODE_ENVdefaultInternal",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVdefaultInternal",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_LAZY_SUBAGENT_HYDRATE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_LAZY_SUBAGENT_HYDRATE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_CCR_LAZY_SUBAGENT_HYDRATE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_CCR_LAZY_SUBAGENT_HYDRATE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WALNUT_SPIRE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WALNUT_SPIRE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_WALNUT_SPIRE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_WALNUT_SPIRE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_ENVInternal",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVInternal"
+      ],
+      "title": "Environment variable no longer read: NODE_ENVInternal",
+      "impact": "informational",
+      "before": "NODE_ENVInternal",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "network.egress.POST api.anthropic.com/api/event_logging/v2/batch",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "egress",
+        "POST api.anthropic.com/api/event_logging/v2/batch"
+      ],
+      "title": "New network request: POST api.anthropic.com/api/event_logging/v2/batch",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "body_keys": [
+          "events"
+        ],
+        "host": "api.anthropic.com",
+        "method": "POST",
+        "path": "/api/event_logging/v2/batch",
+        "when": "after"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.runtime",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "runtime"
+      ],
+      "title": "Binary runtime: bun 1.4.1 → bun 1.4.3",
+      "impact": "informational",
+      "before": "bun 1.4.1",
+      "after": "bun 1.4.3",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

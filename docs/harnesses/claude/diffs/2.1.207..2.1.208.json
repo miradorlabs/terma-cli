@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.207",
+  "to": "2.1.208",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added screen reader mode: opt-in plain-text rendering for screen reader users. Run `claude --ax-screen-reader`, set CLAUDE_AX_SCREEN_READER=1, or add \"axScreenReader\": true to settings.\n- Added `vimInsertModeRemaps` setting: map two-key insert-mode sequences like `jj` to Escape in vim mode\n- Added `CLAUDE_CODE_PROCESS_WRAPPER`: agent view and the background service now honor a corporate launcher by running every Claude Code self-spawn through a required wrapper executable\n- Added mouse-click support for multi-select menus and \"Other\" input rows in fullscreen mode\n- Changed the Fable 5 usage-credits consent prompt to start with the decline option focused\n- Fixed fast mode staying off after switching back to a model that supports it — it now restores automatically when enabled in settings\n- Fixed replies typed to a background agent being lost when delivery fails — the text is now saved and delivered when the session restarts\n- Fixed background-session attach failing permanently (\"Couldn't start the background daemon\") after an update replaced the binary a running `claude agents` process was launched from\n- Fixed the context window (and auto-compact indicator) briefly resetting to 200k after the CLI auto-updates, causing a false \"100% context used\" when resuming long-context sessions\n- Fixed supervised and background sessions crashing when a server closed an HTTP/2 connection with a GOAWAY while requests were in flight\n- Fixed truncated stream-json/JSON output and missing result message when piping large responses from `claude -p`\n- Fixed `CLAUDE_CODE_MAX_OUTPUT_TOKENS` and similar env vars silently using the mantissa of scientific-notation values (`1e6` became `1`)\n- Fixed very large markdown tables stalling rendering or using excessive memory; tables over 200 rows show the first 200 with a \"… N more rows\" notice\n- Fixed the Edit tool failing on files modified after reading when the target text still matches uniquely\n- Fixed Read reporting empty files as \"shorter than offset\", Grep silently returning \"No files found\" for invalid regex patterns, Grep count mode under-reporting totals when paginated, and Glob crashing with an unclear error when the pattern, path, or working directory contained a null byte\n- Fixed `apiKeyHelper` script failures being hidden behind a generic 401 after ~10 silent retries; the script's own error is now shown within 3 attempts\n- Fixed Bedrock streaming requests failing with a misleading \"Truncated event message received\" when a gateway transforms the response — the error now names the content-type and points at the proxy\n- Fixed `/upgrade` showing a login flow instead of the upgrade URL when the browser fails to open\n- Fixed stream-json input killing the session on blank CRLF or whitespace-only lines from Windows-style SDK hosts\n- Fixed headless stream-json sessions hanging permanently when a `control_request` carried a non-string `set_model` payload; the CLI now answers with an error response\n- Fixed repeated \"No completion record was found\" notices on session resume — orphaned background tasks now collapse into a single summary\n- Fixed Remote Control clients attaching to a terminal-hosted session not seeing background agents and workflow progress until a task started or stopped\n- Fixed the Agent tool launching with no tools when a subagent's `tools` list resolves to nothing — it now returns a clear error naming the unrecognized entries\n- Fixed `/usage` showing stale cached bars over fresher data, and `/mcp` not reclassifying placeholder servers after config edits\n- Fixed \"Change directory\" in SDK hosts (e.g. Claude Desktop) failing with \"A turn is in progress\" on idle sessions that have a running background task\n- Fixed the workflow save dialog showing `~/.claude/workflows/` instead of the `CLAUDE_CONFIG_DIR` location for user-scope saves\n- Fixed `/release-notes` adding the viewed notes to the model's context — \"Show all\" previously injected the entire changelog into every subsequent request\n- Fixed a memory leak in the agent view where pasted images were retained for the screen's lifetime after sending peek replies\n- Fixed SDK sessions losing agents defined via the initialize request when a plugin refresh ran before the client attached\n- Fixed several memory leaks in long sessions: MCP stdio server stderr accumulating up to 64 MB per server, LSP documents staying open indefinitely (now LRU with 50-doc cap), async hook output retained after backgrounding, and unbounded growth in headless/SDK sessions from large tool-result payloads\n- Fixed a memory blowup when reading files with extremely long single lines using offset/limit — the read now returns a clean error instead of loading the whole line\n- Fixed multi-second per-turn slowdowns in sessions with many permission deny/ask rules — rule matchers are now compiled once and cached\n- Improved input responsiveness while agent task lists update — task updates no longer re-render the entire UI\n- Reduced per-tool-call CPU overhead in print/SDK sessions with many MCP tools by caching tool-pool assembly (up to 7x faster tool rounds at high tool counts)\n- Reduced memory usage by bounding the file edit read cache to 16 MB instead of pinning up to 1,000 full files\n- Reduced session transcript size (up to 79x in edit-heavy sessions) and bounded checkpoint disk usage by pruning superseded file-history backups\n- Reduced memory usage when resuming sessions with background agents or forks spawned from large conversations\n- Completed background agents now stay listed in `/tasks` until cleanup instead of vanishing the moment they finish\n- Attaching to a stopped background agent now shows its transcript immediately while the session warms up, instead of a blank \"Session is starting\" screen\n- Background sessions: an older daemon no longer silently restarts workers spawned by a newer version onto the older binary\n- Agent view: Ctrl+X now deletes renamed-branch worktrees, never destroys unpushed commits, keeps the session row when a worktree is kept, and reused worktree names reset to the current base\n- Catastrophic removals (e.g. `rm -rf ~`) in commands containing `$(…)`/backticks/`<(…)` now prompt in `--dangerously-skip-permissions` and auto mode, matching the plain form\n- `/install-github-app` and the `/mcp` settings menu no longer open in background sessions\n- MCP servers configured with an empty URL now show as \"not configured\" in `/mcp` instead of a config error\n- `/usage` now shows your last-known usage bars with an \"as of\" note when the usage endpoint is rate-limited, instead of an error screen\n- Fixed Bedrock auth failing with \"Session token not found or invalid\" for AWS SSO profiles whose sso_region differs from the Bedrock region (2.1.207 regression)"
+  },
+  "summary": {
+    "changes": 15,
+    "categories": {
+      "cli": 1,
+      "config": 9,
+      "hooks": 3,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 11,
+      "notable": 4
+    },
+    "undocumented": 12
+  },
+  "changes": [
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+359 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -14,6 +14,10 @@\n \n Write code that reads like the surrounding code: match its comment density, naming, and idiom.\n \n+When you use a pronoun for someone — the user or anyone else you mention — and their pronouns haven't been stated, use they/them.\n+A name doesn't tell you someone's pronouns; a wrong guess misgenders a real person in a way the neutral default never does, so never infer pronouns from a name.\n+This applies to all user-visible text, including visible thinking.\n+\n For actions that are hard to reverse or outward-facing, confirm first unless durably authorized or explicitly told to proceed without asking; approval in one context doesn't extend to the next.\n Sending content to an external service publishes it; it may be cached or indexed even if later deleted.\n Before deleting or overwriting, look at the target — if what you find contradicts how it was described, or you didn't create it, surface that instead of proceeding.\n",
+      "stats": {
+        "added_chars": 359,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+359 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -14,6 +14,10 @@\n \n Write code that reads like the surrounding code: match its comment density, naming, and idiom.\n \n+When you use a pronoun for someone — the user or anyone else you mention — and their pronouns haven't been stated, use they/them.\n+A name doesn't tell you someone's pronouns; a wrong guess misgenders a real person in a way the neutral default never does, so never infer pronouns from a name.\n+This applies to all user-visible text, including visible thinking.\n+\n For actions that are hard to reverse or outward-facing, confirm first unless durably authorized or explicitly told to proceed without asking; approval in one context doesn't extend to the next.\n Sending content to an external service publishes it; it may be cached or indexed even if later deleted.\n Before deleting or overwriting, look at the target — if what you find contradicts how it was described, or you didn't create it, surface that instead of proceeding.\n",
+      "stats": {
+        "added_chars": 359,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.message",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.message"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.message removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.message",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.status",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.status"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.status removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.status",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.auto-mode --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "auto-mode --help"
+      ],
+      "title": "Full help text of `auto-mode --help` changed (+80 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,7 +9,7 @@\n   config              Print the effective auto mode config as JSON: your\n                       settings where set, defaults otherwise\n   critique [options]  Get AI feedback on your custom auto mode rules\n-  defaults            Print the default auto mode environment, allow, soft_deny,\n+  defaults [options]  Print the default auto mode environment, allow, soft_deny,\n                       and hard_deny rules as JSON\n   help [command]      display help for command\n \n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.vimInsertModeRemaps",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "vimInsertModeRemaps"
+      ],
+      "title": "New setting: vimInsertModeRemaps",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Vim INSERT-mode key-sequence remaps, e.g. {\"jj\": \"<Esc>\"}. Each key is exactly two printable characters typed in sequence; \"<Esc>\" (return to NORMAL mode) is the only supported target. Applies when editorMode is \"vim\".",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.BUN_ENV",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENV"
+      ],
+      "title": "New environment variable: BUN_ENV",
+      "impact": "informational",
+      "before": null,
+      "after": "BUN_ENV",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CCR_ON_BRANCH_DEFAULT_GUARD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CCR_ON_BRANCH_DEFAULT_GUARD"
+      ],
+      "title": "New environment variable: CCR_ON_BRANCH_DEFAULT_GUARD",
+      "impact": "informational",
+      "before": null,
+      "after": "CCR_ON_BRANCH_DEFAULT_GUARD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_BEDROCK_CONTENT_TYPE_GUARD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_BEDROCK_CONTENT_TYPE_GUARD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_BEDROCK_CONTENT_TYPE_GUARD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_BEDROCK_CONTENT_TYPE_GUARD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FORCE_RC_LONG_TURN_NUDGE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FORCE_RC_LONG_TURN_NUDGE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FORCE_RC_LONG_TURN_NUDGE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FORCE_RC_LONG_TURN_NUDGE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RC_PERMISSION_NUDGE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RC_PERMISSION_NUDGE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RC_PERMISSION_NUDGE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RC_PERMISSION_NUDGE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_ENVsec",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVsec"
+      ],
+      "title": "New environment variable: NODE_ENVsec",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVsec",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_ENVprocess",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENVprocess"
+      ],
+      "title": "Environment variable no longer read: BUN_ENVprocess",
+      "impact": "informational",
+      "before": "BUN_ENVprocess",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SRT_WIN_PATH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "SRT_WIN_PATH"
+      ],
+      "title": "Environment variable no longer read: SRT_WIN_PATH",
+      "impact": "informational",
+      "before": "SRT_WIN_PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

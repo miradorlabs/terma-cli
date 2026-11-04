@@ -1,0 +1,870 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.94.0",
+  "to": "0.95.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.94.0...rust-v0.95.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.95.0",
+    "text": "## New Features\n- Added `codex app <path>` on macOS to launch Codex Desktop from the CLI, with automatic DMG download if it is missing. (#10418)\n- Added personal skill loading from `~/.agents/skills` (with `~/.codex/skills` compatibility), plus app-server APIs/events to list and download public remote skills. (#10437, #10448)\n- `/plan` now accepts inline prompt arguments and pasted images, and slash-command editing/highlighting in the TUI is more polished. (#10269)\n- Shell-related tools can now run in parallel, improving multi-command execution throughput. (#10505)\n- Shell executions now receive `CODEX_THREAD_ID`, so scripts and skills can detect the active thread/session. (#10096)\n- Added vendored Bubblewrap + FFI wiring in the Linux sandbox as groundwork for upcoming runtime integration. (#10413)\n\n## Bug Fixes\n- Hardened Git command safety so destructive or write-capable invocations no longer bypass approval checks. (#10258)\n- Improved resume/thread browsing reliability by correctly showing saved thread names and fixing thread listing behavior. (#10340, #10383)\n- Fixed first-run trust-mode handling so sandbox mode is reported consistently, and made `$PWD/.agents` read-only like `$PWD/.codex`. (#10415, #10524)\n- Fixed `codex exec` hanging after interrupt in websocket/streaming flows; interrupted turns now shut down cleanly. (#10519)\n- Fixed review-mode approval event wiring so `requestApproval` IDs align with the corresponding command execution items. (#10416)\n- Improved 401 error diagnostics by including server message/body details plus `cf-ray` and `requestId`. (#10508)\n\n## Documentation\n- Expanded TUI chat composer docs to cover slash-command arguments and attachment handling in plan/review flows. (#10269)\n- Refreshed issue templates and labeler prompts to better separate CLI/app bug reporting and feature requests. (#10411, #10453, #10548, #10552)\n\n## Chores\n- Completed migration off the deprecated `mcp-types` crate to `rmcp`-based protocol types/adapters, then removed the legacy crate. (#10356, #10349, #10357)\n- Updated the `bytes` dependency for a security advisory and cleaned up resolved advisory configuration. (#10525)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.94.0...rust-v0.95.0\n\n- #10340 Session picker shows thread_name if set @pap-openai\n- #10381 chore: collab experimental @jif-oai\n- #10231 feat: experimental flags @jif-oai\n- #10382 nit: shell snapshot retention to 3 days @jif-oai\n- #10383 fix: thread listing @jif-oai\n- #10386 fix: Rfc3339 casting @jif-oai\n- #10356 feat: add MCP protocol types and rmcp adapters @bolinfest\n- #10269 Nicer highlighting of slash commands, /plan accepts prompt args and pasted images @charley-oai\n- #10274 Add credits tooltip @pakrym-oai\n- #10394 chore: ignore synthetic messages @jif-oai\n- #10398 feat: drop sqlx logging @jif-oai\n- #10281 Select experimental features with space @pakrym-oai\n- #10402 feat: add `--experimental` to `generate-ts` @jif-oai\n- #10258 fix: unsafe auto-approval of git commands @viyatb-oai\n- #10411 Updated labeler workflow prompt to include \"app\" label @etraut-openai\n- #10399 emit a separate metric when the user cancels UAT during elevated setup @iceweasel-oai\n- #10377 chore(tui) /personalities tip @dylan-hurd-oai\n- #10252 [feat] persist thread_dynamic_tools in db @celia-oai\n- #10437 feat: Read personal skills from .agents/skills @gverma-openai\n- #10145 make codex better at git @pash-openai\n- #10418 Add `codex app` macOS launcher @aibrahim-oai\n- #10447 Fix plan implementation prompt reappearing after /agent thread switch @charley-oai\n- #10064 TUI: Render request_user_input results in history and simplify interrupt handling @charley-oai\n- #10349 feat: replace custom mcp-types crate with equivalents from rmcp @bolinfest\n- #10415 Fixed sandbox mode inconsistency if untrusted is selected @etraut-openai\n- #10452 Hide short worked-for label in final separator @aibrahim-oai\n- #10357 chore: remove deprecated mcp-types crate @bolinfest\n- #10454 app tool tip @aibrahim-oai\n- #10455 chore: add phase to message responseitem @sayan-oai\n- #10414 Require models refresh on cli version mismatch @aibrahim-oai\n- #10271 [Codex][CLI] Gate image inputs by model modalities @ccy-oai\n- #10374 Trim compaction input @pakrym-oai\n- #10453 Updated bug and feature templates @etraut-openai\n- #10465 Restore status after preamble @pakrym-oai\n- #10406 fix: clarify deprecation message for features.web_search @sayan-oai\n- #10474 Ignore remote_compact_trims_function_call_history_to_fit_context_window on windows @pakrym-oai\n- #10413 feat(linux-sandbox): vendor bubblewrap and wire it with FFI @viyatb-oai\n- #10142 feat(secrets): add codex-secrets crate @viyatb-oai\n- #10157 chore: nuke chat/completions API @jif-oai\n- #10498 feat: drop wire_api from clients @jif-oai\n- #10501 feat: clean codex-api part 1 @jif-oai\n- #10508 Add more detail to 401 error @gt-oai\n- #10521 Avoid redundant transactional check before inserting dynamic tools @jif-oai\n- #10525 chore: update bytes crate in response to security advisory @bolinfest\n- #10408 fix WebSearchAction type clash between v1 and v2 @sayan-oai\n- #10404 Cleanup collaboration mode variants @charley-oai\n- #10505 Enable parallel shell tools @jif-oai\n- #10532 feat: `find_thread_path_by_id_str_in_subdir` from DB @jif-oai\n- #10524 fix: make $PWD/.agents read-only like $PWD/.codex @bolinfest\n- #10096 Inject CODEX_THREAD_ID into the terminal environment @maxj-oai\n- #10536 Revert \"Load untrusted rules\" @viyatb-oai\n- #10412 fix(app-server): fix TS annotations for optional fields on requests @owenlin0\n- #10416 fix(app-server): fix approval events in review mode @owenlin0\n- #10545 Improve Default mode prompt (less confusion with Plan mode) @charley-oai\n- #10289 [apps] Gateway MCP should be blocking. @mzeng-openai\n- #10189 implement per-workspace capability SIDs for workspace specific ACLs @iceweasel-oai\n- #10548 Updated bug templates and added a new one for app @etraut-openai\n- #10531 [codex] Default values from requirements if unset @gt-oai\n- #10552 Fixed icon for CLI bug template @etraut-openai\n- #10039 chore(arg0): advisory-lock janitor for codex tmp paths @viyatb-oai\n- #10448 feat: add APIs to list and download public remote skills @xl-openai\n- #10519 Handle exec shutdown on Interrupt (fixes immortal `codex exec` with websockets) @rasmusrygaard\n- #10556 Feat: add upgrade to app server modelList @shijie-oai\n- #10461 feat(tui): pace catch-up stream chunking with hysteresis @joshka-oai\n- #10367 chore: add `codex debug app-server` tooling @celia-oai"
+  },
+  "summary": {
+    "changes": 34,
+    "categories": {
+      "binary": 5,
+      "cli": 19,
+      "config": 9,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 27,
+      "notable": 7
+    },
+    "undocumented": 21
+  },
+  "changes": [
+    {
+      "id": "tools.request_user_input.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "request_user_input",
+        "description"
+      ],
+      "title": "request_user_input tool description changed",
+      "impact": "notable",
+      "before": "Request user input for one to three short questions and wait for the response.",
+      "after": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 626,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/core/src/tools/spec.rs#L626"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 1308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/core/src/tools/spec.rs#L1308"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex.options.--local-provider.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--local-provider",
+        "description"
+      ],
+      "title": "`codex --local-provider`: description changed (+128 −142 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified with --oss, will use config default or show selection\n+Specify which local provider to use (lmstudio or ollama). If not specified with --oss, will use config default or show selection\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 142
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex app",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex app"
+      ],
+      "title": "New command: `codex app`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "arguments": {
+          "PATH": {
+            "default": ".",
+            "description": "Workspace path to open in Codex Desktop",
+            "names": null
+          }
+        },
+        "description": "Launch the Codex desktop app (downloads the macOS installer if missing)",
+        "helped": true,
+        "options": {
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--download-url": {
+            "default": "https://persistent.oaistatic.com/codex-app-prod/Codex.dmg",
+            "description": "Override the macOS DMG download URL (advanced)",
+            "names": [
+              "--download-url"
+            ],
+            "value": "<DOWNLOAD_URL>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex app [OPTIONS] [PATH]"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/desktop_app/mac.rs",
+            "line": 215,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/cli/src/desktop_app/mac.rs#L215"
+          },
+          {
+            "path": "codex-rs/core/src/connectors.rs",
+            "line": 216,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/core/src/connectors.rs#L216"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex debug",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex debug"
+      ],
+      "title": "New command: `codex debug`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Debugging tools",
+        "helped": true,
+        "options": {
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex debug [OPTIONS] <COMMAND>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/bin/logs_client.rs",
+            "line": 315,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/state/src/bin/logs_client.rs#L315"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex debug app-server",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex debug app-server"
+      ],
+      "title": "New command: `codex debug app-server`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Tooling: helps debug the app server",
+        "helped": false
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 478,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/app-server-test-client/src/lib.rs#L478"
+          },
+          {
+            "path": "codex-rs/debug-client/src/client.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/debug-client/src/client.rs#L66"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.options.--local-provider.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--local-provider",
+        "description"
+      ],
+      "title": "`codex exec --local-provider`: description changed (+128 −142 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified with --oss, will use config default or show selection\n+Specify which local provider to use (lmstudio or ollama). If not specified with --oss, will use config default or show selection\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 142
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--local-provider.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--local-provider",
+        "description"
+      ],
+      "title": "`codex fork --local-provider`: description changed (+128 −142 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified with --oss, will use config default or show selection\n+Specify which local provider to use (lmstudio or ollama). If not specified with --oss, will use config default or show selection\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 142
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--local-provider.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--local-provider",
+        "description"
+      ],
+      "title": "`codex resume --local-provider`: description changed (+128 −142 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified with --oss, will use config default or show selection\n+Specify which local provider to use (lmstudio or ollama). If not specified with --oss, will use config default or show selection\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 142
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+319 −236 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -13,8 +13,10 @@\n   mcp         [experimental] Run Codex as an MCP server and manage MCP servers\n   mcp-server  [experimental] Run the Codex MCP server (stdio transport)\n   app-server  [experimental] Run the app server or related tooling\n+  app         Launch the Codex desktop app (downloads the macOS installer if missing)\n   completion  Generate shell completion scripts\n-  sandbox     Run commands within a Codex-provided sandbox [aliases: debug]\n+  sandbox     Run commands within a Codex-provided sandbox\n+  debug       Debugging tools\n   apply       Apply the latest diff produced by Codex agent as a `git apply` to your local working\n               tree [aliases: a]\n   resume      Resume a previous interactive session (picker by default; use --last to continue the\n@@ -55,8 +57,8 @@\n           model_provider=oss; verifies a local LM Studio or Ollama server is running\n \n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n \n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n",
+      "stats": {
+        "added_chars": 319,
+        "removed_chars": 236
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+319 −236 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,8 +11,10 @@\n   mcp         [experimental] Run Codex as an MCP server and manage MCP servers\n   mcp-server  [experimental] Run the Codex MCP server (stdio transport)\n   app-server  [experimental] Run the app server or related tooling\n+  app         Launch the Codex desktop app (downloads the macOS installer if missing)\n   completion  Generate shell completion scripts\n-  sandbox     Run commands within a Codex-provided sandbox [aliases: debug]\n+  sandbox     Run commands within a Codex-provided sandbox\n+  debug       Debugging tools\n   apply       Apply the latest diff produced by Codex agent as a `git apply` to your local working\n               tree [aliases: a]\n   resume      Resume a previous interactive session (picker by default; use --last to continue the\n@@ -43,8 +45,8 @@\n           Convenience flag to select the local open source model provider. Equivalent to -c\n           model_provider=oss; verifies a local LM Studio or Ollama server is running\n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 319,
+        "removed_chars": 236
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.app --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "app --help"
+      ],
+      "title": "Full help text of `app --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Launch the Codex desktop app (downloads the macOS installer if missing)\n\nUsage: codex app [OPTIONS] [PATH]\n\nArguments:\n  [PATH]\n          Workspace path to open in Codex Desktop\n          \n          [default: .]\n\nOptions:\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --download-url <DOWNLOAD_URL>\n          Override the macOS DMG download URL (advanced)\n          \n          [default: https://persistent.oaistatic.com/codex-app-prod/Codex.dmg]\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.app -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "app -h"
+      ],
+      "title": "Full help text of `app -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Launch the Codex desktop app (downloads the macOS installer if missing)\n\nUsage: codex app [OPTIONS] [PATH]\n\nArguments:\n  [PATH]  Workspace path to open in Codex Desktop [default: .]\n\nOptions:\n  -c, --config <key=value>           Override a configuration value that would otherwise be loaded\n                                     from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`)\n                                     to override nested values. The `value` portion is parsed as\n                                     TOML. If it fails to parse as TOML, the raw string is used as a\n                                     literal\n      --download-url <DOWNLOAD_URL>  Override the macOS DMG download URL (advanced) [default:\n                                     https://persistent.oaistatic.com/codex-app-prod/Codex.dmg]\n      --enable <FEATURE>             Enable a feature (repeatable). Equivalent to `-c\n                                     features.<name>=true`\n      --disable <FEATURE>            Disable a feature (repeatable). Equivalent to `-c\n                                     features.<name>=false`\n  -h, --help                         Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.debug --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "debug --help"
+      ],
+      "title": "Full help text of `debug --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Debugging tools\n\nUsage: codex debug [OPTIONS] <COMMAND>\n\nCommands:\n  app-server  Tooling: helps debug the app server\n  help        Print this message or the help of the given subcommand(s)\n\nOptions:\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.debug -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "debug -h"
+      ],
+      "title": "Full help text of `debug -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Debugging tools\n\nUsage: codex debug [OPTIONS] <COMMAND>\n\nCommands:\n  app-server  Tooling: helps debug the app server\n  help        Print this message or the help of the given subcommand(s)\n\nOptions:\n  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                            nested values. The `value` portion is parsed as TOML. If it fails to\n                            parse as TOML, the raw string is used as a literal\n      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n  -h, --help                Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+147 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -37,8 +37,8 @@\n           Use open-source provider\n \n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n \n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+147 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,8 +27,8 @@\n       --oss\n           Use open-source provider\n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+147 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -42,8 +42,8 @@\n           model_provider=oss; verifies a local LM Studio or Ollama server is running\n \n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n \n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+147 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -28,8 +28,8 @@\n           Convenience flag to select the local open source model provider. Equivalent to -c\n           model_provider=oss; verifies a local LM Studio or Ollama server is running\n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+147 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -42,8 +42,8 @@\n           model_provider=oss; verifies a local LM Studio or Ollama server is running\n \n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n \n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+147 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -28,8 +28,8 @@\n           Convenience flag to select the local open source model provider. Equivalent to -c\n           model_provider=oss; verifies a local LM Studio or Ollama server is running\n       --local-provider <OSS_PROVIDER>\n-          Specify which local provider to use (lmstudio, ollama, or ollama-chat). If not specified\n-          with --oss, will use config default or show selection\n+          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n+          will use config default or show selection\n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.wire_api.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.wire_api",
+        "default"
+      ],
+      "title": "Default of model_providers.<name>.wire_api: chat → responses",
+      "impact": "notable",
+      "before": "chat",
+      "after": "responses",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.model_providers.<name>.wire_api.enum.chat",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.wire_api",
+        "enum",
+        "chat"
+      ],
+      "title": "Setting model_providers.<name>.wire_api lost value chat",
+      "impact": "notable",
+      "before": "chat",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.oss_provider.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "oss_provider",
+        "description"
+      ],
+      "title": "oss_provider description changed (+69 −85 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Preferred OSS provider for local models, e.g. \"lmstudio\", \"ollama\", or \"ollama-chat\".\n+Preferred OSS provider for local models, e.g. \"lmstudio\" or \"ollama\".\n",
+      "stats": {
+        "added_chars": 69,
+        "removed_chars": 85
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.experimental_mode.enum.default",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.experimental_mode",
+        "enum",
+        "default"
+      ],
+      "title": "Setting tui.experimental_mode gained value default",
+      "impact": "informational",
+      "before": null,
+      "after": "default",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.experimental_mode.enum.code",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "tui.experimental_mode",
+        "enum",
+        "code"
+      ],
+      "title": "Setting tui.experimental_mode lost value code",
+      "impact": "notable",
+      "before": "code",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.experimental_mode.enum.pair_programming",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "tui.experimental_mode",
+        "enum",
+        "pair_programming"
+      ],
+      "title": "Setting tui.experimental_mode lost value pair_programming",
+      "impact": "notable",
+      "before": "pair_programming",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.experimental_mode.enum.execute",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "tui.experimental_mode",
+        "enum",
+        "execute"
+      ],
+      "title": "Setting tui.experimental_mode lost value execute",
+      "impact": "notable",
+      "before": "execute",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.experimental_mode.enum.custom",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "tui.experimental_mode",
+        "enum",
+        "custom"
+      ],
+      "title": "Setting tui.experimental_mode lost value custom",
+      "impact": "notable",
+      "before": "custom",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.experimental_mode.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.experimental_mode",
+        "description"
+      ],
+      "title": "tui.experimental_mode description changed (+84 −89 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Start the TUI in the specified collaboration mode (plan/execute/etc.). Defaults to unset.\n+Start the TUI in the specified collaboration mode (plan/default). Defaults to unset.\n",
+      "stats": {
+        "added_chars": 84,
+        "removed_chars": 89
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.h2",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "h2"
+      ],
+      "title": "Binary sdk.h2: 0.4.11 → 0.4.13",
+      "impact": "informational",
+      "before": "0.4.11",
+      "after": "0.4.13",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.hyper",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "hyper"
+      ],
+      "title": "Binary sdk.hyper: 1.7.0 → 1.8.1",
+      "impact": "informational",
+      "before": "1.7.0",
+      "after": "1.8.1",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.reqwest",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "reqwest"
+      ],
+      "title": "Binary sdk.reqwest: 0.12.24 → 0.12.28",
+      "impact": "informational",
+      "before": "0.12.24",
+      "after": "0.12.28",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.rustls",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "rustls"
+      ],
+      "title": "Binary sdk.rustls: 0.23.29 → 0.23.36",
+      "impact": "informational",
+      "before": "0.23.29",
+      "after": "0.23.36",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.tonic",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "tonic"
+      ],
+      "title": "Binary sdk.tonic: 0.14.2 → 0.14.3",
+      "impact": "informational",
+      "before": "0.14.2",
+      "after": "0.14.3",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

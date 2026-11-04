@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.144.1",
+  "to": "0.144.2",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.144.1...rust-v0.144.2"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.144.2",
+    "text": "## Bug Fixes\n\n- Restored the previous Guardian auto-review policy, request format, and tool behavior after rolling back a prompting regression. (#32672)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.144.1...rust-v0.144.2\n\n- #32672 [release/0.144] Revert \"Update auto review prompting\" @dylan-hurd-oai"
+  },
+  "summary": {
+    "changes": 10,
+    "categories": {
+      "behavior": 8,
+      "caching": 1,
+      "cli": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 9
+    },
+    "undocumented": 10
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "across_turns"
+      ],
+      "title": "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
+      "impact": "notable",
+      "before": {
+        "breakpoints": [
+          [],
+          [],
+          []
+        ],
+        "stable_cache_key": true,
+        "stable_prefix_chars": 675,
+        "turns": 3
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.approval",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "approval"
+      ],
+      "title": "Behaviour: sandbox approval added",
+      "impact": "notable",
+      "before": null,
+      "after": "never",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model added",
+      "impact": "notable",
+      "before": null,
+      "after": "gpt-5.6-sol",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.provider",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "provider"
+      ],
+      "title": "Behaviour: sandbox provider added",
+      "impact": "notable",
+      "before": null,
+      "after": "telemetry_fixture",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.reasoning effort",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning effort"
+      ],
+      "title": "Behaviour: sandbox reasoning effort added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.session id",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "session id"
+      ],
+      "title": "Behaviour: sandbox session id added",
+      "impact": "notable",
+      "before": null,
+      "after": "<uuid>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.workdir",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "workdir"
+      ],
+      "title": "Behaviour: sandbox workdir added",
+      "impact": "notable",
+      "before": null,
+      "after": "<repo>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+105 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not create PATH aliases: No such file or directory (os error 2)\n [EXPERIMENTAL] Run the standalone exec-server service\n \n Usage: codex exec-server [OPTIONS]\n",
+      "stats": {
+        "added_chars": 105,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 178,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.2/codex-rs/arg0/src/lib.rs#L178"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

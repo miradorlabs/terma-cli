@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.110.0",
+  "to": "0.111.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.110.0...rust-v0.111.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.111.0",
+    "text": "## New Features\n- Fast mode is now enabled by default, and the TUI header shows whether the session is running in Fast or Standard mode. (#13450, #13446)\n- `js_repl` can now dynamically import local `.js` and `.mjs` files, making it easier to reuse workspace scripts from the REPL. (#13437)\n- Codex now tells the model which plugins are enabled at session start, improving discovery of installed MCPs, apps, and skills. (#13433)\n- App-server v2 now exposes MCP elicitation as a structured request/response flow instead of raw events, which simplifies client integrations. (#13425)\n- Expanded image workflow support for clients, including client-side handling of image-generation events and model metadata for image-capable web search. (#13512, #13538)\n\n## Bug Fixes\n- Resuming a thread now preserves its stored git context and keeps apps enabled, avoiding broken state after `codex resume`. (#13504, #13533)\n\n## Documentation\n- Added sample skill documentation for artifact workflows, including slide deck and spreadsheet examples. (#13525)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.110.0...rust-v0.111.0\n\n- #13516 Log non-audio realtime events @aibrahim-oai\n- #13208 chore(deps): bump actions/download-artifact from 7 to 8 @dependabot\n- #13512 image-gen-event/client_processing @won-openai\n- #13210 chore(deps): bump strum_macros from 0.27.2 to 0.28.0 in /codex-rs @dependabot\n- #13209 chore(deps): bump serde_with from 3.16.1 to 3.17.0 in /codex-rs @dependabot\n- #13504 Preserve persisted thread git info in resume @joeytrasatti-openai\n- #13207 chore(deps): bump actions/upload-artifact from 6 to 7 @dependabot\n- #13433 feat: track plugins mcps/apps and add plugin info to user_instructions @sayan-oai\n- #13450 [core] Enable fast mode by default @pash-openai\n- #13438 [tui] rotate paid promo tips to include fast mode @pash-openai\n- #13515 [tui] Update fast mode plan usage copy @pash-openai\n- #13533 [apps] Fix the issue where apps is not enabled after codex resume. @mzeng-openai\n- #13437 [js_repl] Support local ESM file imports @aaronl-openai\n- #13539 Reduce realtime audio submission log noise @aibrahim-oai\n- #13538 chore: add web_search_tool_type for image support @sayan-oai\n- #13446 [tui] Show speed in session header @pash-openai\n- #13392 refactor: prepare unified exec for zsh-fork backend @bolinfest\n- #13571 feat: bind package manager @jif-oai\n- #13525 feat: skills for artifacts @jif-oai\n- #13573 feat: ultra polish package manager @jif-oai\n- #13577 chore: ultra-clean artifacts @jif-oai\n- #13425 feat(app-server): support mcp elicitations in v2 api @owenlin0"
+  },
+  "summary": {
+    "changes": 6,
+    "categories": {
+      "behavior": 2,
+      "caching": 1,
+      "config": 2,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 4
+    },
+    "undocumented": 6
+  },
+  "changes": [
+    {
+      "id": "prompt.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Injected context changed (+430 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,6 +10,8 @@\n - skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n (file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n+- slides: Build, edit, render, import, and export presentation decks with the preloaded @oai/artifact-tool JavaScript surface through the artifacts tool. (file: <codex-home>/skills/.system/slides/SKILL.md)\n+- spreadsheets: Build, edit, recalculate, import, and export spreadsheet workbooks with the preloaded @oai/artifact-tool JavaScript surface through the artifacts tool. (file: <codex-home>/skills/.system/spreadsheets/SKILL.md)\n ### How to use skills\n - Discovery: The list above is the skills available in this session (name + description + file path). Skill bodies live on disk at the listed paths.\n - Trigger rules: If the user names a skill (with `$SkillName` or plain text) OR the task clearly matches a skill's description shown above, you must use that skill for that turn. Multiple mentions mean use them all. Do not carry skills across turns unless re-mentioned.\n",
+      "stats": {
+        "added_chars": 430,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "across_turns"
+      ],
+      "title": "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
+      "impact": "notable",
+      "before": {
+        "breakpoints": [
+          [],
+          [],
+          []
+        ],
+        "stable_cache_key": true,
+        "stable_prefix_chars": 4248,
+        "turns": 3
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox removed",
+      "impact": "notable",
+      "before": {
+        "approval": "never",
+        "model": "gpt-5.3-codex",
+        "models": [
+          "gpt-5.3-codex"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR, <codex-home>/memories]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output removed",
+      "impact": "notable",
+      "before": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40163,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "TE…102500 tokens truncated…9",
+        "truncation": "middle"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LOCALAPPDATA",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "LOCALAPPDATA"
+      ],
+      "title": "New environment variable: LOCALAPPDATA",
+      "impact": "informational",
+      "before": null,
+      "after": "LOCALAPPDATA",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/artifacts/src/runtime/js_runtime.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.111.0/codex-rs/artifacts/src/runtime/js_runtime.rs#L146"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/utils.rs",
+            "line": 151,
+            "url": "https://github.com/openai/codex/blob/rust-v0.111.0/codex-rs/rmcp-client/src/utils.rs#L151"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ProgramFiles",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ProgramFiles"
+      ],
+      "title": "New environment variable: ProgramFiles",
+      "impact": "informational",
+      "before": null,
+      "after": "ProgramFiles",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/artifacts/src/runtime/js_runtime.rs",
+            "line": 149,
+            "url": "https://github.com/openai/codex/blob/rust-v0.111.0/codex-rs/artifacts/src/runtime/js_runtime.rs#L149"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

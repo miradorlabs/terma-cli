@@ -1,0 +1,1523 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.161.0",
+  "to": "0.162.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.161.0...rust-v0.162.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.162.0",
+    "text": "## New Features\n\n- Add tools for creating and listing managed Git worktrees from trusted local projects when the worktrees feature is enabled. (#50148)\n- Pin tasks in the agent Command Center with `p` and keep them in a shared Pinned group when supported by the server. (#51500)\n- Navigate and copy transcript blocks with `/copy`, use `Ctrl+Insert` to copy selections, and tune mouse-wheel scrolling with `tui.mouse_scroll_speed`. (#50434, #50215, #50209)\n- Make URLs clickable in approval headers, questions, MCP prompts, warnings, banners, and verification prompts, including when links wrap across lines. (#51439, #51449, #51450, #51451, #51452, #51458)\n- Configure live web access and remote compaction capabilities for custom Responses-compatible model providers. (#50459)\n- Add JavaScript helpers for streaming promise results as they settle, plus opt-in ranked tool search in Code Mode. (#51126, #51209)\n\n## Bug Fixes\n\n- Respect server model and reasoning-summary defaults for new TUI threads while retaining explicit launch overrides. (#50013, #50811, #50913)\n- Preserve existing CRLF line endings in `apply_patch` updates without requiring an opt-in. (#51203)\n- Fix Linux sandbox startup with multiple denied files, reject writable sandbox-construction executables, and keep ripgrep configuration from weakening deny-glob masks. (#50059, #51211, #51407, #51527)\n- Restore ordinary drive-letter file access on Windows 10 and match Windows sandbox temp permissions to the child process environment. (#51511, #51512)\n- Honor server `Retry-After` advice for retryable Responses and WebSocket failures. (#50418, #51440)\n- Fix archive checksum verification when installing through Windows PowerShell with PowerShell 7 module paths present. (#51257)\n\n## Chores\n\n- Publish a signed PowerShell installer with Windows releases. (#51158)\n- Keep older stable releases and prereleases from replacing newer stable download targets or installer aliases. (#51186, #51425)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.161.0...rust-v0.162.0\n\n- #50013 Honor server model defaults when starting fresh TUI threads @etraut-openai\n- #50018 Use descriptor-safe helpers for executable test fixtures @jif-oai\n- #50019 Protect the guardian decisions API key from environment forwarding @swastik-oai\n- #50026 Preserve user restrictions in Guardian handoff context @jif-oai\n- #50035 Follow MCP tool pagination in legacy protocol mode @jif-oai\n- #50039 Keep transcript Find results readable after closing the query @fcoury-oai\n- #50045 Keep transcript Find expansion scoped to the current match @fcoury-oai\n- #50046 Stabilize Windows voice build cache keys across tool reinstalls @anp-oai\n- #50050 Keep plugin and skill snapshots scoped to each step @sayan-oai\n- #50052 Preserve question context in recovered TUI answer drafts @imac-oai\n- #50054 Check token estimate filtering directly on the tracing subscriber @tamird\n- #50058 Upgrade Windows bindings to `windows-sys` 0.61.2 @tamird\n- #50059 Fix Linux sandbox startup with multiple denied files @yuzhu-oai\n- #50066 Add a bounded Decisions transport for Guardian comparison classification @swastik-oai\n- #50082 Enable dynamic tool inheritance for fresh V2 subagents @ke-oai\n- #50083 Add paginated reverse lookup for thread attachments @joeytrasatti-openai\n- #50087 Preserve queued agent mail across session eviction @jif-oai\n- #50093 Prevent shared instruction providers from delegating to themselves @bryanashley\n- #50094 Add attachment owner lookup to the app-server @joeytrasatti-openai\n- #50099 Add opt-in Decisions comparison for Guardian V2 @swastik-oai\n- #50105 Consolidate chat composer footer logic in `footer_state` @imac-oai\n- #50109 Keep fullscreen prompts bounded and scrollable @imac-oai\n- #50112 Centralize TUI loading glyphs and frame scheduling @imac-oai\n- #50113 Add a native gRPC client for cloud thread resume and attach @bc-openai\n- #50128 Expose the model selected for a running turn's next step @sayan-oai\n- #50129 Preserve Windows environment variables for remote MCP servers @aidanv-oai\n- #50131 Add opt-in JSON diagnostics for TCP tunnels @richardopenai\n- #50140 Use the server permission catalog for TUI permission shortcuts @etraut-openai\n- #50148 Add managed worktree tools to the TUI @bc-openai\n- #50162 Bound in-flight file opens in exec-server @anp-oai\n- #50166 Upgrade `age` to 0.12.1 and remove the obsolete advisory exception @michaelm-openai\n- #50177 Enable writable file streaming in exec-server @anp-oai\n- #50183 Add `dots` to issue labeler guidance @etraut-openai\n- #50189 Replace the Figma OAuth exception with Mercado Pago @mzeng-openai\n- #50199 Restore the account email in `/status` after account updates @etraut-openai\n- #50200 Report the configured TUI mode in `codex doctor` @etraut-openai\n- #50207 Release stable Markdown tables into scrollback during streaming @etraut-openai\n- #50209 Make transcript mouse scroll speed configurable @etraut-openai\n- #50215 Support Ctrl+Insert for copying TUI selections @etraut-openai\n- #50216 Use the shared text editor for command-center task renaming @bc-openai\n- #50219 Bound tmux option probes to one second @etraut-openai\n- #50273 Record Guardian V2 Decisions agreement and latency metrics @swastik-oai\n- #50339 Add end-to-end coverage for MCP sandbox state enforcement @bolinfest\n- #50345 Keep the subagent picker consistent with thread archive state @etraut-openai\n- #50348 Back off automatic remote control reconnects with jitter @cooper-oai\n- #50354 Skip unrelated subtrees during config alias normalization @btraut-openai\n- #50359 Render ANSI styles in TUI hook system messages @etraut-openai\n- #50360 Remove initial messages from session configuration events @owenlin0\n- #50375 Use printable ASCII terminal titles under GNU Screen @imac-oai\n- #50380 Fix thread unloading after disconnect during MCP startup @yuzhu-oai\n- #50384 Allow opting into 16 KiB ARM64 code pages for macOS signing @chess-oai\n- #50389 Honor configured keybindings before transcript navigation @etraut-openai\n- #50396 Honor pager bindings for transcript page keys @bc-openai\n- #50402 Consolidate command execution output into `aggregated_output` @owenlin0\n- #50416 Clarify Git worktree choices for new and forked conversations @bc-openai\n- #50418 Honor Retry-After headers in failed Responses events @anp-oai\n- #50427 Cap persisted command output in paginated history at 64 KiB @owenlin0\n- #50431 Preserve terminal hyperlinks in agents overview previews @bc-openai\n- #50433 Allow API-key accounts to use Daybreak in the TUI @etraut-openai\n- #50434 Add keyboard copy selection to the owned transcript @bc-openai\n- #50435 Persist additional tool definitions in rollout history @pakrym-oai\n- #50437 Add a CLI command to uninstall the legacy Windows sandbox @chess-oai\n- #50441 Support ordered response items in world-state context updates @pakrym-oai\n- #50442 Preserve native USD amounts in thread usage responses @asohrabi-oai\n- #50443 Stabilize paused-time code-mode service tests @seanh-oai\n- #50445 Assert that only direct tool calls emit timing events @seanh-oai\n- #50446 Bundle rollout attachments into a gzip tar archive @dkovalenko-oai\n- #50447 Remove the provider capability gate for tool namespaces @pakrym-oai\n- #50454 Measure rollout persistence size reductions @owenlin0\n- #50458 Truncate oversized MCP results in paginated thread history @owenlin0\n- #50459 Add capability overrides for custom model providers @celia-oai\n- #50462 Populate thread previews from delegated task inputs @bc-openai\n- #50464 Add the `incremental_tools` feature flag @pakrym-oai\n- #50465 Retry registry authentication outages and jitter executor reconnects @apanasenko-oai\n- #50467 Copy transcript selections as literal text while preserving rich HTML @fcoury-oai\n- #50470 Account for JSON overhead when truncating MCP tool results @owenlin0\n- #50472 Enable Ultrafast service tiers for Amazon Bedrock Astra models @celia-oai\n- #50477 Use the app-server default output cap for TUI workspace commands @etraut-openai\n- #50480 Skip managed config loading for registered Windows sandbox refreshes @zm-oai\n- #50499 Include installer stderr in daemon update failures @etraut-openai\n- #50503 Use Enter to accept transcript Find results and Escape to cancel @fcoury-oai\n- #50504 Center TUI confirmations over their retained backdrop @bc-openai\n- #50505 Keep Command Center selection adjacent after task removal @bc-openai\n- #50507 Record Windows sandbox service stop diagnostics @zm-oai\n- #50510 Require GovCloud guidance acknowledgment after Bedrock setup @jackz100\n- #50516 Add scenario coverage for remote `/compact` context preservation @pakrym-oai\n- #50525 Reject unknown TUI keys in strict config validation @etraut-openai\n- #50531 Persist realtime transcript tails before closure without inference @guinness-oai\n- #50536 Keep shared MCP types stable in Code Mode exec descriptions @aibrahim-oai\n- #50540 Send incremental tool catalog updates in Responses Lite @pakrym-oai\n- #50546 Keep MCP resource helpers available in code mode @aibrahim-oai\n- #50555 Skip daemon auto-start for Windows-mounted WSL homes @etraut-openai\n- #50558 Avoid reading the current directory when resolving absolute paths @etraut-openai\n- #50559 Distinguish daemon release identity from executable contents @etraut-openai\n- #50562 Keep Code Mode tool discovery guidance stable across catalog changes @aibrahim-oai\n- #50564 Allow transcript selection and copying while bottom modals are open @etraut-openai\n- #50687 Keep third-party tools deferred in strict Code Mode Only @aibrahim-oai\n- #50695 Preserve local Markdown link labels in the TUI @bc-openai\n- #50700 Let the transport create the Windows remote-control socket directory @etraut-openai\n- #50720 Decode Windows Terminal's mapped Shift+Enter sequence @bc-openai\n- #50727 Show model and reasoning effort near the top of task details @etraut-openai\n- #50741 Keep environment-backed tools exposed across readiness changes @won-openai\n- #50756 Show unavailable slash commands when searched in side conversations @bc-openai\n- #50764 Allow `/archive` while a turn is running @bc-openai\n- #50781 Restrict TUI MCP startup notifications to owned threads @etraut-openai\n- #50782 Retry Windows daemon release publication on transient file locks @etraut-openai\n- #50786 Remember Command Center grouping across launches @bc-openai\n- #50788 Open slash commands from empty drafts in Vim Normal mode @bc-openai\n- #50802 Fall back to mklink when Windows daemon junction updates are denied @etraut-openai\n- #50803 Use the managed daemon for eligible remote-control launches @etraut-openai\n- #50804 Preserve review lifecycle ordering on failure @etraut-openai\n- #50808 Prune TUI snapshots and consolidate behavior tests @etraut-openai\n- #50811 Honor server reasoning summary defaults in new TUI threads @etraut-openai\n- #50913 Use server model defaults for connected TUI fresh starts @etraut-openai\n- #50940 Recover malformed Windows deny-read ACL state safely @zm-oai\n- #50962 Gate stable environment tool exposure behind a feature flag @aibrahim-oai\n- #50964 Track inference tool changes in turn analytics @aibrahim-oai\n- #50977 Isolate tracing in the strict third-party tool deferral test @alishobeiri-oai\n- #51061 Gate Guardian continuation tests on classifier request capture @jif-oai\n- #51063 Honor prior cancellation before starting Codex delegates @jif-oai\n- #51064 Ignore stale refresh responses in agents overview tests @jif-oai\n- #51065 Scope Guardian V2 response timing to snapshot sampling @swastik-oai\n- #51067 Use issuing-step context for Guardian MCP elicitation reviews @jif-oai\n- #51070 Preserve trusted-tool context in Guardian Decisions requests @swastik-oai\n- #51117 Install full context in compaction replacement history @pakrym-oai\n- #51119 Clarify incremental tool namespace updates in Responses Lite @akira-oai\n- #51126 Add promise settlement streaming helpers to code mode @cconger\n- #51133 Allow Guardian Decisions to fall back to `OPENAI_API_KEY` @swastik-oai\n- #51137 Recover Guardian reviews from parent checkpoints @felixxia-oai\n- #51139 Force fresh Guardian sessions for parent-checkpoint recovery @felixxia-oai\n- #51140 Isolate Guardian checkpoint recovery flags per review attempt @felixxia-oai\n- #51156 Send base instructions as Responses input messages @pakrym-oai\n- #51157 Enforce required environment skills before model inference @anp-oai\n- #51158 Sign the PowerShell installer in Windows releases @chess-oai\n- #51184 Remove obsolete Guardian thread-context enables from tests @felixxia-oai\n- #51185 Retry transient gRPC code-mode session admission failures @cassirer-openai\n- #51186 Prevent stable release pointers from moving backward @andrewgu-oai\n- #51188 Record base instructions in incremental tool history @pakrym-oai\n- #51191 Clean up Unix app-server control-socket startup lock files @etraut-openai\n- #51192 Wait for SIGCONT when resuming the TUI @etraut-openai\n- #51193 Test thread archiving before the first turn @btraut-openai\n- #51194 Add browser extension request headers to config requirements @jn-openai\n- #51198 Allow concurrent release builds while serializing publication @andrewgu-oai\n- #51200 Upgrade Bazel to 9.2.0 and refresh the module lockfile @anp-oai\n- #51202 Distinguish namespace removals in incremental tool updates @akira-oai\n- #51203 Make apply_patch preserve line endings unconditionally @charliemarsh-oai\n- #51206 Record initialization analytics for resumed subagents @peilin-openai\n- #51207 Gate CLI Daybreak controls and selection behind an opt-in feature @julee-oai\n- #51209 Add ranked tool discovery to JavaScript code mode @zamoshchin-openai\n- #51211 Reject sandbox-writable bubblewrap executables from PATH @viyatb-oai\n- #51215 Measure raw MCP tool catalog sizes in telemetry @owenlin0\n- #51217 Preserve review targets and scope misalignment continuation metadata @yunhan-wei\n- #51220 Honor the OTLP metrics temporality preference @daniel-oai\n- #51221 Separate environment requests from runtime selections @anp-oai\n- #51223 Remove legacy personality template metadata @rhan-oai\n- #51230 Make session lookup pagination stable and report listing failures @etraut-openai\n- #51235 Remove default model labels from TUI model pickers @etraut-openai\n- #51241 Add a partial answer message phase @rb-oai\n- #51249 Handle partial answers consistently across agent workflows @rb-oai\n- #51253 Enforce Fast and Ultra Fast policies independently @dpatel-oai\n- #51256 Start the Windows sandbox service during registered Core setup @zm-oai\n- #51257 Fix installer checksum verification under Windows PowerShell @zm-oai\n- #51260 Handle partial answers in realtime routing and thread search @rb-oai\n- #51329 Remove partial-history subagent forks @jif-oai\n- #51330 Measure total Guardian approval decision duration @jif-oai\n- #51331 Track sub-agent result delivery outcomes @jif-oai\n- #51332 Record multi-agent wait duration by outcome @jif-oai\n- #51333 Record the multi-agent version in turn analytics @jif-oai\n- #51334 Count Guardian denial-limit interruptions in telemetry @jif-oai\n- #51335 Update collaboration snapshots for full-history fork instructions @jif-oai\n- #51347 Measure shell snapshot use and wait time per command @jif-oai\n- #51350 Allow larger shell snapshots when replaying from a file @jif-oai\n- #51355 Add bounded diagnostics for agent spawn failures @jif-oai\n- #51378 Keep Guardian v2 WebSocket pools warm with concurrent replenishment @jif-oai\n- #51391 Make URLs in asynchronous question titles clickable @charliemarsh-oai\n- #51396 Let late low-risk scores complete pending Guardian reviews @jif-oai\n- #51400 Prevent later Guardian scores from releasing earlier pending reviews @jif-oai\n- #51402 Preserve turn attribution across recovery and compaction @eddie-openai\n- #51407 Protect ripgrep lookup during Linux sandbox construction @viyatb-oai\n- #51411 Suppress repeated image paste presses in legacy terminals @etraut-openai\n- #51415 Expose and persist turn lineage across the app server @eddie-openai\n- #51419 Preserve turn attribution when queued mail wakes durable sleep @eddie-openai\n- #51420 Finish idle thread unloads after slow shutdown @jif-oai\n- #51421 Include root turn IDs in host-owned Apps tool calls @eddie-openai\n- #51422 Accept environment requests at thread and turn settings boundaries @anp-oai\n- #51425 Skip stable installer alias publishing for prereleases @zsol-openai\n- #51426 Remove the Bazel JVM override for Windows ARM64 voice builds @anp-oai\n- #51427 Prevent invalidated wakeups from starting a turn @jif-oai\n- #51433 Show hook status messages as titles in the hooks browser @abhinav-oai\n- #51439 Preserve clickable URLs in TUI approval headers @charliemarsh-oai\n- #51440 Honor Retry-After in WebSocket error events @anp-oai\n- #51441 Fix core integration tests for updated turn APIs @anp-oai\n- #51449 Make URLs clickable in TUI user input questions @charliemarsh-oai\n- #51450 Make URLs clickable in MCP elicitation prompts @charliemarsh-oai\n- #51451 Make URLs in the TUI warnings viewer clickable @charliemarsh-oai\n- #51452 Make banner URLs clickable across wrapped lines @charliemarsh-oai\n- #51457 Preserve status usage hyperlinks when the URL wraps @charliemarsh-oai\n- #51458 Make URLs clickable in user verification prompts @charliemarsh-oai\n- #51459 Preserve wrapped help links in Windows sandbox prompts @charliemarsh-oai\n- #51460 Retry realtime sideband attachment while an existing call activates @bullman-oai\n- #51463 Record resolved model and reasoning effort in sub-agent activity @sdcoffey\n- #51465 Add an optional JSON transcript format for Guardian @felixxia-oai\n- #51466 Keep Guardian transcript records structured through budget recovery @felixxia-oai\n- #51467 Keep submission logs useful without exposing payloads @chess-oai\n- #51470 Raise the managed app-server file descriptor limit on Unix @etraut-openai\n- #51471 Preserve clickable URLs in pending input previews @charliemarsh-oai\n- #51472 Preserve clickable URLs in TUI selection rows @charliemarsh-oai\n- #51473 Preserve URL destinations in wrapped hook details @charliemarsh-oai\n- #51480 Preserve tool declaration mode across resumed context windows @pakrym-oai\n- #51482 Use PathUri for skill identity and path matching @anp-oai\n- #51483 Add correlated, credential-free rendezvous connection diagnostics @alexi-openai\n- #51491 Classify executor capability root ownership independently of parsing @stevenlee-oai\n- #51492 Remove obsolete fields from persisted turn context @pakrym-oai\n- #51493 Bind capability roots to environment selections @anp-oai\n- #51499 Load rollout history on a single blocking worker @charliemarsh-oai\n- #51500 Add shared task pinning to the agent command center @etraut-openai\n- #51502 Bound relay connection attempts and handle pongs during blocked writes @alexi-openai\n- #51503 Expose selected environments to MCP contributors @mtsui-oai\n- #51510 Preserve live TUI settings when configuration reloads fail @imac-oai\n- #51511 Fix Windows 10 drive-letter opens for no-follow filesystem operations @zm-oai\n- #51512 Align Windows sandbox temp permissions with the child environment @zm-oai\n- #51515 Expose detailed agent tree shutdown failure reports @keitht-openai\n- #51517 Pass thread persistence intent to attachment uploads @kchainani-oai\n- #51525 Preserve the CLI MXC preference in executor config reads @zm-oai\n- #51527 Ignore ripgrep configuration when expanding sandbox deny globs @viyatb-oai"
+  },
+  "summary": {
+    "changes": 31,
+    "categories": {
+      "behavior": 1,
+      "cli": 8,
+      "config": 17,
+      "prompt": 1,
+      "telemetry": 2,
+      "tools": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 24,
+      "notable": 7
+    },
+    "undocumented": 16
+  },
+  "changes": [
+    {
+      "id": "prompt.system.4.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "4",
+        "text"
+      ],
+      "title": "System prompt changed (+201 −230 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -33,4 +33,4 @@\n There are 4 available concurrency slots, meaning that up to 4 agents can be active at once, including you.\n \n Full-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides.\n-Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"` or a positive integer string.</multi_agent_role>\n+Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"`.</multi_agent_role>\n",
+      "stats": {
+        "added_chars": 201,
+        "removed_chars": 230
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.exec.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec",
+        "description"
+      ],
+      "title": "exec tool description changed (+3383 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -28,6 +28,91 @@\n - `ALL_TOOLS`: metadata for the enabled nested tools as `{ name, description }` entries.\n - `yield_control()`: yields the accumulated output to the model immediately while the script keeps running.\n \n+Some deferred nested tools may be omitted from this description. They are still available on the global `tools` object and listed in `ALL_TOOLS`.\n+To find one, filter `ALL_TOOLS` by `name` and `description`.\n+\n+Tool availability can change between calls.\n+\n+Shared MCP Types:\n+```ts\n+type Role = \"user\" | \"assistant\";\n+type MetaObject = Record<string, unknown>;\n+type Annotations = {\n+  audience?: Role[];\n+  priority?: number;\n+  lastModified?: string;\n+};\n+type Icon = {\n+  src: string;\n+  mimeType?: string;\n+  sizes?: string[];\n+  theme?: \"light\" | \"dark\";\n+};\n+type TextResourceContents = {\n+  uri: string;\n+  mimeType?: string;\n+  _meta?: MetaObject;\n+  text: string;\n+};\n+type BlobResourceContents = {\n+  uri: string;\n+  mimeType?: string;\n+  _meta?: MetaObject;\n+  blob: string;\n+};\n+type TextContent = {\n+  type: \"text\";\n+  text: string;\n+  annotations?: Annotations;\n+  _meta?: MetaObject;\n+};\n+type ImageContent = {\n+  type: \"image\";\n+  data: string;\n+  mimeType: string;\n+  annotations?: Annotations;\n+  _meta?: MetaObject;\n+};\n+type AudioContent = {\n+  type: \"audio\";\n+  data: string;\n+  mimeType: string;\n+  annotations?: Annotations;\n+  _meta?: MetaObject;\n+};\n+type ResourceLink = {\n+  icons?: Icon[];\n+  name: string;\n+  title?: string;\n+  uri: string;\n+  description?: string;\n+  mimeType?: string;\n+  annotations?: Annotations;\n+  size?: number;\n+  _meta?: MetaObject;\n+  type: \"resource_link\";\n+};\n+type EmbeddedResource = {\n+  type: \"resource\";\n+  resource: TextResourceContents | BlobResourceContents;\n+  annotations?: Annotations;\n+  _meta?: MetaObject;\n+};\n+type ContentBlock =\n+  | TextContent\n+  | ImageContent\n+  | AudioContent\n+  | ResourceLink\n+  | EmbeddedResource;\n+type CallToolResult<TStructured = { [key: string]: unknown }> = {\n+  _meta?: MetaObject;\n+  content: ContentBlock[];\n+  isError?: boolean;\n+  structuredContent?: TStructured;\n+  [key: string]: unknown;\n+};\n+```\n+\n ### `apply_patch`\n The `apply_patch` tool can be used to edit files. This is a FREEFORM tool, so do not wrap the patch in JSON.\n \n@@ -98,6 +183,45 @@\n exec tool declaration:\n ```ts\n declare const tools: { get_goal(args: {}): Promise<unknown>; };\n+```\n+\n+### `list_mcp_resource_templates`\n+Lists resource templates provided by MCP servers. Parameterized resource templates allow servers to share data that takes parameters and provides context to language models, such as files, database schemas, or application-specific information. Prefer resource templates over web search when possible.\n+\n+exec tool declaration:\n+```ts\n+declare const tools: { list_mcp_resource_templates(args: {\n+  // Opaque cursor from a previous list_mcp_resource_templates call; omit for the first page.\n+  cursor?: string;\n+  // MCP server name. Omit to list resource templates from every configured server.\n+  server?: string;\n+}): Promise<unknown>; };\n+```\n+\n+### `list_mcp_resources`\n+Lists resources provided by MCP servers. Resources allow servers to share data that provides context to language models, such as files, database schemas, or application-specific information. Prefer resources over web search when possible.\n+\n+exec tool declaration:\n+```ts\n+declare const tools: { list_mcp_resources(args: {\n+  // Opaque cursor from a previous list_mcp_resources call; omit for the first page.\n+  cursor?: string;\n+  // MCP server name. Omit to list resources from every configured server.\n+  server?: string;\n+}): Promise<unknown>; };\n+```\n+\n+### `read_mcp_resource`\n+Read a specific resource from an MCP server given the server name and resource URI.\n+\n+exec tool declaration:\n+```ts\n+declare const tools: { read_mcp_resource(args: {\n+  // MCP server name exactly as configured. Must match the 'server' field returned by list_mcp_resources.\n+  server: string;\n+  // Resource URI to read. Must be one of the URIs returned by list_mcp_resources.\n+  uri: string;\n+}): Promise<unknown>; };\n ```\n \n ### `update_goal`\n",
+      "stats": {
+        "added_chars": 3383,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource_spec.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/tools/handlers/mcp_resource_spec.rs#L55"
+          },
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/code-mode-protocol/src/description.rs#L16-L19"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.collaboration/spawn_agent.input_schema.properties.fork_turns.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "collaboration/spawn_agent",
+        "input_schema",
+        "properties",
+        "fork_turns",
+        "description"
+      ],
+      "title": "collaboration/spawn_agent tool parameter fork_turns: description changed (+126 −148 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Optional number of turns to fork. Defaults to `all`. Use `none`, `all`, or a positive integer string such as `3` to fork only the most recent turns.\n+Parent history to inherit. Defaults to `all`; use `none` to start without parent history. Only `all` and `none` are supported.\n",
+      "stats": {
+        "added_chars": 126,
+        "removed_chars": 148
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 667,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L667"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.4.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "4",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 4 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -33,4 +33,4 @@\n There are 4 available concurrency slots, meaning that up to 4 agents can be active at once, including you.\n \n Full-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides.\n-Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"` or a positive integer string.</multi_agent_role>\n+Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"`.</multi_agent_role>\n",
+      "stats": {
+        "added_chars": 201,
+        "removed_chars": 230
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "telemetry.surfaces.traces/handle_tool_call_with_source/events/codex.tool_result_ready",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/handle_tool_call_with_source/events/codex.tool_result_ready"
+      ],
+      "title": "New telemetry surface: traces/handle_tool_call_with_source/events/codex.tool_result_ready (12 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "call_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "level": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_namespace": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "turn_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/call_trace.rs",
+            "line": 69,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/tools/call_trace.rs#L69"
+          },
+          {
+            "path": "codex-rs/core/src/tools/call_trace.rs",
+            "line": 72,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/tools/call_trace.rs#L72"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/thread/read",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/thread/read"
+      ],
+      "title": "New telemetry surface: traces/thread/read (17 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "app_server.api_version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "app_server.client_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "app_server.client_version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "app_server.connection_id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "rpc.method": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "rpc.request_id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "rpc.system": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "rpc.transport": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/doctor/filesystem_paths.rs",
+            "line": 289,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/cli/src/doctor/filesystem_paths.rs#L289"
+          },
+          {
+            "path": "codex-rs/codex-api/src/files.rs",
+            "line": 314,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/codex-api/src/files.rs#L314"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex remote-control.options.--no-daemon",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex remote-control",
+        "options",
+        "--no-daemon"
+      ],
+      "title": "New flag `codex remote-control --no-daemon`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Run an embedded app-server in the foreground until Ctrl-C",
+        "names": [
+          "--no-daemon"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/common.rs",
+            "line": 1158,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/app-server-protocol/src/protocol/common.rs#L1158"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/common.rs",
+            "line": 1164,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/app-server-protocol/src/protocol/common.rs#L1164"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.usage.Usage: codex sandbox [OPTIONS] [COMMAND]... [COMMAND]",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "usage",
+        "Usage: codex sandbox [OPTIONS] [COMMAND]... [COMMAND]"
+      ],
+      "title": "Usage of `codex sandbox` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: codex sandbox [OPTIONS] [COMMAND]... [COMMAND]",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 459,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/cli/src/doctor.rs#L459"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor/filesystem_paths.rs",
+            "line": 44,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/cli/src/doctor/filesystem_paths.rs#L44"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.usage.Usage: codex sandbox [OPTIONS] [COMMAND]...",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "usage",
+        "Usage: codex sandbox [OPTIONS] [COMMAND]..."
+      ],
+      "title": "Usage of `codex sandbox` removed",
+      "impact": "notable",
+      "before": "Usage: codex sandbox [OPTIONS] [COMMAND]...",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 459,
+            "url": "https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/cli/src/doctor.rs#L459"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor/filesystem_paths.rs",
+            "line": 44,
+            "url": "https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/cli/src/doctor/filesystem_paths.rs#L44"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox uninstall",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox uninstall"
+      ],
+      "title": "New command: `codex sandbox uninstall`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Remove the legacy Windows sandbox's machine-wide accounts and network rules",
+        "helped": false
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core-plugins/src/remote_legacy.rs",
+            "line": 178,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core-plugins/src/remote_legacy.rs#L178"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control --help"
+      ],
+      "title": "Full help text of `remote-control --help` changed (+84 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -23,6 +23,9 @@\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n+      --no-daemon\n+          Run an embedded app-server in the foreground until Ctrl-C\n+\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n",
+      "stats": {
+        "added_chars": 84,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control -h"
+      ],
+      "title": "Full help text of `remote-control -h` changed (+85 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -15,6 +15,7 @@\n                             parse as TOML, the raw string is used as a literal\n       --json                Emit machine-readable JSON\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --no-daemon           Run an embedded app-server in the foreground until Ctrl-C\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 85,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+220 −43 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,10 @@\n Run commands within a Codex-provided sandbox\n \n-Usage: codex sandbox [OPTIONS] [COMMAND]...\n+Usage: codex sandbox [OPTIONS] [COMMAND]... [COMMAND]\n+\n+Commands:\n+  uninstall  Remove the legacy Windows sandbox's machine-wide accounts and network rules\n+  help       Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [COMMAND]...\n",
+      "stats": {
+        "added_chars": 220,
+        "removed_chars": 43
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/sandbox_uninstall.rs",
+            "line": 7,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/cli/src/sandbox_uninstall.rs#L7"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+220 −43 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,10 @@\n Run commands within a Codex-provided sandbox\n \n-Usage: codex sandbox [OPTIONS] [COMMAND]...\n+Usage: codex sandbox [OPTIONS] [COMMAND]... [COMMAND]\n+\n+Commands:\n+  uninstall  Remove the legacy Windows sandbox's machine-wide accounts and network rules\n+  help       Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [COMMAND]...  Full command args to run under seatbelt\n",
+      "stats": {
+        "added_chars": 220,
+        "removed_chars": 43
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/sandbox_uninstall.rs",
+            "line": 7,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/cli/src/sandbox_uninstall.rs#L7"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.code_mode_only_strict_3p_tools",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_only_strict_3p_tools"
+      ],
+      "title": "New setting: features.code_mode_only_strict_3p_tools",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1172,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1172"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.code_mode_tool_search",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_tool_search"
+      ],
+      "title": "New setting: features.code_mode_tool_search",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1130,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1130"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript_mode"
+      ],
+      "title": "New setting: features.guardianv2.transcript_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Transcript encoding for synchronous Guardian review and asynchronous scoring. Defaults to line.",
+        "enum": [
+          "line",
+          "json"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2_decisions_comparison",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2_decisions_comparison"
+      ],
+      "title": "New setting: features.guardianv2_decisions_comparison",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1812,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1812"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.incremental_tools",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.incremental_tools"
+      ],
+      "title": "New setting: features.incremental_tools",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1530,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1530"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.multi_agent_v2_dynamic_tools",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2_dynamic_tools"
+      ],
+      "title": "New setting: features.multi_agent_v2_dynamic_tools",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1434,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1434"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.stable_environment_tools",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.stable_environment_tools"
+      ],
+      "title": "New setting: features.stable_environment_tools",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1118,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1118"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.ultrafast_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.ultrafast_mode"
+      ],
+      "title": "New setting: features.ultrafast_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/cloud_config_bundle.rs",
+            "line": 74,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/config/src/cloud_config_bundle.rs#L74"
+          },
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1908,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/features/src/lib.rs#L1908"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.capabilities",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.capabilities"
+      ],
+      "title": "New setting: model_providers.<name>.capabilities",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Optional API capability overrides for a custom Responses-compatible provider. Unspecified capabilities retain their existing provider defaults.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/user_verification_test_support.rs",
+            "line": 238,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/app-server/src/user_verification_test_support.rs#L238"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/bin/test_mcp_2026_discovery_stdio_server.rs",
+            "line": 24,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/rmcp-client/src/bin/test_mcp_2026_discovery_stdio_server.rs#L24"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.model_providers.<name>.capabilities.external_web_access",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.capabilities.external_web_access"
+      ],
+      "title": "New setting: model_providers.<name>.capabilities.external_web_access",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether hosted web search may access the live web.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.capabilities.remote_compaction",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.capabilities.remote_compaction"
+      ],
+      "title": "New setting: model_providers.<name>.capabilities.remote_compaction",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Remote context-compaction protocol; omission preserves provider defaults.",
+        "enum": [
+          "unsupported",
+          "v2"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.agents_overview_grouping",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.agents_overview_grouping"
+      ],
+      "title": "New setting: tui.agents_overview_grouping",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "project",
+        "description": "Last selected grouping in Agent Command Center.",
+        "enum": [
+          "project",
+          "status",
+          "model"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/agents_overview_grouping.rs",
+            "line": 111,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/tui/src/app/agents_overview_grouping.rs#L111"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap",
+        "default"
+      ],
+      "title": "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
+      "impact": "notable",
+      "before": {
+        "agents": {
+          "archive": null,
+          "delete": null,
+          "fork": null,
+          "hide": null,
+          "new_task": null,
+          "new_worktree": null,
+          "rename": null,
+          "resume": null,
+          "search": null,
+          "stop": null,
+          "toggle_grouping": null
+        },
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null,
+          "next_permission_mode": null,
+          "previous_permission_mode": null,
+          "prompt_stack_back": null,
+          "skip_question": null,
+          "toggle_voice": null,
+          "toggle_voice_mute": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "find_transcript": null,
+          "focus_activity": null,
+          "open_agents": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_side_conversation": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "find": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "enter_replace_mode": null,
+          "find_backward": null,
+          "find_forward": null,
+          "insert_line_start": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "redo": null,
+          "repeat_last_change": null,
+          "replace_char": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "till_backward": null,
+          "till_forward": null,
+          "undo": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_find_backward": null,
+          "motion_find_forward": null,
+          "motion_jump_bottom": null,
+          "motion_jump_top": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_till_backward": null,
+          "motion_till_forward": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_search": {
+          "backward": null,
+          "forward": null,
+          "next": null,
+          "previous": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "after": {
+        "agents": {
+          "archive": null,
+          "delete": null,
+          "fork": null,
+          "hide": null,
+          "new_task": null,
+          "new_worktree": null,
+          "rename": null,
+          "resume": null,
+          "search": null,
+          "stop": null,
+          "toggle_grouping": null,
+          "toggle_pin": null
+        },
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null,
+          "next_permission_mode": null,
+          "previous_permission_mode": null,
+          "prompt_stack_back": null,
+          "skip_question": null,
+          "toggle_voice": null,
+          "toggle_voice_mute": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "find_transcript": null,
+          "focus_activity": null,
+          "open_agents": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_side_conversation": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "find": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "enter_replace_mode": null,
+          "find_backward": null,
+          "find_forward": null,
+          "insert_line_start": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "redo": null,
+          "repeat_last_change": null,
+          "replace_char": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "till_backward": null,
+          "till_forward": null,
+          "undo": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_find_backward": null,
+          "motion_find_forward": null,
+          "motion_jump_bottom": null,
+          "motion_jump_top": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_till_backward": null,
+          "motion_till_forward": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_search": {
+          "backward": null,
+          "forward": null,
+          "next": null,
+          "previous": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1232,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/config/src/loader/mod.rs#L1232"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 155,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/config/edit.rs#L155"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.agents.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.agents",
+        "default"
+      ],
+      "title": "Default of tui.keymap.agents: {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne… → {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne…",
+      "impact": "notable",
+      "before": {
+        "archive": null,
+        "delete": null,
+        "fork": null,
+        "hide": null,
+        "new_task": null,
+        "new_worktree": null,
+        "rename": null,
+        "resume": null,
+        "search": null,
+        "stop": null,
+        "toggle_grouping": null
+      },
+      "after": {
+        "archive": null,
+        "delete": null,
+        "fork": null,
+        "hide": null,
+        "new_task": null,
+        "new_worktree": null,
+        "rename": null,
+        "resume": null,
+        "search": null,
+        "stop": null,
+        "toggle_grouping": null,
+        "toggle_pin": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/agent-roles/src/loader.rs",
+            "line": 78,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/agent-roles/src/loader.rs#L78"
+          },
+          {
+            "path": "codex-rs/agent-roles/src/loader.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/agent-roles/src/loader.rs#L179"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.keymap.agents.toggle_pin",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.agents.toggle_pin"
+      ],
+      "title": "New setting: tui.keymap.agents.toggle_pin",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Pin or unpin the selected task in the shared sidebar section.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/agent_center/hints.rs",
+            "line": 93,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/tui/src/app/agent_center/hints.rs#L93"
+          },
+          {
+            "path": "codex-rs/tui/src/app/agent_center/hints.rs",
+            "line": 96,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/tui/src/app/agent_center/hints.rs#L96"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.mouse_scroll_speed",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.mouse_scroll_speed"
+      ],
+      "title": "New setting: tui.mouse_scroll_speed",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Mouse wheel speed multiplier for transcript scrolling, based on one row per event. Defaults to `1.0`. Positive fractional values slow scrolling; values above `1.0` speed it up.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"
+      ],
+      "title": "New environment variable: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE",
+      "impact": "informational",
+      "before": null,
+      "after": "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/client.rs",
+            "line": 368,
+            "url": "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/otel/src/metrics/client.rs#L368"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

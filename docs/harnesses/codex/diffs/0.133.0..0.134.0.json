@@ -1,0 +1,1400 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.133.0",
+  "to": "0.134.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.133.0...rust-v0.134.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.134.0",
+    "text": "## New Features\n- Added search across local conversation history, including case-insensitive content matches with result previews. (#23519, #23921)\n- Made `--profile` the primary profile selector across CLI, TUI permissions, and sandbox flows, with legacy profile configs rejected through migration guidance. (#23708, #23883, #23890, #24051, #24055, #24059, #24067, #24110)\n- Improved MCP setup with per-server environment targeting and OAuth options for streamable HTTP servers. (#23583, #24120)\n- Made connector tool schemas more reliable by preserving local `$ref`/`$defs` structures and compacting oversized schemas before exposure. (#23357, #23904)\n- Let read-only MCP tools run concurrently when they advertise `readOnlyHint`. (#23750)\n- Added richer extension and hook context, including conversation history for extension tools and subagent identity in hook inputs. (#22882, #23963)\n\n## Bug Fixes\n- Improved remote reliability by reconnecting stale exec-server websocket clients, retrying remote control immediately after auth recovery, and retrying remote compaction v2 streams. (#23867, #23775, #23951)\n- Fixed Windows TUI rendering corruption by restoring virtual terminal mode before drawing. (#24082)\n- Displayed workspace-specific usage-limit messages for credit and spend-cap failures. (#24114)\n- Allowed plugin skills to reuse shared plugin-level icon assets. (#23776)\n- Preserved active permission profile metadata when syncing auto-review runtime settings. (#23956)\n- Ensured Node-based tools honor Codex’s managed network proxy environment. (#23905)\n\n## Documentation\n- Documented the curl and PowerShell installer paths in the README. (#24106)\n- Updated developer docs to prefer `just test` over direct `cargo test` for repo-local test runs. (#23910)\n- Added profile migration documentation links to relevant config errors. (#23879)\n\n## Chores\n- Simplified release packaging around canonical native artifacts, reusable DotSlash fetching, and a new macOS x64 zsh artifact. (#23833, #23836, #24129, #24165)\n- Added release-build support for Codex-produced V8 artifacts. (#23934)\n- Added image re-encoding benchmarks and connector-style JSON schema policy fixtures. (#23935, #24152)\n- Improved tracing and analytics for websocket requests, turn starts, and remote compaction v2. (#23581, #23980, #24146)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.133.0...rust-v0.134.0\n\n- #23581 Trace logical websocket request after untraced warmup @jif-oai\n- #23718 [codex] Steer budget-limited goal extension turns @jif-oai\n- #23861 fix: cargo lock @jif-oai\n- #23728 feat: retain remote compaction truncation parity in v2 @jif-oai\n- #23870 Make tool executor specs mandatory @jif-oai\n- #23882 [codex] Stabilize subagent start hook test @jif-oai\n- #23876 refactor: centralize tool exposure planning @jif-oai\n- #23879 chore: link doc in profile error messages @jif-oai\n- #23883 cli: rename profile v2 flag to --profile @jif-oai\n- #23835 docs: add description to codex-cli/package.json @bolinfest\n- #23583 Route MCP servers through explicit environments @starr-openai\n- #23886 cli: remove legacy profile v1 plumbing @jif-oai\n- #23708 tui: plumb permission profile selection @viyatb-oai\n- #23833 packaging: move rg manifest out of npm bin @bolinfest\n- #23796 Improve `/goal` error messages for ephemeral sessions @etraut-openai\n- #23867 Reconnect disconnected exec-server websocket clients with fresh sessions @starr-openai\n- #23792 TUI: skip goal replace prompt for completed goals @etraut-openai\n- #23519 [codex] Add rollout-backed thread content search @fc-oai\n- #22552 Remove plugin hooks feature flag @abhinav-oai\n- #23836 npm: remove legacy package artifact synthesis @bolinfest\n- #23921 [codex] Make thread search case-insensitive @fc-oai\n- #23775 fix(remote-control): retry after auth recovery @apanasenko-oai\n- #22882 Add subagent identity to hook inputs @abhinav-oai\n- #22915 [3 of 4] tui: route feature and memory toggles through app server @etraut-openai\n- #23776 fix: Allow plugin skills to share plugin-level icon assets @xl-openai\n- #23860 Add Bedrock Mantle GovCloud region @CHARLESPALEN-OAI\n- #23956 Fix auto-review permission profile override @etraut-openai\n- #23357 feat: support local refs and defs in tool input schemas @celia-oai\n- #23963 Expose conversation history to extension tools @sayan-oai\n- #23904 feat: best-effort compact large tool schemas @celia-oai\n- #23750 Allow parallel MCP tool calls when annotated readOnly @anp-oai\n- #23905 [codex] Enable Node env proxy for managed network proxy @rreichel3-oai\n- #23890 mcp: surface profile migration guidance under --profile @jif-oai\n- #24051 config: remove legacy profile v1 resolution @jif-oai\n- #24055 config: remove legacy profile write paths @jif-oai\n- #24057 Avoid config snapshots in live agent subtree traversal @jif-oai\n- #24061 otel: drop legacy profile usage telemetry @jif-oai\n- #24059 fix: reject legacy profile selectors @jif-oai\n- #23934 ci: Use codex produced v8 artifacts for release builds @cconger\n- #24099 fix(app-server): fix optional bool annotations @owenlin0\n- #23910 Prefer `just test` over `cargo test` in docs @anp-oai\n- #23951 retry remote compaction v2 requests @rhan-oai\n- #24081 tui: make `codex-tui.log` opt-in @jif-oai\n- #24102 cli: infer host sandbox backend @bolinfest\n- #24067 app-server: drop legacy profile config surface @jif-oai\n- #23736 Add new enterprise requirement gate @adams-oai\n- #24117 [codex] Use rolling files for Windows sandbox logs @iceweasel-oai\n- #24106 docs: update README.md to mention curl-based installer @bolinfest\n- #24082 fix(tui): restore Windows VT before TUI renders @fcoury-oai\n- #24110 cli: support --profile for codex sandbox @bolinfest\n- #23980 Add trace_id to TurnStartedEvent @mchen-oai\n- #24120 Support OAuth options in codex mcp add @mzeng-openai\n- #23989 Add typed Images client to codex-api @won-openai\n- #24146 [codex-analytics] split compaction v2 analytics implementation @rhan-oai\n- #24129 package: factor DotSlash executable fetching @bolinfest\n- #24151 [codex] Use TurnInput for session task input @pakrym-oai\n- #23935 [codex] Add image re-encoding benchmarks @anp-oai\n- #24152 chore: add JSON schema policy fixture coverage @celia-oai\n- #24157 [codex] Remove external client session reset plumbing @pakrym-oai\n- #24114 Display workspace usage limit error copy from response header @dhruvgupta-oai\n- #24165 release: build macOS x64 zsh artifact @bolinfest"
+  },
+  "summary": {
+    "changes": 42,
+    "categories": {
+      "cli": 35,
+      "config": 3,
+      "hooks": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 33,
+      "notable": 9
+    },
+    "undocumented": 19
+  },
+  "changes": [
+    {
+      "id": "hooks.events.PreToolUse.control.json_decision",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "json_decision"
+      ],
+      "title": "PreToolUse hook control (json_decision) added",
+      "impact": "informational",
+      "before": null,
+      "after": "does not block the tool; message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 986,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/analytics/src/events.rs#L986"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 387,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L387"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "additional_context"
+      ],
+      "title": "SessionStart hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "ignored",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 991,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/analytics/src/events.rs#L991"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 402,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L402"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.json_decision",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "json_decision"
+      ],
+      "title": "Stop hook control (json_decision) added",
+      "impact": "informational",
+      "before": null,
+      "after": "lets the turn stop; message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 995,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/analytics/src/events.rs#L995"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 414,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L414"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "additional_context"
+      ],
+      "title": "UserPromptSubmit hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "ignored",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 992,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/analytics/src/events.rs#L992"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 405,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L405"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex.options.--profile.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--profile",
+        "description"
+      ],
+      "title": "`codex --profile`: description changed",
+      "impact": "informational",
+      "before": "Configuration profile from config.toml to specify default options",
+      "after": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2398,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/analytics/src/reducer.rs#L2398"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/managed_install.rs",
+            "line": 88,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server-daemon/src/managed_install.rs#L88"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex.options.--profile.value",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--profile",
+        "value"
+      ],
+      "title": "`codex --profile` now takes <CONFIG_PROFILE_V2> (was <CONFIG_PROFILE>)",
+      "impact": "informational",
+      "before": "<CONFIG_PROFILE>",
+      "after": "<CONFIG_PROFILE_V2>",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2398,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/analytics/src/reducer.rs#L2398"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/managed_install.rs",
+            "line": 88,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server-daemon/src/managed_install.rs#L88"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex.options.--profile-v2",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--profile-v2"
+      ],
+      "title": "Flag removed: `codex --profile-v2`",
+      "impact": "notable",
+      "before": {
+        "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+        "names": [
+          "--profile-v2"
+        ],
+        "value": "<CONFIG_PROFILE_V2>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2398,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/reducer.rs#L2398"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/managed_install.rs",
+            "line": 88,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-daemon/src/managed_install.rs#L88"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.options.--profile.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--profile",
+        "description"
+      ],
+      "title": "`codex exec --profile`: description changed",
+      "impact": "informational",
+      "before": "Configuration profile from config.toml to specify default options",
+      "after": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 869,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/main.rs#L869"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 890,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/main.rs#L890"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.options.--profile.value",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--profile",
+        "value"
+      ],
+      "title": "`codex exec --profile` now takes <CONFIG_PROFILE_V2> (was <CONFIG_PROFILE>)",
+      "impact": "informational",
+      "before": "<CONFIG_PROFILE>",
+      "after": "<CONFIG_PROFILE_V2>",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 869,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/main.rs#L869"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 890,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/main.rs#L890"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.options.--profile-v2",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--profile-v2"
+      ],
+      "title": "Flag removed: `codex exec --profile-v2`",
+      "impact": "notable",
+      "before": {
+        "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+        "names": [
+          "--profile-v2"
+        ],
+        "value": "<CONFIG_PROFILE_V2>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 867,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/main.rs#L867"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 888,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/main.rs#L888"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--profile.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--profile",
+        "description"
+      ],
+      "title": "`codex fork --profile`: description changed",
+      "impact": "informational",
+      "before": "Configuration profile from config.toml to specify default options",
+      "after": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/tui/src/cwd_prompt.rs#L36"
+          },
+          {
+            "path": "codex-rs/tui/src/lib.rs",
+            "line": 1468,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/tui/src/lib.rs#L1468"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--profile.value",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--profile",
+        "value"
+      ],
+      "title": "`codex fork --profile` now takes <CONFIG_PROFILE_V2> (was <CONFIG_PROFILE>)",
+      "impact": "informational",
+      "before": "<CONFIG_PROFILE>",
+      "after": "<CONFIG_PROFILE_V2>",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/tui/src/cwd_prompt.rs#L36"
+          },
+          {
+            "path": "codex-rs/tui/src/lib.rs",
+            "line": 1468,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/tui/src/lib.rs#L1468"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--profile-v2",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--profile-v2"
+      ],
+      "title": "Flag removed: `codex fork --profile-v2`",
+      "impact": "notable",
+      "before": {
+        "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+        "names": [
+          "--profile-v2"
+        ],
+        "value": "<CONFIG_PROFILE_V2>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/tui/src/cwd_prompt.rs#L36"
+          },
+          {
+            "path": "codex-rs/tui/src/lib.rs",
+            "line": 1469,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/tui/src/lib.rs#L1469"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--profile.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--profile",
+        "description"
+      ],
+      "title": "`codex resume --profile`: description changed",
+      "impact": "informational",
+      "before": "Configuration profile from config.toml to specify default options",
+      "after": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/debug-client/src/commands.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/debug-client/src/commands.rs#L55"
+          },
+          {
+            "path": "codex-rs/hooks/src/events/session_start.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/hooks/src/events/session_start.rs#L34"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--profile.value",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--profile",
+        "value"
+      ],
+      "title": "`codex resume --profile` now takes <CONFIG_PROFILE_V2> (was <CONFIG_PROFILE>)",
+      "impact": "informational",
+      "before": "<CONFIG_PROFILE>",
+      "after": "<CONFIG_PROFILE_V2>",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/debug-client/src/commands.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/debug-client/src/commands.rs#L55"
+          },
+          {
+            "path": "codex-rs/hooks/src/events/session_start.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/hooks/src/events/session_start.rs#L34"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--profile-v2",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--profile-v2"
+      ],
+      "title": "Flag removed: `codex resume --profile-v2`",
+      "impact": "notable",
+      "before": {
+        "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+        "names": [
+          "--profile-v2"
+        ],
+        "value": "<CONFIG_PROFILE_V2>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/debug-client/src/commands.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/debug-client/src/commands.rs#L55"
+          },
+          {
+            "path": "codex-rs/hooks/src/events/session_start.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/hooks/src/events/session_start.rs#L34"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.arguments",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "arguments"
+      ],
+      "title": "cli.commands.codex sandbox.arguments added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "COMMAND": {
+          "description": "Full command args to run under seatbelt",
+          "names": null
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--allow-unix-socket",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--allow-unix-socket"
+      ],
+      "title": "New flag `codex sandbox --allow-unix-socket`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Allow the sandboxed command to bind/connect AF_UNIX sockets rooted at this path. Relative paths are resolved against the current directory. Repeat to allow multiple paths",
+        "names": [
+          "--allow-unix-socket"
+        ],
+        "value": "<ALLOW_UNIX_SOCKETS>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--cd",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--cd"
+      ],
+      "title": "New flag `codex sandbox --cd`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Working directory used for profile resolution and command execution",
+        "names": [
+          "-C",
+          "--cd"
+        ],
+        "value": "<DIR>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--include-managed-config",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--include-managed-config"
+      ],
+      "title": "New flag `codex sandbox --include-managed-config`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Include managed requirements while resolving an explicit permissions profile",
+        "names": [
+          "--include-managed-config"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--log-denials",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--log-denials"
+      ],
+      "title": "New flag `codex sandbox --log-denials`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "While the command runs, capture macOS sandbox denials via `log stream` and print them after exit",
+        "names": [
+          "--log-denials"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--permissions-profile",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--permissions-profile"
+      ],
+      "title": "New flag `codex sandbox --permissions-profile`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Named permissions profile to apply from the active configuration stack",
+        "names": [
+          "--permissions-profile"
+        ],
+        "value": "<NAME>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--profile",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--profile"
+      ],
+      "title": "New flag `codex sandbox --profile`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+        "names": [
+          "-p",
+          "--profile"
+        ],
+        "value": "<CONFIG_PROFILE>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.usage.Usage: codex sandbox [OPTIONS] [COMMAND]...",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "usage",
+        "Usage: codex sandbox [OPTIONS] [COMMAND]..."
+      ],
+      "title": "Usage of `codex sandbox` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: codex sandbox [OPTIONS] [COMMAND]...",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.usage.Usage: codex sandbox [OPTIONS] <COMMAND>",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "usage",
+        "Usage: codex sandbox [OPTIONS] <COMMAND>"
+      ],
+      "title": "Usage of `codex sandbox` removed",
+      "impact": "notable",
+      "before": "Usage: codex sandbox [OPTIONS] <COMMAND>",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1475,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server/src/config/external_agent_config.rs#L1475"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/doctor.rs#L370"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox linux",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox linux"
+      ],
+      "title": "Command removed: `codex sandbox linux`",
+      "impact": "notable",
+      "before": {
+        "description": "Run a command under the Linux sandbox (bubblewrap by default)",
+        "helped": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 206,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/arg0/src/lib.rs#L206"
+          },
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 334,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/arg0/src/lib.rs#L334"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex sandbox macos",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox macos"
+      ],
+      "title": "Command removed: `codex sandbox macos`",
+      "impact": "notable",
+      "before": {
+        "description": "Run a command under Seatbelt (macOS only)",
+        "helped": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/build.rs",
+            "line": 2,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/build.rs#L2"
+          },
+          {
+            "path": "codex-rs/cli/src/app_cmd.rs",
+            "line": 17,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/app_cmd.rs#L17"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex sandbox windows",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox windows"
+      ],
+      "title": "Command removed: `codex sandbox windows`",
+      "impact": "notable",
+      "before": {
+        "description": "Run a command under Windows restricted token (Windows only)",
+        "helped": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/app_cmd.rs",
+            "line": 21,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/app_cmd.rs#L21"
+          },
+          {
+            "path": "codex-rs/cli/src/debug_sandbox.rs",
+            "line": 212,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/debug_sandbox.rs#L212"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -77,10 +77,7 @@\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n \n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n \n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -59,9 +59,7 @@\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -46,10 +46,7 @@\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n \n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n \n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -34,9 +34,7 @@\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -57,10 +57,7 @@\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n \n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n \n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -37,9 +37,7 @@\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+0 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not update PATH: operation would block\n Manage login\n \n Usage: codex login [OPTIONS] [COMMAND]\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/arg0/src/lib.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -60,10 +60,7 @@\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n \n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n \n   -s, --sandbox <SANDBOX_MODE>\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+35 −145 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -39,9 +39,7 @@\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-      --profile-v2 <CONFIG_PROFILE_V2>\n+  -p, --profile <CONFIG_PROFILE_V2>\n           Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n",
+      "stats": {
+        "added_chars": 35,
+        "removed_chars": 145
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+917 −351 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,12 +1,10 @@\n Run commands within a Codex-provided sandbox\n \n-Usage: codex sandbox [OPTIONS] <COMMAND>\n+Usage: codex sandbox [OPTIONS] [COMMAND]...\n \n-Commands:\n-  macos    Run a command under Seatbelt (macOS only) [aliases: seatbelt]\n-  linux    Run a command under the Linux sandbox (bubblewrap by default) [aliases: landlock]\n-  windows  Run a command under Windows restricted token (Windows only)\n-  help     Print this message or the help of the given subcommand(s)\n+Arguments:\n+  [COMMAND]...\n+          Full command args to run under seatbelt\n \n Options:\n   -c, --config <key=value>\n@@ -17,11 +15,31 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --permissions-profile <NAME>\n+          Named permissions profile to apply from the active configuration stack\n+\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n+  -p, --profile <CONFIG_PROFILE>\n+          Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n+\n+  -C, --cd <DIR>\n+          Working directory used for profile resolution and command execution\n+\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --include-managed-config\n+          Include managed requirements while resolving an explicit permissions profile\n+\n+      --allow-unix-socket <ALLOW_UNIX_SOCKETS>\n+          Allow the sandboxed command to bind/connect AF_UNIX sockets rooted at this path. Relative\n+          paths are resolved against the current directory. Repeat to allow multiple paths\n+\n+      --log-denials\n+          While the command runs, capture macOS sandbox denials via `log stream` and print them\n+          after exit\n \n   -h, --help\n           Print help (see a summary with '-h')\n",
+      "stats": {
+        "added_chars": 917,
+        "removed_chars": 351
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+1487 −977 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,19 +1,33 @@\n Run commands within a Codex-provided sandbox\n \n-Usage: codex sandbox [OPTIONS] <COMMAND>\n+Usage: codex sandbox [OPTIONS] [COMMAND]...\n \n-Commands:\n-  macos    Run a command under Seatbelt (macOS only) [aliases: seatbelt]\n-  linux    Run a command under the Linux sandbox (bubblewrap by default) [aliases: landlock]\n-  windows  Run a command under Windows restricted token (Windows only)\n-  help     Print this message or the help of the given subcommand(s)\n+Arguments:\n+  [COMMAND]...  Full command args to run under seatbelt\n \n Options:\n-  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n-                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n-                            nested values. The `value` portion is parsed as TOML. If it fails to\n-                            parse as TOML, the raw string is used as a literal\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-  -h, --help                Print help (see more with '--help')\n+  -c, --config <key=value>\n+          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n+          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n+          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n+      --permissions-profile <NAME>\n+          Named permissions profile to apply from the active configuration stack\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+  -p, --profile <CONFIG_PROFILE>\n+          Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n+  -C, --cd <DIR>\n+          Working directory used for profile resolution and command execution\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --include-managed-config\n+          Include managed requirements while resolving an explicit permissions profile\n+      --allow-unix-socket <ALLOW_UNIX_SOCKETS>\n+          Allow the sandboxed command to bind/connect AF_UNIX sockets rooted at this path. Relative\n+          paths are resolved against the current directory. Repeat to allow multiple paths\n+      --log-denials\n+          While the command runs, capture macOS sandbox denials via `log stream` and print them\n+          after exit\n+  -h, --help\n+          Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 1487,
+        "removed_chars": 977
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.log_dir.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "log_dir",
+        "description"
+      ],
+      "title": "log_dir description changed (+149 −99 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Directory where Codex writes log files, for example `codex-tui.log`. Defaults to `$CODEX_HOME/log`.\n+Directory where Codex writes log files. Setting this value explicitly also enables the TUI text log in this directory. Defaults to `$CODEX_HOME/log`.\n",
+      "stats": {
+        "added_chars": 149,
+        "removed_chars": 99
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.environment_id",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.environment_id"
+      ],
+      "title": "New setting: mcp_servers.<name>.environment_id",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/backend-client/src/client.rs",
+            "line": 347,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/backend-client/src/client.rs#L347"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.134.0/codex-rs/cli/src/main.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.experimental_environment",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.experimental_environment"
+      ],
+      "title": "Setting no longer read: mcp_servers.<name>.experimental_environment",
+      "impact": "notable",
+      "before": {
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/mcp_edit.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/config/src/mcp_edit.rs#L179"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 304,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/core/src/config/edit.rs#L304"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

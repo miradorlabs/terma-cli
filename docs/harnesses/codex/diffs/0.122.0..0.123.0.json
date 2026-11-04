@@ -1,0 +1,1064 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.122.0",
+  "to": "0.123.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.122.0...rust-v0.123.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.123.0",
+    "text": "## New Features\n- Added a built-in `amazon-bedrock` model provider with configurable AWS profile support (#18744).\n- Added `/mcp verbose` for full MCP server diagnostics, resources, and resource templates while keeping plain `/mcp` fast (#18610).\n- Made plugin MCP loading accept both `mcpServers` and top-level server maps in `.mcp.json` (#18780).\n- Improved realtime handoffs so background agents receive transcript deltas and can explicitly stay silent when appropriate (#18597, #18761, #18635).\n- Added host-specific `remote_sandbox_config` requirements for remote environments (#18763).\n- Refreshed bundled model metadata, including the current `gpt-5.4` default (#18586, #18388, #18719).\n\n## Bug Fixes\n- Fixed `/copy` after rollback so it copies the latest visible assistant response, not a pre-rollback response (#18739).\n- Queued normal follow-up text submitted while a manual shell command is running, preventing stuck `Working` states (#18820).\n- Fixed Unicode/dead-key input in VS Code WSL terminals by disabling the enhanced keyboard mode there (#18741).\n- Prevented stale proxy environment variables from being restored from shell snapshots (#17271).\n- Made `codex exec` inherit root-level shared flags such as sandbox and model options (#18630).\n- Removed leaked review prompts from TUI transcripts (#18659).\n\n## Documentation\n- Added and tightened the Code Review skill instructions used by Codex-driven reviews (#18746, #18818).\n- Documented intentional await-across-lock cases and enabled Clippy linting for them (#18423, #18698).\n- Updated app-server protocol docs for threadless MCP resource reads and namespaced dynamic tools (#18292, #18413).\n\n## Chores\n- Fixed high-severity dependency alerts by pinning patched JS and Rust dependencies (#18167).\n- Reduced Rust dev build debug-info overhead while preserving useful backtraces (#18844).\n- Refreshed generated Python app-server SDK types from the current schema (#18862).\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.122.0...rust-v0.123.0\n\n- #18662 feat: add metric to track the number of turns with memory usage @jif-oai\n- #18659 chore: drop review prompt from TUI UX @jif-oai\n- #18661 feat: log client use min log level @jif-oai\n- #18094 [codex] Use background agent task auth for backend calls @adrian-openai\n- #18441 Avoid false shell snapshot cleanup warnings @etraut-openai\n- #18260 [codex] Use background task auth for additional backend calls @adrian-openai\n- #18657 fix: auth.json leak in tests @jif-oai\n- #18610 Add verbose diagnostics for /mcp @etraut-openai\n- #18633 Use app server thread names in TUI picker @etraut-openai\n- #18591 Surface parent thread status in side conversations @etraut-openai\n- #18361 codex: move thread/name/set and thread/memoryModeSet into ThreadStore @wiltzius-openai\n- #18274 protocol: canonicalize file system permissions @bolinfest\n- #18403 refactor: use semaphores for async serialization gates @bolinfest\n- #18586 Update models.json @aibrahim-oai\n- #18289 Wire the PatchUpdated events through app_server @akshaynathan\n- #18631 Remove simple TUI legacy_core reexports @etraut-openai\n- #18697 [codex] Fix agent identity auth test fixture @adrian-openai\n- #18388 Update models.json @github-actions\n- #18167 [codex] Fix high severity dependency alerts @caseysilver-oai\n- #17692 [codex-analytics] guardian review analytics schema polishing @rhan-oai\n- #18722 chore(guardian) disable mcps and plugins @dylan-hurd-oai\n- #18597 Update realtime handoff transcript handling @guinness-oai\n- #18627 Surface TUI skills refresh failures @etraut-openai\n- #18719 Fix stale model test fixtures @aibrahim-oai\n- #18714 Add experimental remote thread store config @wiltzius-openai\n- #18739 fix(tui): keep /copy aligned with rollback @fcoury-oai\n- #18701 [codex] prefer inherited spawn agent model @tibo-openai\n- #18632 Use app server metadata for fork parent titles @etraut-openai\n- #18112 feat: cascade thread archive @jif-oai\n- #18716 Read conversation summaries through thread store @wiltzius-openai\n- #18635 Add realtime silence tool @guinness-oai\n- #18254 uds: add async Unix socket crate @euroelessar\n- #18746 Add Code Review skill @pakrym-oai\n- #18208 Add session config loader interface @rasmusrygaard\n- #18753 Refactor TUI app module into submodules @etraut-openai\n- #18630 Fix exec inheritance of root shared flags @etraut-openai\n- #18027 [6/6] Fail exec client operations after disconnect @aibrahim-oai\n- #17271 fix: fix stale proxy env restoration after shell snapshots @viyatb-oai\n- #18602 Warn when trusting Git subdirectories @etraut-openai\n- #18761 [codex] Send realtime transcript deltas on handoff @guinness-oai\n- #18435 /statusline & /title - Shared preview values @canvrno-oai\n- #18744 feat: add a built-in Amazon Bedrock model provider @celia-oai\n- #18581 [1/4] Add executor HTTP request protocol @aibrahim-oai\n- #18418 refactor: narrow async lock scopes @bolinfest\n- #18780 feat: Support more plugin MCP file shapes. @xl-openai\n- #18713 protocol: preserve glob scan depth in permission profiles @bolinfest\n- #18795 fix(guardian) Dont hard error on feature disable @dylan-hurd-oai\n- #18292 Make MCP resource read threadless @mzeng-openai\n- #18786 Fallback display names for TUI skill mentions @canvrno-oai\n- #18807 chore(app-server) linguist-generated @dylan-hurd-oai\n- #18393 feat(auto-review) Handle request_permissions calls @dylan-hurd-oai\n- #18763 Add remote_sandbox_config to our config requirements @abhinav-oai\n- #18794 Organize context fragments  @pakrym-oai\n- #18423 chore: document intentional await-holding cases @bolinfest\n- #18698 chore: enable await-holding clippy lints @bolinfest\n- #18413 [tool search] support namespaced deferred dynamic tools @pash-openai\n- #18818 [codex] Tighten code review skill wording @pakrym-oai\n- #18271 show bash mode in the TUI @abhinav-oai\n- #18741 fix(tui): disable enhanced keys for VS Code WSL @fcoury-oai\n- #18850 Move external agent config out of core @pakrym-oai\n- #18844 build: reduce Rust dev debuginfo @bolinfest\n- #18848 feat: baseline lib @jif-oai\n- #18846 core: make test-log a dev dependency @bolinfest\n- #18428 app-server: define device key v2 protocol @euroelessar\n- #18093 Propagate thread id in MCP tool metadata @rennie-openai\n- #17836 [codex] Add tmux-aware OSC 9 notifications @caseychow-oai\n- #18820 Queue follow-up input during user shell commands @etraut-openai\n- #18858 Stabilize debug clear memories integration test @jif-oai\n- #18799 Move TUI app tests to modules they cover @etraut-openai\n- #18442 Refactor app-server config loading into ConfigManager @pakrym-oai\n- #18813 Split DeveloperInstructions into individual fragments. @pakrym-oai\n- #18275 sandboxing: intersect permission profiles semantically @bolinfest\n- #18862 Refresh generated Python app-server SDK types @sdcoffey\n- #15578 Add Windows sandbox unified exec runtime support @iceweasel-oai\n- #18429 app-server: add codex-device-key crate @euroelessar\n- #18872 app-server: fix Bazel clippy in tracing tests @euroelessar\n- #18885 skip busted tests while I fix them @iceweasel-oai\n- #18873 chore: default multi-agent v2 fork to all @jif-oai"
+  },
+  "summary": {
+    "changes": 37,
+    "categories": {
+      "behavior": 4,
+      "cli": 18,
+      "config": 7,
+      "hooks": 4,
+      "model": 1,
+      "prompt": 1,
+      "tools": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 24,
+      "notable": 13
+    },
+    "undocumented": 18
+  },
+  "changes": [
+    {
+      "id": "model.default",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "default"
+      ],
+      "title": "Default model: gpt-5.3-codex → gpt-5.4",
+      "impact": "notable",
+      "before": "gpt-5.3-codex",
+      "after": "gpt-5.4",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/memories/mod.rs",
+            "line": 70,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/core/src/memories/mod.rs#L70"
+          },
+          {
+            "path": "codex-rs/core/src/memories/phase1.rs",
+            "line": 227,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/core/src/memories/phase1.rs#L227"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+6570 −4207 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -24,9 +24,14 @@\n \n \n # General\n+As an expert coding agent, your primary focus is writing code, answering questions, and helping the user complete their task in the current environment.\n+You build context by examining the codebase first without making assumptions or jumping to conclusions.\n+You think through the nuances of the code you encounter, and embody the mentality of a skilled senior software engineer.\n \n - When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)\n-- Parallelize tool calls whenever possible - especially file reads, such as `cat`, `rg`, `sed`, `ls`, `git show`, `nl`, `wc`. Use `multi_tool_use.parallel` to parallelize tool calls and only this.\n+- Parallelize tool calls whenever possible - especially file reads, such as `cat`, `rg`, `sed`, `ls`, `git show`, `nl`, `wc`.\n+Use `multi_tool_use.parallel` to parallelize tool calls and only this.\n+Never chain together bash commands with separators like `echo \"====\";` as this renders to the user poorly.\n \n ## Editing constraints\n \n@@ -34,17 +39,15 @@\n - Add succinct code comments that explain what is going on if code is not self-explanatory.\n You should not add comments like \"Assigns the value to the variable\", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out.\n Usage of these comments should be rare.\n-- Try to use apply_patch for single file edits, but it is fine to explore other options to make the edit if it does not work well.\n-Do not use apply_patch for changes that are auto-generated (i.e.\n-generating package.json or running a lint or format command like gofmt) or when scripting is more efficient (such as search and replacing a string across a codebase).\n+- Always use apply_patch for manual code edits. Do not use cat or any other commands when creating or editing files. Formatting commands or bulk edits don't need to be done with apply_patch.\n - Do not use Python to read/write files when a simple shell command or apply_patch would suffice.\n - You may be in a dirty git worktree.\n-    * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.\n-    * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.\n-    * If the changes are in files you've touched recently, you should read carefully and understand how you can work with the changes rather than reverting them.\n-    * If the changes are in unrelated files, just ignore them and don't revert them.\n+  * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.\n+  * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.\n+  * If the changes are in files you've touched recently, you should read carefully and understand how you can work with the changes rather than reverting them.\n+  * If the changes are in unrelated files, just ignore them and don't revert them.\n - Do not amend a commit unless explicitly requested to do so.\n-- While you are working, you might notice unexpected changes that you didn't make. If this happens, STOP IMMEDIATELY and ask the user how they would like to proceed.\n+- While you are working, you might notice unexpected changes that you didn't make. It's likely the user made them, or were autogenerated. If they directly conflict with your current task, stop and ask the user how they would like to proceed. Otherwise, focus on the task at hand.\n - **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.\n - You struggle using the git interactive console. **ALWAYS** prefer using non-interactive git commands.\n \n@@ -56,6 +59,13 @@\n Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail.\n If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.\n \n+## Autonomy and persistence\n+Persist until the task is fully handled end-to-end within the current turn whenever feasible: do not stop at analysis or partial fixes; carry changes through implementation, verification, and a clear explanation of outcomes unless the user explicitly pauses or redirects you.\n+\n+Unless the user explicitly asks for a plan, asks a question about the code, is brainstorming potential solutions, or some other intent that makes it clear that code should not be written, assume the user wants you to make code changes or run tools to solve the user's problem.\n+In these cases, it's bad to output your proposed solution in a message, you should go ahead and actually implement the change.\n+If you encounter challenges or blockers, you should attempt to resolve them yourself.\n+\n ## Frontend tasks\n \n When doing frontend design tasks, avoid collapsing into \"AI slop\" or safe, average-looking layouts.\n@@ -64,8 +74,9 @@\n - Color & Look: Choose a clear visual direction; define CSS variables; avoid purple-on-white defaults. No purple bias or dark mode bias.\n - Motion: Use a few meaningful animations (page-load, staggered reveals) instead of generic micro-motions.\n - Background: Don't rely on flat, single-color backgrounds; use gradients, shapes, or subtle patterns to build atmosphere.\n-- Overall: Avoid boilerplate layouts and interchangeable UI patterns. Vary themes, type families, and visual languages across outputs.\n - Ensure the page loads properly on both desktop and mobile\n+- For React code, prefer modern patterns including useEffectEvent, startTransition, and useDeferredValue when appropriate if used by the team. Do not add useMemo/useCallback by default unless already used; follow the repo's React Compiler guidance.\n+- Overall: Avoid boilerplate layouts and interchangeable UI patterns. Vary themes, type families, and visual languages across outputs.\n \n Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.\n \n@@ -76,13 +87,6 @@\n - After you have completed all your work, send a message to the `final` channel.\n You are producing plain text that will later be styled by the program you run in. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value. Follow the formatting rules exactly.\n \n-## Autonomy and persistence\n-Persist until the task is fully handled end-to-end within the current turn whenever feasible: do not stop at analysis or partial fixes; carry changes through implementation, verification, and a clear explanation of outcomes unless the user explicitly pauses or redirects you.\n-\n-Unless the user explicitly asks for a plan, asks a question about the code, is brainstorming potential solutions, or some other intent that makes it clear that code should not be written, assume the user wants you to make code changes or run tools to solve the user's problem.\n-In these cases, it's bad to output your proposed solution in a message, you should go ahead and actually implement the change.\n-If you encounter challenges or blockers, you should attempt to resolve them yourself.\n-\n ## Formatting rules\n \n - You may format with GitHub-flavored Markdown.\n@@ -96,28 +100,49 @@\n - Headers are optional, only use them when you think they are necessary. If you do use them, use short Title Case (1-3 words) wrapped in **…**. Don't add a blank line.\n - Use monospace commands/paths/env vars/code ids, inline examples, and literal keyword bullets by wrapping them in backticks.\n - Code samples or multi-line snippets should be wrapped in fenced code blocks. Include an info string as often as possible.\n-- File References: When referencing files in your response follow the below rules:\n-  * Use markdown links (not inline code) for clickable files.\n-  * Each file reference should have a stand-alone path; use inline code for non-clickable paths (for example, directories).\n-  * For clickable/openable file references, the path target must be an absolute filesystem path. Labels may be short (for example, `[app.ts](/abs/path/app.ts)`).\n-  * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n-  * Do not use URIs like file://, vscode://, or https://.\n-  * Do not provide range of lines\n-  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5\n+- When referencing a real local file, prefer a clickable markdown link.\n+  * Clickable file links should look like [app.py](/abs/path/app.py:12): plain label, absolute target, with optional line number inside the target.\n+  * If a file path has spaces, wrap the target in angle brackets: [My Report.md](</abs/path/My Project/My Report.md:3>).\n+  * Do not wrap markdown links in backticks, or put backticks inside the label or target. This confuses the markdown renderer.\n+  * Do not use URIs like file://, vscode://, or https:// for file links.\n+  * Do not provide ranges of lines.\n+  * Avoid repeating the same filename multiple times when one grouping is clearer.\n - Don’t use emojis or em dashes unless explicitly instructed.\n \n ## Final answer instructions\n \n-- Balance conciseness to not overwhelm the user with appropriate detail for the request. Do not narrate abstractly; explain what you are doing and why.\n-- Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”) or framing phrases.\n+Always favor conciseness in your final answer - you should usually avoid long-winded explanations and focus only on the most important details.\n+For casual chit-chat, just chat.\n+For simple or single-file tasks, prefer 1-2 short paragraphs plus an optional short verification line.\n+Do not default to bullets.\n+On simple tasks, prose is usually better than a list, and if there are only one or two concrete changes you should almost always keep the close-out fully in prose.\n+\n+On larger tasks, use at most 2-3 high-level sections when helpful.\n+Each section can be a short paragraph or a few flat bullets.\n+Prefer grouping by major change area or user-facing outcome, not by file or edit inventory.\n+If the answer starts turning into a changelog, compress it: cut file-by-file detail, repeated framing, low-signal recap, and optional follow-up ideas before cutting outcome, verification, or real risks.\n+Only dive deeper into one aspect of the code change if it's especially complex, important, or if the users asks about it.\n+This also holds true for PR explanations, codebase walkthroughs, or architectural decisions: provide a high-level walkthrough unless specifically asked and cap answers at 2-3 sections.\n+\n+Requirements for your final answer:\n+- Prefer short paragraphs by default.\n+- When explaining something, optimize for fast, high-level comprehension rather than completeness-by-default.\n+- Use lists only when the content is inherently list-shaped: enumerating distinct items, steps, options, categories, comparisons, ideas.\n+Do not use lists for opinions or straightforward explanations that would read more naturally as prose.\n+If a short paragraph can answer the question more compactly, prefer prose over bullets or multiple sections.\n+- Do not turn simple explanations into outlines or taxonomies unless the user asks for depth. If a list is used, each bullet should be a complete standalone point.\n+- Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”, \"You're right to call that out\") or framing phrases.\n - The user does not see command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.\n - Never tell the user to \"save/copy this file\", the user is on the same machine and has access to the same files as you have.\n-- If the user asks for a code explanation, structure your answer with code references.\n-- When given a simple task, just provide the outcome in a short answer without strong formatting.\n-- When you make big or complex changes, state the solution first, then walk the user through what you did and why.\n-- For casual chit-chat, just chat.\n+- If the user asks for a code explanation, include code references as appropriate.\n - If you weren't able to do something, for example run tests, tell the user.\n-- If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps. When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.\n+- Never use nested bullets.\n+Keep lists flat (single level).\n+If you need hierarchy, split into separate lists or sections or if you use : just include the line you might usually render using a nested bullet immediately after it.\n+For numbered lists, only use the `1.\n+2.\n+3.` style markers (with a period), never `1)`.\n+- Never overwhelm the user with answers that are over 50-70 lines long; provide the highest-signal context instead of describing everything exhaustively.\n \n ## Intermediary updates \n \n@@ -125,13 +150,12 @@\n - User updates are short updates while you are working, they are NOT final answers.\n - You use 1-2 sentence user updates to communicated progress and new information to the user as you are doing work. \n - Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”) or framing phrases.\n-- You provide user updates frequently, every 20s.\n - Before exploring or doing substantial work, you start with a user update acknowledging the request and explaining your first step.\n You should include your understanding of the user request and explain what you will do.\n Avoid commenting on the request or using starters such at \"Got it -\" or \"Understood -\" etc.\n-- When exploring, e.g.\n-searching, reading files you provide user updates as you go, every 20s, explaining what context you are gathering and what you've learned.\n-Vary your sentence structure when providing these updates to avoid sounding repetitive - in particular, don't start each sentence the same way.\n+- You provide user updates frequently, every 30s.\n+- When exploring, e.g. searching, reading files you provide user updates as you go, explaining what context you are gathering and what you've learned. Vary your sentence structure when providing these updates to avoid sounding repetitive - in particular, don't start each sentence the same way.\n+- When working for a while, keep updates informative and varied, but stay concise.\n - After you have sufficient context, and the work is substantial you provide a longer plan (this is the only user update that may be longer than 2 sentences and can contain formatting).\n - Before performing file edits of any kind, you provide updates explaining what edits you are making.\n - As you are thinking, you very frequently provide updates even if not taking any actions, informing the user of your progress. You interrupt your thinking and send multiple updates in a row if thinking for more than 100 words.\n",
+      "stats": {
+        "added_chars": 6570,
+        "removed_chars": 4207
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/gpt_5_1_prompt.md",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/core/gpt_5_1_prompt.md#L30-L32"
+          },
+          {
+            "path": "codex-rs/core/gpt_5_2_prompt.md",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/core/gpt_5_2_prompt.md#L30-L32"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.spawn_agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "spawn_agent",
+        "description"
+      ],
+      "title": "spawn_agent tool description changed (+1159 −1537 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,22 +1,19 @@\n \n         \n-        - gpt-5.3-codex (`gpt-5.3-codex`): Latest frontier agentic coding model.\n-Default reasoning effort: medium.\n-Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n+        Available model overrides (optional; inherited parent model is preferred):\n - gpt-5.4 (`gpt-5.4`): Latest frontier agentic coding model.\n Default reasoning effort: medium.\n Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-- gpt-5.2-codex (`gpt-5.2-codex`): Frontier agentic coding model.\n+- GPT-5.4-Mini (`gpt-5.4-mini`): Smaller frontier agentic coding model.\n Default reasoning effort: medium.\n Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-- gpt-5.1-codex-max (`gpt-5.1-codex-max`): Codex-optimized flagship for deep and fast reasoning.\n+- gpt-5.3-codex (`gpt-5.3-codex`): Frontier Codex-optimized agentic coding model.\n Default reasoning effort: medium.\n Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-- gpt-5.2 (`gpt-5.2`): Latest frontier model with improvements across knowledge, reasoning and coding Default reasoning effort: medium.\n+- gpt-5.2 (`gpt-5.2`): Optimized for professional work and long-running agents Default reasoning effort: medium.\n Supported reasoning efforts: low (Balances speed with some reasoning; useful for straightforward queries and short explanations), medium (Provides a solid balance of reasoning depth and latency for general-purpose tasks), high (Maximizes reasoning depth for complex or ambiguous problems), xhigh (Extra high reasoning for complex problems).\n-- gpt-5.1-codex-mini (`gpt-5.1-codex-mini`): Optimized for codex. Cheaper, faster, but less capable. Default reasoning effort: medium. Supported reasoning efforts: medium (Dynamically adjusts reasoning based on the task), high (Maximizes reasoning depth for complex or ambiguous problems).\n-        Spawn a sub-agent for a well-scoped task. Returns the spawned agent id plus the user-facing nickname when available.\n-This spawn_agent tool provides you access to smaller but more efficient sub-agents. A mini model can solve many tasks faster than the main model. You should follow the rules and guidelines below to use this tool.\n+        Spawn a sub-agent for a well-scoped task. Returns the spawned agent id plus the user-facing nickname when available. Spawned agents inherit your current model by default. Omit `model` to use that preferred default; set `model` only when an explicit override is needed.\n+This spawn_agent tool provides you access to sub-agents that inherit your current model by default. Do not set the `model` field unless the user explicitly asks for a different model or there is a clear task-specific reason. You should follow the rules and guidelines below to use this tool.\n \n Only use `spawn_agent` if and only if the user explicitly asks for sub-agents, delegation, or parallel agent work.\n Requests for depth, thoroughness, research, investigation, or detailed codebase analysis do not count as permission to spawn.\n@@ -27,7 +24,7 @@\n Identify which tasks are immediate blockers on the critical path, and which tasks are sidecar tasks that are needed but can run in parallel without blocking the next local step.\n As part of that plan, explicitly decide what immediate task you should do locally right now.\n Do this planning step before delegating to agents so you do not hand off the immediate blocking task to a submodel and then waste time waiting on it.\n-- Use the smaller subagent when a subtask is easy enough for it to handle and can run in parallel with your local work. Prefer delegating concrete, bounded sidecar tasks that materially advance the main task without blocking your immediate next local step.\n+- Use a subagent when a subtask is easy enough for it to handle and can run in parallel with your local work. Prefer delegating concrete, bounded sidecar tasks that materially advance the main task without blocking your immediate next local step.\n - Do not delegate urgent blocking work when your immediate next step depends on that result. If the very next action is blocked on that task, the main rollout should usually do it locally to keep the critical path moving.\n - Keep work local when the subtask is too difficult to delegate well and when it is tightly coupled, urgent, or likely to block your immediate next step.\n \n",
+      "stats": {
+        "added_chars": 1159,
+        "removed_chars": 1537
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tools/src/agent_tool.rs",
+            "line": 617,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tools/src/agent_tool.rs#L617"
+          },
+          {
+            "path": "codex-rs/tools/src/agent_tool.rs",
+            "line": 625,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tools/src/agent_tool.rs#L625"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.spawn_agent.input_schema.properties.model.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "spawn_agent",
+        "input_schema",
+        "properties",
+        "model",
+        "description"
+      ],
+      "title": "spawn_agent tool parameter model: description changed (+227 −72 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Optional model override for the new agent. Replaces the inherited model.\n+Optional model override for the new agent. Leave unset to inherit the same model as the parent, which is the preferred default. Only set this when the user explicitly asks for a different model or the task clearly requires one.\n",
+      "stats": {
+        "added_chars": 227,
+        "removed_chars": 72
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tools/src/agent_tool.rs",
+            "line": 10,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tools/src/agent_tool.rs#L10"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction.model",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction",
+        "model"
+      ],
+      "title": "Behaviour: compaction model changed: \"gpt-5.3-codex\" → \"gpt-5.4\"",
+      "impact": "notable",
+      "before": "gpt-5.3-codex",
+      "after": "gpt-5.4",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model changed: \"gpt-5.3-codex\" → \"gpt-5.4\"",
+      "impact": "notable",
+      "before": "gpt-5.3-codex",
+      "after": "gpt-5.4",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.models.gpt-5.4",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "models",
+        "gpt-5.4"
+      ],
+      "title": "Behaviour: sandbox models gpt-5.4 added",
+      "impact": "notable",
+      "before": null,
+      "after": "gpt-5.4",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.models.gpt-5.3-codex",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "models",
+        "gpt-5.3-codex"
+      ],
+      "title": "Behaviour: sandbox models gpt-5.3-codex removed",
+      "impact": "notable",
+      "before": "gpt-5.3-codex",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control removed",
+      "impact": "notable",
+      "before": {
+        "exit_2": "blocks the tool; message to the model",
+        "json_decision": "blocks the tool; message to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 569,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/analytics/src/events.rs#L569"
+          },
+          {
+            "path": "codex-rs/core/src/hook_runtime.rs",
+            "line": 429,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/core/src/hook_runtime.rs#L429"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control removed",
+      "impact": "notable",
+      "before": {
+        "additional_context": "reaches the model",
+        "exit_2": "message not shown to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 572,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/analytics/src/events.rs#L572"
+          },
+          {
+            "path": "codex-rs/core/src/hook_runtime.rs",
+            "line": 432,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/core/src/hook_runtime.rs#L432"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control removed",
+      "impact": "notable",
+      "before": {
+        "exit_2": "keeps the turn going; message to the model",
+        "json_decision": "keeps the turn going; message to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 574,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/analytics/src/events.rs#L574"
+          },
+          {
+            "path": "codex-rs/core/src/hook_runtime.rs",
+            "line": 434,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/core/src/hook_runtime.rs#L434"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control"
+      ],
+      "title": "Hook events.UserPromptSubmit.control removed",
+      "impact": "notable",
+      "before": {
+        "additional_context": "reaches the model",
+        "exit_2": "blocks the prompt; message not shown to the model",
+        "json_decision": "blocks the prompt; message not shown to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 573,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/analytics/src/events.rs#L573"
+          },
+          {
+            "path": "codex-rs/core/src/hook_runtime.rs",
+            "line": 433,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/core/src/hook_runtime.rs#L433"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex.options.--cd.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--cd",
+        "description"
+      ],
+      "title": "`codex --cd`: description changed (+65 −137 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tell the agent to use the specified directory as its working root. In remote mode, the path is forwarded to the server and resolved there\n+Tell the agent to use the specified directory as its working root\n",
+      "stats": {
+        "added_chars": 65,
+        "removed_chars": 137
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex.options.--full-auto.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--full-auto",
+        "description"
+      ],
+      "title": "`codex --full-auto`: description changed",
+      "impact": "informational",
+      "before": "Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox workspace-write)",
+      "after": "Convenience alias for low-friction sandboxed automatic execution",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 291,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/app-server-test-client/src/lib.rs#L291"
+          },
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 2019,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/app-server/src/codex_message_processor.rs#L2019"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex.options.--oss.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--oss",
+        "description"
+      ],
+      "title": "`codex --oss`: description changed (+24 −156 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Convenience flag to select the local open source model provider. Equivalent to -c model_provider=oss; verifies a local LM Studio or Ollama server is running\n+Use open-source provider\n",
+      "stats": {
+        "added_chars": 24,
+        "removed_chars": 156
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.options.--full-auto.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--full-auto",
+        "description"
+      ],
+      "title": "`codex exec --full-auto`: description changed",
+      "impact": "informational",
+      "before": "Convenience alias for low-friction sandboxed automatic execution (--sandbox workspace-write)",
+      "after": "Convenience alias for low-friction sandboxed automatic execution",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 718,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/cli/src/main.rs#L718"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 735,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/cli/src/main.rs#L735"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--cd.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--cd",
+        "description"
+      ],
+      "title": "`codex fork --cd`: description changed (+65 −137 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tell the agent to use the specified directory as its working root. In remote mode, the path is forwarded to the server and resolved there\n+Tell the agent to use the specified directory as its working root\n",
+      "stats": {
+        "added_chars": 65,
+        "removed_chars": 137
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--full-auto.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--full-auto",
+        "description"
+      ],
+      "title": "`codex fork --full-auto`: description changed",
+      "impact": "informational",
+      "before": "Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox workspace-write)",
+      "after": "Convenience alias for low-friction sandboxed automatic execution",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tui/src/cwd_prompt.rs#L36"
+          },
+          {
+            "path": "codex-rs/tui/src/lib.rs",
+            "line": 1198,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tui/src/lib.rs#L1198"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--oss.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--oss",
+        "description"
+      ],
+      "title": "`codex fork --oss`: description changed (+24 −156 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Convenience flag to select the local open source model provider. Equivalent to -c model_provider=oss; verifies a local LM Studio or Ollama server is running\n+Use open-source provider\n",
+      "stats": {
+        "added_chars": 24,
+        "removed_chars": 156
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--cd.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--cd",
+        "description"
+      ],
+      "title": "`codex resume --cd`: description changed (+65 −137 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tell the agent to use the specified directory as its working root. In remote mode, the path is forwarded to the server and resolved there\n+Tell the agent to use the specified directory as its working root\n",
+      "stats": {
+        "added_chars": 65,
+        "removed_chars": 137
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--full-auto.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--full-auto",
+        "description"
+      ],
+      "title": "`codex resume --full-auto`: description changed",
+      "impact": "informational",
+      "before": "Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox workspace-write)",
+      "after": "Convenience alias for low-friction sandboxed automatic execution",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/debug-client/src/commands.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/debug-client/src/commands.rs#L55"
+          },
+          {
+            "path": "codex-rs/hooks/src/events/session_start.rs",
+            "line": 31,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/hooks/src/events/session_start.rs#L31"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--oss.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--oss",
+        "description"
+      ],
+      "title": "`codex resume --oss`: description changed (+24 −156 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Convenience flag to select the local open source model provider. Equivalent to -c model_provider=oss; verifies a local LM Studio or Ollama server is running\n+Use open-source provider\n",
+      "stats": {
+        "added_chars": 24,
+        "removed_chars": 156
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+557 −831 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -64,8 +64,7 @@\n           Model the agent should use\n \n       --oss\n-          Convenience flag to select the local open source model provider. Equivalent to -c\n-          model_provider=oss; verifies a local LM Studio or Ollama server is running\n+          Use open-source provider\n \n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n@@ -79,6 +78,19 @@\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n \n+      --full-auto\n+          Convenience alias for low-friction sandboxed automatic execution\n+\n+      --dangerously-bypass-approvals-and-sandbox\n+          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n+          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n+\n+  -C, --cd <DIR>\n+          Tell the agent to use the specified directory as its working root\n+\n+      --add-dir <DIR>\n+          Additional directories that should be writable alongside the primary workspace\n+\n   -a, --ask-for-approval <APPROVAL_POLICY>\n           Configure when the model requires human approval before executing a command\n \n@@ -94,24 +106,9 @@\n           - never:      Never ask for user approval Execution failures are immediately returned to\n             the model\n \n-      --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n-          workspace-write)\n-\n-      --dangerously-bypass-approvals-and-sandbox\n-          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n-          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n-\n-  -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root. In remote mode, the\n-          path is forwarded to the server and resolved there\n-\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n-\n-      --add-dir <DIR>\n-          Additional directories that should be writable alongside the primary workspace\n \n       --no-alt-screen\n           Disable alternate screen mode\n",
+      "stats": {
+        "added_chars": 557,
+        "removed_chars": 831
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+488 −762 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -49,8 +49,7 @@\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n-          Convenience flag to select the local open source model provider. Equivalent to -c\n-          model_provider=oss; verifies a local LM Studio or Ollama server is running\n+          Use open-source provider\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n@@ -59,23 +58,21 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n-  -a, --ask-for-approval <APPROVAL_POLICY>\n-          Configure when the model requires human approval before executing a command [possible\n-          values: untrusted, on-failure, on-request, never]\n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n-          workspace-write)\n+          Convenience alias for low-friction sandboxed automatic execution\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root. In remote mode, the\n-          path is forwarded to the server and resolved there\n+          Tell the agent to use the specified directory as its working root\n+      --add-dir <DIR>\n+          Additional directories that should be writable alongside the primary workspace\n+  -a, --ask-for-approval <APPROVAL_POLICY>\n+          Configure when the model requires human approval before executing a command [possible\n+          values: untrusted, on-failure, on-request, never]\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n-      --add-dir <DIR>\n-          Additional directories that should be writable alongside the primary workspace\n       --no-alt-screen\n           Disable alternate screen mode\n   -h, --help\n",
+      "stats": {
+        "added_chars": 488,
+        "removed_chars": 762
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+262 −299 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -42,17 +42,16 @@\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n \n+  -p, --profile <CONFIG_PROFILE>\n+          Configuration profile from config.toml to specify default options\n+\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n \n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n-\n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (--sandbox\n-          workspace-write)\n+          Convenience alias for low-friction sandboxed automatic execution\n \n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n@@ -61,11 +60,11 @@\n   -C, --cd <DIR>\n           Tell the agent to use the specified directory as its working root\n \n-      --skip-git-repo-check\n-          Allow running Codex outside a Git repository\n-\n       --add-dir <DIR>\n           Additional directories that should be writable alongside the primary workspace\n+\n+      --skip-git-repo-check\n+          Allow running Codex outside a Git repository\n \n       --ephemeral\n           Run without persisting session files to disk\n",
+      "stats": {
+        "added_chars": 262,
+        "removed_chars": 299
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+262 −299 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -31,23 +31,22 @@\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n+  -p, --profile <CONFIG_PROFILE>\n+          Configuration profile from config.toml to specify default options\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n-  -p, --profile <CONFIG_PROFILE>\n-          Configuration profile from config.toml to specify default options\n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (--sandbox\n-          workspace-write)\n+          Convenience alias for low-friction sandboxed automatic execution\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n           Tell the agent to use the specified directory as its working root\n-      --skip-git-repo-check\n-          Allow running Codex outside a Git repository\n       --add-dir <DIR>\n           Additional directories that should be writable alongside the primary workspace\n+      --skip-git-repo-check\n+          Allow running Codex outside a Git repository\n       --ephemeral\n           Run without persisting session files to disk\n       --ignore-user-config\n",
+      "stats": {
+        "added_chars": 262,
+        "removed_chars": 299
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+557 −831 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -47,8 +47,7 @@\n           Model the agent should use\n \n       --oss\n-          Convenience flag to select the local open source model provider. Equivalent to -c\n-          model_provider=oss; verifies a local LM Studio or Ollama server is running\n+          Use open-source provider\n \n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n@@ -62,6 +61,19 @@\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n \n+      --full-auto\n+          Convenience alias for low-friction sandboxed automatic execution\n+\n+      --dangerously-bypass-approvals-and-sandbox\n+          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n+          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n+\n+  -C, --cd <DIR>\n+          Tell the agent to use the specified directory as its working root\n+\n+      --add-dir <DIR>\n+          Additional directories that should be writable alongside the primary workspace\n+\n   -a, --ask-for-approval <APPROVAL_POLICY>\n           Configure when the model requires human approval before executing a command\n \n@@ -77,24 +89,9 @@\n           - never:      Never ask for user approval Execution failures are immediately returned to\n             the model\n \n-      --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n-          workspace-write)\n-\n-      --dangerously-bypass-approvals-and-sandbox\n-          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n-          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n-\n-  -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root. In remote mode, the\n-          path is forwarded to the server and resolved there\n-\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n-\n-      --add-dir <DIR>\n-          Additional directories that should be writable alongside the primary workspace\n \n       --no-alt-screen\n           Disable alternate screen mode\n",
+      "stats": {
+        "added_chars": 557,
+        "removed_chars": 831
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+488 −762 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -30,8 +30,7 @@\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n-          Convenience flag to select the local open source model provider. Equivalent to -c\n-          model_provider=oss; verifies a local LM Studio or Ollama server is running\n+          Use open-source provider\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n@@ -40,23 +39,21 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n-  -a, --ask-for-approval <APPROVAL_POLICY>\n-          Configure when the model requires human approval before executing a command [possible\n-          values: untrusted, on-failure, on-request, never]\n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n-          workspace-write)\n+          Convenience alias for low-friction sandboxed automatic execution\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root. In remote mode, the\n-          path is forwarded to the server and resolved there\n+          Tell the agent to use the specified directory as its working root\n+      --add-dir <DIR>\n+          Additional directories that should be writable alongside the primary workspace\n+  -a, --ask-for-approval <APPROVAL_POLICY>\n+          Configure when the model requires human approval before executing a command [possible\n+          values: untrusted, on-failure, on-request, never]\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n-      --add-dir <DIR>\n-          Additional directories that should be writable alongside the primary workspace\n       --no-alt-screen\n           Disable alternate screen mode\n   -h, --help\n",
+      "stats": {
+        "added_chars": 488,
+        "removed_chars": 762
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+557 −831 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -50,8 +50,7 @@\n           Model the agent should use\n \n       --oss\n-          Convenience flag to select the local open source model provider. Equivalent to -c\n-          model_provider=oss; verifies a local LM Studio or Ollama server is running\n+          Use open-source provider\n \n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n@@ -65,6 +64,19 @@\n           \n           [possible values: read-only, workspace-write, danger-full-access]\n \n+      --full-auto\n+          Convenience alias for low-friction sandboxed automatic execution\n+\n+      --dangerously-bypass-approvals-and-sandbox\n+          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n+          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n+\n+  -C, --cd <DIR>\n+          Tell the agent to use the specified directory as its working root\n+\n+      --add-dir <DIR>\n+          Additional directories that should be writable alongside the primary workspace\n+\n   -a, --ask-for-approval <APPROVAL_POLICY>\n           Configure when the model requires human approval before executing a command\n \n@@ -80,24 +92,9 @@\n           - never:      Never ask for user approval Execution failures are immediately returned to\n             the model\n \n-      --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n-          workspace-write)\n-\n-      --dangerously-bypass-approvals-and-sandbox\n-          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n-          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n-\n-  -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root. In remote mode, the\n-          path is forwarded to the server and resolved there\n-\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n-\n-      --add-dir <DIR>\n-          Additional directories that should be writable alongside the primary workspace\n \n       --no-alt-screen\n           Disable alternate screen mode\n",
+      "stats": {
+        "added_chars": 557,
+        "removed_chars": 831
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+488 −762 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -32,8 +32,7 @@\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n-          Convenience flag to select the local open source model provider. Equivalent to -c\n-          model_provider=oss; verifies a local LM Studio or Ollama server is running\n+          Use open-source provider\n       --local-provider <OSS_PROVIDER>\n           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n           will use config default or show selection\n@@ -42,23 +41,21 @@\n   -s, --sandbox <SANDBOX_MODE>\n           Select the sandbox policy to use when executing model-generated shell commands [possible\n           values: read-only, workspace-write, danger-full-access]\n-  -a, --ask-for-approval <APPROVAL_POLICY>\n-          Configure when the model requires human approval before executing a command [possible\n-          values: untrusted, on-failure, on-request, never]\n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n-          workspace-write)\n+          Convenience alias for low-friction sandboxed automatic execution\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root. In remote mode, the\n-          path is forwarded to the server and resolved there\n+          Tell the agent to use the specified directory as its working root\n+      --add-dir <DIR>\n+          Additional directories that should be writable alongside the primary workspace\n+  -a, --ask-for-approval <APPROVAL_POLICY>\n+          Configure when the model requires human approval before executing a command [possible\n+          values: untrusted, on-failure, on-request, never]\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n-      --add-dir <DIR>\n-          Additional directories that should be writable alongside the primary workspace\n       --no-alt-screen\n           Disable alternate screen mode\n   -h, --help\n",
+      "stats": {
+        "added_chars": 488,
+        "removed_chars": 762
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_thread_store_endpoint",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "experimental_thread_store_endpoint"
+      ],
+      "title": "New setting: experimental_thread_store_endpoint",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Experimental / do not use. When set, app-server uses a remote thread store at this endpoint instead of the local filesystem/SQLite store.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.aws",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.aws"
+      ],
+      "title": "New setting: model_providers.<name>.aws",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "AWS SigV4 auth configuration for this provider.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.aws.profile",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.aws.profile"
+      ],
+      "title": "New setting: model_providers.<name>.aws.profile",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "AWS profile name to use. When unset, the AWS SDK default chain decides.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/agent/role.rs",
+            "line": 133,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/core/src/agent/role.rs#L133"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 889,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/core/src/config/edit.rs#L889"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.model_providers.<name>.name.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.name",
+        "default"
+      ],
+      "title": "Default of model_providers.<name>.name: none → \"\"",
+      "impact": "notable",
+      "before": null,
+      "after": "",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 532,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/cli/src/mcp_cmd.rs#L532"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 772,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/cli/src/mcp_cmd.rs#L772"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT"
+      ],
+      "title": "New environment variable: CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/tui.rs",
+            "line": 60,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tui/src/tui.rs#L60"
+          },
+          {
+            "path": "codex-rs/tui/src/tui.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/tui/src/tui.rs#L66"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ITERM_SESSION_ID",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "ITERM_SESSION_ID"
+      ],
+      "title": "Environment variable no longer read: ITERM_SESSION_ID",
+      "impact": "informational",
+      "before": "ITERM_SESSION_ID",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/terminal-detection/src/lib.rs",
+            "line": 310,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/terminal-detection/src/lib.rs#L310"
+          },
+          {
+            "path": "codex-rs/tui/src/notifications/mod.rs",
+            "line": 64,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/tui/src/notifications/mod.rs#L64"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TERM",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "TERM"
+      ],
+      "title": "Environment variable no longer read: TERM",
+      "impact": "informational",
+      "before": "TERM",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core-skills/src/injection.rs",
+            "line": 463,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/core-skills/src/injection.rs#L463"
+          },
+          {
+            "path": "codex-rs/core/src/unified_exec/process_manager.rs",
+            "line": 62,
+            "url": "https://github.com/openai/codex/blob/rust-v0.122.0/codex-rs/core/src/unified_exec/process_manager.rs#L62"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    }
+  ]
+}

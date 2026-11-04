@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "steps": [
+    {
+      "version": "1.19.5",
+      "previous": "1.19.4",
+      "changes": []
+    },
+    {
+      "version": "1.19.4",
+      "previous": "1.19.3",
+      "changes": []
+    },
+    {
+      "version": "1.19.3",
+      "previous": "1.19.2",
+      "changes": []
+    },
+    {
+      "version": "1.19.2",
+      "previous": "1.19.1",
+      "changes": []
+    },
+    {
+      "version": "1.19.1",
+      "previous": "1.19.0",
+      "changes": []
+    },
+    {
+      "version": "1.19.0",
+      "previous": "1.18.35",
+      "changes": []
+    },
+    {
+      "version": "1.18.35",
+      "previous": "1.18.34",
+      "changes": []
+    }
+  ]
+}

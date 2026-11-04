@@ -1,0 +1,1864 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.303",
+  "to": "2.1.304",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added a transcript line when a plugin that runs first skips one of your mod's hooks, naming the event and the plugin\n- Added `decider: \"person\"` to a mod's `tool.check` answer: only the permission dialog or a host's callback can approve the ask, and it is refused with the mod's reason where nobody can be asked\n- Added `e.isReadOnly` to a mod's `tool.check` event, set when the tool call is read-only\n- Added `/auto-mode-setup`: a guided setup that reads your project and recent sessions to teach auto mode about your environment, now also available on Bedrock, Vertex, Foundry, Claude apps gateway and telemetry-disabled sessions\n- Added `/claude-api managed-agents-secure`, which compares a Managed Agents agent's settings with Anthropic's published security guide, without changing anything\n- Added the names of the tools called earlier to the compaction summary in the transcript view (Ctrl+O)\n- Added a warning on Pro and Max plans when resuming an inactive conversation would use a noticeable share of your 5-hour usage limit: resume anyway, or start a new conversation and Claude can look up the previous one if you refer to it\n- Fixed the organization policy not refreshing until the hourly check after approving an `ANTHROPIC_API_KEY` at startup or switching \"Use custom API key\" in `/config`\n- Fixed sandboxed commands failing to start on Linux when a `sandbox.filesystem.denyRead` glob contains brackets that are not a character class, such as a `[user-id]` route folder\n- Fixed `rm -r` of a mounted drive or a folder at its top level (`/Volumes`, `/media`, WSL's `/mnt/c`) not getting the safety prompt that `rm -rf /Applications` gets\n- Fixed `CLAUDE_CODE_TRANSCRIPT_LOCAL_GC` dropping messages from the saved transcript when the disk filled up while the file was being trimmed\n- Fixed a plugin keeping a headless run going past `--max-turns`, Stop, or ended input by spawning subagents or re-running a finished one\n- Fixed a failed mod reload removing the tools and commands of the version that stays loaded, and its messages being wrong or silent about whether the previous version is still loaded\n- Fixed a click on a mod's button being lost when buttons with the same label and no `key` were redrawn unchanged\n- Fixed mod sharing in the built-in `plugin-authoring` skill stopping at the secret scan on machines with managed settings and on Team and Enterprise plans\n- Fixed scheduled Cowork cloud sessions waiting five minutes again for each subagent whose WebFetch needed a URL approval that nobody was there to give\n- Fixed Write results and rejected edits showing a file outside the working directory as `../../…`; they now show `~/…` or the full path\n- Fixed a claude.ai Directory plugin's skills not running as commands when picked from the \"/\" menu in Cowork cloud sessions\n- Fixed Remote Control permanently withholding a desktop conversation's history when a different account was signed in to the terminal\n- Fixed Remote Control failing to start from Claude Desktop when DISABLE_TELEMETRY or DO_NOT_TRACK is set on a paid plan\n- Fixed model switches, messages and interrupts waiting behind a context usage check in SDK and desktop sessions\n- Fixed `context_management: Extra inputs are not permitted` errors behind LLM gateways; Claude Code now resends the request without that field\n- Fixed OpenTelemetry settings delivered through server-managed settings being ignored for the whole session after signing in during first-run setup or the first start after /logout\n- Fixed unsandboxed Bash commands in Claude Desktop Code tab sessions on macOS and Linux not seeing environment variables exported in shell startup files such as ~/.zshrc\n- Fixed the Consumer Terms notice being skipped for a day or longer after a server error\n- Fixed `/privacy-settings` offering choices that may not apply to you after a network or server error\n- Fixed a \"Context limit reached\" or \"Prompt is too long\" error after stopping a turn while Claude Code was compacting a conversation the API had rejected as too long\n- Fixed subagents sometimes forgetting their most recent work when they were messaged or resumed right after finishing\n- Fixed `claude --help` text for `--tools`, `--resume`, `--debug`, `--json-schema`, `--disable-slash-commands`, `--system-prompt-snapshot` and `claude update` to match actual behavior\n- Fixed `claude --worktree` removing the worktree and its branch without asking at exit when HEAD was detached or on another branch, which could lose commits\n- Fixed resumed and cloud sessions sending Claude the whole skill list again each time plugins reloaded at startup\n- Fixed an interrupt not ending a Read that waits on an idle pipe or device named like an image\n- Fixed `/effort status`, `/effort ultracode` and the prompt's effort indicator showing a guessed effort level when `CLAUDE_CODE_EFFORT_LEVEL` is `auto` or `unset` and no level is sent\n- Fixed a PreToolUse hook's deny reason being replaced by a timeout error when an Agent SDK callback hook on the same tool call timed out\n- Fixed Bash and PowerShell deleting a large command's output file when it could not be copied to the session's tool-results folder, unless the disk is full\n- Fixed notes typed into a multiple-choice question with previews being cut off with \"…\" in terminals under about 100 columns, hiding what was typed (anthropics/claude-code#82768)\n- Fixed self-paced `/loop` wakeups scheduled at the 1-hour maximum firing just after the 1-hour prompt cache expired, so those wakeups no longer re-read the conversation uncached\n- Fixed agent teams: approving a shutdown request from the main session no longer exits the whole CLI\n- Fixed a skill's `once` hook also removing another skill's identical hook after it ran\n- Fixed transcript mode's `{` and `}` landing the prompt on an inconsistent row, or off screen, instead of the transcript's first row\n- Fixed `CLAUDE_CODE_AUTO_COMPACT_WINDOW=200k` silently setting a 100K window: the variable now accepts `k` and `M` suffixes like `--autocompact`, and warns when a value is out of range or ignored\n- Fixed Ctrl+C in the agents view clearing a text selection without copying it when pressed before the mouse button was released\n- Improved `/usage` to say when a rate limit on usage data ends instead of \"try again in a moment\"\n- Improved the lines shown when a mod written in the session loads, reloads or fails to load\n- Improved artifacts with several views: when you ask for links to them, Claude now writes out each view's link and explains that the address bar stays the same as you switch views\n- Improved cloud sessions: a new conversation's first turn no longer waits for the local (stdio) MCP servers of plugins synced from claude.ai, unless a server sets `alwaysLoad: true`\n- Improved how a remote session recovers its status when the server refuses a status update that carried other session data\n- Improved session file size in auto mode: the safety classifier's context is no longer stored with every request\n- Improved the `claude -p` invalid-settings warning: a file that did not load lists only what stopped it, and long lists are capped per file\n- Improved resume of large compacted sessions in SDK and headless mode: the first request after resuming is sent sooner\n- Improved responsiveness and throughput when many subagents are running at the same time\n- Improved memory use when sending requests in long or resumed conversations\n- Self-hosted runner: Improved the error shown when the git host answers \"not found\" for a session's repository: it now names the repository and whom to ask\n- Windows: Improved git command start-up with a standard Git for Windows install by running its git.exe directly instead of through its cmd launcher\n- Changed mods' `settings.read` hooks to receive each settings layer and rewrite the merged settings, so a managed mod can make an organization's setting a ceiling, including the `cleanupPeriodDays` the retention sweep uses\n- Changed the `/artifacts` delete confirmation to show numbered choices: 1 or Enter keeps the artifact, 2 deletes it, and y, n and Esc still work\n- Changed the question that turns on the mods Claude writes in a session to plain text with no link or session id; it stays up when a new turn starts, and Claude tells you what loaded when you turn them on\n- Changed tool search to be on by default behind a custom `ANTHROPIC_BASE_URL`; a 400 or 422 from the gateway is retried without it\n- Changed compaction to send Claude the skill list again afterwards; `/reload-skills` now sends only new or changed skills\n- Changed skill hooks: the skills of one source (a repo, your own folder, or a plugin) can register at most 1,024 hooks and 16,384 matcher characters per session\n- Changed skills under a policy that allows hooks from plugins only: a skill used in the main conversation whose hooks are kept out no longer gets its `allowed-tools`\n- Updated the /claude-api skill to use the `ant` CLI on Claude Platform on AWS instead of falling back to the SDK or curl\n- Removed the notes from `claude plugin validate` that predicted where a mod's hooks would run\n- Removed the \"(research preview)\" label from the `/fast` dialog title on Opus 5.5\n- [VSCode] Added mod drawing in the chat panel for sessions on Amazon Bedrock, Google Vertex AI and Microsoft Foundry, behind an LLM gateway, or with telemetry turned off\n- [VSCode] Fixed one cause of sessions failing to start with \"Subprocess initialization did not complete within 60000ms\": time a SessionStart command hook spends running no longer counts toward the limit, up to 10 minutes in total\n- [VSCode] Fixed a session closed while it was starting keeping its Claude Code process running until the start ended\n- [VSCode] Fixed a mod's drawings disappearing from a long-open panel until the next turn on machines that also run an older Claude Code\n- [VSCode] Fixed Past conversations hiding sessions when `claudeCode.claudeProcessWrapper` is set\n- [VSCode] Changed background sub-agents to show as one status line under their Agent card instead of streaming every step into the chat; the full transcript stays in /tasks\n- [Cloud sessions] Fixed folders in the composer's @ list showing no name in cloud sessions, where picking one added only a space instead of a mention\n- [Claude Tag] Fixed Claude going silent in a thread when its channel becomes shared across Enterprise Grid workspaces mid-task; it now posts a one-time note to @-mention it in a new thread\n- [Claude Tag] Fixed `@Claude !fork` typed outside a thread getting no visible reply; Claude now shows you a private note saying to run it from inside a thread\n- [Code Review] Added review levels to Code Review: Owners choose Quick, Standard (the default), or Deep for the organization, and can give individual repositories their own level\n- [Code Review] Added an option in Code Review admin settings to review every repository in a GitHub organization, including ones added later, without selecting them one by one\n- [Code Review] Fixed pull requests opened within a minute or two of an admin turning on Code Review being silently skipped; they are now retried and reviewed"
+  },
+  "summary": {
+    "changes": 93,
+    "categories": {
+      "behavior": 12,
+      "cli": 9,
+      "config": 17,
+      "hooks": 24,
+      "prompt": 17,
+      "request": 1,
+      "tools": 13
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 31,
+      "notable": 62
+    },
+    "undocumented": 39
+  },
+  "changes": [
+    {
+      "id": "prompt.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Injected context changed (+627 −268 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,6 +12,19 @@\n \n You are powered by the model named Opus 5.5. The exact model ID is claude-opus-5-5. Assistant knowledge cutoff is June 2026.\n \n+The following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\n+CronCreate\n+CronDelete\n+CronList\n+DesignSync\n+EnterWorktree\n+ExitWorktree\n+NotebookEdit\n+SendMessage\n+TaskStop\n+WebFetch\n+WebSearch\n+\n Available agent types for the Agent tool:\n - claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n - Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps.\n@@ -63,7 +76,7 @@\n - run: Launch and drive this project's app to see a change working.\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n-- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a live pane or panel, a band above the prompt, a status line, a toast, a slash command, or a hook on tool calls or prompts. Use to make, change or debug a mod or its hooks module.\n+- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n \n",
+      "stats": {
+        "added_chars": 627,
+        "removed_chars": 268
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+652 −268 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,6 +12,21 @@\n \n You are powered by the model named Opus 5.5. The exact model ID is claude-opus-5-5. Assistant knowledge cutoff is June 2026.\n \n+The following deferred tools are now available via ToolSearch. Their schemas are NOT loaded — calling them directly will fail with InputValidationError. Use ToolSearch with query \"select:<name>[,<name>...]\" to load tool schemas before calling them:\n+CronCreate\n+CronDelete\n+CronList\n+DesignSync\n+EnterPlanMode\n+EnterWorktree\n+ExitPlanMode\n+ExitWorktree\n+NotebookEdit\n+SendMessage\n+TaskStop\n+WebFetch\n+WebSearch\n+\n Available agent types for the Agent tool:\n - claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n - claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI) and the `/skill-doctor` report.\n@@ -66,7 +81,7 @@\n - run: Launch and drive this project's app to see a change working.\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n-- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a live pane or panel, a band above the prompt, a status line, a toast, a slash command, or a hook on tool calls or prompts. Use to make, change or debug a mod or its hooks module.\n+- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n \n",
+      "stats": {
+        "added_chars": 652,
+        "removed_chars": 268
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.DeferredToolPlaceholder",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "DeferredToolPlaceholder"
+      ],
+      "title": "Interactive system prompt added",
+      "impact": "notable",
+      "before": null,
+      "after": "DeferredToolPlaceholder",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.ToolSearch",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "ToolSearch"
+      ],
+      "title": "Interactive system prompt added",
+      "impact": "notable",
+      "before": null,
+      "after": "ToolSearch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.CronCreate",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "CronCreate"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "CronCreate",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.CronDelete",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "CronDelete"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "CronDelete",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.CronList",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "CronList"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "CronList",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.DesignSync",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "DesignSync"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "DesignSync",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.EnterPlanMode",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "EnterPlanMode"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "EnterPlanMode",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.EnterWorktree",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "EnterWorktree"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "EnterWorktree",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.ExitPlanMode",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "ExitPlanMode"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "ExitPlanMode",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.ExitWorktree",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "ExitWorktree"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "ExitWorktree",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.NotebookEdit",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "NotebookEdit"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "NotebookEdit",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.SendMessage",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "SendMessage"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "SendMessage",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.TaskStop",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "TaskStop"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "TaskStop",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.WebFetch",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "WebFetch"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "WebFetch",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.tools.WebSearch",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "tools",
+        "WebSearch"
+      ],
+      "title": "Interactive system prompt removed",
+      "impact": "notable",
+      "before": "WebSearch",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.CronCreate.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "CronCreate",
+        "deferred"
+      ],
+      "title": "CronCreate is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.CronDelete.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "CronDelete",
+        "deferred"
+      ],
+      "title": "CronDelete is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.CronList.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "CronList",
+        "deferred"
+      ],
+      "title": "CronList is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.DesignSync.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "DesignSync",
+        "deferred"
+      ],
+      "title": "DesignSync is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.EnterWorktree.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "EnterWorktree",
+        "deferred"
+      ],
+      "title": "EnterWorktree is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.ExitWorktree.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "ExitWorktree",
+        "deferred"
+      ],
+      "title": "ExitWorktree is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.NotebookEdit.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "NotebookEdit",
+        "deferred"
+      ],
+      "title": "NotebookEdit is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.SendMessage.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "SendMessage",
+        "deferred"
+      ],
+      "title": "SendMessage is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.TaskStop.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "TaskStop",
+        "deferred"
+      ],
+      "title": "TaskStop is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.WebFetch.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "WebFetch",
+        "deferred"
+      ],
+      "title": "WebFetch is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.WebSearch.deferred",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "WebSearch",
+        "deferred"
+      ],
+      "title": "WebSearch is now a deferred tool (named only; its schema loaded on demand)",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.DeferredToolPlaceholder",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "DeferredToolPlaceholder"
+      ],
+      "title": "New tool: DeferredToolPlaceholder",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Reserved placeholder that keeps deferred tool loading active; never call this tool.",
+        "input_schema": {
+          "properties": {},
+          "type": "object"
+        },
+        "name": "DeferredToolPlaceholder",
+        "sha256": "5af67ac286cf1ea8bb0ce3990bbf58a00597eeeb7579d0dcf93a9642d0a77e2b"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.ToolSearch",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "ToolSearch"
+      ],
+      "title": "New tool: ToolSearch",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Fetches full schema definitions for deferred tools so they can be called.\n\nDeferred tools appear by name in <system-reminder> messages. Until fetched, only the name is known — there is no parameter schema, so the tool cannot be invoked. This tool takes a query, matches it against the deferred tool list, and returns the matched tools' complete JSONSchema definitions inside a <functions> block. Once a tool's schema appears in that result, it is callable exactly like any tool defined at the top of the prompt.\n\nResult format: each matched tool appears as one <function>{\"description\": \"...\", \"name\": \"...\", \"parameters\": {...}}</function> line inside the <functions> block — the same encoding as the tool list at the top of this prompt.\n\nQuery forms:\n- \"select:Read,Edit,Grep\" — fetch these exact tools by name\n- \"notebook jupyter\" — keyword search, up to max_results best matches\n- \"+slack send\" — require \"slack\" in the name, rank by remaining terms",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "max_results": {
+              "default": 5,
+              "description": "Maximum number of results to return (default: 5)",
+              "type": "number"
+            },
+            "query": {
+              "description": "Query to find deferred tools. Use \"select:<tool_name>\" for direct selection, or keywords to search.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "query",
+            "max_results"
+          ],
+          "type": "object"
+        },
+        "name": "ToolSearch",
+        "sha256": "275ca490dcb1be4d85f33746c3936f71d642ffbd70c1b7885dfaa363f2df7668"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.betas.advanced-tool-use-2025-11-20",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "betas",
+        "advanced-tool-use-2025-11-20"
+      ],
+      "title": "New beta: advanced-tool-use-2025-11-20",
+      "impact": "notable",
+      "before": null,
+      "after": "advanced-tool-use-2025-11-20",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction.tools",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction",
+        "tools"
+      ],
+      "title": "Behaviour: compaction tools changed: 23 → 12",
+      "impact": "notable",
+      "before": 23,
+      "after": 12,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction_command.tools",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "tools"
+      ],
+      "title": "Behaviour: compaction_command tools changed: 23 → 12",
+      "impact": "notable",
+      "before": 23,
+      "after": 12,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.DeferredToolPlaceholder",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "DeferredToolPlaceholder"
+      ],
+      "title": "Behaviour: subagents tools DeferredToolPlaceholder added",
+      "impact": "notable",
+      "before": null,
+      "after": "DeferredToolPlaceholder",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.ToolSearch",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "ToolSearch"
+      ],
+      "title": "Behaviour: subagents tools ToolSearch added",
+      "impact": "notable",
+      "before": null,
+      "after": "ToolSearch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.EnterWorktree",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "EnterWorktree"
+      ],
+      "title": "Behaviour: subagents tools EnterWorktree removed",
+      "impact": "notable",
+      "before": "EnterWorktree",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.ExitWorktree",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "ExitWorktree"
+      ],
+      "title": "Behaviour: subagents tools ExitWorktree removed",
+      "impact": "notable",
+      "before": "ExitWorktree",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.Monitor",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "Monitor"
+      ],
+      "title": "Behaviour: subagents tools Monitor removed",
+      "impact": "notable",
+      "before": "Monitor",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.NotebookEdit",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "NotebookEdit"
+      ],
+      "title": "Behaviour: subagents tools NotebookEdit removed",
+      "impact": "notable",
+      "before": "NotebookEdit",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.SendMessage",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "SendMessage"
+      ],
+      "title": "Behaviour: subagents tools SendMessage removed",
+      "impact": "notable",
+      "before": "SendMessage",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.TaskStop",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "TaskStop"
+      ],
+      "title": "Behaviour: subagents tools TaskStop removed",
+      "impact": "notable",
+      "before": "TaskStop",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.WebFetch",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "WebFetch"
+      ],
+      "title": "Behaviour: subagents tools WebFetch removed",
+      "impact": "notable",
+      "before": "WebFetch",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.tools.WebSearch",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "tools",
+        "WebSearch"
+      ],
+      "title": "Behaviour: subagents tools WebSearch removed",
+      "impact": "notable",
+      "before": "WebSearch",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.action",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.action"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.action removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.action",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.discard_changes",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.discard_changes"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.discard_changes removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.discard_changes",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.message",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.message"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.message removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.message",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.name"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.name removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.status",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.status"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.status removed",
+      "impact": "notable",
+      "before": "tool_calls[].tool_input.status",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_input.action",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_input.action"
+      ],
+      "title": "PostToolUse hook payload field tool_input.action removed",
+      "impact": "notable",
+      "before": "tool_input.action",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_input.discard_changes",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_input.discard_changes"
+      ],
+      "title": "PostToolUse hook payload field tool_input.discard_changes removed",
+      "impact": "notable",
+      "before": "tool_input.discard_changes",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_input.name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_input.name"
+      ],
+      "title": "PostToolUse hook payload field tool_input.name removed",
+      "impact": "notable",
+      "before": "tool_input.name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.action",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.action"
+      ],
+      "title": "PostToolUse hook payload field tool_response.action removed",
+      "impact": "notable",
+      "before": "tool_response.action",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.discardedCommits",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.discardedCommits"
+      ],
+      "title": "PostToolUse hook payload field tool_response.discardedCommits removed",
+      "impact": "notable",
+      "before": "tool_response.discardedCommits",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.discardedFiles",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.discardedFiles"
+      ],
+      "title": "PostToolUse hook payload field tool_response.discardedFiles removed",
+      "impact": "notable",
+      "before": "tool_response.discardedFiles",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.message",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.message"
+      ],
+      "title": "PostToolUse hook payload field tool_response.message removed",
+      "impact": "notable",
+      "before": "tool_response.message",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.originalCwd",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.originalCwd"
+      ],
+      "title": "PostToolUse hook payload field tool_response.originalCwd removed",
+      "impact": "notable",
+      "before": "tool_response.originalCwd",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.originalCwdMissing",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.originalCwdMissing"
+      ],
+      "title": "PostToolUse hook payload field tool_response.originalCwdMissing removed",
+      "impact": "notable",
+      "before": "tool_response.originalCwdMissing",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.restoredCwd",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.restoredCwd"
+      ],
+      "title": "PostToolUse hook payload field tool_response.restoredCwd removed",
+      "impact": "notable",
+      "before": "tool_response.restoredCwd",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.worktreePath",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.worktreePath"
+      ],
+      "title": "PostToolUse hook payload field tool_response.worktreePath removed",
+      "impact": "notable",
+      "before": "tool_response.worktreePath",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_input.action",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_input.action"
+      ],
+      "title": "PreToolUse hook payload field tool_input.action removed",
+      "impact": "notable",
+      "before": "tool_input.action",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_input.discard_changes",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_input.discard_changes"
+      ],
+      "title": "PreToolUse hook payload field tool_input.discard_changes removed",
+      "impact": "notable",
+      "before": "tool_input.discard_changes",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_input.name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_input.name"
+      ],
+      "title": "PreToolUse hook payload field tool_input.name removed",
+      "impact": "notable",
+      "before": "tool_input.name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.background_tasks[].agent_type",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "background_tasks[].agent_type"
+      ],
+      "title": "Stop hook payload field background_tasks[].agent_type added",
+      "impact": "informational",
+      "before": null,
+      "after": "background_tasks[].agent_type",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.background_tasks[].description",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "background_tasks[].description"
+      ],
+      "title": "Stop hook payload field background_tasks[].description added",
+      "impact": "informational",
+      "before": null,
+      "after": "background_tasks[].description",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.background_tasks[].id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "background_tasks[].id"
+      ],
+      "title": "Stop hook payload field background_tasks[].id added",
+      "impact": "informational",
+      "before": null,
+      "after": "background_tasks[].id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.background_tasks[].status",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "background_tasks[].status"
+      ],
+      "title": "Stop hook payload field background_tasks[].status added",
+      "impact": "informational",
+      "before": null,
+      "after": "background_tasks[].status",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.background_tasks[].type",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "background_tasks[].type"
+      ],
+      "title": "Stop hook payload field background_tasks[].type added",
+      "impact": "informational",
+      "before": null,
+      "after": "background_tasks[].type",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--debug.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--debug",
+        "description"
+      ],
+      "title": "`claude --debug`: description changed",
+      "impact": "informational",
+      "before": "Enable debug mode with optional category filtering (e.g., \"api,hooks\" or \"!1p,!file\")",
+      "after": "Enable debug mode with optional category filtering (e.g., --debug=hooks,mcp or --debug='!hooks,!mcp')",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--disable-slash-commands.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--disable-slash-commands",
+        "description"
+      ],
+      "title": "`claude --disable-slash-commands`: description changed",
+      "impact": "informational",
+      "before": "Disable all skills",
+      "after": "Disable all skills and commands",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--json-schema.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--json-schema",
+        "description"
+      ],
+      "title": "`claude --json-schema`: description changed (+158 −132 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-JSON Schema for structured output validation. Example: {\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}\n+JSON Schema for structured output validation (only works with --print). Example: {\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}\n",
+      "stats": {
+        "added_chars": 158,
+        "removed_chars": 132
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--resume.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--resume",
+        "description"
+      ],
+      "title": "`claude --resume`: description changed",
+      "impact": "informational",
+      "before": "Resume a conversation by session ID, or open interactive picker with optional search term",
+      "after": "Resume a conversation by session ID or name, or open interactive picker with optional search term",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--system-prompt-snapshot.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--system-prompt-snapshot",
+        "description"
+      ],
+      "title": "`claude --system-prompt-snapshot`: description changed (+356 −356 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n Record the system prompt once per conversation and reuse it verbatim on every request and resume.\n-on (the default): the prompt is rendered on the conversation's first request — a --system-prompt or --append-system-prompt included — sent, and recorded; every later request and resume sends the record as-is, even when a later launch passes different text, until the conversation is compacted.\n+on (the default, except under --bare outside cloud and background sessions): the prompt is rendered on the conversation's first request — a --system-prompt or --append-system-prompt included — sent, and recorded; every later request and resume sends the record as-is, even when a later launch passes different text, until the conversation is compacted.\n off: never record; the prompt is rendered fresh every request (for iterating on prompt text).\n-No effect where system-prompt recording is not yet enabled.\n",
+      "stats": {
+        "added_chars": 356,
+        "removed_chars": 356
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--tools.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--tools",
+        "description"
+      ],
+      "title": "`claude --tools`: description changed (+168 −162 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Specify the list of available tools from the built-in set. Use \"\" to disable all tools, \"default\" to use all tools, or specify tool names (e.g. \"Bash,Edit,Read\").\n+Specify the list of available tools from the built-in set. Use \"\" to disable all tools, \"default\" to use the default set, or specify tool names (e.g. \"Bash,Edit,Read\").\n",
+      "stats": {
+        "added_chars": 168,
+        "removed_chars": 162
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude update.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude update",
+        "description"
+      ],
+      "title": "Description of `claude update` changed",
+      "impact": "informational",
+      "before": "Check for updates and install if available",
+      "after": "Check for updates and install if available; package-manager installs update through the package manager",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1283 −1076 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -70,14 +70,14 @@\n                                         Recommended only for sandboxes with no\n                                         internet access.\n   -d, --debug [filter]                  Enable debug mode with optional category\n-                                        filtering (e.g., \"api,hooks\" or\n-                                        \"!1p,!file\")\n+                                        filtering (e.g., --debug=hooks,mcp or\n+                                        --debug='!hooks,!mcp')\n   --debug-file <path>                   Write debug logs to a specific file path\n                                         (implicitly enables debug mode)\n   --desktop                             Open in the Claude Desktop app instead\n                                         of the terminal (with --continue or\n                                         --resume <id> to pick the session)\n-  --disable-slash-commands              Disable all skills\n+  --disable-slash-commands              Disable all skills and commands\n   --disallowedTools, --disallowed-tools <tools...>\n       Comma or space-separated list of tool names to deny (e.g. \"Bash(git *)\n       Edit\")\n@@ -125,7 +125,8 @@\n                                         (realtime streaming input) (choices:\n                                         \"text\", \"stream-json\")\n   --json-schema <schema>                JSON Schema for structured output\n-                                        validation. Example:\n+                                        validation (only works with --print).\n+                                        Example:\n                                         {\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}\n   --max-budget-usd <amount>             Maximum dollar amount to spend on API\n                                         calls (only works with --print)\n@@ -206,9 +207,9 @@\n                                         permission handler approve writes to\n                                         settings, git and tool-configuration\n                                         files.\n-  -r, --resume [value]                  Resume a conversation by session ID, or\n-                                        open interactive picker with optional\n-                                        search term\n+  -r, --resume [value]                  Resume a conversation by session ID or\n+                                        name, or open interactive picker with\n+                                        optional search term\n   --safe-mode                           Start with all customizations\n                                         (CLAUDE.md, skills, installed plugins,\n                                         hooks, MCP servers, custom commands and\n@@ -232,9 +233,10 @@\n   --system-prompt-snapshot <on|off>     Record the system prompt once per\n                                         conversation and reuse it verbatim on\n                                         every request and resume. on (the\n-                                        default): the prompt is rendered on the\n-                                        conversation's first request — a\n-                                        --system-prompt or\n+                                        default, except under --bare outside\n+                                        cloud and background sessions): the\n+                                        prompt is rendered on the conversation's\n+                                        first request — a --system-prompt or\n                                         --append-system-prompt included — sent,\n                                         and recorded; every later request and\n                                         resume sends the record as-is, even when\n@@ -242,9 +244,8 @@\n                                         until the conversation is compacted.\n                                         off: never record; the prompt is\n                                         rendered fresh every request (for\n-                                        iterating on prompt text). No effect\n-                                        where system-prompt recording is not yet\n-                                        enabled. (choices: \"on\", \"off\")\n+                                        iterating on prompt text). (choices:\n+                                        \"on\", \"off\")\n   --teleport [session]                  Resume a teleport session, optionally\n                                         specify session ID\n   --tmux                                Create a tmux session for the worktree\n@@ -253,8 +254,8 @@\n                                         --tmux=classic for traditional tmux.\n   --tools <tools...>                    Specify the list of available tools from\n                                         the built-in set. Use \"\" to disable all\n-                                        tools, \"default\" to use all tools, or\n-                                        specify tool names (e.g.\n+                                        tools, \"default\" to use the default set,\n+                                        or specify tool names (e.g.\n                                         \"Bash,Edit,Read\").\n   --verbose                             Override verbose mode setting from\n                                         config\n@@ -308,5 +309,6 @@\n                                         number / base branch) and print the\n                                         findings\n   update|upgrade                        Check for updates and install if\n-                                        available\n+                                        available; package-manager installs\n+                                        update through the package manager\n \n",
+      "stats": {
+        "added_chars": 1283,
+        "removed_chars": 1076
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.update --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "update --help"
+      ],
+      "title": "Full help text of `update --help` changed (+102 −42 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,7 @@\n Usage: claude update|upgrade [options]\n \n-Check for updates and install if available\n+Check for updates and install if available; package-manager installs update\n+through the package manager\n \n Options:\n   -h, --help  Display help for command\n",
+      "stats": {
+        "added_chars": 102,
+        "removed_chars": 42
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.policyHelper.refreshIntervalMs.enum.60000",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "policyHelper.refreshIntervalMs",
+        "enum",
+        "60000"
+      ],
+      "title": "Setting policyHelper.refreshIntervalMs gained value 60000",
+      "impact": "informational",
+      "before": null,
+      "after": 60000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.policyHelper.timeoutMs.enum.1000",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "policyHelper.timeoutMs",
+        "enum",
+        "1000"
+      ],
+      "title": "Setting policyHelper.timeoutMs gained value 1000",
+      "impact": "informational",
+      "before": null,
+      "after": 1000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ATTRIBUTION_PROJECT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ATTRIBUTION_PROJECT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ATTRIBUTION_PROJECT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ATTRIBUTION_PROJECT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_REMOTE_BROWSER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_REMOTE_BROWSER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_REMOTE_BROWSER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_REMOTE_BROWSER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BRIDGE_CHILD_PROJECTS_ENTRYPOINT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BRIDGE_CHILD_PROJECTS_ENTRYPOINT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BRIDGE_CHILD_PROJECTS_ENTRYPOINT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BRIDGE_CHILD_PROJECTS_ENTRYPOINT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_SERVE_ENABLED_PLUGINS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_SERVE_ENABLED_PLUGINS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_SERVE_ENABLED_PLUGINS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_SERVE_ENABLED_PLUGINS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PERSONAL_CONFIG_FIX",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PERSONAL_CONFIG_FIX"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PERSONAL_CONFIG_FIX",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PERSONAL_CONFIG_FIX",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SDK_READS_STARTUP_MARKS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SDK_READS_STARTUP_MARKS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SDK_READS_STARTUP_MARKS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SDK_READS_STARTUP_MARKS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SKIP_PLUGIN_LOCAL_MCP_SERVERS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SKIP_PLUGIN_LOCAL_MCP_SERVERS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SKIP_PLUGIN_LOCAL_MCP_SERVERS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SKIP_PLUGIN_LOCAL_MCP_SERVERS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SKIP_PLUGIN_MCP_BUNDLES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SKIP_PLUGIN_MCP_BUNDLES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SKIP_PLUGIN_MCP_BUNDLES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SKIP_PLUGIN_MCP_BUNDLES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WARN_DISK_FREE_GIB",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WARN_DISK_FREE_GIB"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WARN_DISK_FREE_GIB",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WARN_DISK_FREE_GIB",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WARN_MEMORY_FREE_GIB",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WARN_MEMORY_FREE_GIB"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WARN_MEMORY_FREE_GIB",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WARN_MEMORY_FREE_GIB",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_ROW_TOOL_NAMES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_ROW_TOOL_NAMES"
+      ],
+      "title": "New environment variable: MCP_ROW_TOOL_NAMES",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_ROW_TOOL_NAMES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_ENVtaken",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVtaken"
+      ],
+      "title": "New environment variable: NODE_ENVtaken",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVtaken",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BundleV2",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BundleV2"
+      ],
+      "title": "Environment variable no longer read: BundleV2",
+      "impact": "informational",
+      "before": "BundleV2",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.NODE_ENVContent",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVContent"
+      ],
+      "title": "Environment variable no longer read: NODE_ENVContent",
+      "impact": "informational",
+      "before": "NODE_ENVContent",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

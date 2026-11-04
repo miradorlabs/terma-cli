@@ -1,0 +1,616 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.245",
+  "to": "2.1.246",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added a startup warning for Bash allow rules with a wildcard before the subcommand (e.g. `Bash(git * main)`), since they also match options inserted before the subcommand\n- Added an Auto mode tab to `/permissions` for viewing and editing auto mode classifier rules\n- Added the turn's completion time to the end-of-turn duration line, e.g. `✻ Sautéed for 23s · done 6:05 PM`\n- Fixed fullscreen mode showing a blank transcript after resizing the terminal and jumping to the bottom until the next keypress\n- Fixed a severe transcript slowdown when a diff contained a very long single line (e.g. a base64 string); such lines now render truncated with a marker\n- Fixed erratic fullscreen scrolling when positioned at an earlier message, including jump-to-bottom getting stuck mid-transcript\n- Fixed background sessions failing to open after 45 seconds when Claude Code's starting directory had been deleted, the machine had slept, or the host is slow to start processes\n- Fixed background sessions failing to open with \"Couldn't start the background service … EACCES\" when another Claude Code process was re-installing the npm package at that moment\n- Fixed markdown rendering being disabled for a whole message when its first 500 characters contained no markdown, and for `+`/`N)` lists and setext headings\n- Fixed MCP tool calls interrupted by an incoming message in headless/remote sessions being reported to the model as \"completed with no output\" instead of an explicit interrupted error\n- Fixed MCP tool arguments being sent as JSON strings when the parameter's schema is empty (`{}`), instead of their real type\n- Fixed a command interrupted mid-run showing as \"Ran 1 shell command\" with no sign it was cut\n- Fixed pressing ← or running `/background` during a dynamic workflow restarting its finished subagents; it now asks first and says how many subagents would restart\n- Fixed opening a just-started session in `claude agents` while its worker was still booting (common on Windows) stopping it with \"was stopped while the respawn was in flight\"\n- Fixed `claude agents` listing a backgrounded named session twice; backgrounding the same conversation again now numbers the new row (e.g. `my-session (2)`)\n- Fixed the background retention sweep removing git worktrees under `.claude/worktrees/` that you created yourself when an old background-session record pointed at them\n- Fixed auto mode tool calls being denied as \"temporarily unavailable\" on very large sessions by scaling the safety-check deadline with prompt size\n- Fixed the plugin cache creating duplicate SHA-named directories for the same plugin\n- Fixed plugin skills whose frontmatter `name` already includes the `<plugin>:` prefix showing it doubled in the slash menu (e.g. `/plugin:plugin:skill`)\n- Fixed `claude plugin update` failing for an installed plugin given its bare name (only the fully-qualified name worked)\n- Fixed plugin installation failing when `plugin.json` was saved with a UTF-8 byte-order mark (BOM)\n- Fixed `/reload-plugins` reporting 0 skills for plugins that define skills under `skills/*/SKILL.md`\n- Fixed hook error messages showing a literal `${CLAUDE_PLUGIN_ROOT}` instead of the resolved plugin path\n- Fixed `/rename` replacing the theme's prompt border color (including a custom theme's `promptBorder`) with the default cyan; the border now keeps your theme's color unless you pick one with `/color`\n- Fixed custom theme diff colors (`diffAdded`/`diffRemoved` and their dimmed variants) being ignored in diffs and the `/theme` preview\n- Fixed a `keybindings.json` binding with an unknown action name silently deadening that key; it is now skipped so the default binding keeps working, and a warning is logged under `--debug`\n- Fixed `/stats` activity heatmap showing each day's activity one cell off (Sunday's count under Monday) in timezones east of UTC\n- Fixed `/fork` from an already-forked or backgrounded session starting the new session with an empty conversation\n- Fixed prompts beginning with `/--` (e.g. Lean doc comments) being rejected as an unknown slash command instead of being sent to Claude\n- Fixed the `@` file picker staying open after the typed text stopped matching a real path\n- Fixed the status line's cost and duration resetting to zero after navigating to the agents view and back\n- Fixed fullscreen mode moving keyboard focus onto the control under the pointer when you clicked the terminal window only to bring it back into focus\n- Fixed path completion failing when the completion token or working directory contained a null byte\n- Windows/macOS: Fixed headless sessions not cleaning up stale entries in `~/.claude/sessions` left by sessions that exited uncleanly\n- Fixed the UI stopping with a render error on the first tool call when a third-party Anthropic-compatible endpoint (`ANTHROPIC_BASE_URL`) streams a `tool_use` block without an `id`\n- Fixed the Write tool reporting \"Out of memory\" or freezing for a long time after overwriting a very large existing file, even though the file had been written\n- Fixed `claude plugin install <name>` exiting silently (or hanging in a terminal) instead of reporting an error when `~/.claude/plugins/known_marketplaces.json` is empty or corrupted\n- Fixed resumed sessions failing every turn with a 400 when the saved history contains tool blocks the Anthropic API does not accept (typically written by a third-party API proxy)\n- Fixed `curl -fsSL https://claude.ai/install.sh | bash` failing with \"Raw mode is not supported\" for some Team/Enterprise users with server-managed settings\n- Fixed sessions that ended in plan mode resuming outside plan mode in the VS Code extension, and in `claude -p --continue`/`--resume` with a permission prompt tool, when no permission mode was set\n- Fixed the `Notification` hook not firing while the sandbox \"Network request outside of sandbox\" permission prompt is waiting\n- Fixed Bash permission checks to always require approval for malformed commands with a dangling `&&` or `||` operator\n- Fixed `--strict-mcp-config` sessions prompting to approve `.mcp.json` servers they would never load, which left background sessions waiting at startup\n- Fixed telemetry and metrics requests to Anthropic carrying the API key configured for a third-party gateway (`ANTHROPIC_BASE_URL`); a credential is now only sent to its own host\n- Fixed a visible API error on the first prompt after idle when `apiKeyHelper` returns short-lived JWTs: an expired cached token is now refreshed before sending, and 401/403 auth errors retry quietly\n- Fixed memory growing with session length in the fullscreen and Ctrl+O transcript views: each rendered message row no longer retains a full copy of the transcript-wide tool lookups\n- Fixed `/ultrareview` runs and cloud sessions launched at the same time from one repository (e.g. from several worktrees) sometimes starting with another launch's uncommitted changes\n- Fixed the task progress count (e.g. `3/5`) shown for background cloud sessions such as `/autofix-pr` occasionally missing a task\n- Fixed Remote Control sessions keeping their placeholder name in claude.ai and the Claude app until the second prompt; the auto-generated title now appears after the first prompt\n- Fixed MCP tools marked `requiresUserInteraction` still offering \"Yes, and don't ask again\" in their permission prompt; the option wrote an allow rule the tool then ignored\n- Fixed the self-hosted runner ending its live sessions or exiting when a work-poll response is malformed (e.g. an intercepting proxy's HTML page); it now retries the poll\n- Improved `/cd`: the new directory's project settings, hooks, `.mcp.json` servers (behind the usual approval prompt), skills, and agents now take effect right after the move instead of on `--resume`\n- Improved Bash tool latency on bash shells by replaying snapshot functions without a base64 subshell per function\n- Improved subagent results: a subagent that stops at its `maxTurns` limit now returns its output marked as partial, with a hint to continue it via `SendMessage`, instead of appearing finished\n- Improved non-interactive sessions (`-p`, SDK, cloud sessions) to automatically continue a response cut off mid-stream by a server error, connection loss, or stall instead of ending with an error\n- Improved attribution of usage telemetry to your organization for workload identity federation sessions, events sent while `apiKeyHelper` runs at startup, and after a login token expired while idle\n- Changed `/code-review` so Claude can also start it on its own on Bedrock, Vertex AI, and Foundry, through the Claude apps gateway, and when telemetry or non-essential traffic is disabled\n- `/goal`: Changed idle sessions to start at most three check-ins on long-running background work per goal; your next message allows three more\n- Changed `claude install` and `claude update` to defer a pending managed-settings consent prompt to the next interactive session instead of prompting mid-command\n- Changed OpenTelemetry plugin events for plugins synced from claude.ai: `plugin_id_hash` now reflects the plugin's real marketplace, and `enabled_via` is `admin-install` for admin-installed plugins\n- Fixed the command sandbox's filesystem configuration not respecting `--setting-sources`"
+  },
+  "summary": {
+    "changes": 31,
+    "categories": {
+      "binary": 2,
+      "config": 26,
+      "network": 1,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 25,
+      "notable": 6
+    },
+    "undocumented": 31
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+455 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,6 +27,8 @@\n Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\".\n For simple settings like theme/model, suggest the /config command.\n - keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n+- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last.\n+Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.\n - simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n - fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n - loop: Run a prompt or slash command on a recurring interval (e.g.\n",
+      "stats": {
+        "added_chars": 455,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+455 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -32,6 +32,8 @@\n Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\".\n For simple settings like theme/model, suggest the /config command.\n - keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n+- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last.\n+Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.\n - simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n - fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n - loop: Run a prompt or slash command on a recurring interval (e.g.\n",
+      "stats": {
+        "added_chars": 455,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.additionalMarketplaces.enum.additionalMarketplaces",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces",
+        "enum",
+        "additionalMarketplaces"
+      ],
+      "title": "Setting additionalMarketplaces gained value additionalMarketplaces",
+      "impact": "informational",
+      "before": null,
+      "after": "additionalMarketplaces",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.enum.extraKnownMarketplaces",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces",
+        "enum",
+        "extraKnownMarketplaces"
+      ],
+      "title": "Setting extraKnownMarketplaces gained value extraKnownMarketplaces",
+      "impact": "informational",
+      "before": null,
+      "after": "extraKnownMarketplaces",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.16",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "16"
+      ],
+      "title": "Setting modelProposedGoals gained value 16",
+      "impact": "informational",
+      "before": null,
+      "after": 16,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.modelSettings.enum./",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "modelSettings",
+        "enum",
+        "/"
+      ],
+      "title": "Setting modelSettings lost value /",
+      "impact": "notable",
+      "before": "/",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.${…}\\WindowsPowerShell\\v1.0",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "${…}\\WindowsPowerShell\\v1.0"
+      ],
+      "title": "Setting permissions.defaultMode lost value ${…}\\WindowsPowerShell\\v1.0",
+      "impact": "notable",
+      "before": "${…}\\WindowsPowerShell\\v1.0",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.strictPluginOnlyCustomization.enum./",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "strictPluginOnlyCustomization",
+        "enum",
+        "/"
+      ],
+      "title": "Setting strictPluginOnlyCustomization lost value /",
+      "impact": "notable",
+      "before": "/",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.syncClaudeAiPlugins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "syncClaudeAiPlugins"
+      ],
+      "title": "New setting: syncClaudeAiPlugins",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Set to false to turn off syncing of the plugins you have enabled on claude.ai. In your user settings (or managed settings): nothing more is downloaded, previously synced plugins (~/.claude/plugins/synced) are hidden from every session started afterwards and moved to ~/.claude/plugins/.trash at the next launch (deleted after cleanupPeriodDays; re-downloaded, not restored, if you re-enable). In .claude/settings.local.json or --settings: downloads stop and synced plugins are hidden for sessions in that workspace or invocation only (nothing is moved). Not read from project settings (.claude/settings.json). Only false is honored — the feature is enabled server-side for your account, so setting true does not turn it on early. While it is on, synced plugins load in every session like plugins you installed yourself (a plugin you installed with the same name takes precedence), are re-synced at each launch, and are removed when you disable them on claude.ai. Only applies when signed in with your Claude account."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_ENV",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENV"
+      ],
+      "title": "New environment variable: BUN_ENV",
+      "impact": "informational",
+      "before": null,
+      "after": "BUN_ENV",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BREEZY_HORIZON",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BREEZY_HORIZON"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BREEZY_HORIZON",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BREEZY_HORIZON",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_COORDINATOR_WORKER_CHECKIN_SECONDS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FORCE_FIRST_LAUNCH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FORCE_FIRST_LAUNCH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FORCE_FIRST_LAUNCH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FORCE_FIRST_LAUNCH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FORCE_WINDOWS_CREDMAN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FORCE_WINDOWS_CREDMAN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PLUGIN_ATTRIBUTION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PLUGIN_ATTRIBUTION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PLUGIN_ATTRIBUTION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PLUGIN_ATTRIBUTION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_SERVE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_TOOLS_SERVE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_SERVE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_TOOLS_SERVE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TICKLISH_WHISPER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TICKLISH_WHISPER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TICKLISH_WHISPER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TICKLISH_WHISPER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TICKLISH_WHISPER_TIMEOUT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TICKLISH_WHISPER_TIMEOUT_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TICKLISH_WHISPER_TIMEOUT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TICKLISH_WHISPER_TIMEOUT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TOOL_MEMORY_CGROUP_EXCLUDE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TOOL_MEMORY_CGROUP_EXCLUDE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TOOL_MEMORY_CGROUP_EXCLUDE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TOOL_MEMORY_CGROUP_EXCLUDE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_ENVIRONMENT_ID",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_ENVIRONMENT_ID"
+      ],
+      "title": "Environment variable no longer read: ANTHROPIC_ENVIRONMENT_ID",
+      "impact": "informational",
+      "before": "ANTHROPIC_ENVIRONMENT_ID",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_ENVIRONMENT_KEY",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_ENVIRONMENT_KEY"
+      ],
+      "title": "Environment variable no longer read: ANTHROPIC_ENVIRONMENT_KEY",
+      "impact": "informational",
+      "before": "ANTHROPIC_ENVIRONMENT_KEY",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_ENVprocess",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENVprocess"
+      ],
+      "title": "Environment variable no longer read: BUN_ENVprocess",
+      "impact": "informational",
+      "before": "BUN_ENVprocess",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_FEEDBACK_URL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_FEEDBACK_URL"
+      ],
+      "title": "Environment variable no longer read: BUN_FEEDBACK_URL",
+      "impact": "informational",
+      "before": "BUN_FEEDBACK_URL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_INSTALL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_INSTALL"
+      ],
+      "title": "Environment variable no longer read: BUN_INSTALL",
+      "impact": "informational",
+      "before": "BUN_INSTALL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DIR_SYNC_ARCHIVE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DIR_SYNC_ARCHIVE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_DIR_SYNC_ARCHIVE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_DIR_SYNC_ARCHIVE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FORCE_FULL_LOGO",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FORCE_FULL_LOGO"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_FORCE_FULL_LOGO",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_FORCE_FULL_LOGO",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_OAUTH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_OAUTH"
+      ],
+      "title": "Environment variable no longer read: MCP_OAUTH",
+      "impact": "informational",
+      "before": "MCP_OAUTH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_TOOLSET",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_TOOLSET"
+      ],
+      "title": "Environment variable no longer read: MCP_TOOLSET",
+      "impact": "informational",
+      "before": "MCP_TOOLSET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "network.egress.GET api.anthropic.com/api/claude_code/organizations/metrics_enabled",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "egress",
+        "GET api.anthropic.com/api/claude_code/organizations/metrics_enabled"
+      ],
+      "title": "Network request no longer made: GET api.anthropic.com/api/claude_code/organizations/metrics_enabled",
+      "impact": "notable",
+      "before": {
+        "host": "api.anthropic.com",
+        "method": "GET",
+        "path": "/api/claude_code/organizations/metrics_enabled",
+        "when": "after"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.runtime",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "runtime"
+      ],
+      "title": "Binary runtime: bun 1.4.0 → bun 1.4.1",
+      "impact": "informational",
+      "before": "bun 1.4.0",
+      "after": "bun 1.4.1",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 376109392 → 230824016",
+      "impact": "informational",
+      "before": 376109392,
+      "after": 230824016,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

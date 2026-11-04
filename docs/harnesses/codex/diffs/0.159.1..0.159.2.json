@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.159.1",
+  "to": "0.159.2",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.159.1...rust-v0.159.2"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.159.2",
+    "text": "## Bug Fixes\n\n- Suppressed console windows flashing on Windows when Codex launches background processes and sandboxed commands. (#49385)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.159.1...rust-v0.159.2\n\n- #49385 [0.159] Backport Windows console suppression for 0.159.2 @andrewgu-oai"
+  },
+  "summary": {
+    "changes": 1,
+    "categories": {
+      "hooks": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 1
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "hooks.events.UserPromptSubmit.control.exit_2",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "exit_2"
+      ],
+      "title": "UserPromptSubmit hook control (exit_2) removed",
+      "impact": "notable",
+      "before": "blocks the prompt; message not shown to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1481,
+            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/analytics/src/events.rs#L1481"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 613,
+            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L613"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

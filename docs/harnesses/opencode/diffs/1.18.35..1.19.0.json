@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "from": "1.18.35",
+  "to": "1.19.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/anomalyco/opencode/compare/v1.18.35...v1.19.0"
+  },
+  "changelog": {
+    "url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.0",
+    "text": "## Core\n\n### Improvements\n- Run `opencode upgrade --major` to upgrade to OpenCode 2.\n\n### Bugfixes\n- Allow the OpenAI `ultrafast` service tier.\n- Validate PTY connection origins and tickets before checking whether a PTY exists.\n\n## TUI\n\n### Improvements\n- Use `/update` to install OpenCode updates or upgrade to OpenCode 2; updates are no longer installed automatically.\n\n**Thank you to 1 community contributor:**\n- @dc85:\n  - docs(web): add Exo Free to Zen docs (#53622)\n  - fix(stats): attribute exo usage to an unknown provider (#53621)\n  - docs(web): remove Fledge Alpha Free from Zen docs (#53984)"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

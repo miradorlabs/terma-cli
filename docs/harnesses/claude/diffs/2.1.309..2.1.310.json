@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.309",
+  "to": "2.1.310",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added the Monitor tool and plugin monitors on Bedrock, Vertex, and Foundry, and when telemetry or nonessential traffic is disabled; long foreground sleeps are now blocked there too\n- Fixed requests failing behind some gateways and compatible servers that reject the `effort-2025-11-24` beta value or mid-conversation system messages; Claude Code now retries without them\n- Fixed background cleanup deleting some recent files, such as pasted images, when `cleanupPeriodDays` is set to a very large value\n- Fixed compaction after a \"Prompt is too long\" error keeping too much of a conversation with dense text, such as base64 or SVG, so the next request could fail again\n- Fixed file read permission prompts not showing where a symbolic link leads\n- Fixed a question's auto-continue timeout firing the moment the external editor closed after a long edit\n- Windows: Fixed PreToolUse and PermissionRequest hooks letting a tool call through when Git Bash is missing and the hook's command is only quoted strings, such as a quoted path\n- Improved auto mode's prompt before the first read outside the working directories: it now says when blocking those reads makes shell commands ask for permission\n- Improved memory use of non-interactive sessions (`-p`, Agent SDK) during compaction when the transcript file is very large\n- Improved a mod's `Image` to draw inside tmux with `allow-passthrough` and `focus-events` on, in kitty, Ghostty, and iTerm2 3.5+ with fullscreen rendering, where it showed only its `alt` text\n- Linux: Improved `/sandbox` and the sandbox startup warning to name Ubuntu's AppArmor restriction on user namespaces, and how to lift it, when it keeps bubblewrap from starting the sandbox\n- Changed the error for an MCP tool call that times out in a non-interactive session while the server's elicitation is unanswered: it now tells Claude that no answer came and not to repeat the call\n- [VSCode] Fixed pressing Enter on the plan review card's \"Send feedback and keep planning\" button approving the plan instead of sending your comments back\n- [VSCode] Fixed the panel showing \"Something went wrong\" after \"Switch branch & continue\" on a cloud session opened from Session history's Web tab\n- [Cloud sessions] Added Claude Code cloud sessions and Remote Control permissions to Enterprise custom roles, so Owners can control access to each by role\n- [Cloud sessions] Added a Choose file button to load a cloud environment's setup script from a file\n- [Cloud sessions] Fixed failed saves and archives in the cloud environment edit dialog showing no error inside the dialog\n- [Cloud sessions] Fixed failed routine API token actions showing only a toast; the error now appears in the routine edit dialog\n- [Cloud sessions] Improved the session start checklist to show a cloud environment's setup script output in a scrolling box\n- [Cloud sessions] Changed turning on Cloud sessions or Remote Control in admin settings to ask for confirmation and list the custom roles that have that permission\n- [Cloud sessions] Changed the cloud environment dialog to open network access, setup script and environment variables from rows instead of listing every editor at once\n- [Claude Tag] Fixed Claude Tag treating `!` commands such as `!restart` and `!help` as ordinary messages when sent in bold, italic or strikethrough\n- [Claude Tag] Fixed Claude Tag admin channel and workspace pages being replaced by a load error when a background refresh of the bundle list fails\n- [Claude Tag] Fixed Claude Tag's spend limits page in admin settings reporting that no channels match a filter while channel names are still loading\n- [Code Review] Fixed the Code Review admin section hiding its repositories and switches after a failed refresh of the repository list\n- [Code Review] Improved the Code Review admin section to retry the first load and show one Try again banner when it still fails"
+  },
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "config": 6,
+      "network": 2,
+      "prompt": 2,
+      "tools": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 6,
+      "notable": 6
+    },
+    "undocumented": 10
+  },
+  "changes": [
+    {
+      "id": "prompt.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Injected context changed (+7 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -19,6 +19,7 @@\n DesignSync\n EnterWorktree\n ExitWorktree\n+Monitor\n NotebookEdit\n SendMessage\n TaskStop\n",
+      "stats": {
+        "added_chars": 7,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+7 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -21,6 +21,7 @@\n EnterWorktree\n ExitPlanMode\n ExitWorktree\n+Monitor\n NotebookEdit\n SendMessage\n TaskStop\n",
+      "stats": {
+        "added_chars": 7,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.Bash.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Bash",
+        "description"
+      ],
+      "title": "Bash tool description changed (+362 −279 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -5,7 +5,10 @@\n Instead, use the appropriate dedicated tool as this will provide a much better experience for the user.\n - Command output is displayed to you, not reliably to the user.\n - `timeout` is in milliseconds: default 120000, max 600000 for a foreground command.\n-- `run_in_background` runs the command detached: it keeps running across turns and re-invokes you when it exits. With it, `timeout` is how long the command may run in the background (default 600000, max 7200000); at that limit it is stopped and you are re-invoked. No `&` needed.\n+- `run_in_background` runs the command detached: it keeps running across turns and re-invokes you when it exits.\n+With it, `timeout` is how long the command may run in the background (default 600000, max 7200000); at that limit it is stopped and you are re-invoked.\n+No `&` needed.\n+Foreground `sleep` is blocked; use Monitor with an until-loop to wait on a condition.\n \n # Git\n - Interactive flags (`-i`, e.g. `git rebase -i`, `git add -i`) are not supported in this environment.\n",
+      "stats": {
+        "added_chars": 362,
+        "removed_chars": 279
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Monitor",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "Monitor"
+      ],
+      "title": "New deferred tool: Monitor",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "deferred": true,
+        "name": "Monitor"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.credentials.files[].path.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.credentials.files[].path",
+        "description"
+      ],
+      "title": "sandbox.credentials.files[].path description changed (+212 −82 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Path to marketplace.json within repo (defaults to .claude-plugin/marketplace.json)\n+Path to a credential file or directory. Same resolution as sandbox.filesystem.* paths: absolute, ~ expanded, or relative to the settings file root (project root for project settings, ~/.claude for user settings).\n",
+      "stats": {
+        "added_chars": 212,
+        "removed_chars": 82
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_ENVprocess",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENVprocess"
+      ],
+      "title": "New environment variable: BUN_ENVprocess",
+      "impact": "informational",
+      "before": null,
+      "after": "BUN_ENVprocess",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_ASK_FIRST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_ASK_FIRST"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_ASK_FIRST",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_ASK_FIRST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DESKTOP_CONNECTOR_NAMES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DESKTOP_CONNECTOR_NAMES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DESKTOP_CONNECTOR_NAMES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DESKTOP_CONNECTOR_NAMES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RETRY_WATCHDOG_SCOPE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RETRY_WATCHDOG_SCOPE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RETRY_WATCHDOG_SCOPE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RETRY_WATCHDOG_SCOPE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BUN_ENV",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENV"
+      ],
+      "title": "Environment variable no longer read: BUN_ENV",
+      "impact": "informational",
+      "before": "BUN_ENV",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "network.egress.POST api.anthropic.com/api/event_logging/v2/batch",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "egress",
+        "POST api.anthropic.com/api/event_logging/v2/batch"
+      ],
+      "title": "Network request no longer made: POST api.anthropic.com/api/event_logging/v2/batch",
+      "impact": "notable",
+      "before": {
+        "body_keys": [
+          "events"
+        ],
+        "host": "api.anthropic.com",
+        "method": "POST",
+        "path": "/api/event_logging/v2/batch",
+        "when": "after"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "network.egress.CONNECT api.anthropic.com",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "egress",
+        "CONNECT api.anthropic.com"
+      ],
+      "title": "New network request: CONNECT api.anthropic.com",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "error": "tls: read tcp <local>-><local>: read: connection reset by peer",
+        "host": "api.anthropic.com",
+        "method": "CONNECT",
+        "path": "",
+        "when": "after"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

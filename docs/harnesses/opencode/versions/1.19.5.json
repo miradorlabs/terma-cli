@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "version": "1.19.5",
+  "platform": "",
+  "captured_at": "2026-11-04T16:16:16.239171Z",
+  "capture": {
+    "partial": false,
+    "sections": {
+      "support": "2026-11-04T16:16:16.239171Z",
+      "telemetry": "2026-11-04T16:16:16.239171Z"
+    }
+  },
+  "telemetry": {
+    "surfaces": {
+      "logs/opencode.session.created": {
+        "keys": {
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.session.directory": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/opencode.session.idle": {
+        "keys": {
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/opencode.user_prompt": {
+        "keys": {
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.message.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.prompt.length": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "resource": {
+        "keys": {
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/chat {target}": {
+        "keys": {
+          "gen_ai.completion": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.finish_reasons": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.system": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.usage.cache_read.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.cache_write.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.total_cost": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "opencode.agent": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.message.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.parent_message.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "opencode.usage.reasoning_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.content_allowed",
+        "label": "Prompts and tool content delivered when allowed",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.content_withheld",
+        "label": "Prompts and tool content withheld when the project says so",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.equivalent",
+        "label": "The same telemetry through the relay as exported directly",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.only_opted_in",
+        "label": "Nothing leaves for sessions no repository opted in to",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
+}

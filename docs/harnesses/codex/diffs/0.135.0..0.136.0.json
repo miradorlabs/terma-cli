@@ -1,0 +1,1989 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.135.0",
+  "to": "0.136.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.135.0...rust-v0.136.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.136.0",
+    "text": "## New Features\n\n- TUI markdown now keeps web links clickable with OSC 8 metadata, and cramped tables switch to readable key/value records without losing link targets. (#24472, #24636, #24825)\n- Sessions can now be archived from the TUI with `/archive` or from the CLI with `codex archive` / `codex unarchive`; archived sessions are protected from resume/fork until restored. (#25027, #25021)\n- App-server integrations can resume a thread with its initial turns page, see richer MCP server status, and launch stdio mode with `codex app-server --stdio`. (#23534, #24698, #24940)\n- Remote execution setup now supports `CODEX_API_KEY` registration for approved OpenAI hosts, while remote-control websockets use short-lived server tokens instead of ChatGPT access tokens. (#24666, #24141)\n- Windows admins get an alpha `codex sandbox setup --elevated` provisioning path, plus requirements support for allowed Windows sandbox implementations. (#24831, #23766)\n- A feature-gated standalone image generation extension can run through the native Codex image artifact completion pipeline. (#24723, #24972)\n\n## Bug Fixes\n\n- ChatGPT auth refreshes tokens before the five-minute expiry window and shows a relogin-required path for reused refresh tokens instead of collapsing into a generic cloud error. (#23546, #24830)\n- Command-safety hardening prevents `/diff` from running repository-provided Git helpers/hooks, avoids PowerShell parser execution on non-Windows hosts, and rejects browser-origin exec-server websocket handshakes. (#24954, #24946, #24947)\n- Sandboxed commands clean up more reliably after interruptions or denied Windows network attempts, and `deny` read rules stay enforced for safe-command and approval-bypass paths. (#22729, #19880, #23943)\n- Resumed TUI sessions seed prompt history from the session transcript, multiline hook output renders as separate rows, and Vim normal-mode editing behaves correctly. (#24298, #24965, #25022)\n- App-server filesystem watchers debounce later batches correctly, and standalone web search calls now show and restore completed search activity. (#24716, #24693)\n- Bedrock auth now falls back to `AWS_REGION` / `AWS_DEFAULT_REGION`, and unsupported Bedrock GPT service tiers are no longer advertised or sent. (#25171, #25318)\n\n## Documentation\n\n- Python SDK beta docs and package metadata now present the standard `pip install openai-codex` path, refreshed quickstarts, API reference, FAQ, and examples. (#24836, #24866, #24868, #24870)\n- Python SDK examples and docs now use the public `CodexConfig` name for configuring `Codex` / `AsyncCodex`. (#24800)\n- The bundled OpenAI Docs skill was updated with current Codex manual routing and a cached manual fetch helper. (#24914)\n- Built-in tool schema descriptions now clarify defaults, optional fields, bounds, and enums across shell, Code Mode, MCP, image, goal, plan, multi-agent, and related tools. (#24794)\n- App-server and exec-server docs now cover API-key remote registration, `--stdio`, runtime extra skill roots, and remote-control server-token behavior. (#24666, #24940, #24977, #24141)\n\n## Chores\n\n- Python SDK releases can now be staged and published independently from runtime releases using `python-v*` tags while preserving the reviewed runtime dependency pin. (#24828, #24872)\n- Updated MCP dependencies to `rmcp` 1.7.0 and refreshed compatibility code. (#24763)\n- Refreshed Amazon Bedrock catalog metadata, including GPT-5.5, removal of unsupported OSS entries, and default-tier-only GPT model behavior. (#24701, #24960, #25318)\n- Removed the stale app-server debug-client pieces and cleaned up the workspace after deletion. (#25063, #25064, #25065, #25066, #25067, #25068, #25069, #25070, #25075)\n- Trimmed CI/build maintenance by moving Bazel Windows jobs to Codex runners, removing the libubsan workaround, and reverting the startup benchmark that broke musl builders. (#24952, #24782, #24937)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.135.0...rust-v0.136.0\n\n- #22729 fix(linux-sandbox): preserve shell cleanup on interruption @viyatb-oai\n- #24472 feat(tui): add OSC 8 web links to rich content @fcoury-oai\n- #24636 feat(tui): render cramped markdown tables as key-value records [2 of 2] @fcoury-oai\n- #24666 Allow API-key auth for remote exec-server registration @sdcoffey\n- #24763 Update rmcp to 1.7.0 @anp-oai\n- #24825 [codex] Fix hyperlink-aware key-value table rendering @sayan-oai\n- #24800 [codex] Rename Python SDK AppServerConfig to CodexConfig @aibrahim-oai\n- #24819 [codex] Remove redundant SQLite dynamic tool storage @sayan-oai\n- #24828 [codex] Add independent beta release for the Python SDK @aibrahim-oai\n- #24836 [codex] Prepare Python SDK beta documentation and package metadata @aibrahim-oai\n- #24830 Treat refresh_token_reused 400s as relogin-required @alexsong-oai\n- #24866 [codex] Simplify Python SDK install guidance @aibrahim-oai\n- #24868 [codex] Remove Python SDK language classifiers @aibrahim-oai\n- #24870 [codex] Remove Python SDK beta warning note @aibrahim-oai\n- #24872 [codex] Stage Python SDK beta versions from release tags @aibrahim-oai\n- #24758 Move memories root setup out of core config @jif-oai\n- #24891 Stabilize Guardian client cache key handling @jif-oai\n- #24892 Export Guardian prompt cache key helper @jif-oai\n- #24893 Add Guardian review prompt cache key @jif-oai\n- #24894 Assert Guardian prompt cache key reuse @jif-oai\n- #24895 Thread Guardian cache key through session @jif-oai\n- #24803 Use stable Guardian prompt cache keys @jif-oai\n- #24902 [codex] Fix Guardian argument comment lint @jif-oai\n- #24898 Fix memories namespace for Responses API tools @jif-oai\n- #24897 Add Guardian review metrics @jif-oai\n- #23546 [codex-cli] Refresh near-expiry ChatGPT access tokens before requests @cooper-oai\n- #24915 Add thread start contributor facts @jif-oai\n- #24916 Add turn error lifecycle contributor @jif-oai\n- #24865 [codex] Store pending response items directly @pakrym-oai\n- #24914 [codex] Update OpenAI Docs skill @vb-openai\n- #24651 Add app-server startup benchmark crate @anp-oai\n- #24925 Gate goal tools by thread eligibility @jif-oai\n- #24782 Remove libubsan CI workaround @anp-oai\n- #24813 extension-api: add TurnItemEmitter to tool calls @sayan-oai\n- #23534 feat(app-server): include turns page on thread resume @btraut-openai\n- #24698 Expose MCP server info as part of server status @gpeal\n- #24903 Reap stale multi-agent slots @jif-oai\n- #24936 Fix extension turn item emitter test event ordering @bolinfest\n- #24700 [codex] Support ui visibility meta for tools @gpeal\n- #24701 chore: add GPT-5.5 to the Amazon Bedrock catalog @celia-oai\n- #23363 TUI: Unified mentions tweaks + polish mentions rendering @canvrno-oai\n- #24937 Revert \"Add app-server startup benchmark crate\" @anp-oai\n- #24928 Wire task completion into thread-idle lifecycle @jif-oai\n- #24723 Add feature-gated standalone image generation extension @won-openai\n- #24952 Move Bazel Windows jobs onto codex-runners @anp-oai\n- #24940 Add `codex app-server --stdio` alias @anp-oai\n- #24954 fix(tui): prevent repository-configured code execution in /diff @fcoury-oai\n- #24949 [codex] Handle PowerShell UTF-8 setup failures @iceweasel-oai\n- #24960 [codex] Remove Bedrock OSS models from catalog @celia-oai\n- #23768 runtime: prepend zsh fork bin dir to PATH @bolinfest\n- #19880 fix: cancel Windows sandbox on network denial @viyatb-oai\n- #24947 fix(exec-server): reject websocket requests with Origin headers @viyatb-oai\n- #24653 [codex] Add user input client ids @alexi-openai\n- #23924 Surface filesystem permission profiles in prompt context @bolinfest\n- #24108 windows-sandbox: pass workspace roots to runner @bolinfest\n- #24974 windows-sandbox: fix capture cancellation test roots @bolinfest\n- #24962 Tighten hook output event schemas @abhinav-oai\n- #24141 feat(app-server): migrate remote control to server tokens @apanasenko-oai\n- #24970 fix(config): use deny for Unix socket permissions @viyatb-oai\n- #24946 [codex] Avoid PowerShell safety parsing off Windows @adrian-openai\n- #24977 Add runtime extra skill roots API @xl-openai\n- #24298 Seed prompt history from resumed messages @etraut-openai\n- #23943 fix: preserve deny-read sandboxing for safe commands @bolinfest\n- #24716 Fix fs/watch debounce batching @etraut-openai\n- #24918 Use internal model context fragments for goal steering @jif-oai\n- #24924 Use inject_if_running for active goal steering @jif-oai\n- #25063 Drop the stale debug-client manifest @jif-oai\n- #25064 Remove the generated debug-client README @jif-oai\n- #25065 Delete debug-client app-server process plumbing @jif-oai\n- #25066 Retire debug-client interactive command parsing @jif-oai\n- #25067 Remove the debug-client CLI entrypoint @jif-oai\n- #25068 Delete debug-client JSONL output helper @jif-oai\n- #25069 Remove debug-client server event reader @jif-oai\n- #25070 Drop debug-client prompt state tracking @jif-oai\n- #25075 fix: main @jif-oai\n- #24794 [codex] Improve built-in tool schema docs @jif-oai\n- #25095 Handle goal usage limits from turn errors @jif-oai\n- #25106 Remove stale rollout TODO tests @jif-oai\n- #24965 Render multiline hook output in TUI @abhinav-oai\n- #25031 [codex] Add model tool mode selector @aibrahim-oai\n- #24693 Show activity for standalone web search calls @sayan-oai\n- #25110 Move config document helpers into their own module @jif-oai\n- #25013 feat: Add focused diagnostics for MCP HTTP send failures @xl-openai\n- #24964 [codex] Wait for MCP readiness in core integration tests @anp-oai\n- #24972 Route extension image generation through the native image completion pipeline @won-openai\n- #24831 Add Windows sandbox provisioning setup command @iceweasel-oai\n- #25017 Align TUI permissions labels with app @etraut-openai\n- #25027 Add `/archive` slash command @etraut-openai\n- #25035 Use session wording in `/rename` confirmation @etraut-openai\n- #24161 Add subagent lineage metadata for responsesapi @owenlin0\n- #25116 [exec-server] Kill dropped filesystem helpers @erichoracek\n- #24180 code-mode: introduce durable session interface @cconger\n- #23165 thread-store: store permission profiles @bolinfest\n- #25131 [codex] Require model for standalone web search @sayan-oai\n- #25134 ci: use issue triage environment for issue workflows @etraut-openai\n- #25118 exec-server: preserve fs helper CoreFoundation env @starr-openai\n- #25022 [codex] Fix Vim normal mode editing @jinghanx88\n- #25161 Recommend Bazel VSCode extension. @anp-oai\n- #24996 Filter plugin install suggestions by installed apps @nm-openai\n- #23766 Constrain Windows sandbox requirements @abhinav-oai\n- #25172 [codex] Update remote connector suggestions @ericning-o\n- #25171 fix: Bedrock API key region fallback @celia-oai\n- #24541 feat(config) experimental_request_user_input toggle @dylan-hurd-oai\n- #25021 Add thread archive CLI commands @etraut-openai\n- #25267 Rename multi-agent v2 assignment tool @jif-oai\n- #25318 fix: Limit Bedrock GPT models to default service tier @owenlin0\n- #25381 [codex] Avoid forced directory refresh during plugin install auth checks @xl-openai"
+  },
+  "summary": {
+    "changes": 47,
+    "categories": {
+      "binary": 1,
+      "caching": 1,
+      "cli": 14,
+      "config": 9,
+      "prompt": 3,
+      "tools": 19
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 21,
+      "notable": 26
+    },
+    "undocumented": 27
+  },
+  "changes": [
+    {
+      "id": "prompt.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Injected context changed (+563 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,4 +3,5 @@\n   <shell>zsh</shell>\n   <current_date><date></current_date>\n   <timezone><timezone></timezone>\n+  <filesystem><workspace_roots><root><repo></root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry><entry access=\"write\"><path><repo></path></entry><entry access=\"write\"><special>:slash_tmp</special></entry><entry access=\"write\"><special>:tmpdir</special></entry><entry access=\"read\"><path><repo>/.git</path></entry><entry access=\"read\"><path><repo>/.agents</path></entry><entry access=\"read\"><path><repo>/.codex</path></entry></file_system></permission_profile></filesystem>\n </environment_context>\n",
+      "stats": {
+        "added_chars": 563,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+56 −81 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n <permissions instructions>\n Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n- The writable roots are `/private/tmp`, `<tmp> `<codex-home>/memories`, `<repo>`.\n+ The writable roots are `/private/tmp`, `<tmp> `<repo>`.\n </permissions instructions>\n",
+      "stats": {
+        "added_chars": 56,
+        "removed_chars": 81
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+462 −376 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,7 +6,7 @@\n Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n (file: <codex-home>/skills/.system/imagegen/SKILL.md)\n-- openai-docs: Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains.\n+- openai-docs: Use when the user asks how to build with OpenAI products or APIs, asks about Codex itself or choosing Codex surfaces, needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; use OpenAI docs MCP tools for non-Codex docs questions, use the Codex manual helper first for broad Codex self-knowledge, and restrict fallback browsing to official OpenAI domains.\n (file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n",
+      "stats": {
+        "added_chars": 462,
+        "removed_chars": 376
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.create_goal.input_schema.properties.token_budget.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "create_goal",
+        "input_schema",
+        "properties",
+        "token_budget",
+        "description"
+      ],
+      "title": "create_goal tool parameter token_budget: description changed",
+      "impact": "notable",
+      "before": "Optional positive token budget for the new active goal.",
+      "after": "Positive token budget for the new goal. Omit unless explicitly requested.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/goals.rs",
+            "line": 1538,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/goals.rs#L1538"
+          },
+          {
+            "path": "codex-rs/core/src/goals.rs",
+            "line": 1559,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/goals.rs#L1559"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.justification.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "justification",
+        "description"
+      ],
+      "title": "exec_command tool parameter justification: description changed (+70 −389 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,1 @@\n-Only set if sandbox_permissions is \\\"require_escalated\\\".\n-                    Request approval from the user to run this command outside the sandbox.\n-                    Phrased as a simple question that summarizes the purpose of the\n-                    command as it relates to the task at hand - e.g. 'Do you want to\n-                    fetch and pull the latest version of this git branch?'\n+User-facing approval question for `require_escalated`; omit otherwise.\n",
+      "stats": {
+        "added_chars": 70,
+        "removed_chars": 389
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L308"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.login.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "login",
+        "description"
+      ],
+      "title": "exec_command tool parameter login: description changed",
+      "impact": "notable",
+      "before": "Whether to run the shell with -l/-i semantics. Defaults to true.",
+      "after": "True runs the shell with -l/-i semantics; false disables them. Defaults to true.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1251,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/cli/src/main.rs#L1251"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 2012,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/cli/src/main.rs#L2012"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.max_output_tokens.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "max_output_tokens",
+        "description"
+      ],
+      "title": "exec_command tool parameter max_output_tokens: description changed",
+      "impact": "notable",
+      "before": "Maximum number of tokens to return. Excess output will be truncated.",
+      "after": "Output token budget. Defaults to 10000 tokens; larger requests may be capped by policy.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode/src/description.rs",
+            "line": 208,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/code-mode/src/description.rs#L208"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L55"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.prefix_rule.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "prefix_rule",
+        "description"
+      ],
+      "title": "exec_command tool parameter prefix_rule: description changed (+118 −321 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-Only specify when sandbox_permissions is `require_escalated`.\n-                        Suggest a prefix command pattern that will allow you to fulfill similar requests from the user in the future.\n-                        Should be a short but reasonable prefix, e.g. [\\\"git\\\", \\\"pull\\\"] or [\\\"uv\\\", \\\"run\\\"] or [\\\"pytest\\\"].\n+Reusable approval prefix for `cmd`, only with `sandbox_permissions: \"require_escalated\"`; for example [\"git\", \"pull\"].\n",
+      "stats": {
+        "added_chars": 118,
+        "removed_chars": 321
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 314,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L314"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.sandbox_permissions.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "sandbox_permissions",
+        "description"
+      ],
+      "title": "exec_command tool parameter sandbox_permissions: description changed (+107 −139 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Sandbox permissions for the command. Set to \"require_escalated\" to request running without sandbox restrictions; defaults to \"use_default\".\n+Per-command sandbox override. Defaults to `use_default`; use `require_escalated` for unsandboxed execution.\n",
+      "stats": {
+        "added_chars": 107,
+        "removed_chars": 139
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 294,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L294"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.sandbox_permissions.enum",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "sandbox_permissions",
+        "enum"
+      ],
+      "title": "exec_command tool parameter sandbox_permissions: enum added",
+      "impact": "notable",
+      "before": null,
+      "after": [
+        "use_default",
+        "require_escalated"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 299,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L299"
+          },
+          {
+            "path": "codex-rs/rollout-trace/src/tool_dispatch.rs",
+            "line": 327,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/rollout-trace/src/tool_dispatch.rs#L327"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.tty.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "tty",
+        "description"
+      ],
+      "title": "exec_command tool parameter tty: description changed (+72 −125 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Whether to allocate a TTY for the command. Defaults to false (plain pipes); set to true to open a PTY and access TTY process.\n+True allocates a PTY for the command; false or omitted uses plain pipes.\n",
+      "stats": {
+        "added_chars": 72,
+        "removed_chars": 125
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 44,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L44"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.workdir.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "workdir",
+        "description"
+      ],
+      "title": "exec_command tool parameter workdir: description changed",
+      "impact": "notable",
+      "before": "Optional working directory to run the command in; defaults to the turn cwd.",
+      "after": "Working directory for the command. Defaults to the turn cwd.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/mod.rs",
+            "line": 144,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/mod.rs#L144"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 29,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L29"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command.input_schema.properties.yield_time_ms.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec_command",
+        "input_schema",
+        "properties",
+        "yield_time_ms",
+        "description"
+      ],
+      "title": "exec_command tool parameter yield_time_ms: description changed",
+      "impact": "notable",
+      "before": "How long to wait (in milliseconds) for output before yielding.",
+      "after": "Wait before yielding output. Defaults to 10000 ms; effective range is 250-30000 ms.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode/src/description.rs",
+            "line": 208,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/code-mode/src/description.rs#L208"
+          },
+          {
+            "path": "codex-rs/core/src/tools/code_mode/wait_spec.rs",
+            "line": 13,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/code_mode/wait_spec.rs#L13"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.tool_search.input_schema.properties.limit.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "tool_search",
+        "input_schema",
+        "properties",
+        "limit",
+        "description"
+      ],
+      "title": "tool_search tool parameter limit: description changed",
+      "impact": "notable",
+      "before": "Maximum number of tools to return (defaults to 8).",
+      "after": "Maximum number of tools to return. Defaults to 8.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/backend-client/src/client.rs",
+            "line": 332,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/backend-client/src/client.rs#L332"
+          },
+          {
+            "path": "codex-rs/cloud-tasks/src/cli.rs",
+            "line": 88,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/cloud-tasks/src/cli.rs#L88"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.update_plan.input_schema.properties.explanation.description",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "update_plan",
+        "input_schema",
+        "properties",
+        "explanation",
+        "description"
+      ],
+      "title": "update_plan tool parameter explanation: description added",
+      "impact": "notable",
+      "before": null,
+      "after": "Optional explanation for this plan update.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/plan_spec.rs",
+            "line": 24,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/plan_spec.rs#L24"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.update_plan.input_schema.properties.plan.items.properties.status.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "update_plan",
+        "input_schema",
+        "properties",
+        "plan",
+        "items",
+        "properties",
+        "status",
+        "description"
+      ],
+      "title": "update_plan tool parameter plan: items.properties.status.description changed",
+      "impact": "notable",
+      "before": "One of: pending, in_progress, completed",
+      "after": "Step status.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2546,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/analytics/src/reducer.rs#L2546"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/plan_spec.rs",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/plan_spec.rs#L30"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.update_plan.input_schema.properties.plan.items.properties.status.enum",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "update_plan",
+        "input_schema",
+        "properties",
+        "plan",
+        "items",
+        "properties",
+        "status",
+        "enum"
+      ],
+      "title": "update_plan tool parameter plan: items.properties.status.enum added",
+      "impact": "notable",
+      "before": null,
+      "after": [
+        "pending",
+        "in_progress",
+        "completed"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2546,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/analytics/src/reducer.rs#L2546"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/plan_spec.rs",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/plan_spec.rs#L30"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.update_plan.input_schema.properties.plan.items.properties.step.description",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "update_plan",
+        "input_schema",
+        "properties",
+        "plan",
+        "items",
+        "properties",
+        "step",
+        "description"
+      ],
+      "title": "update_plan tool parameter plan: items.properties.step.description added",
+      "impact": "notable",
+      "before": null,
+      "after": "Task step text.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2546,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/analytics/src/reducer.rs#L2546"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/plan_spec.rs",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/plan_spec.rs#L30"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.view_image.input_schema.properties.detail.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "view_image",
+        "input_schema",
+        "properties",
+        "detail",
+        "description"
+      ],
+      "title": "view_image tool parameter detail: description changed (+84 −319 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,1 @@\n-Optional detail override.\n-Supported values are `high` and `original`; omit this field for default high resized behavior.\n-Use `original` to preserve the file's original resolution instead of resizing to fit.\n-This is important when high-fidelity image perception or precise localization is needed, especially for CUA agents.\n+Image detail level. Defaults to `high`; use `original` to preserve exact resolution.\n",
+      "stats": {
+        "added_chars": 84,
+        "removed_chars": 319
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/view_image_spec.rs",
+            "line": 26,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/view_image_spec.rs#L26"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.view_image.input_schema.properties.path.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "view_image",
+        "input_schema",
+        "properties",
+        "path",
+        "description"
+      ],
+      "title": "view_image tool parameter path: description changed",
+      "impact": "notable",
+      "before": "Local filesystem path to an image file",
+      "after": "Local filesystem path to an image file.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/accepted_lines.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/analytics/src/accepted_lines.rs#L66"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 264,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server-test-client/src/lib.rs#L264"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.write_stdin.input_schema.properties.max_output_tokens.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "write_stdin",
+        "input_schema",
+        "properties",
+        "max_output_tokens",
+        "description"
+      ],
+      "title": "write_stdin tool parameter max_output_tokens: description changed",
+      "impact": "notable",
+      "before": "Maximum number of tokens to return. Excess output will be truncated.",
+      "after": "Output token budget. Defaults to 10000 tokens; larger requests may be capped by policy.",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode/src/description.rs",
+            "line": 208,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/code-mode/src/description.rs#L208"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L55"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.write_stdin.input_schema.properties.yield_time_ms.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "write_stdin",
+        "input_schema",
+        "properties",
+        "yield_time_ms",
+        "description"
+      ],
+      "title": "write_stdin tool parameter yield_time_ms: description changed (+128 −62 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-How long to wait (in milliseconds) for output before yielding.\n+Wait before yielding output. Non-empty writes default to 250 ms and cap at 30000 ms; empty polls wait 5000-300000 ms by default.\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 62
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L122"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 5940 → 7004",
+      "impact": "notable",
+      "before": 5940,
+      "after": 7004,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex app-server.options.--stdio",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex app-server",
+        "options",
+        "--stdio"
+      ],
+      "title": "New flag `codex app-server --stdio`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Use stdio as the transport (equivalent to `--listen stdio://`)",
+        "names": [
+          "--stdio"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-daemon/src/backend/pid.rs",
+            "line": 402,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server-daemon/src/backend/pid.rs#L402"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/backend/pid.rs",
+            "line": 405,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server-daemon/src/backend/pid.rs#L405"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex archive",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex archive"
+      ],
+      "title": "New command: `codex archive`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "arguments": {
+          "SESSION": {
+            "description": "Session id (UUID) or session name. UUIDs take precedence if it parses",
+            "names": null
+          }
+        },
+        "description": "Archive a saved session by id or session name",
+        "helped": true,
+        "options": {
+          "--add-dir": {
+            "description": "Additional directories that should be writable alongside the primary workspace",
+            "names": [
+              "--add-dir"
+            ],
+            "value": "<DIR>"
+          },
+          "--cd": {
+            "description": "Tell the agent to use the specified directory as its working root",
+            "names": [
+              "-C",
+              "--cd"
+            ],
+            "value": "<DIR>"
+          },
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--dangerously-bypass-approvals-and-sandbox": {
+            "description": "Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY DANGEROUS. Intended solely for running in environments that are externally sandboxed",
+            "names": [
+              "--dangerously-bypass-approvals-and-sandbox"
+            ]
+          },
+          "--dangerously-bypass-hook-trust": {
+            "description": "Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS. Intended only for automation that already vets hook sources",
+            "names": [
+              "--dangerously-bypass-hook-trust"
+            ]
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          },
+          "--image": {
+            "description": "Optional image(s) to attach to the initial prompt",
+            "names": [
+              "-i",
+              "--image"
+            ],
+            "value": "<FILE>..."
+          },
+          "--local-provider": {
+            "description": "Specify which local provider to use (lmstudio or ollama). If not specified with --oss, will use config default or show selection",
+            "names": [
+              "--local-provider"
+            ],
+            "value": "<OSS_PROVIDER>"
+          },
+          "--model": {
+            "description": "Model the agent should use",
+            "names": [
+              "-m",
+              "--model"
+            ],
+            "value": "<MODEL>"
+          },
+          "--oss": {
+            "description": "Use open-source provider",
+            "names": [
+              "--oss"
+            ]
+          },
+          "--profile": {
+            "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+            "names": [
+              "-p",
+              "--profile"
+            ],
+            "value": "<CONFIG_PROFILE_V2>"
+          },
+          "--remote": {
+            "description": "Connect the TUI to a remote app server endpoint.\nAccepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.",
+            "names": [
+              "--remote"
+            ],
+            "value": "<ADDR>"
+          },
+          "--remote-auth-token-env": {
+            "description": "Name of the environment variable containing the bearer token to send to a remote app server websocket",
+            "names": [
+              "--remote-auth-token-env"
+            ],
+            "value": "<ENV_VAR>"
+          },
+          "--sandbox": {
+            "choices": [
+              "read-only",
+              "workspace-write",
+              "danger-full-access"
+            ],
+            "description": "Select the sandbox policy to use when executing model-generated shell commands",
+            "names": [
+              "-s",
+              "--sandbox"
+            ],
+            "value": "<SANDBOX_MODE>"
+          },
+          "--strict-config": {
+            "description": "Error out when config.toml contains fields that are not recognized by this version of Codex",
+            "names": [
+              "--strict-config"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex archive [OPTIONS] <SESSION>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1346,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1346"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1388,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1388"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.arguments.SESSION_ID.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "arguments",
+        "SESSION_ID",
+        "description"
+      ],
+      "title": "`codex resume SESSION_ID`: description changed (+134 −146 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Conversation/session id (UUID) or thread name. UUIDs take precedence if it parses. If omitted, use --last to pick the most recent recorded session\n+Session id (UUID) or session name. UUIDs take precedence if it parses. If omitted, use --last to pick the most recent recorded session\n",
+      "stats": {
+        "added_chars": 134,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex unarchive",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex unarchive"
+      ],
+      "title": "New command: `codex unarchive`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "arguments": {
+          "SESSION": {
+            "description": "Session id (UUID) or session name. UUIDs take precedence if it parses",
+            "names": null
+          }
+        },
+        "description": "Unarchive a saved session by id or session name",
+        "helped": true,
+        "options": {
+          "--add-dir": {
+            "description": "Additional directories that should be writable alongside the primary workspace",
+            "names": [
+              "--add-dir"
+            ],
+            "value": "<DIR>"
+          },
+          "--cd": {
+            "description": "Tell the agent to use the specified directory as its working root",
+            "names": [
+              "-C",
+              "--cd"
+            ],
+            "value": "<DIR>"
+          },
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--dangerously-bypass-approvals-and-sandbox": {
+            "description": "Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY DANGEROUS. Intended solely for running in environments that are externally sandboxed",
+            "names": [
+              "--dangerously-bypass-approvals-and-sandbox"
+            ]
+          },
+          "--dangerously-bypass-hook-trust": {
+            "description": "Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS. Intended only for automation that already vets hook sources",
+            "names": [
+              "--dangerously-bypass-hook-trust"
+            ]
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          },
+          "--image": {
+            "description": "Optional image(s) to attach to the initial prompt",
+            "names": [
+              "-i",
+              "--image"
+            ],
+            "value": "<FILE>..."
+          },
+          "--local-provider": {
+            "description": "Specify which local provider to use (lmstudio or ollama). If not specified with --oss, will use config default or show selection",
+            "names": [
+              "--local-provider"
+            ],
+            "value": "<OSS_PROVIDER>"
+          },
+          "--model": {
+            "description": "Model the agent should use",
+            "names": [
+              "-m",
+              "--model"
+            ],
+            "value": "<MODEL>"
+          },
+          "--oss": {
+            "description": "Use open-source provider",
+            "names": [
+              "--oss"
+            ]
+          },
+          "--profile": {
+            "description": "Layer $CODEX_HOME/<name>.config.toml on top of the base user config",
+            "names": [
+              "-p",
+              "--profile"
+            ],
+            "value": "<CONFIG_PROFILE_V2>"
+          },
+          "--remote": {
+            "description": "Connect the TUI to a remote app server endpoint.\nAccepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.",
+            "names": [
+              "--remote"
+            ],
+            "value": "<ADDR>"
+          },
+          "--remote-auth-token-env": {
+            "description": "Name of the environment variable containing the bearer token to send to a remote app server websocket",
+            "names": [
+              "--remote-auth-token-env"
+            ],
+            "value": "<ENV_VAR>"
+          },
+          "--sandbox": {
+            "choices": [
+              "read-only",
+              "workspace-write",
+              "danger-full-access"
+            ],
+            "description": "Select the sandbox policy to use when executing model-generated shell commands",
+            "names": [
+              "-s",
+              "--sandbox"
+            ],
+            "value": "<SANDBOX_MODE>"
+          },
+          "--strict-config": {
+            "description": "Error out when config.toml contains fields that are not recognized by this version of Codex",
+            "names": [
+              "--strict-config"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex unarchive [OPTIONS] <SESSION>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1639,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1639"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+128 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -25,6 +25,8 @@\n                   working tree [aliases: a]\n   resume          Resume a previous interactive session (picker by default; use --last to continue\n                   the most recent)\n+  archive         Archive a saved session by id or session name\n+  unarchive       Unarchive a saved session by id or session name\n   fork            Fork a previous interactive session (picker by default; use --last to fork the\n                   most recent)\n   cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+128 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -23,6 +23,8 @@\n                   working tree [aliases: a]\n   resume          Resume a previous interactive session (picker by default; use --last to continue\n                   the most recent)\n+  archive         Archive a saved session by id or session name\n+  unarchive       Unarchive a saved session by id or session name\n   fork            Fork a previous interactive session (picker by default; use --last to fork the\n                   most recent)\n   cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server --help"
+      ],
+      "title": "Full help text of `app-server --help` changed (+85 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -34,6 +34,9 @@\n           \n           [default: stdio://]\n \n+      --stdio\n+          Use stdio as the transport (equivalent to `--listen stdio://`)\n+\n       --analytics-default-enabled\n           Controls whether analytics are enabled by default.\n           \n",
+      "stats": {
+        "added_chars": 85,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+85 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -24,6 +24,8 @@\n       --listen <URL>\n           Transport endpoint URL. Supported values: `stdio://` (default), `unix://`, `unix://PATH`,\n           `ws://IP:PORT`, `off` [default: stdio://]\n+      --stdio\n+          Use stdio as the transport (equivalent to `--listen stdio://`)\n       --analytics-default-enabled\n           Controls whether analytics are enabled by default\n       --ws-auth <MODE>\n",
+      "stats": {
+        "added_chars": 85,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.archive --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "archive --help"
+      ],
+      "title": "Full help text of `archive --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Archive a saved session by id or session name\n\nUsage: codex archive [OPTIONS] <SESSION>\n\nArguments:\n  <SESSION>\n          Session id (UUID) or session name. UUIDs take precedence if it parses\n\nOptions:\n      --remote <ADDR>\n          Connect the TUI to a remote app server endpoint.\n          \n          Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --remote-auth-token-env <ENV_VAR>\n          Name of the environment variable containing the bearer token to send to a remote app\n          server websocket\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -i, --image <FILE>...\n          Optional image(s) to attach to the initial prompt\n\n  -m, --model <MODEL>\n          Model the agent should use\n\n      --oss\n          Use open-source provider\n\n      --local-provider <OSS_PROVIDER>\n          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n          will use config default or show selection\n\n  -p, --profile <CONFIG_PROFILE_V2>\n          Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n\n  -s, --sandbox <SANDBOX_MODE>\n          Select the sandbox policy to use when executing model-generated shell commands\n          \n          [possible values: read-only, workspace-write, danger-full-access]\n\n      --dangerously-bypass-approvals-and-sandbox\n          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n\n      --dangerously-bypass-hook-trust\n          Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS.\n          Intended only for automation that already vets hook sources\n\n  -C, --cd <DIR>\n          Tell the agent to use the specified directory as its working root\n\n      --add-dir <DIR>\n          Additional directories that should be writable alongside the primary workspace\n\n      --strict-config\n          Error out when config.toml contains fields that are not recognized by this version of\n          Codex\n\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.archive -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "archive -h"
+      ],
+      "title": "Full help text of `archive -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Archive a saved session by id or session name\n\nUsage: codex archive [OPTIONS] <SESSION>\n\nArguments:\n  <SESSION>  Session id (UUID) or session name. UUIDs take precedence if it parses\n\nOptions:\n      --remote <ADDR>\n          Connect the TUI to a remote app server endpoint\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n      --remote-auth-token-env <ENV_VAR>\n          Name of the environment variable containing the bearer token to send to a remote app\n          server websocket\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n  -i, --image <FILE>...\n          Optional image(s) to attach to the initial prompt\n  -m, --model <MODEL>\n          Model the agent should use\n      --oss\n          Use open-source provider\n      --local-provider <OSS_PROVIDER>\n          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n          will use config default or show selection\n  -p, --profile <CONFIG_PROFILE_V2>\n          Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n  -s, --sandbox <SANDBOX_MODE>\n          Select the sandbox policy to use when executing model-generated shell commands [possible\n          values: read-only, workspace-write, danger-full-access]\n      --dangerously-bypass-approvals-and-sandbox\n          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n      --dangerously-bypass-hook-trust\n          Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS.\n          Intended only for automation that already vets hook sources\n  -C, --cd <DIR>\n          Tell the agent to use the specified directory as its working root\n      --add-dir <DIR>\n          Additional directories that should be writable alongside the primary workspace\n      --strict-config\n          Error out when config.toml contains fields that are not recognized by this version of\n          Codex\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n  -h, --help\n          Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+153 −165 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,8 +4,8 @@\n \n Arguments:\n   [SESSION_ID]\n-          Conversation/session id (UUID) or thread name. UUIDs take precedence if it parses. If\n-          omitted, use --last to pick the most recent recorded session\n+          Session id (UUID) or session name. UUIDs take precedence if it parses. If omitted, use\n+          --last to pick the most recent recorded session\n \n   [PROMPT]\n           Optional user prompt to start the session\n",
+      "stats": {
+        "added_chars": 153,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+165 −177 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,8 +3,8 @@\n Usage: codex resume [OPTIONS] [SESSION_ID] [PROMPT]\n \n Arguments:\n-  [SESSION_ID]  Conversation/session id (UUID) or thread name. UUIDs take precedence if it parses.\n-                If omitted, use --last to pick the most recent recorded session\n+  [SESSION_ID]  Session id (UUID) or session name. UUIDs take precedence if it parses. If omitted,\n+                use --last to pick the most recent recorded session\n   [PROMPT]      Optional user prompt to start the session\n \n Options:\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 177
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.unarchive --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "unarchive --help"
+      ],
+      "title": "Full help text of `unarchive --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Unarchive a saved session by id or session name\n\nUsage: codex unarchive [OPTIONS] <SESSION>\n\nArguments:\n  <SESSION>\n          Session id (UUID) or session name. UUIDs take precedence if it parses\n\nOptions:\n      --remote <ADDR>\n          Connect the TUI to a remote app server endpoint.\n          \n          Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --remote-auth-token-env <ENV_VAR>\n          Name of the environment variable containing the bearer token to send to a remote app\n          server websocket\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -i, --image <FILE>...\n          Optional image(s) to attach to the initial prompt\n\n  -m, --model <MODEL>\n          Model the agent should use\n\n      --oss\n          Use open-source provider\n\n      --local-provider <OSS_PROVIDER>\n          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n          will use config default or show selection\n\n  -p, --profile <CONFIG_PROFILE_V2>\n          Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n\n  -s, --sandbox <SANDBOX_MODE>\n          Select the sandbox policy to use when executing model-generated shell commands\n          \n          [possible values: read-only, workspace-write, danger-full-access]\n\n      --dangerously-bypass-approvals-and-sandbox\n          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n\n      --dangerously-bypass-hook-trust\n          Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS.\n          Intended only for automation that already vets hook sources\n\n  -C, --cd <DIR>\n          Tell the agent to use the specified directory as its working root\n\n      --add-dir <DIR>\n          Additional directories that should be writable alongside the primary workspace\n\n      --strict-config\n          Error out when config.toml contains fields that are not recognized by this version of\n          Codex\n\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.unarchive -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "unarchive -h"
+      ],
+      "title": "Full help text of `unarchive -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Unarchive a saved session by id or session name\n\nUsage: codex unarchive [OPTIONS] <SESSION>\n\nArguments:\n  <SESSION>  Session id (UUID) or session name. UUIDs take precedence if it parses\n\nOptions:\n      --remote <ADDR>\n          Connect the TUI to a remote app server endpoint\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n      --remote-auth-token-env <ENV_VAR>\n          Name of the environment variable containing the bearer token to send to a remote app\n          server websocket\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n  -i, --image <FILE>...\n          Optional image(s) to attach to the initial prompt\n  -m, --model <MODEL>\n          Model the agent should use\n      --oss\n          Use open-source provider\n      --local-provider <OSS_PROVIDER>\n          Specify which local provider to use (lmstudio or ollama). If not specified with --oss,\n          will use config default or show selection\n  -p, --profile <CONFIG_PROFILE_V2>\n          Layer $CODEX_HOME/<name>.config.toml on top of the base user config\n  -s, --sandbox <SANDBOX_MODE>\n          Select the sandbox policy to use when executing model-generated shell commands [possible\n          values: read-only, workspace-write, danger-full-access]\n      --dangerously-bypass-approvals-and-sandbox\n          Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n          DANGEROUS. Intended solely for running in environments that are externally sandboxed\n      --dangerously-bypass-hook-trust\n          Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS.\n          Intended only for automation that already vets hook sources\n  -C, --cd <DIR>\n          Tell the agent to use the specified directory as its working root\n      --add-dir <DIR>\n          Additional directories that should be writable alongside the primary workspace\n      --strict-config\n          Error out when config.toml contains fields that are not recognized by this version of\n          Codex\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal\n  -h, --help\n          Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.imagegenext",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.imagegenext"
+      ],
+      "title": "New setting: features.imagegenext",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1060,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/features/src/lib.rs#L1060"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.network_proxy.unix_sockets.<name>.enum.deny",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.network_proxy.unix_sockets.<name>",
+        "enum",
+        "deny"
+      ],
+      "title": "Setting features.network_proxy.unix_sockets.<name> gained value deny",
+      "impact": "informational",
+      "before": null,
+      "after": "deny",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.features.network_proxy.unix_sockets.<name>.enum.none",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.network_proxy.unix_sockets.<name>",
+        "enum",
+        "none"
+      ],
+      "title": "Setting features.network_proxy.unix_sockets.<name> lost value none",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tools.experimental_request_user_input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tools.experimental_request_user_input"
+      ],
+      "title": "New setting: tools.experimental_request_user_input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tools.experimental_request_user_input.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tools.experimental_request_user_input.enabled"
+      ],
+      "title": "New setting: tools.experimental_request_user_input.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": true,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+            "line": 860,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L860"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1477,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/app-server/src/config/external_agent_config.rs#L1477"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap",
+        "default"
+      ],
+      "title": "Default of tui.keymap: {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap… → {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap…",
+      "impact": "notable",
+      "before": {
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "insert_line_start": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "after": {
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "insert_line_start": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 157,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/config/edit.rs#L157"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 175,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/core/src/config/edit.rs#L175"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal",
+        "default"
+      ],
+      "title": "Default of tui.keymap.vim_normal: {\"append_after_cursor\":null,\"append_line_end\":null,\"cance… → {\"append_after_cursor\":null,\"append_line_end\":null,\"cance…",
+      "impact": "notable",
+      "before": {
+        "append_after_cursor": null,
+        "append_line_end": null,
+        "cancel_operator": null,
+        "change_to_line_end": null,
+        "delete_char": null,
+        "delete_to_line_end": null,
+        "enter_insert": null,
+        "insert_line_start": null,
+        "move_down": null,
+        "move_left": null,
+        "move_line_end": null,
+        "move_line_start": null,
+        "move_right": null,
+        "move_up": null,
+        "move_word_backward": null,
+        "move_word_end": null,
+        "move_word_forward": null,
+        "open_line_above": null,
+        "open_line_below": null,
+        "paste_after": null,
+        "start_change_operator": null,
+        "start_delete_operator": null,
+        "start_yank_operator": null,
+        "yank_line": null
+      },
+      "after": {
+        "append_after_cursor": null,
+        "append_line_end": null,
+        "cancel_operator": null,
+        "change_to_line_end": null,
+        "delete_char": null,
+        "delete_to_line_end": null,
+        "enter_insert": null,
+        "insert_line_start": null,
+        "move_down": null,
+        "move_left": null,
+        "move_line_end": null,
+        "move_line_start": null,
+        "move_right": null,
+        "move_up": null,
+        "move_word_backward": null,
+        "move_word_end": null,
+        "move_word_forward": null,
+        "open_line_above": null,
+        "open_line_below": null,
+        "paste_after": null,
+        "start_change_operator": null,
+        "start_delete_operator": null,
+        "start_yank_operator": null,
+        "substitute_char": null,
+        "yank_line": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/tui/src/keymap.rs#L1411"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/tui/src/keymap_setup/actions.rs#L122"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.substitute_char",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.substitute_char"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.substitute_char",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Delete character under cursor and enter insert mode (`s`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1454,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/tui/src/keymap.rs#L1454"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 138,
+            "url": "https://github.com/openai/codex/blob/rust-v0.136.0/codex-rs/tui/src/keymap_setup/actions.rs#L138"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.AWS_BEARER_TOKEN_BEDROCK",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "AWS_BEARER_TOKEN_BEDROCK"
+      ],
+      "title": "Environment variable no longer read: AWS_BEARER_TOKEN_BEDROCK",
+      "impact": "informational",
+      "before": "AWS_BEARER_TOKEN_BEDROCK",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/model-provider/src/amazon_bedrock/auth.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.135.0/codex-rs/model-provider/src/amazon_bedrock/auth.rs#L22"
+          },
+          {
+            "path": "codex-rs/model-provider/src/amazon_bedrock/auth.rs",
+            "line": 60,
+            "url": "https://github.com/openai/codex/blob/rust-v0.135.0/codex-rs/model-provider/src/amazon_bedrock/auth.rs#L60"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.rmcp",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "rmcp"
+      ],
+      "title": "Binary sdk.rmcp: 0.15.0 → 1.7.0",
+      "impact": "informational",
+      "before": "0.15.0",
+      "after": "1.7.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.261",
+  "to": "2.1.263",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Bug fixes and reliability improvements"
+  },
+  "summary": {
+    "changes": 1,
+    "categories": {
+      "config": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 0
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "config.env_vars.CLAUDE_CODE_POLISHED_DEWDROP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_POLISHED_DEWDROP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_POLISHED_DEWDROP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_POLISHED_DEWDROP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

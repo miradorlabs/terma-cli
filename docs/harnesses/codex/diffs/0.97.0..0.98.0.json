@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.97.0",
+  "to": "0.98.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.97.0...rust-v0.98.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.98.0",
+    "text": "## New Features\r\n- Introducing GPT-5.3-Codex. [Learn More](https://openai.com/index/introducing-gpt-5-3-codex/)\r\n- Steer mode is now stable and enabled by default, so `Enter` sends immediately during running tasks while `Tab` explicitly queues follow-up input. (#10690)\r\n\r\n## Bug Fixes\r\n- Fixed `resumeThread()` argument ordering in the TypeScript SDK so resuming with local images no longer starts an unintended new session. (#10709)\r\n- Fixed model-instruction handling when changing models mid-conversation or resuming with a different model, ensuring the correct developer instructions are applied. (#10651, #10719)\r\n- Fixed a remote compaction mismatch where token pre-estimation and compact payload generation could use different base instructions, improving trim accuracy and avoiding context overflows. (#10692)\r\n- Cloud requirements now reload immediately after login instead of requiring a later refresh path to take effect. (#10725)\r\n\r\n## Chores\r\n- Restored the default assistant personality to Pragmatic across config and related tests/UI snapshots. (#10705)\r\n- Unified collaboration mode naming and metadata across prompts, tools, protocol types, and TUI labels for more consistent mode behavior and messaging. (#10666)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.97.0...rust-v0.98.0\r\n\r\n- #10709 fix: ensure resume args precede image args @cryptonerdcn\r\n- #10705 chore(config) Default Personality Pragmatic @dylan-hurd-oai\r\n- #10651 fix(core) switching model appends model instructions @dylan-hurd-oai\r\n- #10666 Sync collaboration mode naming across Default prompt, tools, and TUI @charley-oai\r\n- #10690 Make steer stable by default @aibrahim-oai\r\n- #10692 Fix remote compaction estimator/payload instruction small mismatch @charley-oai\r\n- #10725 Reload cloud requirements after user login @xl-openai\r\n- #10719 fix(core,app-server) resume with different model @dylan-hurd-oai"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

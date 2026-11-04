@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.155.0",
+  "to": "0.155.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.155.0...rust-v0.155.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.155.1",
+    "text": "## Bug Fixes\n\n- New local TUI sessions now leave reasoning summaries disabled by default, fixing request rejection by providers that do not support them. Explicit reasoning-summary settings remain respected. (#46467)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.155.0...rust-v0.155.1\n\n- #46467 Restore none as the TUI reasoning summary default (@celia-oai)"
+  },
+  "summary": {
+    "changes": 13,
+    "categories": {
+      "behavior": 9,
+      "cli": 1,
+      "hooks": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 4,
+      "notable": 9
+    },
+    "undocumented": 10
+  },
+  "changes": [
+    {
+      "id": "behavior.compaction",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "compaction"
+      ],
+      "title": "Behaviour: compaction removed",
+      "impact": "notable",
+      "before": {
+        "model": "gpt-6-astra",
+        "prompt": "You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.\n\nInclude:\n- Current progress and key decisions made\n- Important context, constraints, or user preferences\n- What remains to be done (clear next steps)\n- Any critical data, examples, or references needed to continue\n\nBe concise, structured, and focused on helping the next LLM seamlessly continue the work.\n",
+        "reported_input_tokens": 995000,
+        "tools": 0,
+        "trigger": "auto"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.approval",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "approval"
+      ],
+      "title": "Behaviour: sandbox approval removed",
+      "impact": "notable",
+      "before": "never",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model removed",
+      "impact": "notable",
+      "before": "gpt-6-astra",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.provider",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "provider"
+      ],
+      "title": "Behaviour: sandbox provider removed",
+      "impact": "notable",
+      "before": "telemetry_fixture",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning effort",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning effort"
+      ],
+      "title": "Behaviour: sandbox reasoning effort removed",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries removed",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox removed",
+      "impact": "notable",
+      "before": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.session id",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "session id"
+      ],
+      "title": "Behaviour: sandbox session id removed",
+      "impact": "notable",
+      "before": "<uuid>",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.workdir",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "workdir"
+      ],
+      "title": "Behaviour: sandbox workdir removed",
+      "impact": "notable",
+      "before": "<repo>",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "exit_2"
+      ],
+      "title": "PreToolUse hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "blocks the tool; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1436,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/analytics/src/events.rs#L1436"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 583,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L583"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "exit_2"
+      ],
+      "title": "SessionStart hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1441,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/analytics/src/events.rs#L1441"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 598,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L598"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "exit_2"
+      ],
+      "title": "Stop hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "keeps the turn going; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1446,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/analytics/src/events.rs#L1446"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 613,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L613"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.remote-control -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control -h"
+      ],
+      "title": "Full help text of `remote-control -h` changed (+0 −105 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not create PATH aliases: No such file or directory (os error 2)\n [experimental] Manage the app-server daemon with remote control enabled\n \n Usage: codex remote-control [OPTIONS] [COMMAND]\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 105
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.155.0/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

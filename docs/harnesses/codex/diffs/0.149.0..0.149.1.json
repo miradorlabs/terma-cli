@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.149.0",
+  "to": "0.149.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.149.0...rust-v0.149.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.149.1",
+    "text": "## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.149.0...rust-v0.149.1"
+  },
+  "summary": {
+    "changes": 8,
+    "categories": {
+      "cli": 7,
+      "config": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 8,
+      "notable": 0
+    },
+    "undocumented": 8
+  },
+  "changes": [
+    {
+      "id": "cli.commands.codex agents.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex agents",
+        "description"
+      ],
+      "title": "Description of `codex agents` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Browse all agent sessions on the shared local app-server daemon\n+WARNING: proceeding, even though we could not create PATH aliases: operation would block Browse all agent sessions on the shared local app-server daemon\n",
+      "stats": {
+        "added_chars": 152,
+        "removed_chars": 63
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.149.1/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex exec.options.--thread-source",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--thread-source"
+      ],
+      "title": "New flag `codex exec --thread-source`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Source classification for newly created or forked threads",
+        "names": [
+          "--thread-source"
+        ],
+        "value": "<SOURCE>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/doctor/thread_inventory.rs",
+            "line": 671,
+            "url": "https://github.com/openai/codex/blob/rust-v0.149.1/codex-rs/cli/src/doctor/thread_inventory.rs#L671"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1148,
+            "url": "https://github.com/openai/codex/blob/rust-v0.149.1/codex-rs/cli/src/main.rs#L1148"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex mcp.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex mcp",
+        "description"
+      ],
+      "title": "Description of `codex mcp` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-WARNING: proceeding, even though we could not create PATH aliases: operation would block Manage external MCP servers for Codex\n+Manage external MCP servers for Codex\n",
+      "stats": {
+        "added_chars": 37,
+        "removed_chars": 126
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.agents --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents --help"
+      ],
+      "title": "Full help text of `agents --help` changed (+88 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not create PATH aliases: operation would block\n Browse all agent sessions on the shared local app-server daemon\n \n Usage: codex agents [OPTIONS]\n",
+      "stats": {
+        "added_chars": 88,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.149.1/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+97 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -72,6 +72,9 @@\n       --add-dir <DIR>\n           Additional directories that should be writable alongside the primary workspace\n \n+      --thread-source <SOURCE>\n+          Source classification for newly created or forked threads\n+\n       --skip-git-repo-check\n           Allow running Codex outside a Git repository\n \n",
+      "stats": {
+        "added_chars": 97,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+97 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -52,6 +52,8 @@\n           Tell the agent to use the specified directory as its working root\n       --add-dir <DIR>\n           Additional directories that should be writable alongside the primary workspace\n+      --thread-source <SOURCE>\n+          Source classification for newly created or forked threads\n       --skip-git-repo-check\n           Allow running Codex outside a Git repository\n       --ephemeral\n",
+      "stats": {
+        "added_chars": 97,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.mcp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp --help"
+      ],
+      "title": "Full help text of `mcp --help` changed (+0 −88 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not create PATH aliases: operation would block\n Manage external MCP servers for Codex\n \n Usage: codex mcp [OPTIONS] <COMMAND>\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 88
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.149.0/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.compaction_image_budget",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.compaction_image_budget"
+      ],
+      "title": "New setting: features.compaction_image_budget",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1536,
+            "url": "https://github.com/openai/codex/blob/rust-v0.149.1/codex-rs/features/src/lib.rs#L1536"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

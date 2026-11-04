@@ -1,0 +1,1507 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.150.1",
+  "to": "0.151.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.150.1...rust-v0.151.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.151.0",
+    "text": "## New Features\n\n- Added a configurable grace period for discovering tools from optional MCP servers. (#41199)\n- Extensions can now inspect or replace MCP tool results before they reach the model. (#41202)\n- Plugin catalogs now combine per-repository configuration and report invalid project marketplaces without hiding valid plugins. (#41208)\n\n## Bug Fixes\n\n- Preserved restored permission profiles across TUI turns and prevented `/cd` from weakening sandbox restrictions. (#41192)\n- Kept tool availability and reasoning effort correct when switching models or falling back to another model. (#41195, #41206)\n- Improved remote sandbox enforcement using the executor’s actual home directory, operating system, and path conventions. (#41196, #41204, #41207, #41209)\n- Preserved structured MCP tool and resource errors in app-server responses. (#41196)\n- Counted nested subagent token usage toward root goal budgets. (#41183)\n- Prevented stale Guardian classifications from authorizing actions after permission state changes. (#41196)\n\n## Chores\n\n- Added telemetry for escalated stdin reviews and remote executor MCP discovery. (#41189, #41205)\n- Stabilized Guardian WebSocket and core fixture tests under slow or highly concurrent CI. (#41191, #41194)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.150.0...rust-v0.151.0\n\n- #41183 Account subagent token usage toward root goals @copyberry\n- #41189 Instrument stdin review size checks @copyberry\n- #41191 Stabilize Guardian WebSocket tests @copyberry\n- #41192 Preserve restored permission profiles in TUI sessions @copyberry\n- #41193 Report affected capabilities from remote plugin syncs @copyberry\n- #41194 Harden core test fixture startup assertions @copyberry\n- #41195 Finalize model-specific tool plans in `ToolRouter` @copyberry\n- #41196 Improve sandboxing, MCP errors, and cached approvals @copyberry\n- #41199 Make the optional MCP startup grace configurable @copyberry\n- #41202 Let extensions process MCP tool results @copyberry\n- #41204 Propagate executor home directories into sandbox contexts @copyberry\n- #41205 Track executor MCP discovery telemetry @copyberry\n- #41206 Make Ultra reasoning fallback model-aware @copyberry\n- #41207 Propagate executor OS into turn environments @copyberry\n- #41208 Honor per-repository plugin configuration in catalog requests @copyberry\n- #41209 Align deny-read matching with executor path semantics @copyberry"
+  },
+  "summary": {
+    "changes": 34,
+    "categories": {
+      "behavior": 1,
+      "cli": 4,
+      "config": 24,
+      "hooks": 4,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 24,
+      "notable": 10
+    },
+    "undocumented": 34
+  },
+  "changes": [
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+844 −1075 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,23 +1,20 @@\n <skills_instructions>\n ## Skills\n-A skill is a set of instructions provided through a `SKILL.md` source.\n-Below is the list of skills that can be used.\n-Each entry includes a name, description, and source locator.\n-`file` locators are on the host filesystem, `executor package` locators are owned by their execution environment, `orchestrator package` locators are opaque package identifiers, and `custom resource` locators use their provider's access mechanism.\n+A skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n+### Skill roots\n+- `r0` = `<codex-home>/skills/.system`\n ### Available skills\n - imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n-(file: <codex-home>/skills/.system/imagegen/SKILL.md)\n+(file: r0/imagegen/SKILL.md)\n - openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex—and for OpenAI APIs/products and ChatGPT Work.\n Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons.\n Do not use for generic app/software tasks that merely mention Codex.\n-(file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n+(file: r0/openai-docs/SKILL.md)\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n-(file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n-- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n-- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n-Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n-(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n+(file: r0/plugin-creator/SKILL.md)\n+- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n+- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n </skills_instructions>\n",
+      "stats": {
+        "added_chars": 844,
+        "removed_chars": 1075
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/catalog_prompt.rs",
+            "line": 4,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/ext/skills/src/catalog_prompt.rs#L4"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.1.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 1 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,23 +1,20 @@\n <skills_instructions>\n ## Skills\n-A skill is a set of instructions provided through a `SKILL.md` source.\n-Below is the list of skills that can be used.\n-Each entry includes a name, description, and source locator.\n-`file` locators are on the host filesystem, `executor package` locators are owned by their execution environment, `orchestrator package` locators are opaque package identifiers, and `custom resource` locators use their provider's access mechanism.\n+A skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n+### Skill roots\n+- `r0` = `<codex-home>/skills/.system`\n ### Available skills\n - imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n-(file: <codex-home>/skills/.system/imagegen/SKILL.md)\n+(file: r0/imagegen/SKILL.md)\n - openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex—and for OpenAI APIs/products and ChatGPT Work.\n Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons.\n Do not use for generic app/software tasks that merely mention Codex.\n-(file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n+(file: r0/openai-docs/SKILL.md)\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n-(file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n-- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n-- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n-Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n-(file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n+(file: r0/plugin-creator/SKILL.md)\n+- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n+- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n </skills_instructions>\n",
+      "stats": {
+        "added_chars": 844,
+        "removed_chars": 1075
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control.json_decision",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "json_decision"
+      ],
+      "title": "PreToolUse hook control (json_decision) removed",
+      "impact": "notable",
+      "before": "blocks the tool; message to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1403,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/analytics/src/events.rs#L1403"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 559,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L559"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.additional_context",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "additional_context"
+      ],
+      "title": "SessionStart hook control (additional_context) removed",
+      "impact": "notable",
+      "before": "reaches the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1408,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/analytics/src/events.rs#L1408"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 574,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L574"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.json_decision",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "json_decision"
+      ],
+      "title": "Stop hook control (json_decision) removed",
+      "impact": "notable",
+      "before": "keeps the turn going; message to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1413,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/analytics/src/events.rs#L1413"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L589"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.additional_context",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "additional_context"
+      ],
+      "title": "UserPromptSubmit hook control (additional_context) removed",
+      "impact": "notable",
+      "before": "reaches the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1410,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/analytics/src/events.rs#L1410"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 580,
+            "url": "https://github.com/openai/codex/blob/rust-v0.150.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L580"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex archive.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex archive",
+        "description"
+      ],
+      "title": "Description of `codex archive` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Archive a saved session by id or session name\n+WARNING: proceeding, even though we could not create PATH aliases: operation would block Archive a saved session by id or session name\n",
+      "stats": {
+        "added_chars": 134,
+        "removed_chars": 45
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.archive --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "archive --help"
+      ],
+      "title": "Full help text of `archive --help` changed (+88 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not create PATH aliases: operation would block\n Archive a saved session by id or session name\n \n Usage: codex archive [OPTIONS] <SESSION>\n",
+      "stats": {
+        "added_chars": 88,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.doctor --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "doctor --help"
+      ],
+      "title": "Full help text of `doctor --help` changed (+107 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -17,14 +17,14 @@\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n       --summary\n           Only show grouped check rows and the final count summary\n \n       --all\n           Expand long lists in detailed human output\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n       --no-color\n           Disable ANSI color in human output\n",
+      "stats": {
+        "added_chars": 107,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.doctor -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "doctor -h"
+      ],
+      "title": "Full help text of `doctor -h` changed (+100 −100 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,9 +9,9 @@\n                             parse as TOML, the raw string is used as a literal\n       --json                Emit a redacted machine-readable report\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --summary             Only show grouped check rows and the final count summary\n       --all                 Expand long lists in detailed human output\n-      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --no-color            Disable ANSI color in human output\n       --ascii               Use ASCII status labels and separators in human output\n   -h, --help                Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 100,
+        "removed_chars": 100
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.bedrock_setup_wizard",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.bedrock_setup_wizard"
+      ],
+      "title": "New setting: features.bedrock_setup_wizard",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1522,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/features/src/lib.rs#L1522"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.code_mode_prewarm",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_prewarm"
+      ],
+      "title": "New setting: features.code_mode_prewarm",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 960,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/features/src/lib.rs#L960"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.free_guardian",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.free_guardian"
+      ],
+      "title": "New setting: features.guardianv2.free_guardian",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Route Guardian review and classification through the unmetered Codex endpoints.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 1506,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/core/src/config/mod.rs#L1506"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.persist_scores",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.persist_scores"
+      ],
+      "title": "New setting: features.guardianv2.persist_scores",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Persist reviewed actions and risk scores to rollout files for debugging.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.skip_host_skill_discovery",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.skip_host_skill_discovery"
+      ],
+      "title": "New setting: features.skip_host_skill_discovery",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1276,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/features/src/lib.rs#L1276"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.step_model_switching",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.step_model_switching"
+      ],
+      "title": "New setting: features.step_model_switching",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1546,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/features/src/lib.rs#L1546"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.write_stdin_approval",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.write_stdin_approval"
+      ],
+      "title": "New setting: features.write_stdin_approval",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1086,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/features/src/lib.rs#L1086"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_optional_startup_grace_ms",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_optional_startup_grace_ms"
+      ],
+      "title": "New setting: mcp_optional_startup_grace_ms",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Milliseconds to wait for optional MCP servers while building the initial tool catalog.\n\nDefaults to 1000. Set to 0 to disable the shared grace and wait for each server's configured `startup_timeout_sec` instead.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.oauth.callback_url",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.oauth.callback_url"
+      ],
+      "title": "New setting: mcp_servers.<name>.oauth.callback_url",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Registered callback URL associated with this OAuth client.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/plugin_config.rs",
+            "line": 262,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/codex-mcp/src/plugin_config.rs#L262"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 159,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/core/src/config/edit/document_helpers.rs#L159"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap",
+        "default"
+      ],
+      "title": "Default of tui.keymap: {\"agents\":{\"new_task\":null,\"rename\":null,\"search\":null,\"s… → {\"agents\":{\"new_task\":null,\"rename\":null,\"search\":null,\"s…",
+      "impact": "notable",
+      "before": {
+        "agents": {
+          "new_task": null,
+          "rename": null,
+          "search": null,
+          "stop": null,
+          "toggle_grouping": null
+        },
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null,
+          "next_permission_mode": null,
+          "previous_permission_mode": null,
+          "toggle_voice_mute": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "open_agents": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_side_conversation": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "insert_line_start": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "repeat_last_change": null,
+          "replace_char": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "after": {
+        "agents": {
+          "new_task": null,
+          "rename": null,
+          "search": null,
+          "stop": null,
+          "toggle_grouping": null
+        },
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null,
+          "next_permission_mode": null,
+          "previous_permission_mode": null,
+          "toggle_voice_mute": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "open_agents": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_side_conversation": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "find_backward": null,
+          "find_forward": null,
+          "insert_line_start": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "repeat_last_change": null,
+          "replace_char": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "till_backward": null,
+          "till_forward": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_find_backward": null,
+          "motion_find_forward": null,
+          "motion_jump_bottom": null,
+          "motion_jump_top": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_till_backward": null,
+          "motion_till_forward": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1283,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/config/src/loader/mod.rs#L1283"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 160,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/core/src/config/edit.rs#L160"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal",
+        "default"
+      ],
+      "title": "Default of tui.keymap.vim_normal: {\"append_after_cursor\":null,\"append_line_end\":null,\"cance… → {\"append_after_cursor\":null,\"append_line_end\":null,\"cance…",
+      "impact": "notable",
+      "before": {
+        "append_after_cursor": null,
+        "append_line_end": null,
+        "cancel_operator": null,
+        "change_to_line_end": null,
+        "delete_char": null,
+        "delete_to_line_end": null,
+        "enter_insert": null,
+        "insert_line_start": null,
+        "move_down": null,
+        "move_left": null,
+        "move_line_end": null,
+        "move_line_start": null,
+        "move_right": null,
+        "move_up": null,
+        "move_word_backward": null,
+        "move_word_end": null,
+        "move_word_forward": null,
+        "open_line_above": null,
+        "open_line_below": null,
+        "paste_after": null,
+        "repeat_last_change": null,
+        "replace_char": null,
+        "start_change_operator": null,
+        "start_delete_operator": null,
+        "start_yank_operator": null,
+        "substitute_char": null,
+        "yank_line": null
+      },
+      "after": {
+        "append_after_cursor": null,
+        "append_line_end": null,
+        "cancel_operator": null,
+        "change_to_line_end": null,
+        "delete_char": null,
+        "delete_to_line_end": null,
+        "enter_insert": null,
+        "find_backward": null,
+        "find_forward": null,
+        "insert_line_start": null,
+        "jump_bottom": null,
+        "jump_top": null,
+        "move_down": null,
+        "move_left": null,
+        "move_line_end": null,
+        "move_line_start": null,
+        "move_right": null,
+        "move_up": null,
+        "move_word_backward": null,
+        "move_word_end": null,
+        "move_word_forward": null,
+        "open_line_above": null,
+        "open_line_below": null,
+        "paste_after": null,
+        "repeat_last_change": null,
+        "replace_char": null,
+        "start_change_operator": null,
+        "start_delete_operator": null,
+        "start_yank_operator": null,
+        "substitute_char": null,
+        "till_backward": null,
+        "till_forward": null,
+        "yank_line": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2027,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2027"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap/bindings.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap/bindings.rs#L36"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.find_backward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.find_backward"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.find_backward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Find the previous character on the current line (`F`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2069,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2069"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 140,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L140"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.find_forward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.find_forward"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.find_forward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Find the next character on the current line (`f`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2068,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2068"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 139,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L139"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.jump_bottom",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.jump_bottom"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.jump_bottom",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Jump to the last buffer line (`G`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 305,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L305"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2073,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2073"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.jump_top",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.jump_top"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.jump_top",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Begin a jump to the first buffer line (`gg`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 304,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L304"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2072,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2072"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.till_backward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.till_backward"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.till_backward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Stop after the previous character on the current line (`T`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2071,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2071"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 142,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L142"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.till_forward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.till_forward"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.till_forward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Stop before the next character on the current line (`t`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2070,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2070"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 141,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L141"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator",
+        "default"
+      ],
+      "title": "Default of tui.keymap.vim_operator: {\"cancel\":null,\"delete_line\":null,\"motion_down\":null,\"mot… → {\"cancel\":null,\"delete_line\":null,\"motion_down\":null,\"mot…",
+      "impact": "notable",
+      "before": {
+        "cancel": null,
+        "delete_line": null,
+        "motion_down": null,
+        "motion_left": null,
+        "motion_line_end": null,
+        "motion_line_start": null,
+        "motion_right": null,
+        "motion_up": null,
+        "motion_word_backward": null,
+        "motion_word_end": null,
+        "motion_word_forward": null,
+        "select_around_text_object": null,
+        "select_inner_text_object": null,
+        "yank_line": null
+      },
+      "after": {
+        "cancel": null,
+        "delete_line": null,
+        "motion_down": null,
+        "motion_find_backward": null,
+        "motion_find_forward": null,
+        "motion_jump_bottom": null,
+        "motion_jump_top": null,
+        "motion_left": null,
+        "motion_line_end": null,
+        "motion_line_start": null,
+        "motion_right": null,
+        "motion_till_backward": null,
+        "motion_till_forward": null,
+        "motion_up": null,
+        "motion_word_backward": null,
+        "motion_word_end": null,
+        "motion_word_forward": null,
+        "select_around_text_object": null,
+        "select_inner_text_object": null,
+        "yank_line": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2114,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2114"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap/bindings.rs",
+            "line": 37,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap/bindings.rs#L37"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_find_backward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_find_backward"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_find_backward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: find the previous character on the current line (`F`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2147,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2147"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 169,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L169"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_find_forward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_find_forward"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_find_forward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: find the next character on the current line (`f`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2143,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2143"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 168,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L168"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_jump_bottom",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_jump_bottom"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_jump_bottom",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: jump to the last buffer line (`G`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2163,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2163"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 173,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L173"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_jump_top",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_jump_top"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_jump_top",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: begin a jump to the first buffer line (`gg`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2159,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2159"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap/chords.rs",
+            "line": 144,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap/chords.rs#L144"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_till_backward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_till_backward"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_till_backward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: stop after the previous character on the current line (`T`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2155,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2155"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 171,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L171"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_till_forward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_till_forward"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_till_forward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: stop before the next character on the current line (`t`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 2151,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap.rs#L2151"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 170,
+            "url": "https://github.com/openai/codex/blob/rust-v0.151.0/codex-rs/tui/src/keymap_setup/actions.rs#L170"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

@@ -1,0 +1,874 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.101.0",
+  "to": "0.102.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.101.0...rust-v0.102.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.102.0",
+    "text": "## New Features\n- Added a more unified permissions flow, including clearer permissions history in the TUI and a slash command to grant sandbox read access when directories are blocked. (#11633, #11512, #11550, #11639)\n- Introduced structured network approval handling, with richer host/protocol context shown directly in approval prompts. (#11672, #11674)\n- Expanded app-server fuzzy file search with explicit session-complete signaling so clients can stop loading indicators reliably. (#10268, #11773)\n- Added customizable multi-agent roles via config, including migration toward the new multi-agent naming/config surface. (#11917, #11982, #11939, #11918)\n- Added a `model/rerouted` notification so clients can detect and render model reroute events explicitly. (#12001)\n\n## Bug Fixes\n- Fixed remote image attachments so they persist correctly across resume/backtrack and history replay in the TUI. (#10590)\n- Fixed a TUI accessibility regression where animation gating for screen reader users was not consistently respected. (#11860)\n- Fixed app-server thread resume behavior to correctly rejoin active in-memory threads and tighten invalid resume cases. (#11756)\n- Fixed `model/list` output to return full model data plus visibility metadata, avoiding unintended server-side filtering. (#11793)\n- Fixed several `js_repl` stability issues, including reset hangs, in-flight tool-call races, and a `view_image` panic path. (#11932, #11922, #11800, #11796)\n- Fixed app integration edge cases in mention parsing and app list loading/filtering behavior. (#11894, #11518, #11697)\n\n## Documentation\n- Updated contributor guidance to require snapshot coverage for user-visible TUI changes. (#10669)\n- Updated docs/help text around Codex app and MCP command usage. (#11926, #11813)\n\n## Chores\n- Improved developer log tooling with new `just log --search` and `just log --compact` modes. (#11995, #11994)\n- Updated vendored `rg` and tightened Bazel/Cargo lockfile sync checks to reduce dependency drift. (#12007, #11790)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.101.0...rust-v0.102.0\n\n- #10268 app-server: add fuzzy search sessions for streaming file search @nornagon-openai\n- #11547 Parse first order skill/connector mentions @canvrno-oai\n- #11227 feat(app-server): experimental flag to persist extended history @owenlin0\n- #10672 Add js_repl host helpers and exec end events @fjord-oai\n- #11512 add a slash command to grant sandbox read access to inaccessible directories @iceweasel-oai\n- #11631 chore(core) Deprecate approval_policy: on-failure @dylan-hurd-oai\n- #11636 Better error message for model limit hit. @xl-openai\n- #11633 feat: introduce Permissions @bolinfest\n- #10669 docs: require insta snapshot coverage for UI changes @joshka-oai\n- #11645 fix: skip review_start_with_detached_delivery_returns_new_thread_id o… @owenlin0\n- #11639 [feat] add seatbelt permission files @celia-oai\n- #11622 Remove absolute path in rollout_summary @wendyjiao-openai\n- #10671 Add js_repl_tools_only model and routing restrictions @fjord-oai\n- #11657 app-server tests: disable shell_snapshot for review suite @bolinfest\n- #11646 app-server: stabilize detached review start on Windows @bolinfest\n- #11638 fix(app-server): surface more helpful errors for json-rpc @owenlin0\n- #11417 [apps] Add is_enabled to app info. @mzeng-openai\n- #11630 Add new apps_mcp_gateway @canvrno-oai\n- #11656 Persist complete TurnContextItem state via canonical conversion @charley-oai\n- #11510 Remove git commands from dangerous command checks @joshka-oai\n- #11668 feat(shell-tool-mcp): add patched zsh build pipeline @nornagon-openai\n- #11275 Added a test to verify that feature flags that are enabled by default are stable @etraut-openai\n- #11651 Add cwd as an optional field to thread/list @acrognale-oai\n- #11660 chore(approvals) More approvals scenarios @dylan-hurd-oai\n- #11518 [apps] Fix app loading logic. @mzeng-openai\n- #11679 fix: dont show NUX for upgrade-target models that are hidden @sayan-oai\n- #11515 Point Codex App tooltip links to app landing page @joshka-oai\n- #11671 chore(core) Restrict model-suggested rules @dylan-hurd-oai\n- #11703 fix(ci) lock rust toolchain at 1.93.0 to unblock @dylan-hurd-oai\n- #11662 feat(network-proxy): structured policy signaling and attempt correlation to core @viyatb-oai\n- #11709 fix(shell-tool-mcp) build dependencies @dylan-hurd-oai\n- #11618 feat: add token usage on memories @jif-oai\n- #11722 Lower missing rollout log level @jif-oai\n- #11712 chore: streamline phase 2 @jif-oai\n- #11731 feat: memories config @jif-oai\n- #11736 feat: increase windows workers stack @jif-oai\n- #11739 feat: add slug in name @jif-oai\n- #11745 chore: move explorer to spark @jif-oai\n- #11748 Fix memories output schema requirements @jif-oai\n- #11669 core: limit search_tool_bm25 to Apps and clarify discovery guidance @apanasenko-oai\n- #11755 app-server-test-client websocket client and thread tools @maxj-oai\n- #11663 fix: reduce flakiness of compact_resume_after_second_compaction_preserves_history @bolinfest\n- #11667 sandbox NUX metrics update @iceweasel-oai\n- #11695 Updated app bug report template @etraut-openai\n- #11477 feat: switch on dying sub-agents @jif-oai\n- #11711 feat(tui): prevent macOS idle sleep while turns run @yvolovich-cyber\n- #11686 Report syntax errors in rules file @etraut-openai\n- #11763 Update read_path prompt @zuxin-oai\n- #11772 chore: mini @jif-oai\n- #11697 [apps] Improve app listing filtering. @mzeng-openai\n- #11666 Add js_repl kernel crash diagnostics @fjord-oai\n- #11687 support app usage analytics @alexsong-oai\n- #11769 Improve GitHub issue deduplication reliability by introducing a stage… @etraut-openai\n- #11770 fix(nix): use correct version from Cargo.toml in flake build @rupurt\n- #11677 turn metadata: per-turn non-blocking @pash-openai\n- #11692 rmcp-client: fix auth crash @maxj-oai\n- #10590 tui: preserve remote image attachments across resume/backtrack @charley-oai\n- #11782 turn metadata followups @pash-openai\n- #11773 [app-server] add fuzzyFileSearch/sessionCompleted @nornagon-openai\n- #11756 codex-rs: fix thread resume rejoin semantics @maxj-oai\n- #11793 fix: send unfiltered models over model/list @sayan-oai\n- #11799 fix(protocol): make local image test Bazel-friendly @joshka-oai\n- #11796 Fix js_repl view_image test runtime panic @fjord-oai\n- #11800 Fix js_repl in-flight tool-call waiter race @fjord-oai\n- #11658 feat(skills): add permission profiles from openai.yaml metadata @celia-oai\n- #11790 bazel: enforce MODULE.bazel.lock sync with Cargo.lock @joshka-oai\n- #11803 add perf metrics for connectors load @alexsong-oai\n- #11659 Handle model-switch base instructions after compaction @charley-oai\n- #11813 Fixed help text for `mcp` and `mcp-server` CLI commands @etraut-openai\n- #11672 feat(core): add structured network approval plumbing and policy decision model @viyatb-oai\n- #11674 feat(tui): render structured network approval prompts in approval overlay @viyatb-oai\n- #11550 feat(tui) Permissions update history item @dylan-hurd-oai\n- #11767 fix(core): add linux bubblewrap sandbox tag @viyatb-oai\n- #11534 Add process_uuid to sqlite logs @charley-oai\n- #11487 core: snapshot tests for compaction requests, post-compaction layout, some additional compaction tests @charley-oai\n- #11690 fix: show user warning when using default fallback metadata @sayan-oai\n- #11780 chore(tui): reduce noisy key logging @apanasenko-oai\n- #11884 fix: only emit unknown model warning on user turns @sayan-oai\n- #11893 bazel: fix snapshot parity for tests/*.rs rust_test targets @apanasenko-oai\n- #11759 feat: use shell policy in shell snapshot @jif-oai\n- #11615 Allow hooks to error @gt-oai\n- #11918 chore: rename collab feature flag key to multi_agent @jif-oai\n- #11924 nit: memory storage @jif-oai\n- #11917 feat: add customizable roles for multi-agents @jif-oai\n- #11926 docs: mention Codex app in README intro @vb-openai\n- #11900 feat: drop MCP managing tools if no MCP servers @jif-oai\n- #11939 Rename collab modules to multi agents @jif-oai\n- #11894 [apps] Fix app mention syntax. @mzeng-openai\n- #11866 chore(core) rm Feature::RequestRule @dylan-hurd-oai\n- #11948 add(feedback): over-refusal / safety check @fouad-openai\n- #11860 Fixed screen reader regression in CLI @etraut-openai\n- #11964 add(core): safety check downgrade warning @fouad-openai\n- #11951 fix(core) exec_policy parsing fixes @dylan-hurd-oai\n- #11932 fix: js_repl reset hang by clearing exec tool calls without waiting @jif-oai\n- #11974 Hide /debug slash commands from popup menu @jif-oai\n- #11922 fix: race in js repl @jif-oai\n- #11969 fix(ci) Fix shell-tool-mcp.yml @dylan-hurd-oai\n- #11908 Exit early when session initialization fails @jif-oai\n- #11986 nit: wording multi-agent @jif-oai\n- #11995 feat: add `--search` to `just log` @jif-oai\n- #11994 feat: add `--compact` mode to `just log` @jif-oai\n- #11833 Don't allow model_supports_reasoning_summaries to disable reasoning @etraut-openai\n- #11807 Centralize context update diffing logic @charley-oai\n- #12007 Update vendored rg to the latest stable version (15.1) @etraut-openai\n- #11970 Protect workspace .agents directory in Windows sandbox @etraut-openai\n- #12005 Add /statusline tooltip entry @jif-oai\n- #11982 feat: move agents config to main config @jif-oai\n- #11224 chore: clarify web_search deprecation notices and consolidate tests @sayan-oai\n- #12001 Feat: add model reroute notification @shijie-oai\n- #11801 Add remote skill scope/product_surface/enabled params and cleanup @xl-openai"
+  },
+  "summary": {
+    "changes": 31,
+    "categories": {
+      "cli": 13,
+      "config": 15,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 28,
+      "notable": 3
+    },
+    "undocumented": 14
+  },
+  "changes": [
+    {
+      "id": "tools.list_mcp_resource_templates",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "list_mcp_resource_templates"
+      ],
+      "title": "Tool removed: list_mcp_resource_templates",
+      "impact": "notable",
+      "before": {
+        "description": "Lists resource templates provided by MCP servers. Parameterized resource templates allow servers to share data that takes parameters and provides context to language models, such as files, database schemas, or application-specific information. Prefer resource templates over web search when possible.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "description": "Opaque cursor returned by a previous list_mcp_resource_templates call for the same server.",
+              "type": "string"
+            },
+            "server": {
+              "description": "Optional MCP server name. When omitted, lists resource templates from all configured servers.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "list_mcp_resource_templates",
+        "sha256": "10492337d8abb087377f59f3246aa386d3623a432385da03b544ac7a7a32676d"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource.rs",
+            "line": 218,
+            "url": "https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/core/src/tools/handlers/mcp_resource.rs#L218"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource.rs",
+            "line": 362,
+            "url": "https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/core/src/tools/handlers/mcp_resource.rs#L362"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.list_mcp_resources",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "list_mcp_resources"
+      ],
+      "title": "Tool removed: list_mcp_resources",
+      "impact": "notable",
+      "before": {
+        "description": "Lists resources provided by MCP servers. Resources allow servers to share data that provides context to language models, such as files, database schemas, or application-specific information. Prefer resources over web search when possible.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "description": "Opaque cursor returned by a previous list_mcp_resources call for the same server.",
+              "type": "string"
+            },
+            "server": {
+              "description": "Optional MCP server name. When omitted, lists resources from every configured server.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "list_mcp_resources",
+        "sha256": "9b1fe2f8cbd2f25ab540f8bf71734b05d0ab75bfda6e2e661a44c8ea0a77605f"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource.rs",
+            "line": 209,
+            "url": "https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/core/src/tools/handlers/mcp_resource.rs#L209"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource.rs",
+            "line": 256,
+            "url": "https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/core/src/tools/handlers/mcp_resource.rs#L256"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.read_mcp_resource",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "read_mcp_resource"
+      ],
+      "title": "Tool removed: read_mcp_resource",
+      "impact": "notable",
+      "before": {
+        "description": "Read a specific resource from an MCP server given the server name and resource URI.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "server": {
+              "description": "MCP server name exactly as configured. Must match the 'server' field returned by list_mcp_resources.",
+              "type": "string"
+            },
+            "uri": {
+              "description": "Resource URI to read. Must be one of the URIs returned by list_mcp_resources.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "server",
+            "uri"
+          ],
+          "type": "object"
+        },
+        "name": "read_mcp_resource",
+        "sha256": "23f2d43fece9ce15ecf4d9b3e283cd56d1f9dd14b5ee54455e9aca97a7accd9f"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource.rs",
+            "line": 227,
+            "url": "https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/core/src/tools/handlers/mcp_resource.rs#L227"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/mcp_resource.rs",
+            "line": 470,
+            "url": "https://github.com/openai/codex/blob/rust-v0.101.0/codex-rs/core/src/tools/handlers/mcp_resource.rs#L470"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex.options.--ask-for-approval.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--ask-for-approval",
+        "description"
+      ],
+      "title": "`codex --ask-for-approval`: description changed (+534 −445 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,6 @@\n Configure when the model requires human approval before executing a command\n Possible values: - untrusted: Only run \"trusted\" commands (e.g.\n ls, cat, sed) without asking for user approval.\n-Will escalate to the user if the model proposes a command that is not in the \"trusted\" set - on-failure: Run all commands without asking for user approval.\n-Only asks for approval if a command fails to execute, in which case it will escalate to the user to ask for un-sandboxed execution - on-request: The model decides when to ask the user for approval - never: Never ask for user approval Execution failures are immediately returned to the model\n+Will escalate to the user if the model proposes a command that is not in the \"trusted\" set - on-failure: DEPRECATED: Run all commands without asking for user approval.\n+Only asks for approval if a command fails to execute, in which case it will escalate to the user to ask for un-sandboxed execution.\n+Prefer `on-request` for interactive runs or `never` for non-interactive runs - on-request: The model decides when to ask the user for approval - never: Never ask for user approval Execution failures are immediately returned to the model\n",
+      "stats": {
+        "added_chars": 534,
+        "removed_chars": 445
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--ask-for-approval.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--ask-for-approval",
+        "description"
+      ],
+      "title": "`codex fork --ask-for-approval`: description changed (+534 −445 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,6 @@\n Configure when the model requires human approval before executing a command\n Possible values: - untrusted: Only run \"trusted\" commands (e.g.\n ls, cat, sed) without asking for user approval.\n-Will escalate to the user if the model proposes a command that is not in the \"trusted\" set - on-failure: Run all commands without asking for user approval.\n-Only asks for approval if a command fails to execute, in which case it will escalate to the user to ask for un-sandboxed execution - on-request: The model decides when to ask the user for approval - never: Never ask for user approval Execution failures are immediately returned to the model\n+Will escalate to the user if the model proposes a command that is not in the \"trusted\" set - on-failure: DEPRECATED: Run all commands without asking for user approval.\n+Only asks for approval if a command fails to execute, in which case it will escalate to the user to ask for un-sandboxed execution.\n+Prefer `on-request` for interactive runs or `never` for non-interactive runs - on-request: The model decides when to ask the user for approval - never: Never ask for user approval Execution failures are immediately returned to the model\n",
+      "stats": {
+        "added_chars": 534,
+        "removed_chars": 445
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex mcp.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex mcp",
+        "description"
+      ],
+      "title": "Description of `codex mcp` changed",
+      "impact": "informational",
+      "before": "[experimental] Run Codex as an MCP server and manage MCP servers",
+      "after": "Manage external MCP servers for Codex",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 6224,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/app-server/src/codex_message_processor.rs#L6224"
+          },
+          {
+            "path": "codex-rs/core/src/mcp/mod.rs",
+            "line": 29,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/mcp/mod.rs#L29"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex mcp-server.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex mcp-server",
+        "description"
+      ],
+      "title": "Description of `codex mcp-server` changed",
+      "impact": "informational",
+      "before": "[experimental] Run the Codex MCP server (stdio transport)",
+      "after": "Start Codex as an MCP server (stdio)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--ask-for-approval.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--ask-for-approval",
+        "description"
+      ],
+      "title": "`codex resume --ask-for-approval`: description changed (+534 −445 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,6 @@\n Configure when the model requires human approval before executing a command\n Possible values: - untrusted: Only run \"trusted\" commands (e.g.\n ls, cat, sed) without asking for user approval.\n-Will escalate to the user if the model proposes a command that is not in the \"trusted\" set - on-failure: Run all commands without asking for user approval.\n-Only asks for approval if a command fails to execute, in which case it will escalate to the user to ask for un-sandboxed execution - on-request: The model decides when to ask the user for approval - never: Never ask for user approval Execution failures are immediately returned to the model\n+Will escalate to the user if the model proposes a command that is not in the \"trusted\" set - on-failure: DEPRECATED: Run all commands without asking for user approval.\n+Only asks for approval if a command fails to execute, in which case it will escalate to the user to ask for un-sandboxed execution.\n+Prefer `on-request` for interactive runs or `never` for non-interactive runs - on-request: The model decides when to ask the user for approval - never: Never ask for user approval Execution failures are immediately returned to the model\n",
+      "stats": {
+        "added_chars": 534,
+        "removed_chars": 445
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+429 −376 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,8 +10,8 @@\n   review      Run a code review non-interactively\n   login       Manage login\n   logout      Remove stored authentication credentials\n-  mcp         [experimental] Run Codex as an MCP server and manage MCP servers\n-  mcp-server  [experimental] Run the Codex MCP server (stdio transport)\n+  mcp         Manage external MCP servers for Codex\n+  mcp-server  Start Codex as an MCP server (stdio)\n   app-server  [experimental] Run the app server or related tooling\n   app         Launch the Codex desktop app (downloads the macOS installer if missing)\n   completion  Generate shell completion scripts\n@@ -75,9 +75,10 @@\n           - untrusted:  Only run \"trusted\" commands (e.g. ls, cat, sed) without asking for user\n             approval. Will escalate to the user if the model proposes a command that is not in the\n             \"trusted\" set\n-          - on-failure: Run all commands without asking for user approval. Only asks for approval if\n-            a command fails to execute, in which case it will escalate to the user to ask for\n-            un-sandboxed execution\n+          - on-failure: DEPRECATED: Run all commands without asking for user approval. Only asks for\n+            approval if a command fails to execute, in which case it will escalate to the user to\n+            ask for un-sandboxed execution. Prefer `on-request` for interactive runs or `never` for\n+            non-interactive runs\n           - on-request: The model decides when to ask the user for approval\n           - never:      Never ask for user approval Execution failures are immediately returned to\n             the model\n",
+      "stats": {
+        "added_chars": 429,
+        "removed_chars": 376
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+101 −149 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,8 +8,8 @@\n   review      Run a code review non-interactively\n   login       Manage login\n   logout      Remove stored authentication credentials\n-  mcp         [experimental] Run Codex as an MCP server and manage MCP servers\n-  mcp-server  [experimental] Run the Codex MCP server (stdio transport)\n+  mcp         Manage external MCP servers for Codex\n+  mcp-server  Start Codex as an MCP server (stdio)\n   app-server  [experimental] Run the app server or related tooling\n   app         Launch the Codex desktop app (downloads the macOS installer if missing)\n   completion  Generate shell completion scripts\n",
+      "stats": {
+        "added_chars": 101,
+        "removed_chars": 149
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+328 −227 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -60,9 +60,10 @@\n           - untrusted:  Only run \"trusted\" commands (e.g. ls, cat, sed) without asking for user\n             approval. Will escalate to the user if the model proposes a command that is not in the\n             \"trusted\" set\n-          - on-failure: Run all commands without asking for user approval. Only asks for approval if\n-            a command fails to execute, in which case it will escalate to the user to ask for\n-            un-sandboxed execution\n+          - on-failure: DEPRECATED: Run all commands without asking for user approval. Only asks for\n+            approval if a command fails to execute, in which case it will escalate to the user to\n+            ask for un-sandboxed execution. Prefer `on-request` for interactive runs or `never` for\n+            non-interactive runs\n           - on-request: The model decides when to ask the user for approval\n           - never:      Never ask for user approval Execution failures are immediately returned to\n             the model\n",
+      "stats": {
+        "added_chars": 328,
+        "removed_chars": 227
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp --help"
+      ],
+      "title": "Full help text of `mcp --help` changed (+37 −64 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-[experimental] Run Codex as an MCP server and manage MCP servers\n+Manage external MCP servers for Codex\n \n Usage: codex mcp [OPTIONS] <COMMAND>\n \n",
+      "stats": {
+        "added_chars": 37,
+        "removed_chars": 64
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp -h"
+      ],
+      "title": "Full help text of `mcp -h` changed (+37 −64 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-[experimental] Run Codex as an MCP server and manage MCP servers\n+Manage external MCP servers for Codex\n \n Usage: codex mcp [OPTIONS] <COMMAND>\n \n",
+      "stats": {
+        "added_chars": 37,
+        "removed_chars": 64
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server --help"
+      ],
+      "title": "Full help text of `mcp-server --help` changed (+36 −57 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-[experimental] Run the Codex MCP server (stdio transport)\n+Start Codex as an MCP server (stdio)\n \n Usage: codex mcp-server [OPTIONS]\n \n",
+      "stats": {
+        "added_chars": 36,
+        "removed_chars": 57
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server -h"
+      ],
+      "title": "Full help text of `mcp-server -h` changed (+36 −57 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-[experimental] Run the Codex MCP server (stdio transport)\n+Start Codex as an MCP server (stdio)\n \n Usage: codex mcp-server [OPTIONS]\n \n",
+      "stats": {
+        "added_chars": 36,
+        "removed_chars": 57
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+328 −227 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -60,9 +60,10 @@\n           - untrusted:  Only run \"trusted\" commands (e.g. ls, cat, sed) without asking for user\n             approval. Will escalate to the user if the model proposes a command that is not in the\n             \"trusted\" set\n-          - on-failure: Run all commands without asking for user approval. Only asks for approval if\n-            a command fails to execute, in which case it will escalate to the user to ask for\n-            un-sandboxed execution\n+          - on-failure: DEPRECATED: Run all commands without asking for user approval. Only asks for\n+            approval if a command fails to execute, in which case it will escalate to the user to\n+            ask for un-sandboxed execution. Prefer `on-request` for interactive runs or `never` for\n+            non-interactive runs\n           - on-request: The model decides when to ask the user for approval\n           - never:      Never ask for user approval Execution failures are immediately returned to\n             the model\n",
+      "stats": {
+        "added_chars": 328,
+        "removed_chars": 227
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.agents.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "agents.<name>"
+      ],
+      "title": "New setting: agents.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/skills/loader.rs",
+            "line": 95,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/skills/loader.rs#L95"
+          },
+          {
+            "path": "codex-rs/tui/src/multi_agents.rs",
+            "line": 185,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/tui/src/multi_agents.rs#L185"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.agents.<name>.config_file",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "agents.<name>.config_file"
+      ],
+      "title": "New setting: agents.<name>.config_file",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Path to a role-specific config layer.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.agents.<name>.description",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "agents.<name>.description"
+      ],
+      "title": "New setting: agents.<name>.description",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Human-facing role documentation used in spawn tool guidance.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/custom_prompts.rs",
+            "line": 125,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/custom_prompts.rs#L125"
+          },
+          {
+            "path": "codex-rs/core/src/skills/loader.rs",
+            "line": 501,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/skills/loader.rs#L501"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.apps_mcp_gateway",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.apps_mcp_gateway"
+      ],
+      "title": "New setting: features.apps_mcp_gateway",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 576,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/features.rs#L576"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.js_repl_tools_only",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.js_repl_tools_only"
+      ],
+      "title": "New setting: features.js_repl_tools_only",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 446,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/features.rs#L446"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.multi_agent",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent"
+      ],
+      "title": "New setting: features.multi_agent",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 556,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/features.rs#L556"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.prevent_idle_sleep",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.prevent_idle_sleep"
+      ],
+      "title": "New setting: features.prevent_idle_sleep",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 612,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/features.rs#L612"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.memories",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories"
+      ],
+      "title": "New setting: memories",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Memories subsystem settings.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/memories/mod.rs",
+            "line": 84,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/core/src/memories/mod.rs#L84"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.memories.max_raw_memories_for_global",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.max_raw_memories_for_global"
+      ],
+      "title": "New setting: memories.max_raw_memories_for_global",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum number of recent raw memories retained for global consolidation.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.max_rollout_age_days",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.max_rollout_age_days"
+      ],
+      "title": "New setting: memories.max_rollout_age_days",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum age of the threads used for memories.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.max_rollouts_per_startup",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.max_rollouts_per_startup"
+      ],
+      "title": "New setting: memories.max_rollouts_per_startup",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum number of rollout candidates processed per pass.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.min_rollout_idle_hours",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.min_rollout_idle_hours"
+      ],
+      "title": "New setting: memories.min_rollout_idle_hours",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Minimum idle time between last thread activity and memory creation (hours). > 12h recommended.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.phase_1_model",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.phase_1_model"
+      ],
+      "title": "New setting: memories.phase_1_model",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model used for thread summarisation.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.phase_2_model",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.phase_2_model"
+      ],
+      "title": "New setting: memories.phase_2_model",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model used for memory consolidation.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_APP_SERVER_URL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_APP_SERVER_URL"
+      ],
+      "title": "New environment variable: CODEX_APP_SERVER_URL",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_APP_SERVER_URL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 94,
+            "url": "https://github.com/openai/codex/blob/rust-v0.102.0/codex-rs/app-server-test-client/src/lib.rs#L94"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

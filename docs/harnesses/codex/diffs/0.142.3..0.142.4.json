@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.142.3",
+  "to": "0.142.4",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.142.3...rust-v0.142.4"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.142.4",
+    "text": "## Chores\n\n- No user-facing changes were identified for this release.\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.142.3...rust-v0.142.4"
+  },
+  "summary": {
+    "changes": 5,
+    "categories": {
+      "behavior": 1,
+      "binary": 1,
+      "caching": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 4
+    },
+    "undocumented": 5
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns.breakpoints",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "breakpoints"
+      ],
+      "title": "Caching across_turns.breakpoints: [[]] → [[],[],[]]",
+      "impact": "notable",
+      "before": [
+        []
+      ],
+      "after": [
+        [],
+        [],
+        []
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: none → 674",
+      "impact": "notable",
+      "before": null,
+      "after": 674,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.turns",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "turns"
+      ],
+      "title": "Caching across_turns.turns: 1 → 3",
+      "impact": "notable",
+      "before": 1,
+      "after": 3,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox removed",
+      "impact": "notable",
+      "before": {
+        "approval": "never",
+        "model": "gpt-5.5",
+        "models": [
+          "gpt-5.5"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.reqwest",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "reqwest"
+      ],
+      "title": "Binary sdk.reqwest: 0.12.28 → 0.13.4",
+      "impact": "informational",
+      "before": "0.12.28",
+      "after": "0.13.4",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

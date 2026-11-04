@@ -1,0 +1,535 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.263",
+  "to": "2.1.265",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `user.email` and `user.groups` to the telemetry Claude Desktop and Cowork send through a Claude apps gateway, matching terminal sessions\n- Added support for pointing `--plugin-dir` at a folder of plugins: each child folder with a manifest loads, and children added or removed while running are picked up\n- Added a 1 GB cap on tool results saved to disk; the in-conversation preview says when a saved file was truncated\n- Fixed resuming a foreground-spawned subagent changing its tool list and system prompt prefix, which broke prompt-cache reuse for that agent\n- Fixed agent teammates and resumed subagents moving SubagentStart hook context and preloaded skills out of the prompt prefix on later turns, which broke prompt-cache reuse\n- Fixed resume after the previous process died while a tool was running: the last prompt is no longer rewritten, and the interrupted tool call is kept and marked interrupted\n- Fixed `/model opusplan[1m]` being rejected with \"Model not found\"\n- Fixed syntax-highlighted code in permission prompts and messages sometimes omitting a character after a Ruby `?`, Erlang `$`, or Perl `$` sigil\n- Fixed the fullscreen transcript jumping by one row whenever the slash-command or @-file suggestion list opened or closed\n- Fixed a plugin path containing a backslash bypassing the symlink containment check on macOS and Linux\n- Fixed plugin directories whose names begin with two dots being wrongly refused as outside the plugin root\n- Fixed VS Code and SDK sessions occasionally requiring re-login when a session was closed while refreshing its token\n- Fixed Remote Control sessions sending the end-of-turn signal before the reply's last message, which could show a reply as finished in the Claude app before its last part arrived\n- Fixed background (`--bg`) sessions occasionally being retired mid-turn when a message arrived just before the idle timeout\n- Fixed Claude Code's own git status and diff probes running clean filters configured by a nested repository inside the working tree\n- Fixed the advisor tool and its instructions being re-decided per request from the request's model; the decision is now made once and announced in the conversation when it changes\n- Fixed artifact publish accepting connector tool names the connector doesn't expose; the publish is now refused when none of the declared tools exist, and warned when only some don't\n- Fixed `/add-dir <subdirectory>` refusing to load a subdirectory's agents when managed settings lock only skills to plugins, and promising agents when only agents are locked\n- Fixed two-key keyboard shortcuts cancelling silently when the second key arrived more than a second later, as happens inside tmux; they now wait 3 seconds and show a notice when they time out\n- Fixed forked skills (`context: fork`) not streaming their kickoff prompt and, with `--forward-subagent-text`, their text turns as progress events in stream-json\n- Fixed a plugin's default component folder that the OS cannot check, such as a symlink loop, being silently skipped; it is now reported in `/plugin` with the error code\n- Fixed the Claude apps gateway's OTLP telemetry relay pausing all forwarding to a collector for 30 seconds after it rejected a few payloads as malformed or too large\n- Fixed `/plugin` Discover/Browse and `claude plugin list --json --available` showing no description or display name for marketplace plugins whose metadata lives only in their `plugin.json`\n- Fixed `/login` showing \"no gateway URL is configured\" when re-run in a session that signed in to a Claude apps gateway set by managed settings\n- Fixed `/model` claiming a model was \"saved as your default\" when the settings file couldn't be written; it now says the save failed and why\n- Fixed `/clear` from Remote Control waiting on SessionStart hooks and on open terminal dialogs before completing\n- Fixed the `/config` dialog changing height when switching between its tabs\n- Fixed resuming a workflow run after its container restarted; a resume whose run journal is missing now fails with a clear error instead of rerunning every agent\n- Fixed the `claude-api` skill's error-code reference: model access failures return 404 and unavailable beta headers return 400, not 403\n- Fixed non-interactive sessions (`-p` with stream-json input, Agent SDK, cloud sessions) resetting the shell working directory at each new user message; a `cd` now persists across turns\n- Fixed MCP servers configured as `http` that only speak the legacy HTTP+SSE transport never connecting; Claude Code now falls back to SSE as the MCP spec describes\n- Fixed some claude.ai connectors in cloud sessions showing as needing authentication even though they are connected in claude.ai (servers that answer an unsupported request with HTTP 401)\n- Fixed remote sessions keeping their sandbox container alive while a connector approval or sign-in link waits for you\n- Fixed resumed sessions showing long model-facing recovery instructions in \"background task didn't finish\" notices instead of a short status line\n- Windows: Fixed Read, Write and Edit refusing every file (\"symlink resolution changed after permission was checked\") when running inside an AppContainer or restricted-token sandbox\n- Improved `--worktree` startup on large repositories: the new worktree is now checked out in parallel (git 2.32+)\n- Improved `/workflows` agent detail: tool calls are marked running, failed or done, the subagent's task list is shown when it has one, and Enter unfolds the listed calls with their inputs and results\n- Improved slash commands typed mid-prompt: matches now show in a list (Tab opens it outside fullscreen) instead of a single suggestion, and a plugin skill is now found by its bare name\n- Improved remote MCP servers that need sign-in: Claude Code no longer registers an OAuth client with them until you actually authenticate\n- Improved the time to resume long sessions that read many files\n- Improved the error shown when an image over the size limits cannot be decoded: it now names the cause and how to fix it instead of only citing the limit\n- Improved the Artifact tool's read of an artifact someone else wrote: the summary now treats the page as untrusted content and flags embedded instructions rather than relaying them\n- Updated the `.claude` folder permission option to say what it actually allows: editing files in the project's `.claude` folder (or `~/.claude`) for the session\n- Changed machines with `forceLoginGatewayUrl` in managed settings to be Claude apps gateway sessions from startup, like `forceLoginMethod: \"gateway\"`; a leftover claude.ai login or API key is not used\n- Changed image processing to use the runtime's built-in image support; the CLI no longer extracts a native image module to the temp directory\n- Changed plugin display metadata to prefer the marketplace entry over `plugin.json` on the Installed tab and `claude plugin details`, filling gaps from `plugin.json`\n- Changed Claude apps gateway sessions to export OpenTelemetry directly to a collector the gateway's managed settings name in `OTEL_EXPORTER_OTLP_ENDPOINT`, instead of through the gateway's relay; sessions without a named collector still use the relay\n- [VSCode] Added automatic archiving of sessions inactive for a set period (new \"Archive inactive sessions\" setting, default 14 days)\n- [VSCode] Fixed the sidebar chat coming back blank after Reload Window or a restart when the conversation had been open for more than 10 minutes\n- [VSCode] Fixed the timeline dot sitting below the text on the \"Remote Control is active\" message"
+  },
+  "summary": {
+    "changes": 24,
+    "categories": {
+      "behavior": 2,
+      "caching": 1,
+      "cli": 8,
+      "config": 12,
+      "hooks": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 14,
+      "notable": 10
+    },
+    "undocumented": 14
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 834 → 1255",
+      "impact": "notable",
+      "before": 834,
+      "after": 1255,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction_command.prompt",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "prompt"
+      ],
+      "title": "Behaviour: compaction_command prompt changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,10 @@\n+<system-reminder>\n+Attribution for git commits and pull requests you create from here on (this replaces any earlier attribution guidance):\n+- End git commit messages with:\n+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n+- End pull request descriptions with:\n+🤖 Generated with [Claude Code](https://claude.com/claude-code)\n+</system-reminder>\n <prompt-2>\n Continue from where you left off.\n CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.\n",
+      "stats": {
+        "added_chars": 340,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.2.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 2 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -26,15 +26,3 @@\n - For clear communication with the user the assistant MUST avoid using emojis.\n - Do not use a colon before tool calls. Text like \"Let me read the file:\" followed by a read tool call should just be \"Let me read the file.\" with a period.\n - Do NOT Write report/summary/findings/analysis .md files. Return findings directly as your final assistant message — the parent agent reads your text output, not files you create. (Files written as input to another tool are fine; this note is about report files.)\n-\n-Here is useful information about the environment you are running in:\n-<env>\n-Working directory: <repo>\n-Is directory a git repo: Yes\n-Platform: darwin\n-Shell: zsh\n-OS Version: Darwin <os-release>\n-</env>\n-You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n-\n-Assistant knowledge cutoff is May 2026.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 324
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostModelSwitch.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "PostModelSwitch hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude.options.--fallback-model.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--fallback-model",
+        "description"
+      ],
+      "title": "`claude --fallback-model`: description changed (+208 −234 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Enable automatic fallback to specified model(s) when the default model is overloaded or not available. Accepts a comma-separated list to try each in order. Re-tries the primary at the start of each user turn. (only works with --print)\n+Enable automatic fallback to specified model(s) when the default model is overloaded or not available. Accepts a comma-separated list to try each in order. Re-tries the primary at the start of each user turn.\n",
+      "stats": {
+        "added_chars": 208,
+        "removed_chars": 234
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--plugin-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--plugin-dir",
+        "description"
+      ],
+      "title": "`claude --plugin-dir`: description changed (+146 −108 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Load a plugin from a directory or .zip for this session only (repeatable: --plugin-dir A --plugin-dir B.zip)\n+Load a plugin from a directory or .zip for this session only; a folder of plugins loads each child (repeatable: --plugin-dir A --plugin-dir B.zip)\n",
+      "stats": {
+        "added_chars": 146,
+        "removed_chars": 108
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--system-prompt-snapshot.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--system-prompt-snapshot",
+        "description"
+      ],
+      "title": "`claude --system-prompt-snapshot`: description changed (+487 −521 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,4 @@\n-Record the system prompt once per conversation and reuse it verbatim on every request and resume (recommended: on).\n-By default it is on for the built-in prompt, and passing --system-prompt or --append-system-prompt turns it off so the given text applies fresh each launch.\n-on: an existing record in the conversation is sent as-is (a later launch's different --system-prompt/--append-system-prompt is ignored until compaction); otherwise the prompt is rendered with the append included, sent, and recorded.\n-off: never record.\n+Record the system prompt once per conversation and reuse it verbatim on every request and resume.\n+on (the default): the prompt is rendered on the conversation's first request — a --system-prompt or --append-system-prompt included — sent, and recorded; every later request and resume sends the record as-is, even when a later launch passes different text, until the conversation is compacted.\n+off: never record; the prompt is rendered fresh every request (for iterating on prompt text).\n No effect where system-prompt recording is not yet enabled.\n",
+      "stats": {
+        "added_chars": 487,
+        "removed_chars": 521
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude agents.options.--plugin-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--plugin-dir",
+        "description"
+      ],
+      "title": "`claude agents --plugin-dir`: description changed (+131 −93 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Load plugins from specified directory for the agent view and dispatched sessions (repeatable)\n+Load plugins from specified directory for the agent view and dispatched sessions; a folder of plugins loads each child (repeatable)\n",
+      "stats": {
+        "added_chars": 131,
+        "removed_chars": 93
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude import.arguments.source.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude import",
+        "arguments",
+        "source",
+        "description"
+      ],
+      "title": "`claude import source`: description changed",
+      "impact": "informational",
+      "before": "Which agent to import from (codex, gemini)",
+      "after": "Which agent to import from (codex, gemini, cursor)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1198 −1299 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -89,8 +89,7 @@\n                                         overloaded or not available. Accepts a\n                                         comma-separated list to try each in\n                                         order. Re-tries the primary at the start\n-                                        of each user turn. (only works with\n-                                        --print)\n+                                        of each user turn.\n   --file <specs...>                     File resources to download at startup.\n                                         Format: file_id:relative_path (e.g.,\n                                         --file file_abc:doc.txt\n@@ -155,7 +154,8 @@\n                                         (choices: \"host\", \"none\", default:\n                                         \"host\")\n   --plugin-dir <path>                   Load a plugin from a directory or .zip\n-                                        for this session only (repeatable:\n+                                        for this session only; a folder of\n+                                        plugins loads each child (repeatable:\n                                         --plugin-dir A --plugin-dir B.zip)\n                                         (default: [])\n   --plugin-url <url>                    Fetch a plugin .zip from a URL for this\n@@ -225,22 +225,20 @@\n   --system-prompt <prompt>              System prompt to use for the session\n   --system-prompt-snapshot <on|off>     Record the system prompt once per\n                                         conversation and reuse it verbatim on\n-                                        every request and resume (recommended:\n-                                        on). By default it is on for the\n-                                        built-in prompt, and passing\n+                                        every request and resume. on (the\n+                                        default): the prompt is rendered on the\n+                                        conversation's first request — a\n                                         --system-prompt or\n-                                        --append-system-prompt turns it off so\n-                                        the given text applies fresh each\n-                                        launch. on: an existing record in the\n-                                        conversation is sent as-is (a later\n-                                        launch's different\n-                                        --system-prompt/--append-system-prompt\n-                                        is ignored until compaction); otherwise\n-                                        the prompt is rendered with the append\n-                                        included, sent, and recorded. off: never\n-                                        record. No effect where system-prompt\n-                                        recording is not yet enabled. (choices:\n-                                        \"on\", \"off\")\n+                                        --append-system-prompt included — sent,\n+                                        and recorded; every later request and\n+                                        resume sends the record as-is, even when\n+                                        a later launch passes different text,\n+                                        until the conversation is compacted.\n+                                        off: never record; the prompt is\n+                                        rendered fresh every request (for\n+                                        iterating on prompt text). No effect\n+                                        where system-prompt recording is not yet\n+                                        enabled. (choices: \"on\", \"off\")\n   --teleport [session]                  Resume a teleport session, optionally\n                                         specify session ID\n   --tmux                                Create a tmux session for the worktree\n",
+      "stats": {
+        "added_chars": 1198,
+        "removed_chars": 1299
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.agents --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents --help"
+      ],
+      "title": "Full help text of `agents --help` changed (+138 −61 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -32,7 +32,8 @@\n                                         dispatched from agent view\n   --plugin-dir <path>                   Load plugins from specified directory\n                                         for the agent view and dispatched\n-                                        sessions (repeatable)\n+                                        sessions; a folder of plugins loads each\n+                                        child (repeatable)\n   --restricted                          Start dispatched sessions in restricted\n                                         mode\n   --setting-sources <sources>           Comma-separated list of setting sources\n",
+      "stats": {
+        "added_chars": 138,
+        "removed_chars": 61
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.import --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "import --help"
+      ],
+      "title": "Full help text of `import --help` changed (+64 −56 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,7 +3,7 @@\n Import config from another AI coding agent into Claude Code\n \n Arguments:\n-  source      Which agent to import from (codex, gemini)\n+  source      Which agent to import from (codex, gemini, cursor)\n \n Options:\n   --dry-run   Show what would be imported without writing anything\n",
+      "stats": {
+        "added_chars": 64,
+        "removed_chars": 56
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.acceptEdits",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "acceptEdits"
+      ],
+      "title": "Setting permissions.defaultMode lost value acceptEdits",
+      "impact": "notable",
+      "before": "acceptEdits",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting permissions.defaultMode lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.bypassPermissions",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "bypassPermissions"
+      ],
+      "title": "Setting permissions.defaultMode lost value bypassPermissions",
+      "impact": "notable",
+      "before": "bypassPermissions",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.default",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "default"
+      ],
+      "title": "Setting permissions.defaultMode lost value default",
+      "impact": "notable",
+      "before": "default",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.dontAsk",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "dontAsk"
+      ],
+      "title": "Setting permissions.defaultMode lost value dontAsk",
+      "impact": "notable",
+      "before": "dontAsk",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.plan",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "plan"
+      ],
+      "title": "Setting permissions.defaultMode lost value plan",
+      "impact": "notable",
+      "before": "plan",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.policyHelpers.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "policyHelpers",
+        "description"
+      ],
+      "title": "policyHelpers description changed (+354 −50 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n @internal Per-OS variant of policyHelper, keyed by platform: macos, linux, windows, wsl, plus an optional \"default\" entry that is a STATIC settings payload (a JSON object of managed settings, not a helper).\n Each per-OS entry carries a helper — a \"path\", or an inline \"script\" + \"interpreter\" delivered to a fixed interpreter over stdin, either with timeoutMs/refreshIntervalMs — its own static \"defaultSettings\" payload, or both; an entry may be payload-only.\n Selection for a platform walks its chain (the platform's own entry; on wsl the linux entry next): the first helper on the chain wins over policyHelper; if no helper is configured — or the selected helper fails at startup or refresh — the first payload applies (the chain's \"defaultSettings\" in platform-specific-first order, then the top-level \"default\", applied with no process spawned; unrecognized platforms reach only \"default\"); with no payload either, policyHelper.\n-Honored only from admin-controlled policy sources.\n+Honored from admin-controlled policy sources, and from remote managed settings — a payload of plain policy as delivered, like any other remote key; a helper, or a payload carrying anything the managed-settings approval dialog lists, only once the settings are verified this session and approved there (policyHelper itself is never honored from remote).\n",
+      "stats": {
+        "added_chars": 354,
+        "removed_chars": 50
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_DB_STR_REPLACE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_DB_STR_REPLACE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_DB_STR_REPLACE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_DB_STR_REPLACE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_FIVE_CLASS_ASKS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_FIVE_CLASS_ASKS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_FIVE_CLASS_ASKS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_FIVE_CLASS_ASKS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_AWAITING_USER_IDLE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_AWAITING_USER_IDLE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_AWAITING_USER_IDLE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_AWAITING_USER_IDLE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TETHER_LIVE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TETHER_LIVE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TETHER_LIVE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TETHER_LIVE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MODIFIERS_NODE_PATH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "MODIFIERS_NODE_PATH"
+      ],
+      "title": "Environment variable no longer read: MODIFIERS_NODE_PATH",
+      "impact": "informational",
+      "before": "MODIFIERS_NODE_PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

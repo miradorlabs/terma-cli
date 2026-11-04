@@ -1,0 +1,6070 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.318",
+      "released_at": "2026-11-03T21:55:17.247Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.317",
+      "changes": 26,
+      "categories": {
+        "config": 26
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 26,
+        "notable": 0
+      },
+      "undocumented": 26,
+      "highlights": [
+        "attributionProject description changed (+179 −139 chars)",
+        "attributionProjectPolicy.default description changed (+185 −145 chars)",
+        "cleanupPeriodDays description changed (+276 −198 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.317",
+      "released_at": "2026-11-02T23:57:53.069Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.316",
+      "changes": 49,
+      "categories": {
+        "config": 1,
+        "prompt": 2,
+        "telemetry": 46
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 47,
+        "notable": 2
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Interactive system prompt changed (+265 −188 chars)",
+        "System prompt changed (+265 −188 chars)",
+        "New telemetry field: anthropic.custom_base_url on logs/api_request"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "pi",
+      "name": "Pi",
+      "version": "1.5.0",
+      "released_at": "2026-11-02T11:05:09.564Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.4.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.316",
+      "released_at": "2026-10-31T00:42:05.743Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.315",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.315",
+      "released_at": "2026-10-30T21:05:24.08Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.314",
+      "changes": 23,
+      "categories": {
+        "binary": 1,
+        "config": 19,
+        "hooks": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 3
+      },
+      "undocumented": null,
+      "highlights": [
+        "Interactive system prompt changed (+0 −94 chars)",
+        "System prompt changed (+0 −94 chars)",
+        "SessionEnd hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.314",
+      "released_at": "2026-10-30T00:12:56.911Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.312",
+      "changes": 18,
+      "categories": {
+        "cli": 3,
+        "config": 11,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 4
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Injected context changed (+0 −49 chars)",
+        "Interactive session's injected context changed (+0 −49 chars)",
+        "Interactive system prompt changed (+188 −49 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.166.0",
+      "released_at": "2026-10-29T19:56:19.746Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.165.0",
+      "changes": 63,
+      "categories": {
+        "cli": 18,
+        "config": 24,
+        "telemetry": 21
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 2,
+        "informational": 44,
+        "notable": 17
+      },
+      "undocumented": 24,
+      "highlights": [
+        "Telemetry surface no longer sent: traces/handle_tool_call_with_source/events/codex.tool_result_ready",
+        "Telemetry surface no longer sent: traces/thread/read",
+        "Flag removed: `codex queue --add-dir`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "dsh",
+      "name": "DeepSeek Harness",
+      "version": "0.2.1-rc.5",
+      "released_at": "2026-10-29T14:15:23.355Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.1-rc.2",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.5",
+      "released_at": "2026-10-28T06:17:11.1Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.4",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.66.0",
+      "released_at": "2026-10-27T20:30:04.263Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.65.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.165.0",
+      "released_at": "2026-10-27T20:14:25.378Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.164.0",
+      "changes": 11,
+      "categories": {
+        "config": 9,
+        "telemetry": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 1,
+        "informational": 10,
+        "notable": 0
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Telemetry surface no longer sent: traces/codex.turn_input/events/event otel/src/events/session_telemetry.rs",
+        "New telemetry surface: traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs (18 fields)",
+        "New setting: auto_review.timeout_ms"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.312",
+      "released_at": "2026-10-27T18:36:10.16Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.311",
+      "changes": 6,
+      "categories": {
+        "config": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 0
+      },
+      "undocumented": 6,
+      "highlights": [
+        "sandbox.credentials.envVars[].name description changed (+26 −0 chars)",
+        "sandbox.credentials.files[].path description changed (+82 −212 chars)",
+        "New environment variable: CLAUDE_CODE_HOST_GUARDS_ARTIFACTS_MCP"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.311",
+      "released_at": "2026-10-26T19:47:57.395Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.310",
+      "changes": 11,
+      "categories": {
+        "binary": 1,
+        "cli": 3,
+        "config": 1,
+        "network": 2,
+        "prompt": 2,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 5
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Injected context changed (+689 −492 chars)",
+        "Interactive session's injected context changed (+689 −492 chars)",
+        "Bash tool description changed (+392 −235 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.310",
+      "released_at": "2026-10-23T21:20:46.54Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.309",
+      "changes": 12,
+      "categories": {
+        "config": 6,
+        "network": 2,
+        "prompt": 2,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 6
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Injected context changed (+7 −0 chars)",
+        "Interactive session's injected context changed (+7 −0 chars)",
+        "Bash tool description changed (+362 −279 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.164.0",
+      "released_at": "2026-10-23T04:52:29.24Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.163.0",
+      "changes": 89,
+      "categories": {
+        "behavior": 7,
+        "binary": 1,
+        "cli": 18,
+        "config": 59,
+        "telemetry": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 1,
+        "informational": 75,
+        "notable": 13
+      },
+      "undocumented": 52,
+      "highlights": [
+        "Telemetry surface no longer sent: traces/list_skills",
+        "Behaviour: compaction tools changed: 0 → 11",
+        "Behaviour: subagents system 4 text changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.309",
+      "released_at": "2026-10-22T20:34:13.713Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.308",
+      "changes": 16,
+      "categories": {
+        "cli": 4,
+        "config": 10,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 2
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Bash tool description changed (+281 −0 chars)",
+        "Usage of `claude ultrareview` removed",
+        "New flag `claude ultrareview --trust-workspace`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.4",
+      "released_at": "2026-10-22T13:03:43.704Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.3",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.308",
+      "released_at": "2026-10-22T04:19:48.902Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.307",
+      "changes": 3,
+      "categories": {
+        "config": 2,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "New environment variable: BUN_ENV",
+        "Environment variable no longer read: BUN_ENVprocess",
+        "On-disk telemetry added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "pi",
+      "name": "Pi",
+      "version": "1.4.0",
+      "released_at": "2026-10-21T22:48:58.431Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.3.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.307",
+      "released_at": "2026-10-21T20:47:18.383Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.306",
+      "changes": 21,
+      "categories": {
+        "config": 19,
+        "request": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 6
+      },
+      "undocumented": 17,
+      "highlights": [
+        "Agent tool description changed (+1639 −410 chars)",
+        "Beta dropped: prompt-caching-scope-2026-01-05",
+        "Setting no longer read: command"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.306",
+      "released_at": "2026-10-21T02:28:47.495Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.305",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.65.0",
+      "released_at": "2026-10-20T21:26:34.492Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.64.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.305",
+      "released_at": "2026-10-20T19:29:36.816Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.304",
+      "changes": 19,
+      "categories": {
+        "config": 19
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 3
+      },
+      "undocumented": 15,
+      "highlights": [
+        "New setting: attributionProjectPolicy",
+        "Setting policyHelper.refreshIntervalMs lost value 60000",
+        "Setting policyHelper.timeoutMs lost value 1000"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.304",
+      "released_at": "2026-10-19T19:47:15.337Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.303",
+      "changes": 93,
+      "categories": {
+        "behavior": 12,
+        "cli": 9,
+        "config": 17,
+        "hooks": 24,
+        "prompt": 17,
+        "request": 1,
+        "tools": 13
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 31,
+        "notable": 62
+      },
+      "undocumented": 39,
+      "highlights": [
+        "Injected context changed (+627 −268 chars)",
+        "Interactive session's injected context changed (+652 −268 chars)",
+        "Interactive system prompt added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.303",
+      "released_at": "2026-10-18T21:15:23.178Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.302",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "dsh",
+      "name": "DeepSeek Harness",
+      "version": "0.2.1-rc.2",
+      "released_at": "2026-10-17T08:36:31.655Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.0-rc.2",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.302",
+      "released_at": "2026-10-16T16:48:28.057Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.301",
+      "changes": 21,
+      "categories": {
+        "binary": 2,
+        "config": 6,
+        "model": 1,
+        "prompt": 1,
+        "request": 3,
+        "support": 4,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 9,
+        "notable": 12
+      },
+      "undocumented": 13,
+      "highlights": [
+        "Model parameter safeguards removed",
+        "Injected context changed (+0 −476 chars)",
+        "Agent tool description changed (+609 −282 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.3",
+      "released_at": "2026-10-16T12:32:00.28Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.2",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.2",
+      "released_at": "2026-10-16T02:29:31.737Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.1",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.163.0",
+      "released_at": "2026-10-15T21:37:11.083Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.162.1",
+      "changes": 69,
+      "categories": {
+        "binary": 1,
+        "caching": 1,
+        "cli": 9,
+        "config": 53,
+        "telemetry": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 62,
+        "notable": 7
+      },
+      "undocumented": 48,
+      "highlights": [
+        "Caching across_turns.stable_prefix_chars: 996 → 552",
+        "New setting: features.credential_masking",
+        "New setting: features.guardian_trust_orchestrator_connectors"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.1",
+      "released_at": "2026-10-15T19:20:16.648Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "pi",
+      "name": "Pi",
+      "version": "1.3.0",
+      "released_at": "2026-10-15T19:13:30.662Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.2.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.301",
+      "released_at": "2026-10-15T14:34:23.33Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "unsupported",
+      "previous": "2.1.300",
+      "changes": 8,
+      "categories": {
+        "config": 4,
+        "support": 4
+      },
+      "impact": {
+        "breaking": 4,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Terma: Prompts and tool content withheld when the project says so now fails on linux/amd64",
+        "Terma: A session resumed outside the repository stays out now fails on linux/amd64",
+        "Terma: Telemetry reaches the project through the local relay now fails on linux/amd64"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.300",
+      "released_at": "2026-10-14T14:27:26.554Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.299",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "config": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 0
+      },
+      "undocumented": 5,
+      "highlights": [
+        "`claude --restricted`: description changed (+308 −314 chars)",
+        "Full help text of `--help` changed (+966 −972 chars)",
+        "New environment variable: CLAUDE_CODE_ATTACHMENTS_BY_PATH"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.299",
+      "released_at": "2026-10-14T00:23:19.588Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.296",
+      "changes": 39,
+      "categories": {
+        "config": 35,
+        "network": 2,
+        "request": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 32,
+        "notable": 7
+      },
+      "undocumented": 32,
+      "highlights": [
+        "CronCreate tool description changed (+400 −202 chars)",
+        "Beta dropped: mid-conversation-system-2026-04-07",
+        "Setting no longer read: entries"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.64.0",
+      "released_at": "2026-10-13T20:48:24.183Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.63.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.0",
+      "released_at": "2026-10-11T01:38:53.143Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.18.35",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.162.1",
+      "released_at": "2026-10-09T19:50:30.512Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.162.0",
+      "changes": 193,
+      "categories": {
+        "cli": 2,
+        "telemetry": 191
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 193,
+        "notable": 0
+      },
+      "undocumented": 191,
+      "highlights": [
+        "New telemetry surface: logs/codex.api_request (19 fields)",
+        "New telemetry surface: logs/codex.conversation_starts (19 fields)",
+        "New telemetry surface: logs/codex.sse_event (19 fields)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.296",
+      "released_at": "2026-10-09T16:58:10.924Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.295",
+      "changes": 25,
+      "categories": {
+        "config": 23,
+        "model": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 14
+      },
+      "undocumented": 20,
+      "highlights": [
+        "Built-in price for claude-sonnet-5-5 changed",
+        "Read tool parameter allow_large added",
+        "Setting no longer read: detail"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.162.0",
+      "released_at": "2026-10-08T19:01:18.07Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.161.0",
+      "changes": 31,
+      "categories": {
+        "behavior": 1,
+        "cli": 8,
+        "config": 17,
+        "prompt": 1,
+        "telemetry": 2,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 24,
+        "notable": 7
+      },
+      "undocumented": 16,
+      "highlights": [
+        "System prompt changed (+201 −230 chars)",
+        "exec tool description changed (+3383 −0 chars)",
+        "collaboration/spawn_agent tool parameter fork_turns: description changed (+126 −148 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.295",
+      "released_at": "2026-10-08T18:22:58.621Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.294",
+      "changes": 31,
+      "categories": {
+        "config": 27,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 10
+      },
+      "undocumented": 25,
+      "highlights": [
+        "Injected context changed (+268 −249 chars)",
+        "Interactive session's injected context changed (+268 −249 chars)",
+        "Interactive system prompt changed (+97 −78 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.294",
+      "released_at": "2026-10-08T03:42:57.084Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.293",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.293",
+      "released_at": "2026-10-07T17:18:04.464Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.292",
+      "changes": 12,
+      "categories": {
+        "config": 6,
+        "hooks": 1,
+        "model": 3,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 5
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Model alias \"haiku\": claude-haiku-4-5-20251001 → claude-haiku-5-5",
+        "Built-in price for claude-haiku-4-5-20251001 removed",
+        "Built-in price for claude-haiku-5-5 added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.161.0",
+      "released_at": "2026-10-07T16:04:02.844Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.160.1",
+      "changes": 22,
+      "categories": {
+        "binary": 1,
+        "cli": 3,
+        "config": 17,
+        "support": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 18,
+        "notable": 4
+      },
+      "undocumented": 12,
+      "highlights": [
+        "New setting: features.api_key_cyber_access_programs",
+        "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"hide\":null,\"new_… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
+        "Default of tui.keymap.agents: {\"archive\":null,\"delete\":null,\"hide\":null,\"new_task\":null… → {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne…"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.63.0",
+      "released_at": "2026-10-06T20:58:43.642Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.62.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.18.35",
+      "released_at": "2026-10-06T20:21:30.784Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.18.34",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.292",
+      "released_at": "2026-10-06T17:10:31.715Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.291",
+      "changes": 8,
+      "categories": {
+        "config": 5,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 3
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Agent tool parameter effort added",
+        "Bash tool description changed (+279 −280 chars)",
+        "Bash tool parameter run_in_background: description changed (+181 −182 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.291",
+      "released_at": "2026-10-06T03:32:36.856Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.290",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.160.1",
+      "released_at": "2026-10-05T18:33:51.98Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "unsupported",
+      "previous": "0.160.0",
+      "changes": 3,
+      "categories": {
+        "cli": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Description of `codex cloud` changed",
+        "Full help text of `cloud --help` changed (+0 −88 chars)",
+        "Full help text of `login -h` changed (+0 −105 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.290",
+      "released_at": "2026-10-05T18:12:44.907Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.289",
+      "changes": 39,
+      "categories": {
+        "cli": 8,
+        "config": 27,
+        "prompt": 2,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 33,
+        "notable": 6
+      },
+      "undocumented": 32,
+      "highlights": [
+        "Injected context changed (+841 −379 chars)",
+        "Interactive session's injected context changed (+841 −379 chars)",
+        "TaskStop tool description changed (+84 −98 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.289",
+      "released_at": "2026-10-03T20:12:02.717Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.288",
+      "changes": 6,
+      "categories": {
+        "config": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 0
+      },
+      "undocumented": 6,
+      "highlights": [
+        "enabledPlugins.<name>.serverCommand description changed (+75 −75 chars)",
+        "enabledPlugins.<name>.serverName description changed (+49 −58 chars)",
+        "enabledPlugins.<name>.serverUrl description changed (+98 −98 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.288",
+      "released_at": "2026-10-02T18:30:40.093Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.287",
+      "changes": 19,
+      "categories": {
+        "binary": 1,
+        "cli": 6,
+        "config": 9,
+        "prompt": 2,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 4
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Injected context changed (+147 −0 chars)",
+        "Interactive session's injected context changed (+147 −0 chars)",
+        "Command removed: `claude project`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.160.0",
+      "released_at": "2026-10-01T20:26:19.286Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.159.3",
+      "changes": 10,
+      "categories": {
+        "behavior": 1,
+        "binary": 1,
+        "cli": 3,
+        "config": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 9,
+        "notable": 1
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Behaviour: subagents added",
+        "Description of `codex cloud` changed",
+        "Full help text of `cloud --help` changed (+88 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.287",
+      "released_at": "2026-10-01T16:59:25.986Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.286",
+      "changes": 10,
+      "categories": {
+        "cli": 2,
+        "config": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 2
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Flag removed: `claude --client-data-url`",
+        "Setting blockedMarketplaces[].source lost value url",
+        "Full help text of `--help` changed (+0 −437 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.159.3",
+      "released_at": "2026-09-30T23:02:02.182Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.159.2",
+      "changes": 2,
+      "categories": {
+        "behavior": 1,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 1
+      },
+      "undocumented": 2,
+      "highlights": [
+        "Behaviour: subagents removed",
+        "UserPromptSubmit hook control (exit_2) added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.286",
+      "released_at": "2026-09-30T17:14:38.859Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.285",
+      "changes": 15,
+      "categories": {
+        "cli": 2,
+        "config": 10,
+        "network": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 3
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Injected context changed (+249 −0 chars)",
+        "Interactive session's injected context changed (+249 −0 chars)",
+        "New network request: POST api.anthropic.com/api/event_logging/v2/batch"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.159.2",
+      "released_at": "2026-09-30T00:03:49.293Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.159.1",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "UserPromptSubmit hook control (exit_2) removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.62.0",
+      "released_at": "2026-09-29T21:25:44.188Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.61.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.159.1",
+      "released_at": "2026-09-29T20:36:58.049Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.159.0",
+      "changes": 14,
+      "categories": {
+        "behavior": 6,
+        "cli": 2,
+        "hooks": 3,
+        "model": 1,
+        "prompt": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 9
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Default model: gpt-6-astra → gpt-6.1-sol",
+        "System prompt changed (+451 −105 chars)",
+        "collaboration/spawn_agent tool description changed (+446 −454 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.285",
+      "released_at": "2026-09-29T17:32:09.173Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.284",
+      "changes": 54,
+      "categories": {
+        "behavior": 4,
+        "binary": 2,
+        "cli": 4,
+        "config": 28,
+        "model": 1,
+        "network": 1,
+        "prompt": 6,
+        "request": 5,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 35,
+        "notable": 19
+      },
+      "undocumented": 32,
+      "highlights": [
+        "Model parameter safeguards added",
+        "Injected context changed (+173 −147 chars)",
+        "Injected context changed (+55 −68 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.159.0",
+      "released_at": "2026-09-29T08:10:59.17Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.158.0",
+      "changes": 13,
+      "categories": {
+        "behavior": 1,
+        "cli": 5,
+        "config": 2,
+        "hooks": 3,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 6
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Injected context changed (+616 −563 chars)",
+        "System prompt changed (+0 −522 chars)",
+        "Behaviour: subagents system 1 text changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.284",
+      "released_at": "2026-09-28T17:11:59.75Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.283",
+      "changes": 25,
+      "categories": {
+        "binary": 1,
+        "cli": 2,
+        "config": 14,
+        "model": 5,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 17,
+        "notable": 8
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Model alias \"opusplan\": claude-sonnet-5 → claude-sonnet-5-5",
+        "Model alias \"sonnet\": claude-sonnet-5 → claude-sonnet-5-5",
+        "Model alias \"sonnet[1m]\": claude-sonnet-5 → claude-sonnet-5-5"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.158.0",
+      "released_at": "2026-09-28T05:12:20.266Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.157.1",
+      "changes": 27,
+      "categories": {
+        "cli": 13,
+        "config": 14
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 25,
+        "notable": 2
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Setting features.guardianv2.thread_context deprecated",
+        "New setting: mcp_servers.<name>.oauth.client_secret",
+        "`codex app-server --ws-auth`: description changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.157.1",
+      "released_at": "2026-09-26T01:06:57.149Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.157.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.283",
+      "released_at": "2026-09-25T18:46:11.33Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.282",
+      "changes": 18,
+      "categories": {
+        "cli": 2,
+        "config": 15,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 2
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Interactive session's injected context changed (+476 −0 chars)",
+        "New setting: deniedModels",
+        "New flag `claude --client-data-url`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.157.0",
+      "released_at": "2026-09-25T02:35:19.752Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.156.1",
+      "changes": 18,
+      "categories": {
+        "behavior": 2,
+        "config": 12,
+        "hooks": 1,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 8
+      },
+      "undocumented": 12,
+      "highlights": [
+        "System prompt changed (+283 −124 chars)",
+        "System prompt changed (+21 −426 chars)",
+        "collaboration/spawn_agent tool description changed (+145 −156 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.282",
+      "released_at": "2026-09-24T15:56:22.706Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.281",
+      "changes": 17,
+      "categories": {
+        "config": 16,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 2
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Beta dropped: fallback-credit-2026-06-01",
+        "New setting: allowClaudeInChromeWithManagedMcp",
+        "allowManagedPermissionRulesOnly description changed (+403 −104 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.281",
+      "released_at": "2026-09-23T17:01:17.78Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.280",
+      "changes": 20,
+      "categories": {
+        "cli": 3,
+        "config": 15,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 0
+      },
+      "undocumented": 14,
+      "highlights": [
+        "PostToolUse hook payload field tool_response.originalCwdMissing added",
+        "PostToolUse hook payload field tool_response.restoredCwd added",
+        "`claude --agents`: description changed (+177 −126 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.156.1",
+      "released_at": "2026-09-23T02:45:25.21Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.156.0",
+      "changes": 1,
+      "categories": {
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "collaboration/spawn_agent tool description changed (+768 −778 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.156.0",
+      "released_at": "2026-09-22T19:55:37.255Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.155.1",
+      "changes": 88,
+      "categories": {
+        "behavior": 9,
+        "binary": 1,
+        "cli": 13,
+        "config": 63,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 63,
+        "notable": 25
+      },
+      "undocumented": 44,
+      "highlights": [
+        "collaboration/spawn_agent tool description changed (+0 −135 chars)",
+        "Behaviour: compaction added",
+        "Behaviour: sandbox approval added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.280",
+      "released_at": "2026-09-22T15:44:39.443Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.278",
+      "changes": 37,
+      "categories": {
+        "behavior": 2,
+        "cli": 3,
+        "config": 16,
+        "model": 7,
+        "prompt": 7,
+        "request": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 18
+      },
+      "undocumented": 22,
+      "highlights": [
+        "Model alias \"opus\": claude-opus-5 → claude-opus-5-5",
+        "Model alias \"opus[1m]\": claude-opus-5 → claude-opus-5-5",
+        "Default model: claude-opus-5 → claude-opus-5-5"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.278",
+      "released_at": "2026-09-19T01:48:59.758Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.277",
+      "changes": 1,
+      "categories": {
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "On-disk telemetry removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.155.1",
+      "released_at": "2026-09-18T20:09:23.628Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.155.0",
+      "changes": 13,
+      "categories": {
+        "behavior": 9,
+        "cli": 1,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 9
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Behaviour: compaction removed",
+        "Behaviour: sandbox approval removed",
+        "Behaviour: sandbox model removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.277",
+      "released_at": "2026-09-18T16:22:26.548Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.276",
+      "changes": 14,
+      "categories": {
+        "behavior": 1,
+        "config": 8,
+        "hooks": 2,
+        "prompt": 1,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 6
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Interactive system prompt removed",
+        "Tool removed: TaskOutput",
+        "Behaviour: compaction_command tools changed: 24 → 23"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.276",
+      "released_at": "2026-09-18T01:39:31.986Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.275",
+      "changes": 2,
+      "categories": {
+        "behavior": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 2
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Behaviour: compaction_command tools changed: 25 → 24",
+        "Behaviour: subagents tools advisor removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.155.0",
+      "released_at": "2026-09-17T23:19:02.781Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.154.0",
+      "changes": 16,
+      "categories": {
+        "binary": 1,
+        "cli": 1,
+        "config": 13,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 9,
+        "notable": 7
+      },
+      "undocumented": 7,
+      "highlights": [
+        "exec tool description changed (+470 −237 chars)",
+        "New setting: features.api_key_model_discovery",
+        "New setting: features.network_proxy.credentials"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.275",
+      "released_at": "2026-09-17T20:20:31.805Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.274",
+      "changes": 16,
+      "categories": {
+        "behavior": 2,
+        "config": 13,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 4
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Behaviour: compaction_command tools changed: 24 → 25",
+        "Behaviour: subagents tools advisor added",
+        "Setting policyHelper.refreshIntervalMs lost value 60000"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.274",
+      "released_at": "2026-09-16T22:36:09.883Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.273",
+      "changes": 21,
+      "categories": {
+        "cli": 1,
+        "config": 17,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 18,
+        "notable": 3
+      },
+      "undocumented": 17,
+      "highlights": [
+        "Injected context changed (+379 −332 chars)",
+        "Interactive session's injected context changed (+379 −332 chars)",
+        "SendMessage tool description changed (+324 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.273",
+      "released_at": "2026-09-15T18:06:34.098Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.272",
+      "changes": 3,
+      "categories": {
+        "config": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "New environment variable: CLAUDE_CODE_BRIDGE_CHILD_MACHINE_SETTINGS",
+        "New environment variable: CLAUDE_CODE_GATEWAY_HINT_HEADERS",
+        "New environment variable: CLAUDE_CODE_OCHRE_KITE"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.272",
+      "released_at": "2026-09-14T23:34:13.565Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.271",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.271",
+      "released_at": "2026-09-14T19:45:19.456Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.270",
+      "changes": 19,
+      "categories": {
+        "behavior": 4,
+        "caching": 1,
+        "config": 11,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 8
+      },
+      "undocumented": 13,
+      "highlights": [
+        "DesignSync tool description changed (+208 −190 chars)",
+        "SendMessage tool description changed (+728 −180 chars)",
+        "Workflow tool description changed (+275 −275 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.270",
+      "released_at": "2026-09-12T18:52:44.937Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.269",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "PostModelSwitch hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.269",
+      "released_at": "2026-09-11T18:12:49.253Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.268",
+      "changes": 56,
+      "categories": {
+        "behavior": 6,
+        "binary": 1,
+        "caching": 1,
+        "cli": 2,
+        "config": 17,
+        "hooks": 24,
+        "network": 1,
+        "prompt": 3,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 44,
+        "notable": 12
+      },
+      "undocumented": 45,
+      "highlights": [
+        "Injected context changed (+353 −119 chars)",
+        "Interactive session's injected context changed (+353 −119 chars)",
+        "Interactive session's injected context changed (+860 −885 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.268",
+      "released_at": "2026-09-10T18:41:11.77Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.267",
+      "changes": 35,
+      "categories": {
+        "cli": 3,
+        "config": 13,
+        "hooks": 3,
+        "network": 1,
+        "prompt": 12,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 22
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Injected context changed (+457 −207 chars)",
+        "Injected context removed",
+        "Injected context changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.154.0",
+      "released_at": "2026-09-09T22:40:10.746Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.153.4",
+      "changes": 62,
+      "categories": {
+        "behavior": 1,
+        "binary": 1,
+        "cli": 34,
+        "config": 23,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 51,
+        "notable": 11
+      },
+      "undocumented": 22,
+      "highlights": [
+        "Behaviour: compaction added",
+        "PreToolUse hook control (exit_2) removed",
+        "SessionStart hook control (exit_2) removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.267",
+      "released_at": "2026-09-09T18:25:42.82Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.266",
+      "changes": 15,
+      "categories": {
+        "config": 13,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 1
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Bash tool parameter description: description changed (+167 −0 chars)",
+        "PostModelSwitch hook payload field prompt_id added",
+        "New setting: maxEffortLevel"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.266",
+      "released_at": "2026-09-08T23:32:32.88Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.265",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.265",
+      "released_at": "2026-09-08T19:05:16.492Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.263",
+      "changes": 24,
+      "categories": {
+        "behavior": 2,
+        "caching": 1,
+        "cli": 8,
+        "config": 12,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 10
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Caching across_turns.stable_prefix_chars: 834 → 1255",
+        "Behaviour: compaction_command prompt changed",
+        "Behaviour: subagents system 2 text changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.263",
+      "released_at": "2026-09-06T02:07:58.391Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.261",
+      "changes": 1,
+      "categories": {
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "New environment variable: CLAUDE_CODE_POLISHED_DEWDROP"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.153.4",
+      "released_at": "2026-09-04T23:31:18.513Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.153.3",
+      "changes": 21,
+      "categories": {
+        "behavior": 10,
+        "cli": 2,
+        "model": 1,
+        "prompt": 4,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 19
+      },
+      "undocumented": 19,
+      "highlights": [
+        "Default model: gpt-5.6-sol → gpt-6-astra",
+        "System prompt changed (+17916 −14448 chars)",
+        "System prompt changed (+1310 −2230 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.153.3",
+      "released_at": "2026-09-04T19:07:16.079Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.153.2",
+      "changes": 2,
+      "categories": {
+        "cli": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "Description of `codex mcp-server` changed",
+        "Full help text of `mcp-server --help` changed (+88 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.261",
+      "released_at": "2026-09-04T17:49:34.927Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.260",
+      "changes": 7,
+      "categories": {
+        "config": 6,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 1
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Setting keybindingFlavor deprecated",
+        "PostModelSwitch hook payload field prompt_id added",
+        "New setting: bashOutputMaxChars"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.153.2",
+      "released_at": "2026-09-03T23:57:21.074Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.153.1",
+      "changes": 4,
+      "categories": {
+        "caching": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 4
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Caching across_turns.breakpoints: none → [[],[],[]]",
+        "Caching across_turns.stable_cache_key: none → true",
+        "Caching across_turns.stable_prefix_chars: none → 972"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.260",
+      "released_at": "2026-09-03T22:32:02.087Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.259",
+      "changes": 5,
+      "categories": {
+        "cli": 3,
+        "config": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 1
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Usage of `claude rm` removed",
+        "Usage of `claude rm` added",
+        "Full help text of `rm --help` changed (+291 −21 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.153.1",
+      "released_at": "2026-09-03T21:09:57.109Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.153.0",
+      "changes": 8,
+      "categories": {
+        "caching": 4,
+        "hooks": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 4
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Caching across_turns.breakpoints: [[],[],[]] → none",
+        "Caching across_turns.stable_cache_key: true → none",
+        "Caching across_turns.stable_prefix_chars: 972 → none"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.153.0",
+      "released_at": "2026-09-03T01:42:05.774Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.152.1",
+      "changes": 23,
+      "categories": {
+        "cli": 5,
+        "config": 13,
+        "hooks": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 7
+      },
+      "undocumented": 16,
+      "highlights": [
+        "PreToolUse hook control (exit_2) removed",
+        "SessionStart hook control (exit_2) removed",
+        "Stop hook control (exit_2) removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.259",
+      "released_at": "2026-09-02T21:21:42.115Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.258",
+      "changes": 13,
+      "categories": {
+        "cli": 4,
+        "config": 9
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 1
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Default of `claude ultrareview --timeout`: 30 → 45",
+        "New flag `claude --permission-prompts`",
+        "Full help text of `--help` changed (+572 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.152.1",
+      "released_at": "2026-09-01T22:36:50.784Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.152.0",
+      "changes": 5,
+      "categories": {
+        "hooks": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 1
+      },
+      "undocumented": 5,
+      "highlights": [
+        "UserPromptSubmit hook control (json_decision) removed",
+        "PreToolUse hook control (json_decision) added",
+        "SessionStart hook control (additional_context) added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.258",
+      "released_at": "2026-09-01T22:25:07.449Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.257",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "PostModelSwitch hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.257",
+      "released_at": "2026-09-01T17:15:33.223Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.252",
+      "changes": 38,
+      "categories": {
+        "cli": 3,
+        "config": 30,
+        "hooks": 1,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 32,
+        "notable": 6
+      },
+      "undocumented": 21,
+      "highlights": [
+        "Injected context changed (+258 −164 chars)",
+        "Interactive session's injected context changed (+258 −164 chars)",
+        "Interactive system prompt changed (+407 −411 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.152.0",
+      "released_at": "2026-09-01T02:02:46.635Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.151.0",
+      "changes": 18,
+      "categories": {
+        "binary": 1,
+        "cli": 2,
+        "config": 14,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 3
+      },
+      "undocumented": 9,
+      "highlights": [
+        "exec tool description changed (+0 −479 chars)",
+        "Default of tools.update_plan.enabled: true → false",
+        "Default of tui.keymap: {\"agents\":{\"new_task\":null,\"rename\":null,\"search\":null,\"s… → {\"agents\":{\"new_task\":null,\"rename\":null,\"search\":null,\"s…"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.252",
+      "released_at": "2026-08-31T17:07:28.168Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.251",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.151.0",
+      "released_at": "2026-08-29T09:59:26.3Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.150.1",
+      "changes": 34,
+      "categories": {
+        "behavior": 1,
+        "cli": 4,
+        "config": 24,
+        "hooks": 4,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 24,
+        "notable": 10
+      },
+      "undocumented": 34,
+      "highlights": [
+        "System prompt changed (+844 −1075 chars)",
+        "Behaviour: subagents system 1 text changed",
+        "PreToolUse hook control (json_decision) removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.251",
+      "released_at": "2026-08-28T15:34:26.421Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.250",
+      "changes": 45,
+      "categories": {
+        "behavior": 2,
+        "caching": 2,
+        "cli": 14,
+        "config": 18,
+        "hooks": 6,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 36,
+        "notable": 9
+      },
+      "undocumented": 23,
+      "highlights": [
+        "Injected context changed (+302 −0 chars)",
+        "Interactive session's injected context changed (+302 −0 chars)",
+        "Agent tool parameter model: description changed (+357 −256 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.250",
+      "released_at": "2026-08-27T22:27:48.314Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.248",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.248",
+      "released_at": "2026-08-27T20:35:36.671Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.247",
+      "changes": 126,
+      "categories": {
+        "binary": 1,
+        "caching": 4,
+        "cli": 4,
+        "config": 103,
+        "hooks": 1,
+        "prompt": 5,
+        "tools": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 104,
+        "notable": 22
+      },
+      "undocumented": 85,
+      "highlights": [
+        "Injected context added",
+        "Injected context changed (+427 −147 chars)",
+        "Interactive session's injected context added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.150.1",
+      "released_at": "2026-08-27T02:01:46.851Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.150.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.150.0",
+      "released_at": "2026-08-26T19:43:31.702Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.149.1",
+      "changes": 68,
+      "categories": {
+        "behavior": 1,
+        "binary": 1,
+        "cli": 2,
+        "config": 62,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 57,
+        "notable": 11
+      },
+      "undocumented": 45,
+      "highlights": [
+        "collaboration/spawn_agent tool description changed (+157 −146 chars)",
+        "Behaviour: sandbox requests changed: 1 → 2",
+        "New hook event: Interrupt"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.247",
+      "released_at": "2026-08-26T18:02:01.046Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.246",
+      "changes": 12,
+      "categories": {
+        "config": 12
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 1
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Setting modelProposedGoals lost value 16",
+        "Setting fileSuggestion.type gained value command",
+        "spinnerTipsOverride description changed (+264 −115 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.246",
+      "released_at": "2026-08-25T19:17:34.421Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.245",
+      "changes": 31,
+      "categories": {
+        "binary": 2,
+        "config": 26,
+        "network": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 25,
+        "notable": 6
+      },
+      "undocumented": 31,
+      "highlights": [
+        "Injected context changed (+455 −0 chars)",
+        "Interactive session's injected context changed (+455 −0 chars)",
+        "Setting modelSettings lost value /"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.245",
+      "released_at": "2026-08-25T04:45:52.102Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.243",
+      "changes": 2,
+      "categories": {
+        "config": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "New environment variable: BUN_FEEDBACK_URL",
+        "New environment variable: BUN_INSTALL"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.243",
+      "released_at": "2026-08-24T23:10:45.498Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.242",
+      "changes": 1,
+      "categories": {
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Environment variable no longer read: ENABLE_LSP_TOOL"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.242",
+      "released_at": "2026-08-24T19:16:14.767Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.241",
+      "changes": 102,
+      "categories": {
+        "binary": 1,
+        "config": 99,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 91
+      },
+      "undocumented": null,
+      "highlights": [
+        "ScheduleWakeup tool description changed (+462 −0 chars)",
+        "ScheduleWakeup tool parameter noop added",
+        "Setting askUserQuestionTimeout lost value 60s"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.149.1",
+      "released_at": "2026-08-24T00:32:45.066Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.149.0",
+      "changes": 8,
+      "categories": {
+        "cli": 7,
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 0
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Description of `codex agents` changed",
+        "New flag `codex exec --thread-source`",
+        "Description of `codex mcp` changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.241",
+      "released_at": "2026-08-22T23:58:33.046Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.240",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.240",
+      "released_at": "2026-08-22T13:03:23.566Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.239",
+      "changes": 4,
+      "categories": {
+        "config": 2,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+        "New environment variable: CLAUDE_CODE_SABLE_THRUSH"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.239",
+      "released_at": "2026-08-21T17:18:54.506Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.238",
+      "changes": 10,
+      "categories": {
+        "config": 4,
+        "hooks": 1,
+        "model": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 5
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Built-in price for claude-sonnet-5 changed",
+        "Built-in price for claude-sonnet-5 changed",
+        "Built-in price for claude-sonnet-5 changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.149.0",
+      "released_at": "2026-08-20T21:09:05.284Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.148.0",
+      "changes": 57,
+      "categories": {
+        "behavior": 3,
+        "binary": 2,
+        "cli": 22,
+        "config": 28,
+        "request": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 45,
+        "notable": 12
+      },
+      "undocumented": 28,
+      "highlights": [
+        "No longer sends identifier header:authorization",
+        "Behaviour: subagents system 3 text changed",
+        "Behaviour: subagents system 4 text changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.238",
+      "released_at": "2026-08-20T18:01:54.712Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.237",
+      "changes": 16,
+      "categories": {
+        "cli": 3,
+        "config": 10,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 3
+      },
+      "undocumented": 14,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+        "SessionEnd hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.237",
+      "released_at": "2026-08-19T23:57:54.833Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.236",
+      "changes": 9,
+      "categories": {
+        "caching": 4,
+        "config": 1,
+        "hooks": 2,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 6
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Injected context removed",
+        "Interactive session's injected context removed",
+        "Caching across_turns.breakpoints: [[\"messages[1].content[0]\",\"system[1]\",\"system[2]\"],[\"mes… → [[\"messages[0].content[1]\",\"system[1]\",\"system[2]\"],[\"mes…"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.236",
+      "released_at": "2026-08-19T18:45:14.539Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.235",
+      "changes": 10,
+      "categories": {
+        "config": 8,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 2
+      },
+      "undocumented": 9,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+        "New environment variable: ANTHROPIC_DEFAULT_MODEL"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.148.0",
+      "released_at": "2026-08-18T22:30:14.842Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.147.0",
+      "changes": 122,
+      "categories": {
+        "behavior": 3,
+        "caching": 1,
+        "cli": 37,
+        "config": 71,
+        "hooks": 8,
+        "prompt": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 104,
+        "notable": 18
+      },
+      "undocumented": 63,
+      "highlights": [
+        "System prompt changed (+429 −553 chars)",
+        "exec tool description changed (+98 −98 chars)",
+        "Caching across_turns.stable_prefix_chars: 1191 → 909"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.235",
+      "released_at": "2026-08-18T18:24:10.21Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.234",
+      "changes": 6,
+      "categories": {
+        "cli": 2,
+        "config": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Description of `claude plugin eval` changed",
+        "Full help text of `plugin --help` changed (+675 −530 chars)",
+        "New setting: spellcheck"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.234",
+      "released_at": "2026-08-17T18:19:13.187Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.233",
+      "changes": 29,
+      "categories": {
+        "config": 11,
+        "hooks": 16,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 27,
+        "notable": 2
+      },
+      "undocumented": 23,
+      "highlights": [
+        "SendMessage tool parameter to: allOf added",
+        "SendMessage tool parameter to: pattern removed",
+        "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.233",
+      "released_at": "2026-08-14T18:50:44.102Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.232",
+      "changes": 41,
+      "categories": {
+        "behavior": 1,
+        "cli": 2,
+        "config": 9,
+        "hooks": 17,
+        "prompt": 8,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 29
+      },
+      "undocumented": 34,
+      "highlights": [
+        "Injected context changed (+49 −0 chars)",
+        "Interactive session's injected context changed (+934 −732 chars)",
+        "Interactive system prompt changed (+49 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.232",
+      "released_at": "2026-08-13T21:30:53.194Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.231",
+      "changes": 20,
+      "categories": {
+        "config": 20
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 1
+      },
+      "undocumented": 16,
+      "highlights": [
+        "New setting: allowedMarketplaces",
+        "New setting: additionalMarketplaces",
+        "policyHelpers description changed (+890 −283 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.231",
+      "released_at": "2026-08-13T08:27:21.757Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.229",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.229",
+      "released_at": "2026-08-12T19:28:48.616Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.228",
+      "changes": 13,
+      "categories": {
+        "config": 11,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 1
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Workflow tool description changed (+128 −123 chars)",
+        "SessionEnd hook payload field prompt_id added",
+        "New setting: disableCommandPluginSources"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.228",
+      "released_at": "2026-08-11T17:45:45.882Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.227",
+      "changes": 41,
+      "categories": {
+        "config": 15,
+        "hooks": 25,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 40,
+        "notable": 1
+      },
+      "undocumented": 40,
+      "highlights": [
+        "New setting: policyHelpers",
+        "Header x-stainless-package-version: 0.94.0 → 0.112.1",
+        "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.227",
+      "released_at": "2026-08-10T20:56:57.591Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.226",
+      "changes": 19,
+      "categories": {
+        "cli": 3,
+        "config": 10,
+        "hooks": 1,
+        "prompt": 2,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 6
+      },
+      "undocumented": 19,
+      "highlights": [
+        "Interactive system prompt changed (+839 −862 chars)",
+        "System prompt changed (+839 −862 chars)",
+        "Agent tool description changed (+193 −97 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.226",
+      "released_at": "2026-08-08T01:53:22.182Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.225",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.225",
+      "released_at": "2026-08-07T23:08:56.171Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.224",
+      "changes": 3,
+      "categories": {
+        "config": 2,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+        "New environment variable: CLAUDE_REMOTE_TOOLS_BRIDGE_URL",
+        "New environment variable: CLAUDE_WORKSHOP_PROGRESS"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.147.0",
+      "released_at": "2026-08-07T01:47:21.081Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.146.1",
+      "changes": 67,
+      "categories": {
+        "behavior": 5,
+        "binary": 2,
+        "cli": 39,
+        "config": 11,
+        "hooks": 4,
+        "prompt": 3,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 56,
+        "notable": 11
+      },
+      "undocumented": 18,
+      "highlights": [
+        "System prompt changed (+2815 −498 chars)",
+        "System prompt changed (+498 −2850 chars)",
+        "System prompt changed (+79 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.224",
+      "released_at": "2026-08-07T01:36:32.682Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.223",
+      "changes": 21,
+      "categories": {
+        "behavior": 1,
+        "cli": 4,
+        "config": 3,
+        "hooks": 13
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 1
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Behaviour: compaction_command tools changed: 27 → 28",
+        "InstructionsLoaded hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+        "MessageDisplay hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.223",
+      "released_at": "2026-08-05T22:51:13.206Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.222",
+      "changes": 12,
+      "categories": {
+        "config": 9,
+        "hooks": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 2
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Injected context changed (+0 −78 chars)",
+        "Interactive session's injected context changed (+0 −78 chars)",
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.146.1",
+      "released_at": "2026-08-05T16:00:31.441Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.146.0",
+      "changes": 10,
+      "categories": {
+        "behavior": 2,
+        "cli": 3,
+        "hooks": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 7
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Behaviour: subagents added",
+        "Behaviour: tool_output added",
+        "Hook events.PreToolUse.control removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.222",
+      "released_at": "2026-08-04T20:37:17.953Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.221",
+      "changes": 5,
+      "categories": {
+        "cli": 3,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 2
+      },
+      "undocumented": 3,
+      "highlights": [
+        "SendMessage tool parameter summary: description changed (+199 −84 chars)",
+        "SendMessage tool parameter to: pattern added",
+        "New command: `claude import`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.221",
+      "released_at": "2026-08-03T22:16:25.561Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.220",
+      "changes": 23,
+      "categories": {
+        "binary": 1,
+        "cli": 2,
+        "config": 18,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 2
+      },
+      "undocumented": 20,
+      "highlights": [
+        "Interactive system prompt changed (+169 −173 chars)",
+        "System prompt changed (+169 −173 chars)",
+        "New flag `claude --autocompact`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.146.0",
+      "released_at": "2026-07-29T01:45:57.696Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.145.0",
+      "changes": 33,
+      "categories": {
+        "behavior": 3,
+        "caching": 1,
+        "cli": 6,
+        "config": 19,
+        "hooks": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 23,
+        "notable": 10
+      },
+      "undocumented": 17,
+      "highlights": [
+        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+        "Behaviour: compaction added",
+        "Behaviour: subagents removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.220",
+      "released_at": "2026-07-24T23:11:21.821Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.219",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.219",
+      "released_at": "2026-07-24T16:11:49.832Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.218",
+      "changes": 22,
+      "categories": {
+        "behavior": 3,
+        "config": 4,
+        "hooks": 2,
+        "model": 5,
+        "prompt": 4,
+        "request": 1,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 17
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Model alias \"opus\": claude-opus-4-8 → claude-opus-5",
+        "Model alias \"opus[1m]\": claude-opus-4-8 → claude-opus-5",
+        "Default model: claude-opus-4-8 → claude-opus-5"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.218",
+      "released_at": "2026-07-22T19:55:32.144Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.217",
+      "changes": 12,
+      "categories": {
+        "config": 8,
+        "hooks": 1,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 4
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Injected context changed (+0 −488 chars)",
+        "Interactive session's injected context changed (+0 −488 chars)",
+        "Skill tool description changed (+174 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.217",
+      "released_at": "2026-07-21T19:55:38.926Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.216",
+      "changes": 17,
+      "categories": {
+        "behavior": 2,
+        "config": 13,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 3
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Workflow tool description changed (+188 −173 chars)",
+        "Behaviour: compaction outcome changed: \"compacted\" → \"refused\"",
+        "Behaviour: compaction reason added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.145.0",
+      "released_at": "2026-07-21T18:24:11.494Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.6",
+      "changes": 56,
+      "categories": {
+        "behavior": 4,
+        "cli": 6,
+        "config": 38,
+        "hooks": 1,
+        "prompt": 3,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 41,
+        "notable": 15
+      },
+      "undocumented": 35,
+      "highlights": [
+        "System prompt changed (+511 −462 chars)",
+        "System prompt changed (+338 −0 chars)",
+        "System prompt changed (+271 −186 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.216",
+      "released_at": "2026-07-20T20:19:37.447Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.215",
+      "changes": 5,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 2
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Skill tool description changed (+1237 −1692 chars)",
+        "SessionEnd hook payload field prompt_id removed",
+        "New environment variable: CLAUDE_CODE_FLEETVIEW_SIMPLE"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.215",
+      "released_at": "2026-07-19T00:53:37.17Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.214",
+      "changes": 6,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 2
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Injected context changed (+0 −826 chars)",
+        "Interactive session's injected context changed (+0 −826 chars)",
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.6",
+      "released_at": "2026-07-18T13:54:50.572Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.5",
+      "changes": 16,
+      "categories": {
+        "behavior": 11,
+        "hooks": 4,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 16
+      },
+      "undocumented": 15,
+      "highlights": [
+        "System prompt changed (+2122 −705 chars)",
+        "Behaviour: compaction removed",
+        "Behaviour: sandbox approval added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.214",
+      "released_at": "2026-07-18T00:13:41.661Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.213",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.213",
+      "released_at": "2026-07-17T22:26:26.753Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.212",
+      "changes": 41,
+      "categories": {
+        "cli": 3,
+        "config": 17,
+        "hooks": 21
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 40,
+        "notable": 1
+      },
+      "undocumented": null,
+      "highlights": [
+        "SessionEnd hook payload field prompt_id removed",
+        "CwdChanged hook environment variable CLAUDE_PID added",
+        "InstructionsLoaded hook environment variable CLAUDE_PID added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.212",
+      "released_at": "2026-07-16T19:20:24.324Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.211",
+      "changes": 13,
+      "categories": {
+        "caching": 4,
+        "cli": 4,
+        "config": 2,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 7
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Injected context added",
+        "Interactive session's injected context added",
+        "ReportFindings tool parameter findings: items.properties.short_summary added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.5",
+      "released_at": "2026-07-16T02:57:51.857Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.4",
+      "changes": 13,
+      "categories": {
+        "behavior": 10,
+        "caching": 1,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 13
+      },
+      "undocumented": 13,
+      "highlights": [
+        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
+        "Behaviour: compaction added",
+        "Behaviour: sandbox approval removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.211",
+      "released_at": "2026-07-15T19:24:07.013Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.210",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "config": 4,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 1
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Agent tool description changed (+428 −300 chars)",
+        "New flag `claude --forward-subagent-text`",
+        "Full help text of `--help` changed (+311 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.210",
+      "released_at": "2026-07-14T19:39:21.73Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.209",
+      "changes": 4,
+      "categories": {
+        "config": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "New setting: processWrapper",
+        "New environment variable: CLAUDE_CODE_DISABLE_MEMORY_STREAM_LIST",
+        "New environment variable: CLAUDE_CODE_DISABLE_ORG_MEMORY"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.4",
+      "released_at": "2026-07-14T05:10:51.485Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.3",
+      "changes": 7,
+      "categories": {
+        "behavior": 3,
+        "hooks": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 3
+      },
+      "undocumented": 7,
+      "highlights": [
+        "Behaviour: compaction removed",
+        "Behaviour: sandbox added",
+        "Behaviour: tool_output removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.209",
+      "released_at": "2026-07-14T04:45:37.792Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.208",
+      "changes": 3,
+      "categories": {
+        "config": 1,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "PostToolBatch hook payload field tool_calls[].tool_input.message added",
+        "PostToolBatch hook payload field tool_calls[].tool_input.status added",
+        "New environment variable: CLAUDE_CODE_ARTIFACT_MCP"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.208",
+      "released_at": "2026-07-13T21:31:27.921Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.207",
+      "changes": 15,
+      "categories": {
+        "cli": 1,
+        "config": 9,
+        "hooks": 3,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 4
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Interactive system prompt changed (+359 −0 chars)",
+        "System prompt changed (+359 −0 chars)",
+        "PostToolBatch hook payload field tool_calls[].tool_input.message removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.3",
+      "released_at": "2026-07-13T06:15:20.67Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.2",
+      "changes": 4,
+      "categories": {
+        "behavior": 1,
+        "caching": 1,
+        "cli": 1,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 2
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+        "Behaviour: sandbox removed",
+        "Hook events.UserPromptSubmit.control added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.2",
+      "released_at": "2026-07-13T04:42:46.19Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.1",
+      "changes": 10,
+      "categories": {
+        "behavior": 8,
+        "caching": 1,
+        "cli": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 9
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
+        "Behaviour: sandbox approval added",
+        "Behaviour: sandbox model added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.207",
+      "released_at": "2026-07-10T22:25:09.43Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.206",
+      "changes": 12,
+      "categories": {
+        "config": 10,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 2
+      },
+      "undocumented": 11,
+      "highlights": [
+        "ScheduleWakeup tool description changed (+230 −200 chars)",
+        "SessionEnd hook payload field prompt_id removed",
+        "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.1",
+      "released_at": "2026-07-09T23:05:40.041Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.144.0",
+      "changes": 14,
+      "categories": {
+        "behavior": 9,
+        "caching": 1,
+        "hooks": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 14
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+        "Behaviour: compaction added",
+        "Behaviour: sandbox approval removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.144.0",
+      "released_at": "2026-07-09T16:50:26.998Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.143.0",
+      "changes": 51,
+      "categories": {
+        "behavior": 3,
+        "caching": 1,
+        "config": 6,
+        "hooks": 12,
+        "model": 4,
+        "prompt": 4,
+        "request": 3,
+        "tools": 18
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 32
+      },
+      "undocumented": 37,
+      "highlights": [
+        "Default model: gpt-5.5 → gpt-5.6-sol",
+        "Model parameter parallel_tool_calls: true → false",
+        "Model parameter reasoning.context: none → all_turns"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.143.0",
+      "released_at": "2026-07-08T01:34:38.318Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.142.5",
+      "changes": 36,
+      "categories": {
+        "behavior": 2,
+        "binary": 2,
+        "cli": 19,
+        "config": 13
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 28,
+        "notable": 8
+      },
+      "undocumented": 13,
+      "highlights": [
+        "Behaviour: compaction added",
+        "Behaviour: tool_output added",
+        "Flag removed: `codex sandbox --permissions-profile`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.142.5",
+      "released_at": "2026-07-01T01:18:19.998Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.142.4",
+      "changes": 2,
+      "categories": {
+        "behavior": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 2
+      },
+      "undocumented": 2,
+      "highlights": [
+        "Behaviour: compaction removed",
+        "Behaviour: tool_output removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.142.4",
+      "released_at": "2026-06-29T05:07:05.914Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.142.3",
+      "changes": 5,
+      "categories": {
+        "behavior": 1,
+        "binary": 1,
+        "caching": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 4
+      },
+      "undocumented": 5,
+      "highlights": [
+        "Caching across_turns.breakpoints: [[]] → [[],[],[]]",
+        "Caching across_turns.stable_prefix_chars: none → 674",
+        "Caching across_turns.turns: 1 → 3"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.142.3",
+      "released_at": "2026-06-26T21:32:08.704Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.142.2",
+      "changes": 11,
+      "categories": {
+        "behavior": 8,
+        "caching": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 11
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Caching across_turns.breakpoints: [[],[],[]] → [[]]",
+        "Caching across_turns.stable_prefix_chars: 674 → none",
+        "Caching across_turns.turns: 3 → 1"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.142.2",
+      "released_at": "2026-06-25T07:34:58.281Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.142.1",
+      "changes": 13,
+      "categories": {
+        "behavior": 8,
+        "binary": 1,
+        "config": 1,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 8
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Behaviour: sandbox approval removed",
+        "Behaviour: sandbox model removed",
+        "Behaviour: sandbox provider removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.142.1",
+      "released_at": "2026-06-25T00:38:54.309Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.142.0",
+      "changes": 4,
+      "categories": {
+        "binary": 1,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 3
+      },
+      "undocumented": 4,
+      "highlights": [
+        "PreToolUse hook control (exit_2) removed",
+        "SessionStart hook control (exit_2) removed",
+        "Stop hook control (exit_2) removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.142.0",
+      "released_at": "2026-06-22T22:22:41.166Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.141.0",
+      "changes": 42,
+      "categories": {
+        "behavior": 9,
+        "config": 33
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 27,
+        "notable": 15
+      },
+      "undocumented": 24,
+      "highlights": [
+        "Behaviour: sandbox approval added",
+        "Behaviour: sandbox model added",
+        "Behaviour: sandbox provider added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.141.0",
+      "released_at": "2026-06-18T04:45:39.921Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.140.0",
+      "changes": 74,
+      "categories": {
+        "behavior": 8,
+        "config": 2,
+        "hooks": 63,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 57,
+        "notable": 17
+      },
+      "undocumented": 56,
+      "highlights": [
+        "Beta dropped: terminal_resize_reflow",
+        "Behaviour: sandbox approval removed",
+        "Behaviour: sandbox model removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.140.0",
+      "released_at": "2026-06-15T21:09:21.79Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.139.0",
+      "changes": 22,
+      "categories": {
+        "binary": 1,
+        "caching": 1,
+        "cli": 5,
+        "config": 6,
+        "prompt": 1,
+        "request": 4,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 12
+      },
+      "undocumented": 11,
+      "highlights": [
+        "System prompt changed (+2195 −1221 chars)",
+        "create_goal tool description changed (+134 −122 chars)",
+        "create_goal tool parameter objective: description changed (+151 −164 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.139.0",
+      "released_at": "2026-06-09T20:17:25.855Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.138.0",
+      "changes": 7,
+      "categories": {
+        "binary": 1,
+        "caching": 1,
+        "cli": 3,
+        "prompt": 1,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 3
+      },
+      "undocumented": 6,
+      "highlights": [
+        "System prompt changed (+742 −350 chars)",
+        "Caching across_turns.stable_prefix_chars: 7004 → 7442",
+        "Now sends identifier client_metadata.x-codex-window-id"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.138.0",
+      "released_at": "2026-06-08T23:03:39.681Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.137.0",
+      "changes": 18,
+      "categories": {
+        "config": 18
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 14
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Type of features.code_mode: boolean → boolean|object",
+        "Setting no longer read: features.responses_websocket_response_processed",
+        "Setting model_reasoning_effort lost value none"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.137.0",
+      "released_at": "2026-06-04T01:41:31.275Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.136.0",
+      "changes": 6,
+      "categories": {
+        "config": 3,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 1
+      },
+      "undocumented": 4,
+      "highlights": [
+        "New setting: apps.<name>.approvals_reviewer",
+        "PreToolUse hook control (exit_2) added",
+        "SessionStart hook control (exit_2) added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.136.0",
+      "released_at": "2026-06-01T18:53:55.315Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.135.0",
+      "changes": 47,
+      "categories": {
+        "binary": 1,
+        "caching": 1,
+        "cli": 14,
+        "config": 9,
+        "prompt": 3,
+        "tools": 19
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 26
+      },
+      "undocumented": 27,
+      "highlights": [
+        "Injected context changed (+563 −0 chars)",
+        "System prompt changed (+56 −81 chars)",
+        "System prompt changed (+462 −376 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.135.0",
+      "released_at": "2026-05-28T19:08:37.797Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.134.0",
+      "changes": 26,
+      "categories": {
+        "binary": 1,
+        "config": 23,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 6
+      },
+      "undocumented": 22,
+      "highlights": [
+        "view_image tool description changed (+124 −171 chars)",
+        "Default of tui.keymap: {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap… → {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap…",
+        "Default of tui.keymap.chat: {\"decrease_reasoning_effort\":null,\"edit_queued_message\":n… → {\"decrease_reasoning_effort\":null,\"edit_queued_message\":n…"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.134.0",
+      "released_at": "2026-05-26T19:33:51.389Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.133.0",
+      "changes": 42,
+      "categories": {
+        "cli": 35,
+        "config": 3,
+        "hooks": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 33,
+        "notable": 9
+      },
+      "undocumented": 19,
+      "highlights": [
+        "Flag removed: `codex --profile-v2`",
+        "Flag removed: `codex exec --profile-v2`",
+        "Flag removed: `codex fork --profile-v2`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.133.0",
+      "released_at": "2026-05-21T17:13:06.253Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.132.0",
+      "changes": 58,
+      "categories": {
+        "behavior": 8,
+        "cli": 11,
+        "config": 22,
+        "hooks": 6,
+        "prompt": 1,
+        "storage": 1,
+        "tools": 9
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 33,
+        "notable": 25
+      },
+      "undocumented": 27,
+      "highlights": [
+        "System prompt changed (+276 −173 chars)",
+        "Tool removed: close_agent",
+        "Tool removed: resume_agent"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.132.0",
+      "released_at": "2026-05-20T02:39:00.388Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.131.0",
+      "changes": 11,
+      "categories": {
+        "binary": 2,
+        "cli": 4,
+        "config": 1,
+        "prompt": 1,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 5
+      },
+      "undocumented": 4,
+      "highlights": [
+        "System prompt changed (+385 −429 chars)",
+        "spawn_agent tool description changed (+641 −2100 chars)",
+        "view_image tool parameter detail: description changed (+94 −85 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.131.0",
+      "released_at": "2026-05-18T18:08:19.71Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.130.0",
+      "changes": 142,
+      "categories": {
+        "behavior": 9,
+        "binary": 2,
+        "cli": 53,
+        "config": 70,
+        "prompt": 2,
+        "request": 4,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 101,
+        "notable": 41
+      },
+      "undocumented": 62,
+      "highlights": [
+        "System prompt changed (+81 −81 chars)",
+        "System prompt changed (+218 −203 chars)",
+        "spawn_agent tool description changed (+263 −32 chars)"
+      ],
+      "signing": "rejected"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.130.0",
+      "released_at": "2026-05-08T23:12:58.744Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.129.0",
+      "changes": 13,
+      "categories": {
+        "cli": 5,
+        "config": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 2
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Setting no longer read: experimental_thread_store.endpoint",
+        "Setting no longer read: experimental_thread_store_endpoint",
+        "New command: `codex remote-control`"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.129.0",
+      "released_at": "2026-05-07T17:05:37.553Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.128.0",
+      "changes": 171,
+      "categories": {
+        "behavior": 1,
+        "cli": 13,
+        "config": 95,
+        "hooks": 61,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 102,
+        "notable": 69
+      },
+      "undocumented": 100,
+      "highlights": [
+        "Now sends identifier header:thread_id",
+        "Behaviour: tool_output removed",
+        "PreToolUse hook environment variable LOGNAME removed"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.128.0",
+      "released_at": "2026-04-30T16:43:46.064Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.125.0",
+      "changes": 121,
+      "categories": {
+        "binary": 1,
+        "cli": 18,
+        "config": 100,
+        "prompt": 1,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 106,
+        "notable": 15
+      },
+      "undocumented": 90,
+      "highlights": [
+        "System prompt changed (+81 −73 chars)",
+        "New beta: terminal_resize_reflow",
+        "Flag removed: `codex --full-auto`"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.125.0",
+      "released_at": "2026-04-24T18:01:41.002Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.124.0",
+      "changes": 19,
+      "categories": {
+        "behavior": 2,
+        "cli": 7,
+        "config": 3,
+        "hooks": 4,
+        "model": 1,
+        "prompt": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 9,
+        "notable": 10
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Default model: gpt-5.4 → gpt-5.5",
+        "System prompt changed (+17945 −11407 chars)",
+        "spawn_agent tool description changed (+689 −324 chars)"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.124.0",
+      "released_at": "2026-04-23T18:30:45.892Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.123.0",
+      "changes": 70,
+      "categories": {
+        "behavior": 1,
+        "cli": 1,
+        "config": 63,
+        "hooks": 4,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 65,
+        "notable": 5
+      },
+      "undocumented": 50,
+      "highlights": [
+        "System prompt changed (+376 −387 chars)",
+        "Behaviour: sandbox removed",
+        "New setting: auto_review.policy"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.123.0",
+      "released_at": "2026-04-23T01:27:03.972Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.122.0",
+      "changes": 37,
+      "categories": {
+        "behavior": 4,
+        "cli": 18,
+        "config": 7,
+        "hooks": 4,
+        "model": 1,
+        "prompt": 1,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 24,
+        "notable": 13
+      },
+      "undocumented": 18,
+      "highlights": [
+        "Default model: gpt-5.3-codex → gpt-5.4",
+        "System prompt changed (+6570 −4207 chars)",
+        "spawn_agent tool description changed (+1159 −1537 chars)"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.122.0",
+      "released_at": "2026-04-20T18:39:33.583Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.121.0",
+      "changes": 46,
+      "categories": {
+        "cli": 25,
+        "config": 20,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 40,
+        "notable": 6
+      },
+      "undocumented": 22,
+      "highlights": [
+        "New hook event: PermissionRequest",
+        "Default of `codex app --download-url`: https://persistent.oaistatic.com/codex-app-prod/Codex.dmg → none",
+        "Command removed: `codex marketplace`"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.121.0",
+      "released_at": "2026-04-15T20:46:45.517Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.120.0",
+      "changes": 32,
+      "categories": {
+        "binary": 1,
+        "cli": 14,
+        "config": 16,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 31,
+        "notable": 1
+      },
+      "undocumented": 15,
+      "highlights": [
+        "view_image tool parameter detail added",
+        "New flag `codex app-server --ws-token-sha256`",
+        "Description of `codex exec-server` changed"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.120.0",
+      "released_at": "2026-04-11T02:54:37.375Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.119.0",
+      "changes": 1,
+      "categories": {
+        "binary": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Signed with a different certificate"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.119.0",
+      "released_at": "2026-04-10T22:45:06.804Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.118.0",
+      "changes": 50,
+      "categories": {
+        "binary": 1,
+        "cli": 24,
+        "config": 19,
+        "request": 4,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 43,
+        "notable": 7
+      },
+      "undocumented": 23,
+      "highlights": [
+        "spawn_agent tool description changed (+803 −808 chars)",
+        "Now sends identifier client_metadata.x-codex-installation-id",
+        "Now sends identifier header:x-codex-window-id"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.118.0",
+      "released_at": "2026-03-31T17:03:18.49Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.117.0",
+      "changes": 23,
+      "categories": {
+        "binary": 1,
+        "cli": 14,
+        "config": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 2
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Setting no longer read: features.voice_transcription",
+        "New setting: model_providers.<name>.auth",
+        "`codex --remote`: description changed (+58 −76 chars)"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.117.0",
+      "released_at": "2026-03-26T22:28:43.427Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.116.0",
+      "changes": 62,
+      "categories": {
+        "binary": 1,
+        "caching": 1,
+        "cli": 24,
+        "config": 14,
+        "hooks": 7,
+        "prompt": 1,
+        "tools": 14
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 40,
+        "notable": 22
+      },
+      "undocumented": 27,
+      "highlights": [
+        "System prompt changed (+1106 −0 chars)",
+        "close_agent tool description changed (+216 −172 chars)",
+        "close_agent tool parameter id removed"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.116.0",
+      "released_at": "2026-03-19T17:52:17.991Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.115.0",
+      "changes": 21,
+      "categories": {
+        "binary": 1,
+        "cli": 12,
+        "config": 6,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 2
+      },
+      "undocumented": 5,
+      "highlights": [
+        "close_agent tool description changed (+172 −144 chars)",
+        "New hook event: UserPromptSubmit",
+        "New flag `codex --remote`"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.115.0",
+      "released_at": "2026-03-16T19:38:16.363Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.114.0",
+      "changes": 46,
+      "categories": {
+        "behavior": 2,
+        "caching": 1,
+        "cli": 3,
+        "config": 31,
+        "prompt": 3,
+        "request": 1,
+        "tools": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 25
+      },
+      "undocumented": 30,
+      "highlights": [
+        "Injected context changed (+152 −2940 chars)",
+        "Injected context block removed",
+        "System prompt block added"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.114.0",
+      "released_at": "2026-03-11T00:29:28.692Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.113.0",
+      "changes": 10,
+      "categories": {
+        "config": 8,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 3
+      },
+      "undocumented": 3,
+      "highlights": [
+        "New hook event: SessionStart",
+        "New hook event: Stop",
+        "New setting: approval_policy.reject.request_permissions"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.113.0",
+      "released_at": "2026-03-10T05:25:37.995Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.112.0",
+      "changes": 38,
+      "categories": {
+        "behavior": 2,
+        "binary": 1,
+        "caching": 1,
+        "cli": 1,
+        "config": 31,
+        "prompt": 1,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 24
+      },
+      "undocumented": 33,
+      "highlights": [
+        "Injected context changed (+0 −430 chars)",
+        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
+        "Behaviour: sandbox removed"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.112.0",
+      "released_at": "2026-03-08T20:44:58.047Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.111.0",
+      "changes": 6,
+      "categories": {
+        "behavior": 2,
+        "caching": 1,
+        "cli": 1,
+        "model": 1,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 5
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Model parameter reasoning.summary: auto → none",
+        "System prompt changed (+184 −144 chars)",
+        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.111.0",
+      "released_at": "2026-03-05T19:13:00.697Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.110.0",
+      "changes": 6,
+      "categories": {
+        "behavior": 2,
+        "caching": 1,
+        "config": 2,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 4
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Injected context changed (+430 −0 chars)",
+        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
+        "Behaviour: sandbox removed"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.110.0",
+      "released_at": "2026-03-05T02:23:39.861Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.107.0",
+      "changes": 24,
+      "categories": {
+        "behavior": 1,
+        "binary": 1,
+        "config": 21,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 5
+      },
+      "undocumented": 16,
+      "highlights": [
+        "System prompt changed (+73 −48 chars)",
+        "Behaviour: sandbox sandbox changed",
+        "Setting no longer read: memories.max_raw_memories_for_global"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.107.0",
+      "released_at": "2026-03-02T18:00:55.212Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.106.0",
+      "changes": 10,
+      "categories": {
+        "config": 9,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 2
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Injected context changed (+70 −0 chars)",
+        "New setting: mcp_servers.<name>.oauth_resource",
+        "New setting: audio"
+      ],
+      "signing": "revoked"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.106.0",
+      "released_at": "2026-02-26T23:12:45.073Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.105.0",
+      "changes": 15,
+      "categories": {
+        "behavior": 5,
+        "binary": 1,
+        "cli": 2,
+        "config": 3,
+        "model": 2,
+        "prompt": 1,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 9
+      },
+      "undocumented": 7,
+      "highlights": [
+        "Default model: gpt-5.2-codex → gpt-5.3-codex",
+        "Model parameter text added",
+        "System prompt changed (+7574 −4413 chars)"
+      ],
+      "signing": "revoked"
+    }
+  ]
+}

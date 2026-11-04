@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.153.0",
+  "to": "0.153.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.153.0...rust-v0.153.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.153.1",
+    "text": "## New Features\n\n- Added support for configuring GPT-6-Astra through the API without changing the default model or showing it in the model picker. (#42605)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.153.0...rust-v0.153.1\n\n- #42605 Backport GPT-6-Astra model catalog to 0.153 @anp-oai"
+  },
+  "summary": {
+    "changes": 8,
+    "categories": {
+      "caching": 4,
+      "hooks": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 4,
+      "notable": 4
+    },
+    "undocumented": 8
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns.breakpoints",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "across_turns",
+        "breakpoints"
+      ],
+      "title": "Caching across_turns.breakpoints: [[],[],[]] → none",
+      "impact": "notable",
+      "before": [
+        [],
+        [],
+        []
+      ],
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_cache_key",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_cache_key"
+      ],
+      "title": "Caching across_turns.stable_cache_key: true → none",
+      "impact": "notable",
+      "before": true,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 972 → none",
+      "impact": "notable",
+      "before": 972,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.turns",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "turns"
+      ],
+      "title": "Caching across_turns.turns: 3 → 0",
+      "impact": "notable",
+      "before": 3,
+      "after": 0,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "exit_2"
+      ],
+      "title": "PreToolUse hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "blocks the tool; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1409,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/analytics/src/events.rs#L1409"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 579,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L579"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "exit_2"
+      ],
+      "title": "SessionStart hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1414,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/analytics/src/events.rs#L1414"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 594,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L594"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "exit_2"
+      ],
+      "title": "Stop hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "keeps the turn going; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1419,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/analytics/src/events.rs#L1419"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 609,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L609"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.exit_2",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "exit_2"
+      ],
+      "title": "UserPromptSubmit hook control (exit_2) added",
+      "impact": "informational",
+      "before": null,
+      "after": "blocks the prompt; message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1416,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/analytics/src/events.rs#L1416"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 600,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L600"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

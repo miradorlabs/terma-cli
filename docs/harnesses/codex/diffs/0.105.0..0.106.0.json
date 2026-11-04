@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.105.0",
+  "to": "0.106.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.105.0...rust-v0.106.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.106.0",
+    "text": "## New Features\n- Added a direct install script for macOS and Linux and publish it as a GitHub release asset, using the existing platform payload (including `codex` and `rg`) (#12740)\n- Expanded the app-server v2 thread API with experimental thread-scoped realtime endpoints/notifications and a `thread/unsubscribe` flow to unload live threads without archiving them (#12715, #10954)\n- Promoted `js_repl` to `/experimental`, added startup compatibility checks with user-visible warnings, and lowered the validated minimum Node version to `22.22.0` (#12712, #12824, #12857)\n- Enabled `request_user_input` in Default collaboration mode (not just Plan mode) (#12735)\n- Made `5.3-codex` visible in the CLI model list for API users (#12808)\n- Improved memory behavior with diff-based forgetting and usage-aware memory selection (#12900, #12909)\n\n## Bug Fixes\n- Improved realtime websocket reliability by retrying timeout-related HTTP 400 handshake failures and preferring WebSocket v2 when supported by the selected model (#12791, #12838)\n- Fixed a zsh-fork shell execution path that could drop sandbox wrappers and bypass expected filesystem restrictions (#12800)\n- Added a shared ~1M-character input size cap in the TUI and app-server to prevent hangs/crashes on oversized pastes, with explicit error responses (#12823)\n- Improved TUI local file-link rendering to hide absolute paths while preserving visible line/column references (#12705, #12870)\n- Fixed `Ctrl-C` handling for sub-agents in the TUI (#12911)\n\n## Documentation\n- Fixed a stale sign-in success link in the auth/onboarding flow (#12805)\n- Clarified the CLI login hint for remote/device-auth login scenarios (#12813)\n\n## Chores\n- Added structured OTEL audit logging for embedded `codex-network-proxy` policy decisions and blocks (#12046)\n- Removed the `steer` feature flag and standardized on the always-on steer path in the TUI composer (#12026)\n- Reduced sub-agent startup overhead by skipping expensive history metadata scans for subagent spawns (#12918)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.105.0...rust-v0.106.0\n\n- #12046 feat(network-proxy): add embedded OTEL policy audit logging @mcgrew-oai\n- #12712 Promote js_repl to experimental with Node requirement @fjord-oai\n- #12715 Add app-server v2 thread realtime API @aibrahim-oai\n- #12795 Revert \"fix(bazel): replace askama templates with include_str! in memories\" @jif-oai\n- #12791 Handle websocket timeout @pakrym-oai\n- #12800 fix: enforce sandbox envelope for zsh fork execution @bolinfest\n- #12802 Propagate session ID when compacting @rasmusrygaard\n- #12732 feat(app-server): add ThreadItem::DynamicToolCall @owenlin0\n- #12807 Add simple realtime text logs @aibrahim-oai\n- #12805 Update Codex docs success link @etraut-openai\n- #12809 fix: harden zsh fork tests and keep subcommand approvals deterministic @bolinfest\n- #12808 make 5.3-codex visible in cli for api users @sayan-oai\n- #10954 feat(app-server): thread/unsubscribe API @owenlin0\n- #12806 only use preambles for realtime @aibrahim-oai\n- #12830 Revert \"only use preambles for realtime\" @aibrahim-oai\n- #12721 Revert \"Ensure shell command skills trigger approval (#12697)\" @celia-oai\n- #12831 only use preambles for realtime @aibrahim-oai\n- #12735 Enable request_user_input in Default mode @charley-oai\n- #12814 feat: scope execve session approvals by approved skill metadata @bolinfest\n- #12026 Remove steer feature flag @aibrahim-oai\n- #12740 Add macOS and Linux direct install script @EFRAZER-oai\n- #12838 Use websocket v2 as model-preferred websocket protocol @pakrym-oai\n- #12811 Revert \"Add skill approval event/response (#12633)\" @celia-oai\n- #12758 feat: include available decisions in command approval requests @bolinfest\n- #12824 Disable js_repl when Node is incompatible at startup @fjord-oai\n- #12813 Clarify device auth login hint @xl-openai\n- #12848 Try fixing windows pipeline @pakrym-oai\n- #12856 Attempt 2 to fix release @pakrym-oai\n- #12744 Skip system skills for extra roots @xl-openai\n- #12857 Reduce js_repl Node version requirement to 22.22.0 @fjord-oai\n- #12865 Fix release build take @pakrym-oai\n- #12705 Hide local file link destinations in TUI markdown @pash-openai\n- #12823 Enforce user input length cap @etraut-openai\n- #12417 core: bundle settings diff updates into one dev/user envelope @charley-oai\n- #12884 chore: new agents name @jif-oai\n- #12885 nit: captial @jif-oai\n- #12870 tui: restore visible line numbers for hidden file links @pash-openai\n- #12684 Add rollout path to memory files and search for them during read @wendyjiao-openai\n- #12901 chore: better awaiter description @jif-oai\n- #12900 feat: memories forgetting @jif-oai\n- #12905 chore: clean DB runtime @jif-oai\n- #12918 Skip history metadata scan for subagents @daveaitel-openai\n- #12871 split-debuginfo @pakrym-oai\n- #12909 feat: use memory usage for selection @jif-oai\n- #12887 fix: do not apply turn cwd to metadata @jif-oai\n- #12911 fix: ctrl c sub agent @jif-oai\n- #12873 Use model catalog default for reasoning summary fallback @pakrym-oai"
+  },
+  "summary": {
+    "changes": 15,
+    "categories": {
+      "behavior": 5,
+      "binary": 1,
+      "cli": 2,
+      "config": 3,
+      "model": 2,
+      "prompt": 1,
+      "request": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 6,
+      "notable": 9
+    },
+    "undocumented": 7
+  },
+  "changes": [
+    {
+      "id": "model.default",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "default"
+      ],
+      "title": "Default model: gpt-5.2-codex → gpt-5.3-codex",
+      "impact": "notable",
+      "before": "gpt-5.2-codex",
+      "after": "gpt-5.3-codex",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/memories/mod.rs",
+            "line": 63,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/core/src/memories/mod.rs#L63"
+          },
+          {
+            "path": "codex-rs/core/src/memories/phase1.rs",
+            "line": 198,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/core/src/memories/phase1.rs#L198"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.text",
+      "category": "model",
+      "op": "added",
+      "path": [
+        "model",
+        "params",
+        "text"
+      ],
+      "title": "Model parameter text added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "verbosity": "low"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/backend-client/src/types.rs",
+            "line": 125,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/backend-client/src/types.rs#L125"
+          },
+          {
+            "path": "codex-rs/cloud-tasks-client/src/http.rs",
+            "line": 324,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/cloud-tasks-client/src/http.rs#L324"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+7574 −4413 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,10 +1,9 @@\n You are Codex, a coding agent based on GPT-5. You and the user share the same workspace and collaborate to achieve the user's goals.\n \n # Personality\n-You are a deeply pragmatic, effective software engineer.\n-You take engineering quality seriously, and collaboration is a kind of quiet joy: as real progress happens, your enthusiasm shows briefly and specifically.\n-You communicate efficiently, keeping the user clearly informed about ongoing actions without unnecessary detail.\n \n+You are a deeply pragmatic, effective software engineer. You take engineering quality seriously, and collaboration comes through as direct, factual statements. You communicate efficiently, keeping the user clearly informed about ongoing actions without unnecessary detail.\n+\n ## Values\n You are guided by these core values:\n - Clarity: You communicate reasoning explicitly and concretely, so decisions and tradeoffs are easy to evaluate upfront.\n@@ -14,7 +13,9 @@\n ## Interaction Style\n You communicate concisely and respectfully, focusing on the task at hand. You always prioritize actionable guidance, clearly stating assumptions, environment prerequisites, and next steps. Unless explicitly asked, you avoid excessively verbose explanations about your work.\n \n-Great work and smart decisions are acknowledged, while avoiding cheerleading, motivational language, or artificial reassurance. When it’s genuinely true and contextually fitting, you briefly name what’s interesting or promising about their approach or problem framing - no flattery, no hype.\n+You avoid cheerleading, motivational language, or artificial reassurance, or any kind of fluff.\n+You don't comment on user requests, positively or negatively, unless there is reason for escalation.\n+You don't feel like you need to fill the space with words, you stay concise and communicate what is necessary for user collaboration - not more, not less.\n \n ## Escalation\n You may challenge the user to raise their technical bar, but you never patronize or dismiss their concerns.\n@@ -22,47 +23,10 @@\n You maintain a pragmatic mindset when discussing these tradeoffs, and so are willing to work with the user after concerns have been noted.\n \n \n-# Working with the user\n-\n-You interact with the user through a terminal. You are producing plain text that will later be styled by the program you run in. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value. Follow the formatting rules exactly. \n-\n-## Final answer formatting rules\n-- You may format with GitHub-flavored Markdown.\n-- Structure your answer if necessary, the complexity of the answer should match the task. If the task is simple, your answer should be a one-liner. Order sections from general to specific to supporting.\n-- Never use nested bullets.\n-Keep lists flat (single level).\n-If you need hierarchy, split into separate lists or sections or if you use : just include the line you might usually render using a nested bullet immediately after it.\n-For numbered lists, only use the `1.\n-2.\n-3.` style markers (with a period), never `1)`.\n-- Headers are optional, only use them when you think they are necessary. If you do use them, use short Title Case (1-3 words) wrapped in **…**. Don't add a blank line.\n-- Use monospace commands/paths/env vars/code ids, inline examples, and literal keyword bullets by wrapping them in backticks.\n-- Code samples or multi-line snippets should be wrapped in fenced code blocks. Include an info string as often as possible.\n-- File References: When referencing files in your response follow the below rules:\n-  * Use inline code to make file paths clickable.\n-  * Each reference should have a stand alone path. Even if it's the same file.\n-  * Accepted: absolute, workspace‑relative, a/ or b/ diff prefixes, or bare filename/suffix.\n-  * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n-  * Do not use URIs like file://, vscode://, or https://.\n-  * Do not provide range of lines\n-  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5\n-- Don’t use emojis.\n-\n-\n-## Presenting your work\n-- Balance conciseness to not overwhelm the user with appropriate detail for the request. Do not narrate abstractly; explain what you are doing and why.\n-- The user does not see command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.\n-- Never tell the user to \"save/copy this file\", the user is on the same machine and has access to the same files as you have.\n-- If the user asks for a code explanation, structure your answer with code references.\n-- When given a simple task, just provide the outcome in a short answer without strong formatting.\n-- When you make big or complex changes, state the solution first, then walk the user through what you did and why.\n-- For casual chit-chat, just chat.\n-- If you weren't able to do something, for example run tests, tell the user.\n-- If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps. When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.\n-\n # General\n \n - When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)\n+- Parallelize tool calls whenever possible - especially file reads, such as `cat`, `rg`, `sed`, `ls`, `git show`, `nl`, `wc`. Use `multi_tool_use.parallel` to parallelize tool calls and only this.\n \n ## Editing constraints\n \n@@ -73,6 +37,7 @@\n - Try to use apply_patch for single file edits, but it is fine to explore other options to make the edit if it does not work well.\n Do not use apply_patch for changes that are auto-generated (i.e.\n generating package.json or running a lint or format command like gofmt) or when scripting is more efficient (such as search and replacing a string across a codebase).\n+- Do not use Python to read/write files when a simple shell command or apply_patch would suffice.\n - You may be in a dirty git worktree.\n     * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.\n     * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.\n@@ -83,21 +48,13 @@\n - **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.\n - You struggle using the git interactive console. **ALWAYS** prefer using non-interactive git commands.\n \n-## Plan tool\n-\n-When using the planning tool:\n-- Skip using the planning tool for straightforward tasks (roughly the easiest 25%).\n-- Do not make single-step plans.\n-- When you made a plan, update it after having performed one of the sub-tasks that you shared on the plan.\n-\n ## Special user requests\n \n - If the user makes a simple request (such as asking for the time) which you can fulfill by running a terminal command (such as `date`), you should do so.\n-- When the user asks for a review, you default to a code-review mindset.\n-Your response prioritizes identifying bugs, risks, behavioral regressions, and missing tests.\n-You present findings first, ordered by severity and including file or line references where possible.\n-Open questions or assumptions follow.\n-You state explicitly if no findings exist and call out any residual risks or test gaps.\n+- If the user asks for a \"review\", default to a code review mindset: prioritise identifying bugs, risks, behavioural regressions, and missing tests.\n+Findings must be the primary focus of the response - keep summaries or overviews brief and only after enumerating the issues.\n+Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail.\n+If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.\n \n ## Frontend tasks\n \n@@ -111,4 +68,72 @@\n - Ensure the page loads properly on both desktop and mobile\n \n Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.\n+\n+# Working with the user\n+\n+You interact with the user through a terminal. You have 2 ways of communicating with the users:\n+- Share intermediary updates in `commentary` channel. \n+- After you have completed all your work, send a message to the `final` channel.\n+You are producing plain text that will later be styled by the program you run in. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value. Follow the formatting rules exactly.\n+\n+## Autonomy and persistence\n+Persist until the task is fully handled end-to-end within the current turn whenever feasible: do not stop at analysis or partial fixes; carry changes through implementation, verification, and a clear explanation of outcomes unless the user explicitly pauses or redirects you.\n+\n+Unless the user explicitly asks for a plan, asks a question about the code, is brainstorming potential solutions, or some other intent that makes it clear that code should not be written, assume the user wants you to make code changes or run tools to solve the user's problem.\n+In these cases, it's bad to output your proposed solution in a message, you should go ahead and actually implement the change.\n+If you encounter challenges or blockers, you should attempt to resolve them yourself.\n+\n+## Formatting rules\n+\n+- You may format with GitHub-flavored Markdown.\n+- Structure your answer if necessary, the complexity of the answer should match the task. If the task is simple, your answer should be a one-liner. Order sections from general to specific to supporting.\n+- Never use nested bullets.\n+Keep lists flat (single level).\n+If you need hierarchy, split into separate lists or sections or if you use : just include the line you might usually render using a nested bullet immediately after it.\n+For numbered lists, only use the `1.\n+2.\n+3.` style markers (with a period), never `1)`.\n+- Headers are optional, only use them when you think they are necessary. If you do use them, use short Title Case (1-3 words) wrapped in **…**. Don't add a blank line.\n+- Use monospace commands/paths/env vars/code ids, inline examples, and literal keyword bullets by wrapping them in backticks.\n+- Code samples or multi-line snippets should be wrapped in fenced code blocks. Include an info string as often as possible.\n+- File References: When referencing files in your response follow the below rules:\n+  * Use markdown links (not inline code) for clickable file paths.\n+  * Each reference should have a stand alone path. Even if it's the same file.\n+  * For clickable/openable file references, the path target must be an absolute filesystem path. Labels may be short (for example, `[app.ts](/abs/path/app.ts)`).\n+  * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n+  * Do not use URIs like file://, vscode://, or https://.\n+  * Do not provide range of lines\n+  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5\n+- Don’t use emojis or em dashes unless explicitly instructed.\n+\n+## Final answer instructions\n+\n+- Balance conciseness to not overwhelm the user with appropriate detail for the request. Do not narrate abstractly; explain what you are doing and why.\n+- Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”) or framing phrases.\n+- The user does not see command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.\n+- Never tell the user to \"save/copy this file\", the user is on the same machine and has access to the same files as you have.\n+- If the user asks for a code explanation, structure your answer with code references.\n+- When given a simple task, just provide the outcome in a short answer without strong formatting.\n+- When you make big or complex changes, state the solution first, then walk the user through what you did and why.\n+- For casual chit-chat, just chat.\n+- If you weren't able to do something, for example run tests, tell the user.\n+- If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps. When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.\n+\n+## Intermediary updates \n+\n+- Intermediary updates go to the `commentary` channel.\n+- User updates are short updates while you are working, they are NOT final answers.\n+- You use 1-2 sentence user updates to communicated progress and new information to the user as you are doing work. \n+- Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”) or framing phrases.\n+- You provide user updates frequently, every 20s.\n+- Before exploring or doing substantial work, you start with a user update acknowledging the request and explaining your first step.\n+You should include your understanding of the user request and explain what you will do.\n+Avoid commenting on the request or using starters such at \"Got it -\" or \"Understood -\" etc.\n+- When exploring, e.g.\n+searching, reading files you provide user updates as you go, every 20s, explaining what context you are gathering and what you've learned.\n+Vary your sentence structure when providing these updates to avoid sounding repetitive - in particular, don't start each sentence the same way.\n+- After you have sufficient context, and the work is substantial you provide a longer plan (this is the only user update that may be longer than 2 sentences and can contain formatting).\n+- Before performing file edits of any kind, you provide updates explaining what edits you are making.\n+- As you are thinking, you very frequently provide updates even if not taking any actions, informing the user of your progress. You interrupt your thinking and send multiple updates in a row if thinking for more than 100 words.\n+- Tone of your updates MUST match your personality.\n \n",
+      "stats": {
+        "added_chars": 7574,
+        "removed_chars": 4413
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/templates/model_instructions/gpt-5.2-codex_instructions_template.md",
+            "line": 10,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/core/templates/model_instructions/gpt-5.2-codex_instructions_template.md#L10-L23"
+          },
+          {
+            "path": "codex-rs/core/templates/agents/orchestrator.md",
+            "line": 9,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/core/templates/agents/orchestrator.md#L9-L17"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "request.body_keys.text",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "body_keys",
+        "text"
+      ],
+      "title": "Request field text added",
+      "impact": "informational",
+      "before": null,
+      "after": "text",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/backend-client/src/types.rs",
+            "line": 125,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/backend-client/src/types.rs#L125"
+          },
+          {
+            "path": "codex-rs/cloud-tasks-client/src/http.rs",
+            "line": 324,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/cloud-tasks-client/src/http.rs#L324"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "behavior.compaction.model",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction",
+        "model"
+      ],
+      "title": "Behaviour: compaction model changed: \"gpt-5.2-codex\" → \"gpt-5.3-codex\"",
+      "impact": "notable",
+      "before": "gpt-5.2-codex",
+      "after": "gpt-5.3-codex",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model changed: \"gpt-5.2-codex\" → \"gpt-5.3-codex\"",
+      "impact": "notable",
+      "before": "gpt-5.2-codex",
+      "after": "gpt-5.3-codex",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.models.gpt-5.3-codex",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "models",
+        "gpt-5.3-codex"
+      ],
+      "title": "Behaviour: sandbox models gpt-5.3-codex added",
+      "impact": "notable",
+      "before": null,
+      "after": "gpt-5.3-codex",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.models.gpt-5.2-codex",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "models",
+        "gpt-5.2-codex"
+      ],
+      "title": "Behaviour: sandbox models gpt-5.2-codex removed",
+      "impact": "notable",
+      "before": "gpt-5.2-codex",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries changed: \"auto\" → \"none\"",
+      "impact": "notable",
+      "before": "auto",
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex debug.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex debug",
+        "description"
+      ],
+      "title": "Description of `codex debug` changed",
+      "impact": "informational",
+      "before": "WARNING: proceeding, even though we could not update PATH: operation would block Debugging tools",
+      "after": "Debugging tools",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/bin/logs_client.rs",
+            "line": 332,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/state/src/bin/logs_client.rs#L332"
+          },
+          {
+            "path": "codex-rs/tui/src/bottom_pane/command_popup.rs",
+            "line": 57,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/tui/src/bottom_pane/command_popup.rs#L57"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.debug --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "debug --help"
+      ],
+      "title": "Full help text of `debug --help` changed (+0 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not update PATH: operation would block\n Debugging tools\n \n Usage: codex debug [OPTIONS] <COMMAND>\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 118,
+            "url": "https://github.com/openai/codex/blob/rust-v0.105.0/codex-rs/arg0/src/lib.rs#L118"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.default_mode_request_user_input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.default_mode_request_user_input"
+      ],
+      "title": "New setting: features.default_mode_request_user_input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 639,
+            "url": "https://github.com/openai/codex/blob/rust-v0.106.0/codex-rs/core/src/features.rs#L639"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.skill_approval",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.skill_approval"
+      ],
+      "title": "Setting no longer read: features.skill_approval",
+      "impact": "notable",
+      "before": {
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 628,
+            "url": "https://github.com/openai/codex/blob/rust-v0.105.0/codex-rs/core/src/features.rs#L628"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.memories.max_unused_days",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.max_unused_days"
+      ],
+      "title": "New setting: memories.max_unused_days",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum number of days since a memory was last used before it becomes ineligible for phase 2 selection.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.tonic",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "tonic"
+      ],
+      "title": "Binary sdk.tonic: 0.14.5 → 0.14.3",
+      "impact": "informational",
+      "before": "0.14.5",
+      "after": "0.14.3",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

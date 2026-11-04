@@ -1,0 +1,278 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.292",
+  "to": "2.1.293",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added Claude Haiku 5.5 (`claude-haiku-5-5`), now the default Haiku model on the Anthropic API — 1M context, $0.10/$0.50 per Mtok ($0.50/$2.50 for prompts over 100K)\n- Added `agentType` to the `subagentStatusLine` payload, so scripts can tell custom subagent types apart\n- Added `isDeferred` to `$.tool.register` for mods: `false` lists the tool's schema in the prompt from the start instead of behind tool search\n- Fixed Claude sometimes treating its own last actions before a context compaction as done after it, and retracting or redoing finished work\n- Fixed a memory leak where an HTTP MCP connection kept every request it had sent until it closed\n- Fixed a message sent while Claude was working being lost when `←` moved the session to the background; if a queued message can't move, `←` now stays put and says so\n- Fixed `/model` effort ←/→ wrapping past the highest or lowest level, which could accidentally save Low as a model's default effort\n- Fixed `/tui` disconnecting Claude in Chrome in a session started with `--chrome`, and ignoring `--no-chrome`\n- Fixed Claude being told to continue or message subagents with `SendMessage` in sessions, including resumed ones, where a host, a permission rule or a `--tools` list removed that tool\n- Fixed subagents and `--agent` sessions being told a built-in tool was disabled for the whole session when only their own tool list left it out\n- Fixed a claude.ai-synced skill's edited description sometimes not reaching the model until a new conversation or `/clear`\n- Fixed `claude logs`, `stop`, `kill`, `rm` and `claude daemon status`, `stop`, `uninstall` sometimes signing you out when your login had expired or was about to\n- Fixed the footer's agents count disappearing after a momentary failure to read the sessions folder (for example, too many open files)\n- Fixed a custom agent named `worker` being shown as \"Agent\" when it starts, and the agent detail dialog's title losing the agent type once the agent finishes\n- Fixed the Artifact tool's transcript row briefly reading `Artifact(\"(unprintable path)\")` while a publish call was still streaming in\n- Fixed the `/ultrareview` upload on Linux wrongly refusing some repositories, such as one inside another checkout, over a settings file that \"could not be parsed\" while a sandboxed command was running\n- Fixed the `/ultrareview` upload's refusal over split-index files advising a git command that could leave git unable to read its index\n- Fixed replies in very long Remote Control and cloud sessions that could still appear a block at a time instead of streaming in\n- Fixed Remote Control uploading a session's starting history again after every credential recovery\n- Fixed PushNotification reporting \"Remote Control inactive\" in sessions started with `claude remote-control`\n- Fixed a mod's hooks on `classic.*` events being skipped while the plugin hooks worker restarts, which left settings hooks to answer without them\n- Fixed `claude plugin test` failing for mods that call `$.session.append`; tests can read the appended rows back with the new `mock.session`\n- Fixed `claude plugin eval` refusing every Bash-granting run on Macs with Docker Desktop (links under `~/.docker/bin`); the refusal now names which part of a credential store held the link\n- Fixed the Claude apps gateway refusing to start when a `desktop` policy sets Claude Desktop's built-in browser keys, such as `builtinBrowserEnabled`\n- Fixed `claude agents` offering bypass permissions that background sessions then ignored when consent was saved only in `.claude/settings.local.json` or a `--settings` file; it now asks for consent first, and a session that ignores bypass shows a short notice that stays\n- Fixed `←` backgrounding a session after 10 seconds while the prompt held unsent text (it now cancels the move) or a question was waiting for your answer\n- Fixed Esc, or No without feedback, on a permission prompt not stopping the turn when `←` had just been pressed to move the session to the background\n- Fixed the agents view briefly replacing the session list with placeholder rows when the sessions folder could not be read (for example, too many open files)\n- Fixed path-scoped rules and nested CLAUDE.md files not loading when Claude views a file with a single-file cat, head, tail, sed -n or grep command in the Bash tool instead of the Read tool\n- Fixed pasted text that begins and ends with the same words sometimes being sent to Claude as if it had been typed\n- Fixed a skill name in pasted text being treated as typed when an accent typed or pasted right after the paste merged into its last letter\n- Fixed `/feedback` returning to the drafts list after Ctrl+O or Ctrl+Z while a report was sending, leaving the send impossible to cancel\n- Fixed `claude purge` stopping silently (exit 0, or a hang in a terminal) when a file or folder could not be deleted; it now deletes the rest, lists what it could not delete, and exits 1\n- Fixed keybindings.json checks: a lone \" \" (space key) is no longer reported as an error, and keys like \"ctrl+ k\" now get a warning\n- Fixed vim mode `>>` and `<<` on a line of only spaces leaving the cursor past the end of the line, where a following `x` deleted nothing\n- Fixed vim mode: after deleting whole lines in Visual mode (`V` then `d`) the cursor lands on the first non-blank, and `.` after it acts on the cursor's line\n- Windows: Fixed stopping a status line, hook, or shell command sometimes terminating an unrelated process that had been given the same process ID\n- Reverted the auto mode denial message change from 2.1.281 that told Claude a denial covers the outcome, not only the exact command\n- Reverted the 2.1.290 fix for cloud sessions staying asleep after a container restart lost a pending `/loop` wakeup or scheduled task; Claude is no longer told, and the session stays asleep\n- Improved startup for Team and Enterprise organizations: policy and managed settings are fetched earlier, and a stalled request is retried after 3 seconds\n- Improved Claude in Chrome: fewer page actions are refused when the browser is slow to report its tabs\n- Improved the Claude in Chrome message in cloud sessions when the browser can't be reached: if you belong to more than one organization, it now says the extension must be signed in to the same one, and how to change that\n- Improved the Bash edit diff note to say the listed files changed while the command ran, which can include writes by other processes\n- Improved artifacts: Claude pins libraries to exact versions two weeks old or older\n- Changed claude.ai skill syncing to check for changes about every 40 minutes, instead of every 10, while no session is in use\n- Changed the order of agent lists and of MCP servers announced to the model: names with non-ASCII characters now sort after ASCII names\n- Changed OpenTelemetry `claude_code.at_mention` logging to emit at most 100 agent and 100 MCP-resource events each time a prompt is read\n- Self-hosted runner: Changed the orchestrator to sleep 4 to 6 seconds between polls instead of a constant 5, so several replicas for one environment stop polling at the same moment\n- [Claude Tag] Fixed Claude in Slack saying a workspace isn't set up in Enterprise Grid channels shared across workspaces when Slack labels a message with a workspace that isn't connected\n- [Claude Tag] Fixed Claude in Slack stopping mid-task in a channel when an admin changed the channel's connectors, plugins, skills or rules; the change now applies once Claude finishes\n- [Claude Tag] Fixed asking Claude in Slack to run a thread's routine now with extra notes starting a separate run that couldn't post back; the run now continues in that thread\n- [Claude Tag] Fixed an access bundle's Add a connector dialog in Claude Tag admin settings showing every Google connector as connected after one Google sign-in\n- [Claude Tag] Improved Claude Tag admin settings to list an Enterprise Grid that isn't connected yet, with a Connect button\n- [Claude Tag] Changed Claude in Slack to join announcement channels, where only admins can post, without posting its intro\n- [Claude Tag] Changed the limit on channel rules in Claude Tag admin settings from 20 to 50 for each workspace and for the organization-wide Slack page\n- [Code Review] Improved Code Review's Add a repository dialog to list each repository that couldn't be added and why, such as missing GitHub write access"
+  },
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "config": 6,
+      "hooks": 1,
+      "model": 3,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 7,
+      "notable": 5
+    },
+    "undocumented": 10
+  },
+  "changes": [
+    {
+      "id": "model.aliases.haiku",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "aliases",
+        "haiku"
+      ],
+      "title": "Model alias \"haiku\": claude-haiku-4-5-20251001 → claude-haiku-5-5",
+      "impact": "notable",
+      "before": "claude-haiku-4-5-20251001",
+      "after": "claude-haiku-5-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.prices.claude-haiku-4-5-20251001",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "prices",
+        "claude-haiku-4-5-20251001"
+      ],
+      "title": "Built-in price for claude-haiku-4-5-20251001 removed",
+      "impact": "notable",
+      "before": {
+        "cache_read": 0.1,
+        "cache_write_1h": 2,
+        "cache_write_5m": 1.25,
+        "input": 1,
+        "output": 5,
+        "unit": "USD per million tokens"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "model.prices.claude-haiku-5-5",
+      "category": "model",
+      "op": "added",
+      "path": [
+        "model",
+        "prices",
+        "claude-haiku-5-5"
+      ],
+      "title": "Built-in price for claude-haiku-5-5 added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "cache_read": 0.01,
+        "cache_write_1h": 0.2,
+        "cache_write_5m": 0.125,
+        "input": 0.1,
+        "output": 0.5,
+        "unit": "USD per million tokens"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+280 −301 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -58,9 +58,7 @@\n If one names a file, function, or flag, verify it still exists before recommending it.\n \n # Environment\n- - The most recent Claude models are the Claude 5 family and Haiku 4.5.\n-Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5.5: 'claude-sonnet-5-5', Haiku 4.5: 'claude-haiku-4-5-20251001'.\n-When building AI applications, default to the latest and most capable Claude models.\n+ - The most recent Claude models are the Claude 5 family. Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5.5: 'claude-sonnet-5-5', Haiku 5.5: 'claude-haiku-5-5'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n  - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast.\n \n",
+      "stats": {
+        "added_chars": 280,
+        "removed_chars": 301
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+280 −301 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -57,9 +57,7 @@\n If one names a file, function, or flag, verify it still exists before recommending it.\n \n # Environment\n- - The most recent Claude models are the Claude 5 family and Haiku 4.5.\n-Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5.5: 'claude-sonnet-5-5', Haiku 4.5: 'claude-haiku-4-5-20251001'.\n-When building AI applications, default to the latest and most capable Claude models.\n+ - The most recent Claude models are the Claude 5 family. Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5.5: 'claude-sonnet-5-5', Haiku 5.5: 'claude-haiku-5-5'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n  - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast.\n \n",
+      "stats": {
+        "added_chars": 280,
+        "removed_chars": 301
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.canContinueAgent",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.canContinueAgent"
+      ],
+      "title": "PostToolUse hook payload field tool_response.canContinueAgent added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_response.canContinueAgent",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.syncClaudeAiSkills.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "syncClaudeAiSkills",
+        "description"
+      ],
+      "title": "syncClaudeAiSkills description changed (+202 −137 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,5 +3,5 @@\n In .claude/settings.local.json or --settings: downloads stop and synced skills are blocked and hidden for sessions in that workspace or invocation only (nothing is moved).\n Not read from project settings (.claude/settings.json).\n Only false is honored — the feature is enabled server-side for your account, so setting true does not turn it on early.\n-While it is on, synced skills are available in every session, re-synced every 10 minutes, and removed when you disable them on claude.ai.\n+While it is on, synced skills are available in every session, re-synced about every 10 minutes while a session is in use and a quarter as often otherwise, and removed when you disable them on claude.ai.\n Only applies when signed in with your Claude account.\n",
+      "stats": {
+        "added_chars": 202,
+        "removed_chars": 137
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_BG_CARRIED_PROMPTS_SHA256",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_BG_CARRIED_PROMPTS_SHA256"
+      ],
+      "title": "New environment variable: CLAUDE_BG_CARRIED_PROMPTS_SHA256",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_BG_CARRIED_PROMPTS_SHA256",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DESKTOP_SKILL_SWITCHES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DESKTOP_SKILL_SWITCHES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DESKTOP_SKILL_SWITCHES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DESKTOP_SKILL_SWITCHES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PROCESS_WRAPPER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PROCESS_WRAPPER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PROCESS_WRAPPER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PROCESS_WRAPPER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_APP_SANDBOX_BASE_HOST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_APP_SANDBOX_BASE_HOST"
+      ],
+      "title": "New environment variable: MCP_APP_SANDBOX_BASE_HOST",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_APP_SANDBOX_BASE_HOST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_TRANSPORT_POLICY_ONLY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_TRANSPORT_POLICY_ONLY"
+      ],
+      "title": "New environment variable: MCP_TRANSPORT_POLICY_ONLY",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_TRANSPORT_POLICY_ONLY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

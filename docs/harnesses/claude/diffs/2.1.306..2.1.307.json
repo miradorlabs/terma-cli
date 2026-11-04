@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.306",
+  "to": "2.1.307",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `/claude-api api-version` to move Claude API code to API version `2026-10-21`\n- Added the `claude_code.safety_event` OpenTelemetry event for each tool call a permission rule, auto mode, a safety check, a hook or the sandbox stopped, prompted or sent back\n- Fixed requests failing with a model-not-found error when `CLAUDE_CODE_DISABLE_1M_CONTEXT` is set and the model is an alias with the `[1m]` suffix, such as `opus[1m]`\n- Fixed the `prompt-caching-scope` beta header being sent behind custom `ANTHROPIC_BASE_URL` gateways and on Foundry, where it has no effect\n- Fixed MCP servers showing \"needs authentication\" in `claude -p` on macOS while the login keychain was locked; they now say why, and the next run after an unlock connects without a new sign-in\n- Fixed MCP servers being reported as timed out, and staying failed in headless runs, when a macOS or Linux computer went to sleep while they were connecting\n- Fixed HTTP MCP tool calls being sent twice when the connection closed mid-call; only read-only or idempotent tools are now retried\n- Fixed a turn sometimes starting without an SDK MCP server's latest tools when a background task was running\n- Fixed some \"Autocompact is thrashing\" errors in turns that read many PDF pages, images or other large tool results\n- Fixed `/autocompact` in cloud sessions going back to the default window after the session restarted\n- Fixed a conversation cleared with `/clear` sometimes coming back when a cloud or self-hosted runner session restarted\n- Fixed `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS` being ignored in Claude apps gateway sessions\n- Fixed telemetry from Claude Desktop sessions behind a Claude apps gateway being rejected when `OTEL_EXPORTER_OTLP_HEADERS` is set\n- Fixed `/permissions` > Recently denied not showing the denied shell command, and auto mode's local classifier ignoring an approval from there when it checks a retried command; approving a row now names the command, not its description\n- Fixed `/help` and the `/` command menu showing long model-facing descriptions for bundled skills such as `/claude-api` instead of their short descriptions\n- Fixed subagent transcripts recording placeholder token usage and an empty stop reason for streamed responses\n- Fixed model switches through the Agent SDK's `setModel()`, and apps built on it, being refused when the API took more than 5 seconds to confirm the model; Claude Code now waits up to 15 seconds\n- Fixed a background command stopped through a connected app (such as the desktop app archiving an idle session) being reported to Claude as stopped by the user; the notice now names its output file\n- Fixed WebFetch in Cowork cloud sessions reporting a tool error when a site answered with a 4xx status or a robots.txt refusal; it is now a normal result, as in local sessions\n- Fixed write tools on a directly configured GitHub MCP server showing a form that closed without creating anything in the desktop app's Code tab\n- Fixed Artifact tool reads failing with a connection reset when the server had closed a reused connection\n- Self-hosted runner: Fixed sessions with `--use-anthropic-git-proxy` committing a `.claude/settings.local.json` left in the clone by an earlier session\n- Self-hosted runner: Fixed archiving or requeueing a session, or stopping the runner, during its checkout hook leaving the hook's processes running and the runner's slot held\n- Improved recovery from unparseable tool calls: Claude Code now retries the call up to twice before ending the turn with an error\n- Improved fork subagents launched together: each is now told which launch is its own, so forks are much less likely to try to start each other's work\n- Improved browser sign-in: the success page now appears as soon as sign-in completes, without waiting for your account profile to load\n- Improved web search errors in cloud and self-hosted runner sessions: a search refused with a 403 that gives a reason now shows that reason instead of a generic \"Authentication error\"\n- Improved the time to the first reply in cloud sessions when one of the desktop app's MCP servers can't connect\n- Improved Remote Control connect time for sessions whose transcript contains large pasted images or PDF reads\n- Changed the notice Claude gets when the WebSearch budget is used up to also tell it not to query search engines in a browser or through computer use\n- Changed the `axScreenReader` setting and `CLAUDE_AX_SCREEN_READER` in a settings `env` block to apply only from user, managed or `--settings` settings (since 2.1.305)\n- Self-hosted runner: Changed checkout hooks to be stopped after 30 minutes by default, failing the session's setup; if yours needs longer, raise `--checkout-hook-timeout-min` or set it to `0`\n- Self-hosted runner: Changed the certificate file built for Anthropic-managed git to filter its trusted certificates as the CLI does; a `[runner:warn]` line gives the number left out\n- [VSCode] Added a notice on the microphone button when voice dictation stops by itself (15 seconds without recognized speech, or the 2-minute limit), saying why and that the text so far is kept\n- [VSCode] Fixed a long prompt expanded with Show more covering the whole chat panel: a pinned prompt is now capped at 40% of the panel and scrolls\n- [VSCode] Fixed part of a list item or table cell with LaTeX math pasting as a new list or table in rich text editors\n- [VSCode] Fixed dictation failing behind a TLS-inspecting proxy when `NODE_EXTRA_CA_CERTS` is set only in `~/.claude/settings.json`; it now also follows `CLAUDE_CODE_CERT_STORE`\n- [VSCode] Changed the \"still open somewhere else\" notice to also cover a Claude process left over from an extension restart, which usually ends on its own within about 10 minutes\n- [VSCode] Changed voice dictation to filter its trusted certificates as the CLI does\n- [VSCode] Changed the extension's own requests to filter their trusted certificates as the CLI does, and to trust the `NODE_EXTRA_CA_CERTS` file named in the environment or in user settings\n- [Cloud sessions] Fixed the repository picker saying \"No repositories match\" while a search was still running; it now shows \"Searching…\" until the results arrive\n- [Cloud sessions] Fixed the \"Waiting for a runner\" status on self-hosted environments being cut off; with on-demand runners it now counts up from your last message and shows failed attempts\n- [Code Review] Added `@claude review stop` (also `off` and `pause`) to Code Review, ending an `@claude review always` subscription on a pull request without starting a new review"
+  },
+  "summary": {
+    "changes": 21,
+    "categories": {
+      "config": 19,
+      "request": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 15,
+      "notable": 6
+    },
+    "undocumented": 17
+  },
+  "changes": [
+    {
+      "id": "tools.Agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "description"
+      ],
+      "title": "Agent tool description changed (+1639 −410 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,9 +6,22 @@\n \n ## When to use\n \n-Reach for this when the task matches an available agent type, when you have independent work to run in parallel, or when answering would mean reading across several files — delegate it and you keep the conclusion, not the file dumps.\n-For a single-fact lookup where you already know the file, symbol, or value, search directly.\n-Once you've delegated a search, don't also run it yourself — wait for the result.\n+A fresh agent costs more than it looks.\n+It knows only what you put in the prompt, and you see only the summary it sends back — both handoffs drop detail, and neither of you can tell what the other missed.\n+You can't watch it work, only wait or cancel.\n+Its mistakes come back in the same confident register as its findings, and an agent handed your hypothesis tends to return it confirmed.\n+Several at once spend tokens in a burst the user didn't ask for.\n+Weigh those tokens against the accuracy they buy: the user pays for agents you did not need, and pays again for work you redo because you skipped one.\n+\n+Reach for this when you have independent work to run in parallel, when the user asks for a side quest that shouldn't block your main thread, or when answering would mean reading across several files — delegate that and you keep the conclusion, not the file dumps.\n+\n+Do the work yourself when it is a handful of tool calls or a lookup whose target you already know; don't delegate a check you could run inline.\n+Delegate review only when you want a read that isn't anchored on yours — then give it the code, not your conclusion.\n+Once you've delegated something, don't also run it yourself; wait for the result.\n+When in doubt, don't spawn.\n+\n+When you do spawn one, brief it like the peer it is: state the goal and what you have already ruled out, point it at the files and docs worth reading instead of retyping them, and keep the scope explicit and narrow.\n+That brief is the only context it will have, so it is your first lever on every cost above — and if you cannot write a clear one, you do not understand the task well enough to hand it off.\n \n A fork keeps its tool output out of your context. If you are the fork, execute directly — don't re-delegate.\n \n",
+      "stats": {
+        "added_chars": 1639,
+        "removed_chars": 410
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "request.betas.prompt-caching-scope-2026-01-05",
+      "category": "request",
+      "op": "removed",
+      "path": [
+        "request",
+        "betas",
+        "prompt-caching-scope-2026-01-05"
+      ],
+      "title": "Beta dropped: prompt-caching-scope-2026-01-05",
+      "impact": "notable",
+      "before": "prompt-caching-scope-2026-01-05",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "command"
+      ],
+      "title": "Setting no longer read: command",
+      "impact": "notable",
+      "before": {
+        "description": "Shell command to run as a persistent background monitor. Each stdout line is delivered to the model as a <task_notification> event; the process runs for the session lifetime. ${CLAUDE_PLUGIN_ROOT}, ${CLAUDE_PLUGIN_DATA}, ${CLAUDE_PROJECT_DIR}, ${user_config.*}, and ${ENV_VAR} are substituted. Runs in the session cwd (the named --project-config-root when a host set one) — prefix with `cd \"${CLAUDE_PLUGIN_ROOT}\" && ` if the script needs its own directory.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.description",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "description"
+      ],
+      "title": "Setting no longer read: description",
+      "impact": "notable",
+      "before": {
+        "description": "Short human-readable description of what is being monitored (shown in task panel and notification summary).",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.name",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "name"
+      ],
+      "title": "Setting no longer read: name",
+      "impact": "notable",
+      "before": {
+        "description": "Identifier for this monitor, unique within the plugin. Used to dedupe so re-arming (plugin reload, repeat skill invoke) does not spawn duplicates.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.credentials.files[].path.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.credentials.files[].path",
+        "description"
+      ],
+      "title": "sandbox.credentials.files[].path description changed (+82 −212 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Path to a credential file or directory. Same resolution as sandbox.filesystem.* paths: absolute, ~ expanded, or relative to the settings file root (project root for project settings, ~/.claude for user settings).\n+Path to marketplace.json within repo (defaults to .claude-plugin/marketplace.json)\n",
+      "stats": {
+        "added_chars": 82,
+        "removed_chars": 212
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sshHostCommands",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "sshHostCommands"
+      ],
+      "title": "New setting: sshHostCommands",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "SSH connections in Claude Desktop on macOS and Linux whose host comes from a command. A list of entries, each with `id`, `name` and `command`, and optionally `sshIdentityFile` and `startDirectory`. When you ask Desktop to create or replace an entry's host, it runs `command` on this computer: a program name or absolute path, followed by plain arguments. There is no shell, so quotes, pipes, variables and a leading `~` do not work. The command must print only the host on standard output: `host` or `user@host` on one line, or a JSON object with `sshHost` and, optionally, `sshPort` and `startDirectory`. Desktop reads this key only from user settings and from this computer's managed settings. Claude Code itself does not use it."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.when",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "when"
+      ],
+      "title": "Setting no longer read: when",
+      "impact": "notable",
+      "before": {
+        "default": "always",
+        "description": "Arm trigger. \"always\" arms at session start and on plugin reload. \"on-skill-invoke:<skill>\" arms the first time that skill is dispatched (via Skill tool or slash command).",
+        "enum": [
+          "always"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_THREAD_ASK_HELD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_THREAD_ASK_HELD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_THREAD_ASK_HELD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_THREAD_ASK_HELD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DIFF_COPY_ROOT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DIFF_COPY_ROOT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DIFF_COPY_ROOT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DIFF_COPY_ROOT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_LAUNCHER_SIGN_IN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_LAUNCHER_SIGN_IN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_LAUNCHER_SIGN_IN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_LAUNCHER_SIGN_IN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_IGNORE_PERSISTED_TRUST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_IGNORE_PERSISTED_TRUST"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_IGNORE_PERSISTED_TRUST",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_IGNORE_PERSISTED_TRUST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SPAWNED_BY_SERVER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SPAWNED_BY_SERVER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SPAWNED_BY_SERVER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SPAWNED_BY_SERVER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SUBAGENT_HISTORY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SUBAGENT_HISTORY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SUBAGENT_HISTORY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SUBAGENT_HISTORY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WITTY_DEWDROP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WITTY_DEWDROP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WITTY_DEWDROP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WITTY_DEWDROP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_AGENT_PROXY_URL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_AGENT_PROXY_URL"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_AGENT_PROXY_URL",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_AGENT_PROXY_URL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_CHECKOUT_HOOK_TIMEOUT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_CHECKOUT_HOOK_TIMEOUT_MS"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_CHECKOUT_HOOK_TIMEOUT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_CHECKOUT_HOOK_TIMEOUT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_DIFF_FINDS_NESTED_REPOSITORY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_DIFF_FINDS_NESTED_REPOSITORY"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_DIFF_FINDS_NESTED_REPOSITORY",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_DIFF_FINDS_NESTED_REPOSITORY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.AGENT_PROXY_AUTH_TOKEN",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "AGENT_PROXY_AUTH_TOKEN"
+      ],
+      "title": "Environment variable no longer read: AGENT_PROXY_AUTH_TOKEN",
+      "impact": "informational",
+      "before": "AGENT_PROXY_AUTH_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.AGENT_PROXY_URL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "AGENT_PROXY_URL"
+      ],
+      "title": "Environment variable no longer read: AGENT_PROXY_URL",
+      "impact": "informational",
+      "before": "AGENT_PROXY_URL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

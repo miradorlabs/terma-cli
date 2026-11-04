@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.152.0",
+  "to": "0.152.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.152.0...rust-v0.152.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.152.1",
+    "text": "## Bug Fixes\n- Guardian approval review now honors Node REPL policies provided through model metadata.\n\n**Full Changelog**: https://github.com/openai/codex/compare/rust-v0.152.0...rust-v0.152.1"
+  },
+  "summary": {
+    "changes": 5,
+    "categories": {
+      "hooks": 5
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 4,
+      "notable": 1
+    },
+    "undocumented": 5
+  },
+  "changes": [
+    {
+      "id": "hooks.events.PreToolUse.control.json_decision",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "json_decision"
+      ],
+      "title": "PreToolUse hook control (json_decision) added",
+      "impact": "informational",
+      "before": null,
+      "after": "blocks the tool; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1404,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/analytics/src/events.rs#L1404"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 559,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L559"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "additional_context"
+      ],
+      "title": "SessionStart hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "reaches the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1409,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/analytics/src/events.rs#L1409"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 574,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L574"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.json_decision",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "json_decision"
+      ],
+      "title": "Stop hook control (json_decision) added",
+      "impact": "informational",
+      "before": null,
+      "after": "keeps the turn going; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1414,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/analytics/src/events.rs#L1414"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L589"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "additional_context"
+      ],
+      "title": "UserPromptSubmit hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "reaches the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/analytics/src/events.rs#L1411"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 580,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L580"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.json_decision",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "json_decision"
+      ],
+      "title": "UserPromptSubmit hook control (json_decision) removed",
+      "impact": "notable",
+      "before": "blocks the prompt; message not shown to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.0/codex-rs/analytics/src/events.rs#L1411"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 580,
+            "url": "https://github.com/openai/codex/blob/rust-v0.152.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L580"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

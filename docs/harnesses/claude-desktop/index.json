@@ -1,0 +1,403 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "claude-desktop",
+    "name": "Claude Desktop (Code)",
+    "vendor": "Anthropic",
+    "homepage": "https://claude.ai/download",
+    "source": null,
+    "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "latest": "2.1.318",
+    "support": "supported",
+    "versions_tracked": 18,
+    "first_tracked": "2026-11-04",
+    "last_change": {
+      "from": "2.1.317",
+      "to": "2.1.318",
+      "at": "2026-11-04T16:16:16.239171Z",
+      "released_at": null,
+      "changes": 0,
+      "categories": {}
+    }
+  },
+  "versions": [
+    {
+      "version": "2.1.318",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.317",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.317",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.316",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.316",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.314",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.314",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.312",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.312",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.311",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.311",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.310",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.310",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.309",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.309",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.308",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.308",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.306",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.306",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.304",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.304",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.303",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.303",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.302",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.302",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.301",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.301",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.300",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.300",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.299",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.299",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.296",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.296",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.202",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "2.1.202",
+      "released_at": null,
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    }
+  ]
+}

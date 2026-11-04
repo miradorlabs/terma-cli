@@ -1,0 +1,278 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.222",
+  "to": "2.1.223",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added owner wildcard entries (`\"owner/*\"`) to the `strictKnownMarketplaces` and `blockedMarketplaces` managed settings for allowing or blocking all marketplace repos under a GitHub org\n- Added a warning when workflow agents, forked skills, slash commands, or resumed background agents' requested subagent model is restricted and the parent model runs instead\n- Added a `/teleport` hint in cloud sessions showing how to continue locally with `claude --teleport <session id>`\n- Fixed a Bash permission bypass where a crafted command could hide parts of itself from permission checks\n- Fixed permission prompts so commands padded with tabs or invisible Unicode can no longer hide part of the command from the approval dialog\n- Fixed workflow scripts being able to use dynamic `import()` to run code outside the workflow sandbox\n- Fixed a permission gap where an agent definition's `bypassPermissions` mode ignored the org bypass-permissions disable policy\n- Fixed resuming a session after a mid-session `/cd` coming back empty\n- Fixed gateway model discovery hiding Claude models registered under provider-prefixed IDs such as `vertex_ai/claude-*` or `bedrock/anthropic.claude-*`\n- Fixed `modelOverrides` keys that aren't Anthropic model IDs being treated as the session's canonical model ID; unknown keys are now ignored as documented\n- Fixed managed settings: server-delivered settings no longer disable the env block of a machine-local `managed-settings.json` or MDM profile; admin env now merges per key\n- Fixed sandboxed commands failing to start on Linux when `sandbox.filesystem.denyWrite` covers the working directory\n- Fixed forked background agents getting stuck \"already resuming\" for the rest of the session when rebuilding the fork's parent prompt failed during resume\n- Fixed a resumed session failing every turn, or leaving the interactive app on an unresponsive error screen, when its history held a malformed diagnostics attachment\n- Fixed a rare hang when parsing unusual `git push` output\n- Changed `CLAUDE_CODE_DISABLE_1M_CONTEXT` to hold every Claude model with a native 1M window to 200K via auto-compaction, not just a fixed list; a startup warning now appears when auto-compaction isn't holding the session to 200K\n- Changed auto-compact to keep sessions on unrecognized model IDs within the assumed context window instead of letting them grow past it; set `CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1` to restore the previous behavior\n- Changed `/review` to be an alias of `/code-review`, which reviews the current diff or a PR (`/code-review <level> <pr#>`); use `/code-review ultra` for a deep cloud review\n- Changed `/code-review` with no effort level to reuse the level you typed last; type a level like `/code-review high` to change it"
+  },
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "config": 9,
+      "hooks": 1,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 10,
+      "notable": 2
+    },
+    "undocumented": 11
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+0 −78 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -40,5 +40,4 @@\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n - init: Initialize a new CLAUDE.md file with codebase documentation\n-- review: Review a GitHub pull request; for your working diff use /code-review\n - security-review: Complete a security review of the pending changes on the current branch\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 78
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+0 −78 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -45,5 +45,4 @@\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n - init: Initialize a new CLAUDE.md file with codebase documentation\n-- review: Review a GitHub pull request; for your working diff use /code-review\n - security-review: Complete a security review of the pending changes on the current branch\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 78
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.blockedMarketplaces.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "blockedMarketplaces",
+        "description"
+      ],
+      "title": "blockedMarketplaces description changed (+379 −225 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Enterprise blocklist of marketplace sources. When set in managed settings, these exact sources are blocked from being added as marketplaces. The check happens BEFORE downloading, so blocked sources never touch the filesystem.\n+Enterprise blocklist of marketplace sources.\n+When set in managed settings, these sources are blocked from being added as marketplaces.\n+Entries match exactly, except that a github entry may use the owner-wildcard form {\"source\":\"github\",\"repo\":\"owner/*\"} to block every repository under that owner.\n+The check happens BEFORE downloading, so blocked sources never touch the filesystem.\n",
+      "stats": {
+        "added_chars": 379,
+        "removed_chars": 225
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.blockedMarketplaces[].repo.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "blockedMarketplaces[].repo",
+        "description"
+      ],
+      "title": "blockedMarketplaces[].repo description changed (+0 −38 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-GitHub repository in owner/repo format\n+\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 38
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.source.repo.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.source.repo",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.source.repo description changed (+0 −38 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-GitHub repository in owner/repo format\n+\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 38
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.strictKnownMarketplaces[].repo.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "strictKnownMarketplaces[].repo",
+        "description"
+      ],
+      "title": "strictKnownMarketplaces[].repo description changed (+0 −38 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-GitHub repository in owner/repo format\n+\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 38
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_ADMIN_ENV_UNION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_ADMIN_ENV_UNION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_ADMIN_ENV_UNION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_ADMIN_ENV_UNION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PARCHMENT_FERN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PARCHMENT_FERN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PARCHMENT_FERN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PARCHMENT_FERN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PLAN_ARTIFACTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PLAN_ARTIFACTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PLAN_ARTIFACTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PLAN_ARTIFACTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_INVESTIGATE_FIRST",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_INVESTIGATE_FIRST"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_INVESTIGATE_FIRST",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_INVESTIGATE_FIRST",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

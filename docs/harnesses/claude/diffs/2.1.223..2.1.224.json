@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.223",
+  "to": "2.1.224",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added self-hosted environments: `claude self-hosted-runner` turns your own machines or containers into a place Claude Code web, mobile, and desktop sessions can run, on Team and Enterprise plans\n- Added `archive` plugin source: install plugins from a zip over HTTPS without git or npm, with optional SHA-256 pinning\n- Added a cancel-and-confirm step when removing an unavailable paste changes a command's text\n- Added `ANTHROPIC_BEDROCK_REGION_PREFIX` env var for Bedrock to prefer a specific cross-region inference profile over the `AWS_REGION`-derived one\n- Added `crossSessionInbound` and `dialogExpiry` settings: cross-session messages sent to a session running with bypassed permissions are held for your approval, and messages to other sessions auto-deliver\n- Added sandbox credential-masking options: `extract` and `onExtractNoMatch` for structured env values, `decode: \"jwt\"` with `maskClaims` for JWT-aware masking, and `awsPairs`/`sigv4` for AWS SigV4 re-signing; these need `network.tlsTerminate` and are honored only from user, managed, or `--settings` settings\n- Added cross-session `SendMessage`: Claude Code sessions can now message each other, on any of your machines, with `ListAgents` to discover them (macOS and Linux)\n- Fixed long (>200 char) project paths resolving to another project's session directory under a shared sanitized prefix; session list, rename, fork, delete and `/resume` no longer cross projects\n- Fixed `SendMessage` reporting \"Message sent\" when the write to a teammate's inbox had actually failed; failed deliveries are now reported as errors\n- Fixed sandbox filesystem deny entries written with a trailing slash (e.g. `denyRead: \"~/.aws/\"`) being silently bypassable on Linux and macOS\n- Fixed sandbox violation details never appearing in Bash tool results; Claude now sees which file or network access was denied and why\n- Fixed MCP tools that connect mid-turn being deferred for tool search without their names announced to the model\n- Fixed plugin install records being silently corrupted when the same plugin is installed in multiple projects\n- Fixed recalled or restored paste content occasionally attaching wrong data or silently losing text when the paste had aged out or placeholder numbers collided\n- Fixed copy-on-select on Wayland sometimes not reaching the clipboard; the two selection writes no longer race\n- Fixed the feedback survey's transcript share silently failing on long sessions; a failed share now shows an error instead of a success message\n- Fixed Remote Control auto-start intermittently failing with \"Remote credentials fetch failed\" on a cold start with a stale login token\n- Fixed Remote Control and SDK clients showing a blank \"(no content)\" message after `/clear` and other output-less commands\n- Fixed a Remote Control session recreated after its server session expired uploading prior local conversation history into the new session\n- Improved fullscreen mode to keep the full pre-compaction history in scrollback across repeated compactions, instead of only the most recent interval\n- Improved Remote Control: attached web and mobile clients now see compaction progress and the post-compaction boundary instead of a silent pause; `/clear` resets now propagate to attached clients\n- Improved Remote Control: connection failures now show a persistent failure indicator with details and a reconnect shortcut, instead of only an 8-second toast\n- Removed the 200-subagent-per-session spawn cap; long-running sessions no longer refuse new agents (concurrency and depth limits still apply)\n- Changed managed settings: the approval prompt no longer re-appears after re-login or org switching when the organization's settings are unchanged\n- Changed the feedback-survey transcript share: with your consent it now also uploads the last request's model settings — the system prompt (which includes your `CLAUDE.md` instructions), tool definitions, and model parameters. Secrets are redacted as before, and these fields are dropped first if the share is too large\n- Changed the Bash tool description to always note that command output is displayed to the model, not reliably to the user\n- Changed recalled paste placeholder numbers to renumber when accepted into the input\n- Changed Remote Control to archive the stale server session instead of leaving a dead one listed when a fresh session is minted after compaction or `/resume`\n- [VSCode] Fixed the extension showing Remote Control as connected after the connection failed\n- Fixed a session resume silently reconnecting Remote Control after the user turned it off (`--resume`, SDK hosts, and the VS Code extension)\n- [VSCode] Fixed sessions not honoring `remoteControlAtStartup` when explicitly enabled"
+  },
+  "summary": {
+    "changes": 21,
+    "categories": {
+      "behavior": 1,
+      "cli": 4,
+      "config": 3,
+      "hooks": 13
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 20,
+      "notable": 1
+    },
+    "undocumented": 15
+  },
+  "changes": [
+    {
+      "id": "behavior.compaction_command.tools",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "tools"
+      ],
+      "title": "Behaviour: compaction_command tools changed: 27 → 28",
+      "impact": "notable",
+      "before": 27,
+      "after": 28,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.InstructionsLoaded.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "InstructionsLoaded",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "InstructionsLoaded hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "MessageDisplay",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "MessageDisplay hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PermissionDenied.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionDenied",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PermissionDenied hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostCompact.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostCompact",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostCompact hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolBatch hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreCompact.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreCompact",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PreCompact hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PreToolUse hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SessionStart hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Setup.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Setup",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "Setup hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "Stop hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStop.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStop",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SubagentStop hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptExpansion.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptExpansion",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "UserPromptExpansion hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude.options.--cloud",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--cloud"
+      ],
+      "title": "New flag `claude --cloud`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Create a cloud session with the given description, or attach to an existing one by session ID or claude.ai/code URL",
+        "names": [
+          "--cloud"
+        ],
+        "value": "[description|session_id|url]"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--environment",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--environment"
+      ],
+      "title": "New flag `claude --environment`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Create a new cloud session that runs on the given self-hosted environment (ccpool_...).",
+        "names": [
+          "--environment"
+        ],
+        "value": "<environment_id>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--teleport",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--teleport"
+      ],
+      "title": "New flag `claude --teleport`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Resume a teleport session, optionally specify session ID",
+        "names": [
+          "--teleport"
+        ],
+        "value": "[session]"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+573 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -52,6 +52,9 @@\n   --brief                               Enable SendUserMessage tool for\n                                         agent-to-user communication\n   --chrome                              Enable Claude in Chrome integration\n+  --cloud [description|session_id|url]  Create a cloud session with the given\n+                                        description, or attach to an existing\n+                                        one by session ID or claude.ai/code URL\n   -c, --continue                        Continue the most recent conversation in\n                                         the current directory\n   --dangerously-skip-permissions        Bypass all permission checks.\n@@ -68,6 +71,9 @@\n       Edit\")\n   --effort <level>                      Effort level for the current session\n                                         (low, medium, high, xhigh, max)\n+  --environment <environment_id>        Create a new cloud session that runs on\n+                                        the given self-hosted environment\n+                                        (ccpool_...).\n   --exclude-dynamic-system-prompt-sections\n       Move per-machine sections (cwd, env info, memory paths, git status) from\n       the system prompt into the first user message. Improves cross-user\n@@ -189,6 +195,8 @@\n   --strict-mcp-config                   Only use MCP servers from --mcp-config,\n                                         ignoring all other MCP configurations\n   --system-prompt <prompt>              System prompt to use for the session\n+  --teleport [session]                  Resume a teleport session, optionally\n+                                        specify session ID\n   --tmux                                Create a tmux session for the worktree\n                                         (requires --worktree). Uses iTerm2\n                                         native panes when available; use\n",
+      "stats": {
+        "added_chars": 573,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.crossSessionInbound",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound"
+      ],
+      "title": "New setting: crossSessionInbound",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Inbound cross-session peer messages (SendMessage from your other sessions): 'accept' delivers them, 'hold' parks them for your review without letting Claude act, 'refuse' opts this session out. An explicit value always wins. Unset (mode parity): a message auto-delivers only when the sending session's permission-mode class matches yours (bypass↔bypass or prompting↔prompting); a mismatched sender's message is held for your approval; a sender that asserts no class is held only while this session bypasses permission prompts.",
+        "enum": [
+          "accept",
+          "hold",
+          "refuse"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.dialogExpiry",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry"
+      ],
+      "title": "New setting: dialogExpiry",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Max time a permission/user dialog forwarded to a remote client stays parked awaiting an answer, and how long a HELD cross-session message awaits approval, before either resolves to its safe no-action default (cancelled / dropped-with-denial). Defaults to 5m to match the long-standing remote-dialog deadline; \"never\" disables the deadline. Local-only permission prompts (no remote client) are unaffected. The CLAUDE_CODE_USER_DIALOG_TIMEOUT_MS env var, when set, overrides this. Read from trusted sources only (never a checked-in repo settings file).",
+        "enum": [
+          "60s",
+          "5m",
+          "10m",
+          "never"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "env_vars"
+      ],
+      "title": "Environment variables: +41 −2",
+      "impact": "informational",
+      "before": [
+        "CLAUDE_CODE_MARL_CORMORANT",
+        "CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION"
+      ],
+      "after": [
+        "ALL_PROXY",
+        "ANTHROPIC_BEDROCK_REGION_PREFIX",
+        "CCR_SHR_SSE_HINTS",
+        "CLAUDE_CODE_ARTIFACT_DB",
+        "CLAUDE_CODE_AUTO_MODE_CLASSIFY_ASK_USER_QUESTION",
+        "CLAUDE_CODE_HARBOR_KITE",
+        "CLAUDE_CODE_MESSAGING_SOCKET",
+        "CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE",
+        "CLAUDE_RUNNER_DISABLE_AWAITING_ACTION_OVERRIDE",
+        "CLAUDE_RUNNER_FAIL_FAST_FETCH",
+        "CLAUDE_RUNNER_FETCH_DEPTH",
+        "CLAUDE_RUNNER_SKIP_GIT_VERIFY",
+        "CLAUDE_RUNNER_TRUST_CANONICAL_PREWARM",
+        "CLAUDE_RUNNER_USE_GIT_PROXY",
+        "GIT_SSH_COMMAND",
+        "SELF_HOSTED_RUNNER_BASE_DIR",
+        "SELF_HOSTED_RUNNER_CONFIGURE_GIT",
+        "SELF_HOSTED_RUNNER_CONFINE_REPO_SETTINGS",
+        "SELF_HOSTED_RUNNER_DEBUG_DIR",
+        "SELF_HOSTED_RUNNER_DEBUG_TOKEN_DIR",
+        "SELF_HOSTED_RUNNER_DRAIN_GRACE_MS",
+        "SELF_HOSTED_RUNNER_DRAIN_WAIT_MS",
+        "SELF_HOSTED_RUNNER_ENVIRONMENT_SECRET",
+        "SELF_HOSTED_RUNNER_EXEC_PATH",
+        "SELF_HOSTED_RUNNER_HEALTH_PORT",
+        "SELF_HOSTED_RUNNER_HOOKS_DIR",
+        "SELF_HOSTED_RUNNER_HOST_CONFIG_DIR",
+        "SELF_HOSTED_RUNNER_IDLE_SHUTDOWN_MS",
+        "SELF_HOSTED_RUNNER_LOCK_TO_ACCOUNT",
+        "SELF_HOSTED_RUNNER_LOG_FILE",
+        "SELF_HOSTED_RUNNER_MAX_LIFETIME_MS",
+        "SELF_HOSTED_RUNNER_POOL_SECRET",
+        "SELF_HOSTED_RUNNER_POST_SESSION_HOOK_TIMEOUT_MS",
+        "SELF_HOSTED_RUNNER_PUSH_OUTCOME_ON_RELEASE",
+        "SELF_HOSTED_RUNNER_RETIRE_AT",
+        "SELF_HOSTED_RUNNER_SESSION_IDLE_MS",
+        "SELF_HOSTED_RUNNER_SESSION_STOP_GRACE_MS",
+        "SELF_HOSTED_RUNNER_SIGKILL_TIMEOUT_MS",
+        "SELF_HOSTED_RUNNER_STARTUP_TIMEOUT_MS",
+        "SELF_HOSTED_RUNNER_TRUST_WORKSPACE",
+        "all_proxy"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

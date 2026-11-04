@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "harness": "codex-desktop",
+  "version": "0.165.0",
+  "platform": "",
+  "captured_at": "2026-11-04T16:16:16.239171Z",
+  "capture": {
+    "partial": false,
+    "sections": {
+      "support": "2026-11-04T16:16:16.239171Z"
+    }
+  },
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.desktop",
+        "label": "The desktop app through the relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.resumed_elsewhere",
+        "label": "A session resumed outside the repository stays out",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
+}

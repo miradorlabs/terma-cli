@@ -1,0 +1,628 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.115.0",
+  "to": "0.116.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.115.0...rust-v0.116.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.116.0",
+    "text": "## New Features\n- App-server TUI now supports device-code ChatGPT sign-in during onboarding and can refresh existing ChatGPT tokens. (#14952)\n- Plugin setup is smoother: Codex can prompt to install missing plugins or connectors, honor a configured suggestion allowlist, and sync install/uninstall state remotely. (#14896, #15022, #14878)\n- Added a `userpromptsubmit` hook so prompts can be blocked or augmented before execution and before they enter history. (#14626)\n- Realtime sessions now start with recent thread context and are less likely to self-interrupt during audio playback. (#14829, #14827)\n\n## Bug Fixes\n- Fixed a first-turn stall where websocket prewarm could delay `turn/start`; startup now times out and falls back cleanly. (#14838)\n- Restored conversation history for remote resume/fork in the app-server TUI and stopped duplicate live transcript output from legacy stream events. (#14930, #14892)\n- Improved Linux sandbox startup on symlinked checkouts, missing writable roots, and Ubuntu/AppArmor hosts by preferring system `bwrap` when available. (#14849, #14890, #14963)\n- Fixed an agent job finalization race and reduced status polling churn for worker threads. (#14843)\n\n## Documentation\n- Refreshed the Python SDK public API docs, examples, and walkthrough around the generated app-server models. (#14446)\n\n## Chores\n- Pinned the `setup-zig` GitHub Action to an immutable SHA for more reproducible CI. (#14858)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.115.0...rust-v0.116.0\n\n- #14717 Move TUI on top of app server (parallel code) @etraut-openai\n- #14665 Use request permission profile in app server @mousseau-oai\n- #14826 Fixed build failures related to PR 14717 @etraut-openai\n- #14833 fix(core): fix sanitize name to use '_' everywhere @apanasenko-oai\n- #14268 memories: exclude AGENTS and skills from stage1 input @andi-oai\n- #14139 windows-sandbox: add runner IPC foundation for future unified_exec @iceweasel-oai\n- #14851 Add exit helper to code mode scripts @pakrym-oai\n- #14828 [stack 1/4] Split realtime websocket methods by version @aibrahim-oai\n- #14652 Apply argument comment lint across codex-rs @bolinfest\n- #14837 skill-creator: default new skills to ~/.codex/skills @xl-openai\n- #14861 Add marketplace display names to plugin/list @xl-openai\n- #14878 feat: support remote_sync for plugin install/uninstall. @xl-openai\n- #14830 [stack 2/4] Align main realtime v2 wire and runtime flow @aibrahim-oai\n- #14886 fix: align marketplace display name with existing interface conventions @xl-openai\n- #14881 [codex] add Jason as a predefined subagent name @tibo-openai\n- #14864 fix: tighten up shell arg quoting in GitHub workflows @bolinfest\n- #14829 [stack 3/4] Add current thread context to realtime startup @aibrahim-oai\n- #14827 [stack 4/4] Reduce realtime self-interruptions during playback @aibrahim-oai\n- #14849 fix: canonicalize symlinked Linux sandbox cwd @viyatb-oai\n- #14892 Fix tui_app_server: ignore duplicate legacy stream events @etraut-openai\n- #14899 Revert tui code so it does not rely on in-process app server @etraut-openai\n- #14890 fix(linux-sandbox): ignore missing writable roots @viyatb-oai\n- #14920 feat: centralize package manager version @jif-oai\n- #14935 feat: rename to get more explicit close agent @jif-oai\n- #14843 Fix agent jobs finalization race and reduce status polling churn @daveaitel-openai\n- #14944 feat: show effective model in spawn agent event @jif-oai\n- #14838 fix(core): prevent hanging turn/start due to websocket warming issues @owenlin0\n- #14859 Feat: CXA-1831 Persist latest model and reasoning effort in sqlite @shijie-oai\n- #14930 fix(tui): restore remote resume and fork history @fcoury\n- #14955 Fix fuzzy search notification buffering in app-server tests @aibrahim-oai\n- #14938 feat: add suffix to shell snapshot name @jif-oai\n- #14959 Fix code mode yield startup race @aibrahim-oai\n- #14434 generate an internal json schema for `RolloutLine` @keyz\n- #14846 use framed IPC for elevated command runner @iceweasel-oai\n- #14952 Add device-code onboarding and ChatGPT token refresh to app-server TUI @etraut-openai\n- #14896 [plugins] Support plugin installation elicitation. @mzeng-openai\n- #14958 Stabilize Windows cmd-based shell test harnesses @aibrahim-oai\n- #14966 Stabilize permissions popup selection tests @aibrahim-oai\n- #14968 Stabilize approval matrix write-file command @aibrahim-oai\n- #14986 temporarily disable private desktop until it works with elevated IPC path @iceweasel-oai\n- #14983 Rename exec_wait tool to wait @pakrym-oai\n- #14905 Add auth env observability @ccy-oai\n- #14931 fix(tui): implement /mcp inventory for tui_app_server @fcoury\n- #14977 Cleanup skills/remote/xxx endpoints. @xl-openai\n- #14984 Gate realtime audio interruption logic to v2 @aibrahim-oai\n- #14902 Unify realtime shutdown in core @aibrahim-oai\n- #14963 fix(linux-sandbox): prefer system /usr/bin/bwrap when available @viyatb-oai\n- #14446 Add Python SDK public API and examples @shaqayeq-oai\n- #14993 feat: Add product-aware plugin policies and clean up manifest naming @xl-openai\n- #14995 app-server: reject websocket requests with Origin headers @maxj-oai\n- #14960 Add FS abstraction and use in view_image @pakrym-oai\n- #14293 fix: honor active permission profiles in sandbox debug @viyatb-oai\n- #14610 feat: support restricted ReadOnlyAccess in elevated Windows sandbox @viyatb-oai\n- #13592 Prefer websockets when providers support them @pakrym-oai\n- #14903 Handle realtime conversation end in the TUI @aibrahim-oai\n- #14727 Use workspace requirements for guardian prompt override @charley-oai\n- #14626 [hooks] userpromptsubmit - hook before user's prompt is executed @eternal-openai\n- #14858 Pin setup-zig GitHub Action to immutable SHA @viyatb-oai\n- #13702 fix(subagents) share execpolicy by default @dylan-hurd-oai\n- #15022 [plugins] Support configuration tool suggest allowlist. @mzeng-openai\n- #14947 feat: adapt artifacts to new packaging and 2.5.6 @jif-oai\n- #14821 feat: add memory citation to agent message @jif-oai\n- #15058 nit: disable live memory edition @jif-oai\n- #14942 Removed remaining core events from tui_app_server @etraut-openai\n- #15059 chore: disable memory read path for morpheus @jif-oai\n- #14842 Add notify to code-mode @pakrym-oai\n- #15020 fix: harden plugin feature gating @xl-openai"
+  },
+  "summary": {
+    "changes": 21,
+    "categories": {
+      "binary": 1,
+      "cli": 12,
+      "config": 6,
+      "hooks": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 19,
+      "notable": 2
+    },
+    "undocumented": 5
+  },
+  "changes": [
+    {
+      "id": "tools.close_agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "close_agent",
+        "description"
+      ],
+      "title": "close_agent tool description changed (+172 −144 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Close an agent when it is no longer needed and return its last known status. Don't keep agents open for too long if they are not needed anymore.\n+Close an agent when it is no longer needed and return its previous status before shutdown was requested. Don't keep agents open for too long if they are not needed anymore.\n",
+      "stats": {
+        "added_chars": 172,
+        "removed_chars": 144
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 1529,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/core/src/tools/spec.rs#L1529"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.supported.UserPromptSubmit",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "UserPromptSubmit"
+      ],
+      "title": "New hook event: UserPromptSubmit",
+      "impact": "notable",
+      "before": null,
+      "after": "UserPromptSubmit",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec/src/event_processor_with_human_output.rs",
+            "line": 992,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/exec/src/event_processor_with_human_output.rs#L992"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/config.rs",
+            "line": 13,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/hooks/src/engine/config.rs#L13"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex.options.--remote",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--remote"
+      ],
+      "title": "New flag `codex --remote`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Connect the app-server-backed TUI to a remote app server websocket endpoint.\nAccepted forms: `ws://host:port` or `wss://host:port`.",
+        "names": [
+          "--remote"
+        ],
+        "value": "<ADDR>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 287,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-test-client/src/lib.rs#L287"
+          },
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 1513,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server/src/codex_message_processor.rs#L1513"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex app-server.options.--session-source",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex app-server",
+        "options",
+        "--session-source"
+      ],
+      "title": "New flag `codex app-server --session-source`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "vscode",
+        "description": "Session source stamped into new threads started by this app-server.\nKnown values such as `vscode`, `cli`, `exec`, and `mcp` map to built-in sources. Any other non-empty value is recorded as a custom source.",
+        "names": [
+          "--session-source"
+        ],
+        "value": "<SOURCE>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 483,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-test-client/src/lib.rs#L483"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 1425,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-test-client/src/lib.rs#L1425"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--remote",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--remote"
+      ],
+      "title": "New flag `codex fork --remote`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Connect the app-server-backed TUI to a remote app server websocket endpoint.\nAccepted forms: `ws://host:port` or `wss://host:port`.",
+        "names": [
+          "--remote"
+        ],
+        "value": "<ADDR>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/tui/src/cwd_prompt.rs#L36"
+          },
+          {
+            "path": "codex-rs/tui/src/lib.rs",
+            "line": 722,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/tui/src/lib.rs#L722"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex resume.options.--remote",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--remote"
+      ],
+      "title": "New flag `codex resume --remote`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Connect the app-server-backed TUI to a remote app server websocket endpoint.\nAccepted forms: `ws://host:port` or `wss://host:port`.",
+        "names": [
+          "--remote"
+        ],
+        "value": "<ADDR>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/debug-client/src/commands.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/debug-client/src/commands.rs#L55"
+          },
+          {
+            "path": "codex-rs/exec/src/lib.rs",
+            "line": 935,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/exec/src/lib.rs#L935"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+181 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -46,6 +46,11 @@\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n+      --remote <ADDR>\n+          Connect the app-server-backed TUI to a remote app server websocket endpoint.\n+          \n+          Accepted forms: `ws://host:port` or `wss://host:port`.\n+\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n",
+      "stats": {
+        "added_chars": 181,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+106 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -37,6 +37,8 @@\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --remote <ADDR>\n+          Connect the app-server-backed TUI to a remote app server websocket endpoint\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n",
+      "stats": {
+        "added_chars": 106,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server --help"
+      ],
+      "title": "Full help text of `app-server --help` changed (+312 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,6 +27,14 @@\n           \n           [default: stdio://]\n \n+      --session-source <SOURCE>\n+          Session source stamped into new threads started by this app-server.\n+          \n+          Known values such as `vscode`, `cli`, `exec`, and `mcp` map to built-in sources. Any other\n+          non-empty value is recorded as a custom source.\n+          \n+          [default: vscode]\n+\n       --analytics-default-enabled\n           Controls whether analytics are enabled by default.\n           \n",
+      "stats": {
+        "added_chars": 312,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+153 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -18,6 +18,8 @@\n                                    features.<name>=false`\n       --listen <URL>               Transport endpoint URL. Supported values: `stdio://` (default),\n                                    `ws://IP:PORT` [default: stdio://]\n+      --session-source <SOURCE>    Session source stamped into new threads started by this\n+                                   app-server [default: vscode]\n       --analytics-default-enabled  Controls whether analytics are enabled by default\n   -h, --help                       Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 153,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+181 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -31,6 +31,11 @@\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n+      --remote <ADDR>\n+          Connect the app-server-backed TUI to a remote app server websocket endpoint.\n+          \n+          Accepted forms: `ws://host:port` or `wss://host:port`.\n+\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n",
+      "stats": {
+        "added_chars": 181,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+106 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -20,6 +20,8 @@\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --remote <ADDR>\n+          Connect the app-server-backed TUI to a remote app server websocket endpoint\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n",
+      "stats": {
+        "added_chars": 106,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+181 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -31,6 +31,11 @@\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n+      --remote <ADDR>\n+          Connect the app-server-backed TUI to a remote app server websocket endpoint.\n+          \n+          Accepted forms: `ws://host:port` or `wss://host:port`.\n+\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n \n",
+      "stats": {
+        "added_chars": 181,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+106 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -20,6 +20,8 @@\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --remote <ADDR>\n+          Connect the app-server-backed TUI to a remote app server websocket endpoint\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n",
+      "stats": {
+        "added_chars": 106,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.features.tui_app_server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.tui_app_server"
+      ],
+      "title": "New setting: features.tui_app_server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 834,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/core/src/features.rs#L834"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.model_providers.<name>.websocket_connect_timeout_ms",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.websocket_connect_timeout_ms"
+      ],
+      "title": "New setting: model_providers.<name>.websocket_connect_timeout_ms",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum time (in milliseconds) to wait for a websocket connection attempt before treating it as failed.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tool_suggest",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tool_suggest"
+      ],
+      "title": "New setting: tool_suggest",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Additional discoverable tools that can be suggested for installation.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 740,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/core/src/features.rs#L740"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/tool_suggest.rs",
+            "line": 33,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/core/src/tools/handlers/tool_suggest.rs#L33"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tool_suggest.discoverables",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tool_suggest.discoverables"
+      ],
+      "title": "New setting: tool_suggest.discoverables",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tool_suggest.discoverables[].id",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tool_suggest.discoverables[].id"
+      ],
+      "title": "New setting: tool_suggest.discoverables[].id",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/common.rs",
+            "line": 105,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-protocol/src/protocol/common.rs#L105"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/common.rs",
+            "line": 562,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-protocol/src/protocol/common.rs#L562"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tool_suggest.discoverables[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tool_suggest.discoverables[].type"
+      ],
+      "title": "New setting: tool_suggest.discoverables[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "connector",
+          "plugin"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 467,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-protocol/src/export.rs#L467"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 1023,
+            "url": "https://github.com/openai/codex/blob/rust-v0.116.0/codex-rs/app-server-protocol/src/export.rs#L1023"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 106367872 → 116978464",
+      "impact": "informational",
+      "before": 106367872,
+      "after": 116978464,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

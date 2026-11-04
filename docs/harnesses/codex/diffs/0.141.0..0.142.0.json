@@ -1,0 +1,1164 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.141.0",
+  "to": "0.142.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.141.0...rust-v0.142.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.142.0",
+    "text": "## New Features\n\n- `/usage` can now show and redeem earned usage-limit reset credits, with confirmation, retry, and refreshed availability states. (#28154, #28793)\n- `/plugins` now organizes remote plugins into OpenAI Curated, Workspace, and Shared with me sections, while eligible turns can recommend and install relevant plugins. (#26703, #28399, #28400, #27704, #28403)\n- Configurable rollout token budgets track usage across agent threads, provide remaining-budget reminders, and abort turns when exhausted. (#28746, #28494, #28707, #29423)\n- App-server clients can configure multi-agent delegation as disabled, explicit-request-only, or proactive at the thread and turn level. (#28685, #28792, #29324)\n- Added an indexed web-search mode that permits live searches while restricting direct page access to server-approved URLs. (#28489)\n- Codex can now receive scheduled UTC time reminders and query the current time directly, including through client-provided app-server clocks. (#28822, #28824, #28835, #29011)\n\n## Bug Fixes\n\n- Restored reliable Linux TUI rendering after suspending with `Ctrl+Z` and resuming with `fg`. (#28342)\n- Exec-server processes and stdio MCP sessions now survive transient disconnects, including signed-URL refresh and retry-safe stdin writes. (#28512, #28374, #28546, #28895)\n- Remote environments now preserve executor-native paths, shells, `AGENTS.md` discovery, and sandbox behavior across operating systems. (#28146, #28152, #28958, #28983, #29099, #29108, #29113, #29424)\n- Plugin loading and installation now handle root marketplace layouts, manifest fallbacks, multiple skill paths, actionable download errors, and immediate tool refreshes. (#28771, #28789, #28790, #28863, #28951)\n- Parent agents now receive terminal subagent errors instead of seeing failed work as an empty successful completion. (#28375)\n- Goal-first threads are once again persisted and returned by `thread/list` and `thread/search`. (#28808)\n\n## Chores\n\n- Reduced startup and session latency by deferring unnecessary DNS work, warming the model cache, reusing parsed plugin skills, parallelizing skill metadata reads, and skipping redundant catalog synchronization. (#28542, #28699, #28844, #29326, #29005)\n- Reduced persistent-log churn by removing per-event WebSocket payload logging and filtering duplicated telemetry records. (#29432, #29457)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.141.0...rust-v0.142.0\n\n- #28396 [codex] Record external agent import results @charlesgong-openai\n- #27751 [codex] expose Bedrock credential source in account/read @celia-oai\n- #28338 [codex] Compress cold active rollouts @jif-oai\n- #28368 feat: render typed envelopes for multi-agent v2 messages @jif-oai\n- #28508 [tests] Keep Apps out of generic core test harness @jif-oai\n- #28472 [codex] Clarify plugin load and runtime capability stages @xl-openai\n- #28375 core: surface terminal subagent errors to parent agents @jif-oai\n- #28542 perf(config): defer remote sandbox hostname lookup @fcoury-oai\n- #28473 path-uri: clarify invalid host path errors @anp-oai\n- #28342 fix(tui): restore TUI after suspend @fcoury-oai\n- #28354 [codex] exec-server: stream files in chunks @pakrym-oai\n- #28553 chore: side prompt @jif-oai\n- #27099 [codex-app-server-test-client & codex-app-server] Plugin Usage Analytics Smoke Test @jameswt-oai\n- #28554 fix(tui): highlight C++ module files @fcoury-oai\n- #28467 [codex] Warn clearly when code mode output is truncated @aibrahim-oai\n- #27750 [codex] Add incremental thread history changes @wiltzius-openai\n- #28154 feat(tui): add rate-limit reset redemption to /usage @jayp-oai\n- #28562 ci: run code-mode unit tests on all bazel targets @cconger\n- #27923 [codex] Route MCP file uploads through environment filesystem @pakrym-oai\n- #27100 [codex-app-server-test-client] Plugin Install/Uninstall Analytics Smoke Test @jameswt-oai\n- #28581 [codex] re-enable absolute workdir integration test @anp-oai\n- #28468 code-mode: extend test coverage to lock in cell lifecycle @cconger\n- #28587 [codex] test exec relative additional permissions @anp-oai\n- #28577 Clarify model-generated and legacy app path types @anp-oai\n- #28589 Record invariants for path migration. @anp-oai\n- #28146 app-server: preserve target-native environment cwd @anp-oai\n- #28595 Tell codex about PathUri serde compat. @anp-oai\n- #28399 [codex] [1/4] Add recommended plugin endpoint cache @adaley-openai\n- #28400 [codex] [2/4] Generalize plugin suggestion presentation @adaley-openai\n- #27704 [codex] [3/4] Activate endpoint plugin recommendations @adaley-openai\n- #28152 core: render remote environment cwd natively @anp-oai\n- #28403 [codex] [4/4] Simplify recommended plugin install schema @adaley-openai\n- #26706 PAC 1 - Add system proxy feature config surface @canvrno-oai\n- #27910 Add thread recencyAt for sidebar ordering @nornagon-openai\n- #28627 Revert \"Tell codex about PathUri serde compat. (#28595)\" @anp-oai\n- #28625 [codex] Gate remote plugin catalog by auth @xl-openai\n- #28629 [codex] core: restore absolute turn context cwd @anp-oai\n- #28642 thread-store: fix response fixture compilation @pakrym-oai\n- #28580 [codex] Support object-valued plugin MCP manifests @charlesgong-openai\n- #28599 code-mode: move cell state into library actor @cconger\n- #28471 [codex] Test code-mode variable truncation @aibrahim-oai\n- #28655 Revert thread recencyAt for sidebar ordering @pakrym-oai\n- #28638 core: remove redundant TurnContext and Prompt fields @pakrym-oai\n- #28656 [codex] Persist built-in image results reported as generating @won-openai\n- #28512 Resume exec-server sessions after disconnect @jif-oai\n- #28546 Back off registry retries during exec recovery @jif-oai\n- #28561 Add join key for MAv2 inter-agent messages @jif-oai\n- #28699 app-server: keep the model cache warm @jif-oai\n- #28705 Replace SkillsManager with SkillsService @jif-oai\n- #27965 [ez][codex-rs] Support apps._default.default_tools_approval_mode @zamoshchin-openai\n- #28359 Run fs helper through Windows sandbox wrapper @iceweasel-oai\n- #28628 [codex] Repair invalid skill frontmatter scalars @charlesgong-openai\n- #28632 Tell codex to avoid changing rollout format. @anp-oai\n- #28738 Scope command approvals by execution environment @jif-oai\n- #19047 feat: add run task identity primitives @adrian-openai\n- #28671 [codex] Restore thread recency with compatible migration history @nornagon-openai\n- #28768 Extract TUI plugin catalog rendering @canvrno-oai\n- #28389 [codex] Use compact OpenAI docs search queries @kkahadze-oai\n- #28681 unified-exec: preserve PathUri through exec-server @anp-oai\n- #28731 [codex] Track plugin install and import telemetry failures @charlesgong-openai\n- #28651 exec-server: expose environment registry payloads @viyatb-oai\n- #28771 fix(plugins): support root local marketplace plugins @caseychow-oai\n- #28791 bazel: refresh expired macOS SDK pin @anp-oai\n- #28782 [codex] trace tools build latency @owenlin0\n- #28778 path-uri: decouple native path parsing @anp-oai\n- #28774 feat(exec-server): add Noise rendezvous environment @apanasenko-oai\n- #28812 [codex] Add optional IDs to response items @pakrym-oai\n- #28784 fix(install): support older awk checksum parsing @fcoury-oai\n- #28826 [codex] Use unique IDs for realtime-routed turns @guinness-oai\n- #27986 [codex] control automatic realtime handoff delivery @jiayuhuang-openai\n- #28836 [codex] Support assistant realtime append text @guinness-oai\n- #28374 Refresh signed exec-server URLs on reconnect @apanasenko-oai\n- #28825 Expose selecte namespaces as direct model tools @won-openai\n- #28790 [codex] Support plugin manifest path lists @charlesgong-openai\n- #28851 Record more path migration guidance for codex. @anp-oai\n- #28780 unified-exec: retain PathUri in command events @anp-oai\n- #28605 [codex] Split plugin and skill warmup tracing @mzeng-openai\n- #28608 [codex] Pass plugin namespace into skill loading @mzeng-openai\n- #28746 [codex] add rollout token budget configuration (1/N) @rka-oai\n- #28766 Add network environment ID plumbing @jif-oai\n- #28915 Avoid sandbox helper in apply_patch approval tests @jif-oai\n- #28813 Pause active goals before TUI interrupts @etraut-openai\n- #28895 Recover exec process stdin writes @jif-oai\n- #28940 Pin Windows argument lint to Windows 2022 @rka-oai\n- #28914 Scope MCP sandbox metadata to server environment @jif-oai\n- #28911 Add turn-scoped context contributions @jif-oai\n- #28808 Fix goal-first live threads missing from thread/list @etraut-openai\n- #25019 [codex] Initialize exec-server OpenTelemetry at startup @starr-openai\n- #28943 [codex] Fix Windows sandbox runtime ACL refresh @iceweasel-oai\n- #28946 Synchronize realtime notification test requests @rka-oai\n- #28822 Add Config for Time Reminders (1/n) @rka-oai\n- #28494 [codex] rollout budget implementation (2/N) @rka-oai\n- #27500 Support `openai/form` extended form elicitations @gpeal\n- #28949 [codex] Make thread store turn filter optional @wiltzius-openai\n- #28824 current time reminders impl for system clock (2/n) @rka-oai\n- #27812 [codex] Cache plugin metadata for tool suggestions @mzeng-openai\n- #28854 apply-patch: carry paths as PathUri @anp-oai\n- #28835 Add app-server current-time impl (3/n) @rka-oai\n- #26496 Make auto-review on-request prompt more proactive @maja-openai\n- #28947 [codex] Remove hardcoded app ID filters @ericning-o\n- #28959 TUI: improve unified mention selection visibility @canvrno-oai\n- #27132 Emit Trusted MCP App Identity on Tool-Call Items @martinauyeung-oai\n- #19049 feat: opt ChatGPT auth into agent identity @adrian-openai\n- #28770 [connectors] Ignore synthetic links for app accessibility @adaley-openai\n- #28863 [codex] Preserve remote plugin download status errors @xl-openai\n- #28958 core: load AGENTS.md from foreign environments @anp-oai\n- #28789 [codex] Support marketplace plugin manifest fallback @charlesgong-openai\n- #28993 [codex] Remove child AGENTS.md prompt experiment @pakrym-oai\n- #28989 core: log AGENTS.md paths as URIs @anp-oai\n- #28983 core: keep remote exec on reported shell @anp-oai\n- #28844 [codex] Reuse parsed plugin skills during session startup @xl-openai\n- #28953 core: add UUIDv7 context window IDs @pakrym-oai\n- #28951 [plugins] Refresh plugin and tool caches after remote install @adaley-openai\n- #28856 Always use AVAS for realtime WebRTC calls @bakks\n- #28814 [codex] Assign response item IDs when recording history @pakrym-oai\n- #29005 [codex] Skip curated repo sync for remote plugins @xl-openai\n- #29011 [codex] add clock current-time tool @rka-oai\n- #29012 core: assign item IDs to compacted replacement history @pakrym-oai\n- #29022 [codex] Support protected resource OAuth discovery @xl-openai\n- #28674 [1/3] core: add remote environment connection lifecycle @sayan-oai\n- #28683 [2/3] core: track starting environments in snapshots @sayan-oai\n- #29025 [3/3] app-server: configure environment connection timeout @sayan-oai\n- #28685 Add per-turn multi-agent mode @shijie-oai\n- #28792 Expose thread-level multi-agent mode @shijie-oai\n- #28707 [codex] abort turns when rollout budgets expire (token budget 3/3) @rka-oai\n- #28899 Scope network approvals by environment @jif-oai\n- #29086 Document raw response item compatibility @jif-oai\n- #28489 Add indexed web search mode @winston-openai\n- #28942 Add config toggles for orchestrator skills and MCP @jif-oai\n- #29099 Keep remote exec commands native to the executor @jif-oai\n- #29095 Use cached and live web access terminology @winston-openai\n- #29042 [codex] trace pre-sampling skill and persistence latency @rphilizaire-openai\n- #29132 chore(deps): advance tokio-tungstenite @apanasenko-oai\n- #29006 [codex] Preserve skill descriptions outside model context @charlesgong-openai\n- #29154 Allow resume and settings commands during tasks and MCP startup @etraut-openai\n- #29256 core: add context window lineage IDs @pakrym-oai\n- #29259 [codex] prototype mcp_history thread hint injection @pakrym-oai\n- #29255 [codex] add configurable token budget compaction reminder @pakrym-oai\n- #29295 [codex] simplify token budget context @pakrym-oai\n- #29108 Carry sandbox intent to remote exec servers @jif-oai\n- #29325 Test pipelined scalar exec-server requests @jif-oai\n- #29326 Parallelize skill metadata stats @jif-oai\n- #29329 Use controlled time for remote initialization timeout test @jif-oai\n- #29170 code-mode: define transport-neutral runtime types @cconger\n- #29285 code-mode: move session ownership into runtime @cconger\n- #29286 code-mode: linearize cell terminal state @cconger\n- #29287 code-mode: make session shutdown authoritative @cconger\n- #29301 [prompting] updated plan mode prompt @rhan-oai\n- #29288 code-mode: preserve dropped observation output @cconger\n- #29289 code-mode: preserve initial yield at completion @cconger\n- #28260 [codex] Add internal auto-compaction opt-out @rhan-oai\n- #29371 Propagate safety buffering events to app-server clients @fc-oai\n- #29393 chore: fix merge race (auto-compaction feature access) @sayan-oai\n- #29327 Persist session IDs across thread resume @jif-oai\n- #29324 Simplify multi-agent mode controls @jif-oai\n- #29113 Apply sandbox intent inside remote exec servers @jif-oai\n- #29001 Add workspace messages app-server API @xli-oai\n- #29432 Stop logging every Responses WebSocket event @jif-oai\n- #29073 core: refresh environment context before sampling @sayan-oai\n- #29455 fix(core): restore thread_source in x-codex-turn-metadata @owenlin0\n- #29457 Filter noisy targets from persistent logs @jif-oai\n- #29429 remove flag for image preparation @rka-oai\n- #29143 ci: restore custom Windows runner with hermetic LLVM 0.7.9 @anp-oai\n- #27102 [codex] Centralize Plugin Analytics Metadata @jameswt-oai\n- #26703 TUI Plugin Sharing 3 - render remote plugin catalog sections @canvrno-oai\n- #29424 Report remote sandbox denials semantically @jif-oai\n- #28968 core: rename metadata -> internal_chat_message_metadata_passthrough @owenlin0\n- #29464 [sdk/python] Stop advertising HTTP image URLs @rka-oai\n- #28793 [codex] Fix usage-limit reset copy and state @jayp-oai\n- #27982 [codex] Start the guardian child session when parent session is started @jgershen-oai\n- #29468 core: remove unused permissions cwd plumbing @bolinfest\n- #26707 PAC 2 - Add shared auth system proxy contract @canvrno-oai\n- #28991 Allow ChatGPT accounts without email @efrazer-oai\n- #29423 [codex] configure rollout budget reminder thresholds @rka-oai\n- #26678 permission profiles: expose availability to clients @viyatb-oai\n- #29476 [codex] handle request_user_input in app-server test client @celia-oai\n- #29479 fix(config): address permission profile review follow-ups @viyatb-oai\n- #29014 Honor startup custom CA bundles with managed MITM @winston-openai\n- #29480 chore: advance tungstenite fork pins @apanasenko-oai\n- #27669 [codex-core-plugins] Remote Plugin ID Persisted to File @jameswt-oai"
+  },
+  "summary": {
+    "changes": 42,
+    "categories": {
+      "behavior": 9,
+      "config": 33
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 27,
+      "notable": 15
+    },
+    "undocumented": 24
+  },
+  "changes": [
+    {
+      "id": "behavior.sandbox.approval",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "approval"
+      ],
+      "title": "Behaviour: sandbox approval added",
+      "impact": "notable",
+      "before": null,
+      "after": "never",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model added",
+      "impact": "notable",
+      "before": null,
+      "after": "gpt-5.5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.provider",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "provider"
+      ],
+      "title": "Behaviour: sandbox provider added",
+      "impact": "notable",
+      "before": null,
+      "after": "telemetry_fixture",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning effort",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning effort"
+      ],
+      "title": "Behaviour: sandbox reasoning effort added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.session id",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "session id"
+      ],
+      "title": "Behaviour: sandbox session id added",
+      "impact": "notable",
+      "before": null,
+      "after": "<uuid>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.workdir",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "workdir"
+      ],
+      "title": "Behaviour: sandbox workdir added",
+      "impact": "notable",
+      "before": null,
+      "after": "<repo>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.tool_output.marker",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "tool_output",
+        "marker"
+      ],
+      "title": "Behaviour: tool_output marker changed",
+      "impact": "notable",
+      "before": "TE…102500 tokens truncated…9",
+      "after": "Warning: truncated output (original token count: 112500)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.apps._default.default_tools_approval_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "apps._default.default_tools_approval_mode"
+      ],
+      "title": "New setting: apps._default.default_tools_approval_mode",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Approval mode for tools unless overridden by per-app or per-tool settings.",
+        "enum": [
+          "auto",
+          "prompt",
+          "approve"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/mcp_edit.rs",
+            "line": 194,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/config/src/mcp_edit.rs#L194"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 117,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/core/src/config/edit/document_helpers.rs#L117"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.auto_compaction",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.auto_compaction"
+      ],
+      "title": "New setting: features.auto_compaction",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1342,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1342"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.child_agents_md",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.child_agents_md"
+      ],
+      "title": "Setting no longer read: features.child_agents_md",
+      "impact": "notable",
+      "before": {
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 884,
+            "url": "https://github.com/openai/codex/blob/rust-v0.141.0/codex-rs/features/src/lib.rs#L884"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.code_mode.direct_only_tool_namespaces",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode.direct_only_tool_namespaces"
+      ],
+      "title": "New setting: features.code_mode.direct_only_tool_namespaces",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Exact tool namespaces to expose only as direct model tools. These tools bypass deferral, remain top-level in code-mode-only sessions, and are omitted from the nested code-mode tool surface.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.current_time_reminder",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.current_time_reminder"
+      ],
+      "title": "New setting: features.current_time_reminder",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean|object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1234,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1234"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.current_time_reminder.clock_source",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.current_time_reminder.clock_source"
+      ],
+      "title": "New setting: features.current_time_reminder.clock_source",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "system",
+          "external"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.current_time_reminder.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.current_time_reminder.enabled"
+      ],
+      "title": "New setting: features.current_time_reminder.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L883"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1705,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/config/external_agent_config.rs#L1705"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.current_time_reminder.reminder_interval_model_requests",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.current_time_reminder.reminder_interval_model_requests"
+      ],
+      "title": "New setting: features.current_time_reminder.reminder_interval_model_requests",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.deferred_executor",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.deferred_executor"
+      ],
+      "title": "New setting: features.deferred_executor",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 836,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L836"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.item_ids",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.item_ids"
+      ],
+      "title": "New setting: features.item_ids",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1168,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1168"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.multi_agent_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_mode"
+      ],
+      "title": "New setting: features.multi_agent_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1036,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1036"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.usage_hint_enabled.deprecated",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2.usage_hint_enabled",
+        "deprecated"
+      ],
+      "title": "Setting features.multi_agent_v2.usage_hint_enabled deprecated",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.usage_hint_enabled.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2.usage_hint_enabled",
+        "description"
+      ],
+      "title": "features.multi_agent_v2.usage_hint_enabled description changed (+53 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-\n+Deprecated compatibility field. Its value is ignored.\n",
+      "stats": {
+        "added_chars": 53,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.respect_system_proxy",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.respect_system_proxy"
+      ],
+      "title": "New setting: features.respect_system_proxy",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 949,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/config/src/loader/mod.rs#L949"
+          },
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1018,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1018"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.rollout_budget",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.rollout_budget"
+      ],
+      "title": "New setting: features.rollout_budget",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean|object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1228,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1228"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.rollout_budget.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.rollout_budget.enabled"
+      ],
+      "title": "New setting: features.rollout_budget.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L883"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1705,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/config/external_agent_config.rs#L1705"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.rollout_budget.limit_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.rollout_budget.limit_tokens"
+      ],
+      "title": "New setting: features.rollout_budget.limit_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.rollout_budget.prefill_token_weight",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.rollout_budget.prefill_token_weight"
+      ],
+      "title": "New setting: features.rollout_budget.prefill_token_weight",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 2632,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/core/src/config/mod.rs#L2632"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.rollout_budget.reminder_at_remaining_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.rollout_budget.reminder_at_remaining_tokens"
+      ],
+      "title": "New setting: features.rollout_budget.reminder_at_remaining_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Remaining weighted-token values that trigger reminders when crossed.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.rollout_budget.sampling_token_weight",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.rollout_budget.sampling_token_weight"
+      ],
+      "title": "New setting: features.rollout_budget.sampling_token_weight",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 2631,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/core/src/config/mod.rs#L2631"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.token_budget.type",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.token_budget",
+        "type"
+      ],
+      "title": "Type of features.token_budget: boolean → boolean|object",
+      "impact": "notable",
+      "before": "boolean",
+      "after": "boolean|object",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/goal/src/spec.rs",
+            "line": 35,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/ext/goal/src/spec.rs#L35"
+          },
+          {
+            "path": "codex-rs/ext/goal/src/steering.rs",
+            "line": 72,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/ext/goal/src/steering.rs#L72"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.use_agent_identity",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.use_agent_identity"
+      ],
+      "title": "New setting: features.use_agent_identity",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1354,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/features/src/lib.rs#L1354"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.orchestrator",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "orchestrator"
+      ],
+      "title": "New setting: orchestrator",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Orchestrator-owned feature settings.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/catalog.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/ext/skills/src/catalog.rs#L28"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/sources.rs",
+            "line": 100,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/ext/skills/src/sources.rs#L100"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.orchestrator.mcp",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "orchestrator.mcp"
+      ],
+      "title": "New setting: orchestrator.mcp",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Settings for a feature owned by the orchestrator.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 263,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L263"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 318,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L318"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.orchestrator.mcp.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "orchestrator.mcp.enabled"
+      ],
+      "title": "New setting: orchestrator.mcp.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L883"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1705,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/config/external_agent_config.rs#L1705"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.orchestrator.skills",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "orchestrator.skills"
+      ],
+      "title": "New setting: orchestrator.skills",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Settings for a feature owned by the orchestrator.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 566,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/config/external_agent_config.rs#L566"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 567,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/config/external_agent_config.rs#L567"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.orchestrator.skills.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "orchestrator.skills.enabled"
+      ],
+      "title": "New setting: orchestrator.skills.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L883"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1705,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/config/external_agent_config.rs#L1705"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.realtime.architecture",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "realtime.architecture"
+      ],
+      "title": "Setting no longer read: realtime.architecture",
+      "impact": "notable",
+      "before": {
+        "enum": [
+          "realtimeapi",
+          "avas"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_call.rs",
+            "line": 219,
+            "url": "https://github.com/openai/codex/blob/rust-v0.141.0/codex-rs/codex-api/src/endpoint/realtime_call.rs#L219"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.web_search.enum.indexed",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "web_search",
+        "enum",
+        "indexed"
+      ],
+      "title": "Setting web_search gained value indexed",
+      "impact": "informational",
+      "before": null,
+      "after": "indexed",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 1982,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/analytics/src/reducer.rs#L1982"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 504,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/cli/src/doctor.rs#L504"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.web_search.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "web_search",
+        "description"
+      ],
+      "title": "web_search description changed (+70 −61 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Controls the web search tool mode: disabled, cached, or live.\n+Controls the web search tool mode: disabled, cached, indexed, or live.\n",
+      "stats": {
+        "added_chars": 70,
+        "removed_chars": 61
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_APP_SERVER_TEST_USER_CONFIG_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_APP_SERVER_TEST_USER_CONFIG_FILE"
+      ],
+      "title": "New environment variable: CODEX_APP_SERVER_TEST_USER_CONFIG_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_APP_SERVER_TEST_USER_CONFIG_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/plugin_analytics_smoke.rs",
+            "line": 31,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server-test-client/src/plugin_analytics_smoke.rs#L31"
+          },
+          {
+            "path": "codex-rs/app-server/src/lib.rs",
+            "line": 126,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/app-server/src/lib.rs#L126"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN"
+      ],
+      "title": "New environment variable: CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/environment.rs",
+            "line": 38,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/exec-server/src/environment.rs#L38"
+          },
+          {
+            "path": "codex-rs/exec-server/src/environment.rs",
+            "line": 369,
+            "url": "https://github.com/openai/codex/blob/rust-v0.142.0/codex-rs/exec-server/src/environment.rs#L369"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_AGENT_IDENTITY_AUTHAPI_BASE_URL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_AGENT_IDENTITY_AUTHAPI_BASE_URL"
+      ],
+      "title": "Environment variable no longer read: CODEX_AGENT_IDENTITY_AUTHAPI_BASE_URL",
+      "impact": "informational",
+      "before": "CODEX_AGENT_IDENTITY_AUTHAPI_BASE_URL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/login/src/auth/agent_identity.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.141.0/codex-rs/login/src/auth/agent_identity.rs#L11"
+          },
+          {
+            "path": "codex-rs/login/src/auth/agent_identity.rs",
+            "line": 65,
+            "url": "https://github.com/openai/codex/blob/rust-v0.141.0/codex-rs/login/src/auth/agent_identity.rs#L65"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

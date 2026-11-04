@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.237",
+  "to": "2.1.238",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added a `keybindingFlavor` setting: set it to `\"readline\"` to make Ctrl+W in the prompt delete back to the previous whitespace, as in Bash; the default (`\"classic\"`) is unchanged\n- Plugin marketplaces: `headersHelper` on a url marketplace or a catalog entry runs a command that mints HTTP headers (e.g. a short-lived token) for catalog and same-origin archive fetches\n- A catalog entry's `headersHelper` runs only when you install or update that plugin, after its command is shown; `claude plugin install/update` ask `[y/N]` (or pass `-y`)\n- Added `claude self-hosted-runner --defer-shutdown-max-min <minutes>`: on SIGTERM, keep serving attached sessions, park what is left after that many minutes, then exit\n- Added `claude self-hosted-runner --proxy-authorization-command` / `--proxy-authorization-file` for egress proxies that require a freshly issued `Proxy-Authorization` header on every connection\n- Fixed unbounded memory growth in long interactive sessions: subagent tool results are now released once they leave the recent display window\n- Fixed custom, project, and plugin output styles drifting back to the default voice mid-session\n- Fixed `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=true` not keeping prompt suggestions on when your account is near, but not over, its usage limit\n- Fixed worktree-isolation Bash refusals telling you to remove a redirect when the command had none\n- Fixed self-hosted runners occasionally being removed by the server after a single slow or lost poll request, handing their healthy session to another runner\n- Fixed MCP elicitation dialogs showing nothing for URLs longer than 4,096 characters, and permission prompts dropping the \"don't ask again\" option when the project path didn't fit the terminal width\n- Fixed leftover `/tmp/claude-*-cwd` files when a Bash command is killed, times out, or is interrupted\n- Fixed held Backspace being ignored on terminals that send Ctrl+H for Backspace when keystrokes arrive in large bursts (slow SSH/mosh links)\n- Fixed text-wrapping in permission prompt diffs: lines containing wide multi-code-point characters (such as emoji) or tabs are no longer clipped\n- Fixed killing a suspended (Ctrl+Z) session sometimes leaving the terminal in bracketed-paste mode with the cursor hidden\n- Fixed stdio MCP servers receiving a `server/discover` request before `initialize`, forcing lazy servers to start their backend on every session open\n- Fixed a proxy's refusal of a connection being reported as a generic network error instead of naming the proxy\n- Fixed the `/model` and `/effort` cache-miss warning appearing when the prompt cache had already expired\n- Fixed per-task Stop from the Remote Control tasks panel doing nothing on CLI-hosted sessions\n- Fixed remote sessions exiting when a client delivered a user message without a valid role\n- Fixed Remote Control sessions started by `claude remote-control` inheriting session-scoped environment variables from the launching shell\n- Fixed a Remote Control session whose process crashed staying unavailable until `claude remote-control` was restarted; it can now be reused when you next message it\n- Fixed Remote Control messages sent from the web or Desktop while Claude is mid-turn disappearing from the transcript after the turn finishes\n- Fixed Remote Control model picks made on a phone or web not updating the model shown in the terminal\n- Fixed Remote Control disconnecting with \"login expired\" when a brief network hiccup delays renewing your sign-in; it now retries and stays connected\n- Fixed Remote Control reporting a failed reconnect on sign-out; signing out now ends the session with a clear message\n- Fixed `ListAgents`/`SendMessage` reporting \"Remote Control is not connected\" in sessions run by `claude remote-control` (server mode) or Desktop/IDE hosts; they now list and reach Remote Control peers\n- Fixed `ListAgents` and `SendMessage` exposing the idle worker that the agent view pre-warms for your next background session; it now appears only once a task claims it\n- Cross-session messaging: sending to a session on this machine that refuses inbound messages (e.g. `crossSessionInbound: \"refuse\"`) now reports \"refused\" to the sender instead of a silent success\n- Cross-session messaging: a session whose inbox drops your messages (rate limit or full queue) now tells your session, instead of the messages vanishing silently\n- Improved startup: bare `claude` starts sooner on macOS\n- Improved Bash tool permission checking for zsh-specific syntax in shell conditionals\n- Improved Remote Control connection resilience: brief HTTP 403 refusals from a network edge, VPN, or proxy are now tolerated for up to 3 minutes, with the refusing party named when a block persists\n- Improved startup responsiveness: the automatic update check now runs about 10 seconds after launch instead of competing with startup for CPU\n- Updated the bundled `claude-api` skill for the Managed Agents Aug 19 release: web search/fetch domain settings and memory stores on self-hosted sandboxes\n- Changed Ctrl+L and Cmd+K in fullscreen to always just repaint — the double-press `/clear` shortcut was removed, and 1-row nvim terminals no longer trigger automatic `/clear` loops\n- Changed `claude mcp list` and `claude mcp get` to show disabled servers as `⊘ Disabled` instead of connecting to them for a health check\n- MCP `headersHelper` in a project `.mcp.json`, and inline MCP servers in project or `--add-dir` agent files, now require that folder's trust dialog to have been accepted (also under `claude -p`)\n- MCP `headersHelper` from a project `.mcp.json`, plugin, or agent file runs without inherited credential env vars; user, managed and claude.ai-scope helpers now run from the Claude config dir"
+  },
+  "summary": {
+    "changes": 16,
+    "categories": {
+      "cli": 3,
+      "config": 10,
+      "hooks": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 13,
+      "notable": 3
+    },
+    "undocumented": 14
+  },
+  "changes": [
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+      "impact": "notable",
+      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude mcp get.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp get",
+        "description"
+      ],
+      "title": "Description of `claude mcp get` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Get details about an MCP server. Unapproved .mcp.json servers are shown as ⏸ Pending approval and not connected to; approved servers are health-checked.\n+Get details about an MCP server. Unapproved .mcp.json servers are shown as ⏸ Pending approval and not connected to; approved servers are health-checked unless disabled for this project.\n",
+      "stats": {
+        "added_chars": 187,
+        "removed_chars": 154
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude mcp list.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp list",
+        "description"
+      ],
+      "title": "Description of `claude mcp list` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-List configured MCP servers. Unapproved .mcp.json servers are shown as ⏸ Pending approval and not connected to; approved servers are health-checked.\n+List configured MCP servers. Unapproved .mcp.json servers are shown as ⏸ Pending approval and not connected to; approved servers are health-checked unless disabled for this project.\n",
+      "stats": {
+        "added_chars": 183,
+        "removed_chars": 150
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.mcp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp --help"
+      ],
+      "title": "Full help text of `mcp --help` changed (+291 −147 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,12 +27,14 @@\n   get <name>                            Get details about an MCP server.\n                                         Unapproved .mcp.json servers are shown\n                                         as ⏸ Pending approval and not connected\n-                                        to; approved servers are health-checked.\n+                                        to; approved servers are health-checked\n+                                        unless disabled for this project.\n   help [command]                        display help for command\n   list                                  List configured MCP servers. Unapproved\n                                         .mcp.json servers are shown as ⏸ Pending\n                                         approval and not connected to; approved\n-                                        servers are health-checked.\n+                                        servers are health-checked unless\n+                                        disabled for this project.\n   login [options] <name>                Authenticate with an MCP server (HTTP,\n                                         SSE, or claude.ai connector)\n   logout <name>                         Clear stored OAuth credentials for an\n",
+      "stats": {
+        "added_chars": 291,
+        "removed_chars": 147
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.keybindingFlavor",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "keybindingFlavor"
+      ],
+      "title": "New setting: keybindingFlavor",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Which conventions the prompt's editing keys follow: \"readline\" matches Bash and other readline programs (Ctrl+W deletes back to the previous whitespace); \"classic\" (default) keeps Claude Code's long-standing behavior (Ctrl+W deletes the previous word)",
+        "enum": [
+          "classic",
+          "readline"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ADOPT_UNDERIVABLE_PARKED_PERMISSION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_VERIFY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_VERIFY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_VERIFY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_VERIFY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_NESTED_USER_REPAIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_NESTED_USER_REPAIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_NESTED_USER_REPAIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_NESTED_USER_REPAIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HOVER_REST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HOVER_REST"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HOVER_REST",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HOVER_REST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PRINT_ENGINE_LOOP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PRINT_ENGINE_LOOP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PRINT_ENGINE_LOOP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PRINT_ENGINE_LOOP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_DISCOVERY_CACHE_STRIKES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_DISCOVERY_CACHE_STRIKES"
+      ],
+      "title": "New environment variable: MCP_DISCOVERY_CACHE_STRIKES",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_DISCOVERY_CACHE_STRIKES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_DEFER_SHUTDOWN_MAX_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_DEFER_SHUTDOWN_MAX_MS"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_DEFER_SHUTDOWN_MAX_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_DEFER_SHUTDOWN_MAX_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PLAN_ARTIFACTS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PLAN_ARTIFACTS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_PLAN_ARTIFACTS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_PLAN_ARTIFACTS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

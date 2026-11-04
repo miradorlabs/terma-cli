@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.157.0",
+  "to": "0.157.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.157.0...rust-v0.157.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.157.1",
+    "text": "## Chores\n\n- Release highlights could not be determined: the supplied PR index is empty, and the GitHub tag comparison returned 404.\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.157.0...rust-v0.157.1"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.144.3",
+  "to": "0.144.4",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.144.3...rust-v0.144.4"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.144.4",
+    "text": "## Chores\n\n- No user-facing changes in this patch release.\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.144.3...rust-v0.144.4"
+  },
+  "summary": {
+    "changes": 7,
+    "categories": {
+      "behavior": 3,
+      "hooks": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 4,
+      "notable": 3
+    },
+    "undocumented": 7
+  },
+  "changes": [
+    {
+      "id": "behavior.compaction",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "compaction"
+      ],
+      "title": "Behaviour: compaction removed",
+      "impact": "notable",
+      "before": {
+        "model": "gpt-5.6-sol",
+        "prompt": "You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.\n\nInclude:\n- Current progress and key decisions made\n- Important context, constraints, or user preferences\n- What remains to be done (clear next steps)\n- Any critical data, examples, or references needed to continue\n\nBe concise, structured, and focused on helping the next LLM seamlessly continue the work.\n",
+        "reported_input_tokens": 995000,
+        "tools": 0,
+        "trigger": "auto"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "approval": "never",
+        "model": "gpt-5.6-sol",
+        "models": [
+          "gpt-5.6-sol"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output removed",
+      "impact": "notable",
+      "before": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40220,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "Warning: truncated output (original token count: 112500)",
+        "truncation": "middle"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "blocks the tool; message to the model",
+        "json_decision": "blocks the tool; message to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1229,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1229"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 426,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L426"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "additional_context": "reaches the model",
+        "exit_2": "message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1234,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1234"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 441,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L441"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "keeps the turn going; message to the model",
+        "json_decision": "keeps the turn going; message to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1238,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1238"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 453,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L453"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "additional_context"
+      ],
+      "title": "UserPromptSubmit hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "reaches the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1235,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1235"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 444,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L444"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

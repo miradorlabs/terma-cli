@@ -1,0 +1,959 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.250",
+  "to": "2.1.251",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `PreModelSwitch` and `PostModelSwitch` hook events (block, confirm, or annotate a model switch); `SessionStart` resume hooks now receive session staleness and the estimated re-cache cost\n- Added live streaming of a foreground subagent's tool calls and results to Remote Control clients (background subagents, the default, still show status only)\n- Added a Spend limit bar to `/usage` and a `rate_limits.spend_limit` status line field for developers behind a Claude apps gateway with spend limits\n- Added a per-session prompt-cache line to `/cost` (hit ratio, misses, tokens re-cached, warm/cold) and a matching `prompt_cache` object for status line scripts\n- Added `attach`, `logs`, `stop`, `respawn`, and `rm` to `claude --help`; the `--resume` message for a running background session now names the exact `claude attach <id>` command\n- Fixed file tools (Read, Write, Edit) following a symlink swapped inside the working directory after the permission check, which could read or write outside the approved location\n- Fixed plugin commands declared in a marketplace entry being able to point outside the plugin directory; such paths are now rejected with a path-traversal error\n- Fixed project settings being able to enable detailed beta tracing or raw API body logging, and a lower-scope beta tracing endpoint bypassing an OTLP collector pinned by managed settings or a host app\n- Fixed the Workflow tool reading (and quoting in errors) a `scriptPath` outside what the session may read before the permission check ran\n- Fixed Grep and Glob not applying `Read(...)` deny rules to files reached through a symlinked search path\n- Fixed conversations getting stuck on \"text content blocks must be non-empty\" errors after a turn where the model produced only thinking\n- Fixed the first launch on a fresh install starting in default mode instead of auto mode for accounts whose startup default is auto mode\n- Fixed Opus 5 requests failing with \"effort … is not supported when thinking is disabled\" when effort was xhigh/max and thinking was turned off; effort is now sent as `high` in that case\n- Fixed replying to a message Claude Desktop delivered from another session: `SendMessage` to that session id now delivers through Claude Desktop instead of failing with \"not reachable\"\n- Fixed TUI lag with many parallel subagents: per-second progress ticks now replace their predecessor instead of piling up in the transcript\n- Fixed agent teams: a teammate's final answer not reaching the team lead — it now arrives in the idle notification instead of a content-free \"available\" notice\n- Fixed background subagents being unable to reply to a message from an unnamed sibling or parent agent (`from` was the agent type, which is not an address)\n- Fixed managed-settings `disableAutoMode` arriving mid-session not moving an already-running auto-mode session back to default mode\n- Fixed a \"switch to Opus 1M for 5x more context\" tip that appeared even when the current Opus model already has a 1M context window\n- Fixed Claude apps gateway sessions treating a stored Anthropic profile (e.g. a Console sign-in) as active: listing it in `/status` and retrying gateway 401s with it, though requests never use it\n- Fixed cloud sessions telling Claude the model had changed when the host was only setting the session's initial model\n- Fixed Remote Control reporting a failure when an organization's policy disables it; it now shows a single quiet notice instead\n- Fixed `/mcp reconnect` on Remote Control showing a generic withheld-detail error instead of the real remedy when a server was disabled in another session\n- Fixed `--input-format stream-json`: client-injected assistant tool calls sent without a message id were merged into the first one and their results lost, including when resuming older sessions\n- Fixed session transcripts being silently overwritten when a directory change relocated a session onto an existing same-ID transcript\n- Fixed background sessions and their subagents being unable to edit files inside a git worktree they created with `git worktree add`\n- Fixed background sessions occasionally starting without any plugin skills (and staying that way) when another Claude Code process was refreshing the plugin marketplace at the same moment\n- Fixed selecting text in an opened background session inside tmux over SSH: it now copies to the tmux buffer like a foreground session instead of falling back to OSC 52\n- Fixed SDK and cloud sessions hanging indefinitely when an SDK MCP server's handshake acknowledgment was lost; the wait now times out after 70 seconds and marks only that server failed\n- Fixed self-hosted runner leaving a stuck session's Bash tool processes running after the session was force-stopped\n- Fixed `/usage-credits` for Team and Enterprise members whose admin set the org's usage-credit limit to $0: it now offers to ask the admin instead of saying a cap was reached\n- Fixed `--worktree --tmux` with a merge-request number on a gitlab.com origin trying a doomed GitHub-style fetch first instead of fetching the GitLab ref directly\n- Fixed Ctrl+G failing with \"Emacs quit unexpectedly\" in background sessions for editors that open `/dev/tty`, such as `emacs -nw` and `micro`\n- Fixed an `additionalDirectories` entry containing a null byte crashing startup, or breaking `/add-dir` and later settings updates when it came from an SDK host, IDE, or hook; it is now skipped\n- Fixed the MCP server menu's copy shortcut: it now says how the sign-in URL was copied instead of always claiming success\n- Fixed italic text (such as the session recap line) rendering as highlighted blocks in GNU screen and in tmux sessions using a `screen` terminal type\n- Fixed `claude mcp add --header` and `claude mcp add-json` help text naming the wrong transports\n- Fixed `claude ultrareview` and `/ultrareview` waiting the full 30 minutes when the cloud session fails to start; they now stop early and report the reason\n- Fixed Bash permission checks auto-approving commands that assign an arithmetic expression to an integer shell variable (e.g. `OPTIND=1/0`, `RANDOM=2+2`); these now prompt for approval\n- Fixed backgrounded sessions (`←`, `/background`, `--bg`) losing a Vertex/Bedrock gateway (`ANTHROPIC_*_BASE_URL` + `CLAUDE_CODE_SKIP_*_AUTH`) exported in the shell, so every request failed\n- Fixed `claude --bg --model fable` on Max plans stopping to ask for usage credits while the interactive session on the same account still had Fable allowance\n- Fixed the one-time \"make auto mode your default\" offer appearing in unattended sessions (e.g. agent-team teammate panes), where a stray keypress could accept it unread\n- Fixed the managed-settings approval prompt re-appearing after signing in again to the same Claude apps gateway when the settings are unchanged\n- Fixed disabled `/bug` and `/share` reporting that `/feedback` was disabled; tips, `/help`, and refusal messages no longer suggest `/feedback` when an org policy or env var turns it off\n- Fixed cloud session creation advising GitHub setup after a transient GitHub connection failure — the message now says to retry instead\n- Improved CPU usage during turns in interactive sessions by cutting redundant UI re-renders\n- Improved install size: the native binary is about 5 MB smaller\n- Improved cloud sessions: when the session's network proxy drops a connection during a Bash command, the tool result now names the host and reason instead of only \"connection reset\"\n- Improved `/schedule` to explain that MCP servers configured in Claude Code can't be attached to cloud routines, instead of a bare \"No MCP connectors\" message\n- Improved framing of messages from your own subagents: Claude is told the sender is a worker inside this session, not an unrelated Claude session\n- Improved the prompt placeholder to read \"Message @name…\" while viewing a background subagent or fork transcript opened from the subagent panel or `/tasks`\n- Improved sanitization of MCP server names in error messages, menus, and command results\n- Improved Amazon Bedrock session start under `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST` (e.g. Claude Desktop): a session given a Bedrock model ID or ARN no longer waits for inference-profile discovery\n- Improved the managed settings approval dialog to list only the settings that changed since you last approved them\n- Improved retry when the model's tool call is malformed: the broken output is now dropped from the retry context, including on Bedrock, Vertex, and Foundry\n- Changed `/radio` to be available on Bedrock, Vertex AI, Foundry, and Claude Platform on AWS, and when telemetry is disabled\n- Changed Claude in Chrome so browser actions always go through Claude Code's permission checks, including in sessions with telemetry disabled, which previously used the Chrome extension's own prompts\n- Changed `CLAUDE_CODE_SUBAGENT_MODEL` to set the default subagent model rather than override everything: an agent definition's `model:` and an explicit per-spawn model now take precedence over it\n- Changed the default commit trailer to `Co-Authored-By: Claude Code` when the active model isn't a recognized Claude model (e.g. third-party models behind a custom `ANTHROPIC_BASE_URL`)\n- Changed the default model for seat-based Enterprise subscriptions to Opus 5, matching other premium plans\n- Changed `/effort` to save your default effort level per model, so each model keeps its own setting when you switch\n- Changed analytics to no longer turn off before sign-in solely because managed settings force gateway login (or cannot be read); they stay off once signed in to the gateway or via `DISABLE_TELEMETRY`\n- Changed the footer PR badge on Bedrock, Vertex, and Foundry, and when telemetry is off, to call the GitHub API directly (via `gh auth token`, `GH_TOKEN`, or `GITHUB_TOKEN`) instead of `gh pr view`\n- Changed how Bash command output files are created and read back when commands run in the sandbox, so a sandboxed command cannot redirect or replace them\n- Changed plugin/LSP install suggestions and the auto-mode default offer to wait until you've sent or cleared what you're typing, so the Enter that sends your prompt can't answer them\n- Changed server-managed settings that terminate sandbox TLS, route sandbox traffic through your own proxy, inject credentials, or weaken sandbox isolation to require approval before they apply\n- Changed `ANTHROPIC_CUSTOM_HEADERS` from managed or project settings to require approval when it sets a credential, org/tenant, routing, or API-behavior header (e.g. `Authorization`, `Host`)\n- Changed project-level `.claude/settings.json` `env` to no longer set `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_TMPDIR`, or `TMPDIR`/`TMP`/`TEMP`; set them in your shell, user, or managed settings instead\n- Removed syntax highlighting for six rarely used languages (1c, gml, isbl, mathematica, maxima, sqf); the binary is 2.5 MB smaller\n- [VSCode] Fixed the sign-in screen's \"Bedrock, Foundry, or Vertex\" button opening the docs at the top of the page instead of the third-party provider setup section\n- [VSCode] Changed the Remote Control banner to a footer pill (shown while Remote Control is on or has failed) that opens the session on claude.ai/code; turn it on or off with `/remote-control`"
+  },
+  "summary": {
+    "changes": 45,
+    "categories": {
+      "behavior": 2,
+      "caching": 2,
+      "cli": 14,
+      "config": 18,
+      "hooks": 6,
+      "prompt": 2,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 36,
+      "notable": 9
+    },
+    "undocumented": 23
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+302 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -17,6 +17,7 @@\n \n - dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard.\n+When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments.\n Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own.\n Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules.\n A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's.\n",
+      "stats": {
+        "added_chars": 302,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+302 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -22,6 +22,7 @@\n \n - dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard.\n+When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments.\n Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own.\n Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules.\n A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's.\n",
+      "stats": {
+        "added_chars": 302,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.Agent.input_schema.properties.model.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "input_schema",
+        "properties",
+        "model",
+        "description"
+      ],
+      "title": "Agent tool parameter model: description changed (+357 −256 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Optional model override for this agent. Takes precedence over the agent definition's model frontmatter. If omitted, uses the agent definition's model, or inherits from the parent. Ignored for subagent_type: \"fork\" — forks always inherit the parent model.\n+Optional model override for this agent.\n+Takes precedence over the agent definition's model frontmatter and the configured default subagent model.\n+If omitted, uses the agent definition's model, else the default (inherits from the parent unless a default subagent model is configured).\n+Ignored for subagent_type: \"fork\" — forks always inherit the parent model.\n",
+      "stats": {
+        "added_chars": 357,
+        "removed_chars": 256
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "caching.across_turns.breakpoints",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "breakpoints"
+      ],
+      "title": "Caching across_turns.breakpoints: [[\"messages[1].content[0]\",\"system[1]\",\"system[2]\"],[\"mes… → [[\"messages[1].content[0]\",\"system[1]\",\"system[2]\"],[\"mes…",
+      "impact": "notable",
+      "before": [
+        [
+          "messages[1].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[2].content[0]",
+          "messages[3].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[4].content[0]",
+          "messages[5].content[0]",
+          "system[1]",
+          "system[2]"
+        ]
+      ],
+      "after": [
+        [
+          "messages[1].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[2].content[0]",
+          "messages[4].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[5].content[0]",
+          "messages[6].content[0]",
+          "system[1]",
+          "system[2]"
+        ]
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 562 → 834",
+      "impact": "notable",
+      "before": 562,
+      "after": 834,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction_command.prompt",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "prompt"
+      ],
+      "title": "Behaviour: compaction_command prompt changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,5 @@\n <prompt-2>\n+Continue from where you left off.\n CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.\n \n - Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.\n",
+      "stats": {
+        "added_chars": 33,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.2.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 2 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -38,17 +38,3 @@\n You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n \n Assistant knowledge cutoff is May 2026.\n-\n-gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n-\n-Current branch: main\n-\n-Main branch (you will usually use this for PRs): main\n-\n-Git user: Terma Live\n-\n-Status:\n-(clean)\n-\n-Recent commits:\n-<commit> init\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 292
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.context_tokens",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "context_tokens"
+      ],
+      "title": "SessionStart hook payload field context_tokens added",
+      "impact": "informational",
+      "before": null,
+      "after": "context_tokens",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.estimated_cache_write_usd",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "estimated_cache_write_usd"
+      ],
+      "title": "SessionStart hook payload field estimated_cache_write_usd added",
+      "impact": "informational",
+      "before": null,
+      "after": "estimated_cache_write_usd",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.prompt_cache_likely_expired",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "prompt_cache_likely_expired"
+      ],
+      "title": "SessionStart hook payload field prompt_cache_likely_expired added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_cache_likely_expired",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.seconds_since_last_response",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "seconds_since_last_response"
+      ],
+      "title": "SessionStart hook payload field seconds_since_last_response added",
+      "impact": "informational",
+      "before": null,
+      "after": "seconds_since_last_response",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.supported.PostModelSwitch",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "PostModelSwitch"
+      ],
+      "title": "New hook event: PostModelSwitch",
+      "impact": "notable",
+      "before": null,
+      "after": "PostModelSwitch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.supported.PreModelSwitch",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "PreModelSwitch"
+      ],
+      "title": "New hook event: PreModelSwitch",
+      "impact": "notable",
+      "before": null,
+      "after": "PreModelSwitch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--bg.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--bg",
+        "description"
+      ],
+      "title": "`claude --bg`: description changed (+152 −92 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Start the session as a background agent and return immediately (manage with `claude agents`)\n+Start the session in the background and return immediately. Prints the id that `claude attach`, `logs`, `stop` and `rm` take; `claude agents` lists them\n",
+      "stats": {
+        "added_chars": 152,
+        "removed_chars": 92
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude attach",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude attach"
+      ],
+      "title": "New command: `claude attach`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "helped": true,
+        "usage": [
+          "Usage: claude attach <id>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude logs",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude logs"
+      ],
+      "title": "New command: `claude logs`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Print a background session's recent terminal output",
+        "helped": true,
+        "usage": [
+          "Usage: claude logs <id>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude mcp add-json.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp add-json",
+        "description"
+      ],
+      "title": "Description of `claude mcp add-json` changed",
+      "impact": "informational",
+      "before": "Add an MCP server (stdio or SSE) with a JSON string",
+      "after": "Add an MCP server (stdio, SSE, HTTP, or WebSocket) with a JSON string",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude respawn",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude respawn"
+      ],
+      "title": "New command: `claude respawn`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Restart a background session, or all of them with --all, so it runs the current Claude Code version",
+        "helped": true,
+        "usage": [
+          "Usage: claude respawn <id>|--all"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude rm",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude rm"
+      ],
+      "title": "New command: `claude rm`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "helped": true,
+        "usage": [
+          "Usage: claude rm <id>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude stop",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude stop"
+      ],
+      "title": "New command: `claude stop`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Stop a background session. Its conversation is kept: `claude attach <id>` opens it again, `claude --resume` works once it is stopped",
+        "helped": true,
+        "usage": [
+          "Usage: claude stop <id>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1443 −210 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -29,9 +29,10 @@\n   --ax-screen-reader                    Render screen-reader friendly output\n                                         (flat text, no decorative borders or\n                                         animations).\n-  --bg, --background                    Start the session as a background agent\n-                                        and return immediately (manage with\n-                                        `claude agents`)\n+  --bg, --background                    Start the session in the background and\n+                                        return immediately. Prints the id that\n+                                        `claude attach`, `logs`, `stop` and `rm`\n+                                        take; `claude agents` lists them\n   --bare                                Minimal mode: skip hooks, LSP, plugin\n                                         sync, attribution, auto-memory,\n                                         background prefetches, keychain reads,\n@@ -229,6 +230,10 @@\n \n Commands:\n   agents [options]                      Manage background agents\n+  attach <id>                           Open a background session in this\n+                                        terminal. <id> is the short id that\n+                                        `claude --bg` prints and `claude agents`\n+                                        lists\n   auth                                  Manage authentication\n   auto-mode                             Inspect or reset auto mode classifier\n                                         configuration\n@@ -244,11 +249,23 @@\n   install [options] [target]            Install Claude Code native build. Use\n                                         [target] to specify version (stable,\n                                         latest, or specific version)\n+  logs <id>                             Print a background session's recent\n+                                        terminal output\n   mcp                                   Configure and manage MCP servers\n   plugin|plugins                        Manage Claude Code plugins\n   project                               Manage Claude Code project state\n+  respawn [options] [id]                Restart a background session, or all of\n+                                        them with --all, so it runs the current\n+                                        Claude Code version\n+  rm <id>                               Delete a background session, and its\n+                                        worktree when that is safe. Works on\n+                                        sessions that have already exited\n   setup-token                           Set up a long-lived authentication token\n                                         (requires Claude subscription)\n+  stop|kill <id>                        Stop a background session. Its\n+                                        conversation is kept: `claude attach\n+                                        <id>` opens it again, `claude --resume`\n+                                        works once it is stopped\n   ultrareview [options] [target]        Run a cloud-hosted multi-agent code\n                                         review of the current branch (or a PR\n                                         number / base branch) and print the\n",
+      "stats": {
+        "added_chars": 1443,
+        "removed_chars": 210
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.attach --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "attach --help"
+      ],
+      "title": "Full help text of `attach --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: claude attach <id>\n\n  Open the background session in this terminal. ← returns to agent view, Ctrl+Z drops back to your shell. The session keeps running either way.\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.logs --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "logs --help"
+      ],
+      "title": "Full help text of `logs --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: claude logs <id>\n\n  Print the background session's recent terminal output.\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp --help"
+      ],
+      "title": "Full help text of `mcp --help` changed (+148 −130 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -22,8 +22,8 @@\n     claude mcp add my-server -- my-command --some-flag arg1\n   add-from-claude-desktop [options]     Import MCP servers from Claude Desktop\n                                         (Mac and WSL only)\n-  add-json [options] <name> <json>      Add an MCP server (stdio or SSE) with a\n-                                        JSON string\n+  add-json [options] <name> <json>      Add an MCP server (stdio, SSE, HTTP, or\n+                                        WebSocket) with a JSON string\n   get <name>                            Get details about an MCP server.\n                                         Unapproved .mcp.json servers are shown\n                                         as ⏸ Pending approval and not connected\n",
+      "stats": {
+        "added_chars": 148,
+        "removed_chars": 130
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.respawn --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "respawn --help"
+      ],
+      "title": "Full help text of `respawn --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: claude respawn <id>|--all\n\n  Restart a background session (or all of them) so it picks up the current Claude binary.\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.rm --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "rm --help"
+      ],
+      "title": "Full help text of `rm --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: claude rm <id>\n\n  Delete a background session and its worktree. Unlike `stop`, works on already-exited sessions.\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.stop --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "stop --help"
+      ],
+      "title": "Full help text of `stop --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: claude stop <id>\n\n  Stop a background session. Its conversation is kept; resume it later with `claude attach <id>`.\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_BG_DISPATCHER_RATE_LIMIT_TIER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_BG_DISPATCHER_RATE_LIMIT_TIER"
+      ],
+      "title": "New environment variable: CLAUDE_BG_DISPATCHER_RATE_LIMIT_TIER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_BG_DISPATCHER_RATE_LIMIT_TIER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_BG_DISPATCHER_SUBSCRIPTION_TYPE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_BG_DISPATCHER_SUBSCRIPTION_TYPE"
+      ],
+      "title": "New environment variable: CLAUDE_BG_DISPATCHER_SUBSCRIPTION_TYPE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_BG_DISPATCHER_SUBSCRIPTION_TYPE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_PRESENCE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_PRESENCE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_PRESENCE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_PRESENCE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BRIDGE_OWNER_ACCOUNT_UUID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BRIDGE_OWNER_ACCOUNT_UUID"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BRIDGE_OWNER_ACCOUNT_UUID",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BRIDGE_OWNER_ACCOUNT_UUID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BRIDGE_OWNER_ORG_UUID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BRIDGE_OWNER_ORG_UUID"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BRIDGE_OWNER_ORG_UUID",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BRIDGE_OWNER_ORG_UUID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CARVED_SLATE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CARVED_SLATE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CARVED_SLATE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CARVED_SLATE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DAPPER_LAGOON",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DAPPER_LAGOON"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DAPPER_LAGOON",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DAPPER_LAGOON",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DIR_SYNC_STREAM",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DIR_SYNC_STREAM"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DIR_SYNC_STREAM",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DIR_SYNC_STREAM",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISPATCH_V2D",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISPATCH_V2D"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISPATCH_V2D",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISPATCH_V2D",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_EDITOR_CODELIVERY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_EDITOR_CODELIVERY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_EDITOR_CODELIVERY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_EDITOR_CODELIVERY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_EVAL_CONFINED",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_EVAL_CONFINED"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_EVAL_CONFINED",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_EVAL_CONFINED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_LUMINOUS_WHISTLE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_LUMINOUS_WHISTLE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_LUMINOUS_WHISTLE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_LUMINOUS_WHISTLE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MODEL_CATALOG",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MODEL_CATALOG"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MODEL_CATALOG",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MODEL_CATALOG",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SABLE_THRUSH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SABLE_THRUSH"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_SABLE_THRUSH",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_SABLE_THRUSH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TOASTY_THIMBLE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TOASTY_THIMBLE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_TOASTY_THIMBLE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_TOASTY_THIMBLE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_SONNET_4_6",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_SONNET_4_6"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_SONNET_4_6",
+      "impact": "informational",
+      "before": "CLAUDE_SONNET_4_6",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SCREENSHOT_DIR",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "SCREENSHOT_DIR"
+      ],
+      "title": "Environment variable no longer read: SCREENSHOT_DIR",
+      "impact": "informational",
+      "before": "SCREENSHOT_DIR",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.USERPROFILE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "USERPROFILE"
+      ],
+      "title": "Environment variable no longer read: USERPROFILE",
+      "impact": "informational",
+      "before": "USERPROFILE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

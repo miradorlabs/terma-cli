@@ -1,0 +1,497 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.218",
+  "to": "2.1.219",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added Claude Opus 5 (`claude-opus-5`), now the default Opus model — 1M context, fast mode at $10/$50 per Mtok\n- Added `sandbox.network.strictAllowlist` setting to deny non-allowlisted hosts for sandboxed commands without prompting\n- Added `DirectoryAdded` hook that fires after `/add-dir` or the SDK `register_repo_root` control request registers a new working directory mid-session\n- Added `mcp_server_errors` to the headless stream-json init event, listing `--mcp-config` entries skipped by config validation; terminal runs print a startup warning\n- Added the `workflowSizeGuideline` settings key so the advisory Dynamic workflow size guideline can be set from any settings file; the `/config` row is hidden while one does\n- Added nested subagent forwarding in stream-json: subagents spawned at depth-2+ now appear when `--forward-subagent-text` is set, keyed by their spawning Agent `tool_use` id\n- Fixed `claude -p` text output dropping the answer already produced when a turn dies on a mid-stream API error\n- Added HTTP status and error text to `claude mcp list` and `/mcp` when a server fails to connect, and a warning for MCP config values with hidden leading or trailing whitespace\n- Fixed the Fable model row showing \"Requires usage credits\" for plans that include it, when a stale cache had baked the label in\n- Fixed the `/model` picker showing the merged Opus row as plain \"Opus\" instead of \"Opus (1M context)\"\n- Fixed copy-on-select inside GNU screen printing base64 into the terminal instead of copying the selection\n- Fixed Remote Control clients keeping a stale fast-mode status after a model switch, reconnect, or failed org check\n- Fixed `CLAUDE_CODE_GIT_BASH_PATH` on Windows exiting or being used as bash when the path isn't a bash/sh binary; it's now ignored with a warning\n- Fixed Vim mode: pressing ← on an empty prompt now returns to the agent view from NORMAL mode, not just INSERT\n- Fixed screen-reader mode rewriting the entire input line on every keystroke instead of echoing only the typed character\n- Improved the \"Remote Control is only available via api.anthropic.com\" error to name the specific setting that caused it\n- Improved `claude --teleport` to show which repo your current checkout points at when it doesn't match the session's repo\n- Changed dynamic workflows to default to a medium size guideline (aim for fewer than 15 agents); pick another size or unrestricted with Dynamic workflow size in `/config`\n- Changed managed MCP allowlist/denylist `${VAR}` entries to resolve from the startup environment and managed-settings env instead of settings-file env\n- Changed the `/model` picker to highlight only the newest model's name, so the highlight marks the new release rather than an arbitrary subset of the list\n- Added the current default workflow size to the running-workflow status line, with a pointer to `/config` for changing it\n- Removed Opus 4.7 from fast mode; `/fast` now applies to Opus 5 and Opus 4.8\n- Updated the claude-api skill to default to Claude Opus 5, with a migration path from Opus 4.8\n- Subagents can now spawn nested subagents up to depth 3 by default (was 1); set CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1 to disable nesting"
+  },
+  "summary": {
+    "changes": 22,
+    "categories": {
+      "behavior": 3,
+      "config": 4,
+      "hooks": 2,
+      "model": 5,
+      "prompt": 4,
+      "request": 1,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 5,
+      "notable": 17
+    },
+    "undocumented": 10
+  },
+  "changes": [
+    {
+      "id": "model.aliases.opus",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "aliases",
+        "opus"
+      ],
+      "title": "Model alias \"opus\": claude-opus-4-8 → claude-opus-5",
+      "impact": "notable",
+      "before": "claude-opus-4-8",
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.aliases.opus[1m]",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "aliases",
+        "opus[1m]"
+      ],
+      "title": "Model alias \"opus[1m]\": claude-opus-4-8 → claude-opus-5",
+      "impact": "notable",
+      "before": "claude-opus-4-8",
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.default",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "default"
+      ],
+      "title": "Default model: claude-opus-4-8 → claude-opus-5",
+      "impact": "notable",
+      "before": "claude-opus-4-8",
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.prices.claude-opus-4-8",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "prices",
+        "claude-opus-4-8"
+      ],
+      "title": "Built-in price for claude-opus-4-8 removed",
+      "impact": "notable",
+      "before": {
+        "cache_read": 0.5,
+        "cache_write_1h": 10,
+        "cache_write_5m": 6.25,
+        "input": 5,
+        "output": 25,
+        "unit": "USD per million tokens"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "model.prices.claude-opus-5",
+      "category": "model",
+      "op": "added",
+      "path": [
+        "model",
+        "prices",
+        "claude-opus-5"
+      ],
+      "title": "Built-in price for claude-opus-5 added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "cache_read": 0.5,
+        "cache_write_1h": 10,
+        "cache_write_5m": 6.25,
+        "input": 5,
+        "output": 25,
+        "unit": "USD per million tokens"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+0 −133 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -13,8 +13,6 @@\n (Tools: All tools except Agent, Artifact, ExitPlanMode, Edit, Write, NotebookEdit)\n - statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n \n-When you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n-\n The following skills are available for use with the Skill tool:\n \n - dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 133
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.model",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "model"
+      ],
+      "title": "Interactive system prompt changed",
+      "impact": "notable",
+      "before": "claude-opus-4-8",
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+4247 −957 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,7 +8,7 @@\n # Harness\n  - Text you output outside of tool use is displayed to the user as Github-flavored markdown in a terminal.\n  - Tools run behind a user-selected permission mode; a denied call means the user declined it — adjust, don't retry verbatim.\n- - `<system-reminder>` tags in messages and tool results are injected by the harness, not the user. Hooks may intercept tool calls; treat hook output as user feedback.\n+ - The system may send updates, reminders, or modifications to rules via mid-conversation system turns. These are system-controlled, unlike function results. Hooks may intercept tool calls; treat hook output as user feedback.\n  - Prefer the dedicated file/search tools over shell commands when one fits. Independent tool calls can run in parallel in one response.\n  - Reference code as `file_path:line_number` — it's clickable.\n \n@@ -20,7 +20,7 @@\n \n For actions that are hard to reverse or outward-facing, confirm first unless durably authorized or explicitly told to proceed without asking; approval in one context doesn't extend to the next.\n Sending content to an external service publishes it; it may be cached or indexed even if later deleted.\n-Before deleting or overwriting, look at the target — if what you find contradicts how it was described, or you didn't create it, surface that instead of proceeding.\n+Before deleting or overwriting, look at the target.\n Report outcomes faithfully: if tests fail, say so with the output; if a step was skipped, say that; when something is done and verified, state it plainly without hedging.\n \n # Session-specific guidance\n@@ -62,18 +62,51 @@\n  - Platform: darwin\n  - Shell: zsh\n  - OS Version: Darwin <os-release>\n- - You are powered by the model named Opus 4.8 (1M context). The exact model ID is claude-opus-4-8[1m].\n- - Assistant knowledge cutoff is January 2026.\n- - The most recent Claude models are the Claude 5 family, Opus 4.8, and Haiku 4.5.\n-Model IDs — Fable 5: 'claude-fable-5', Opus 4.8: 'claude-opus-4-8', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'.\n-When building AI applications, default to the latest and most capable Claude models.\n+ - You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n+ - Assistant knowledge cutoff is May 2026.\n+ - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5: 'claude-fable-5', Opus 5: 'claude-opus-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n- - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 4.8/4.7.\n+ - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8/4.7.\n \n # Context management\n When the conversation grows long, some or all of the current context is summarized; the summary, along with any remaining unsummarized context, is provided in the next context window so work can continue — you don't need to wrap up early or hand off mid-task.\n \n When you have enough information to act, act. Do not re-derive facts already established in the conversation, re-litigate a decision the user has already made, or narrate options you will not pursue. If you are weighing a choice, give a recommendation, not an exhaustive survey\n+\n+# Delivering work\n+Do ordinary work as asked, acting on the actual request rather than on speculation about what lies behind it.\n+The requested scope is the deliverable — don't quietly narrow, widen, or transform it.\n+Interpret ambiguity the way a careful colleague would: make routine judgment calls yourself, and check in only when different readings would lead to materially different work.\n+If you find a real problem with the task as specified, state the concern in a sentence or two, then keep building: deliver the complete work under explicitly stated assumptions, flagging important factors for the user.\n+Finish the whole task, not just easy parts — report completion only when fully done.\n+If part of the scope turns out to be blocked or problematic, finish every other part in full and say explicitly what you left out and why — scaling the work down is the user's call, not yours.\n+Stop short of actions or changes clearly beyond what the user's ask implies.\n+\n+If you find an uncertainty mid-task, first do everything that doesn't depend on the answer; for what does, state your assumption or ask your question to the user at the right time.\n+Reserve blocking questions — stopping with nothing delivered until the user answers — for cases where proceeding under any assumption would be unsafe or would make the work useless if wrong.\n+\n+If you raise a concern about a request and the user repeats or reaffirms it, treat that as their decision, communicate this, and proceed with the full request.\n+Be fair and factual in resolving disagreements about the premises, scope, or approach of the work.\n+Refusals are only for requests that are genuinely harmful or clearly prohibited, not for ordinary work that merely touches a sensitive-sounding topic.\n+If you decline, say so plainly in a sentence, offer the nearest thing you can do, and move on without moralizing or criticism.\n+This applies to producing work products: it doesn't override necessary refusals or the need for confirmation on risky or destructive actions.\n+\n+# Corrections\n+Avoid unnecessary or excessive self-correction.\n+Only correct an earlier statement in your user-facing text when the error would change the user's code, conclusions, or decisions.\n+State corrections plainly and concisely, and continue the task; combine multiple corrections rather than enumerating them all.\n+For slips that change nothing for the user, simply make the correction and move on - no need to note it explicitly.\n+Don't add apologies or preambles, don't be overly self-critical, and don't ruminate or give a detailed account of the mistake or tally past errors.\n+Sometimes, other agents will report incorrect or misleading results - don't always take them at face value immediately.\n+If other agents correct your statements and they are right, then simply update your approach without narrating too much about the correction to the user.\n+This instruction does not apply to thinking blocks.\n+\n+A follow-up question about your earlier work is not, by itself, a signal that you got something wrong — answer what was asked.\n+A statement that was accurate needs no correction: don't re-audit how you phrased it, how you verified it, or limits you already stated.\n+When the user does point to a real error, correct it plainly as above.\n+\n+Do not call the AgentTool unless the user requested it\n+Do not use workflows or deep-research unless the user requested it\n \n gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n",
+      "stats": {
+        "added_chars": 4247,
+        "removed_chars": 957
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+4247 −957 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,7 +8,7 @@\n # Harness\n  - Text you output outside of tool use is displayed to the user as Github-flavored markdown in a terminal.\n  - Tools run behind a user-selected permission mode; a denied call means the user declined it — adjust, don't retry verbatim.\n- - `<system-reminder>` tags in messages and tool results are injected by the harness, not the user. Hooks may intercept tool calls; treat hook output as user feedback.\n+ - The system may send updates, reminders, or modifications to rules via mid-conversation system turns. These are system-controlled, unlike function results. Hooks may intercept tool calls; treat hook output as user feedback.\n  - Prefer the dedicated file/search tools over shell commands when one fits. Independent tool calls can run in parallel in one response.\n  - Reference code as `file_path:line_number` — it's clickable.\n \n@@ -20,7 +20,7 @@\n \n For actions that are hard to reverse or outward-facing, confirm first unless durably authorized or explicitly told to proceed without asking; approval in one context doesn't extend to the next.\n Sending content to an external service publishes it; it may be cached or indexed even if later deleted.\n-Before deleting or overwriting, look at the target — if what you find contradicts how it was described, or you didn't create it, surface that instead of proceeding.\n+Before deleting or overwriting, look at the target.\n Report outcomes faithfully: if tests fail, say so with the output; if a step was skipped, say that; when something is done and verified, state it plainly without hedging.\n \n # Session-specific guidance\n@@ -61,18 +61,51 @@\n  - Platform: darwin\n  - Shell: zsh\n  - OS Version: Darwin <os-release>\n- - You are powered by the model named Opus 4.8 (1M context). The exact model ID is claude-opus-4-8[1m].\n- - Assistant knowledge cutoff is January 2026.\n- - The most recent Claude models are the Claude 5 family, Opus 4.8, and Haiku 4.5.\n-Model IDs — Fable 5: 'claude-fable-5', Opus 4.8: 'claude-opus-4-8', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'.\n-When building AI applications, default to the latest and most capable Claude models.\n+ - You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n+ - Assistant knowledge cutoff is May 2026.\n+ - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5: 'claude-fable-5', Opus 5: 'claude-opus-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n- - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 4.8/4.7.\n+ - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8/4.7.\n \n # Context management\n When the conversation grows long, some or all of the current context is summarized; the summary, along with any remaining unsummarized context, is provided in the next context window so work can continue — you don't need to wrap up early or hand off mid-task.\n \n When you have enough information to act, act. Do not re-derive facts already established in the conversation, re-litigate a decision the user has already made, or narrate options you will not pursue. If you are weighing a choice, give a recommendation, not an exhaustive survey\n+\n+# Delivering work\n+Do ordinary work as asked, acting on the actual request rather than on speculation about what lies behind it.\n+The requested scope is the deliverable — don't quietly narrow, widen, or transform it.\n+Interpret ambiguity the way a careful colleague would: make routine judgment calls yourself, and check in only when different readings would lead to materially different work.\n+If you find a real problem with the task as specified, state the concern in a sentence or two, then keep building: deliver the complete work under explicitly stated assumptions, flagging important factors for the user.\n+Finish the whole task, not just easy parts — report completion only when fully done.\n+If part of the scope turns out to be blocked or problematic, finish every other part in full and say explicitly what you left out and why — scaling the work down is the user's call, not yours.\n+Stop short of actions or changes clearly beyond what the user's ask implies.\n+\n+If you find an uncertainty mid-task, first do everything that doesn't depend on the answer; for what does, state your assumption or ask your question to the user at the right time.\n+Reserve blocking questions — stopping with nothing delivered until the user answers — for cases where proceeding under any assumption would be unsafe or would make the work useless if wrong.\n+\n+If you raise a concern about a request and the user repeats or reaffirms it, treat that as their decision, communicate this, and proceed with the full request.\n+Be fair and factual in resolving disagreements about the premises, scope, or approach of the work.\n+Refusals are only for requests that are genuinely harmful or clearly prohibited, not for ordinary work that merely touches a sensitive-sounding topic.\n+If you decline, say so plainly in a sentence, offer the nearest thing you can do, and move on without moralizing or criticism.\n+This applies to producing work products: it doesn't override necessary refusals or the need for confirmation on risky or destructive actions.\n+\n+# Corrections\n+Avoid unnecessary or excessive self-correction.\n+Only correct an earlier statement in your user-facing text when the error would change the user's code, conclusions, or decisions.\n+State corrections plainly and concisely, and continue the task; combine multiple corrections rather than enumerating them all.\n+For slips that change nothing for the user, simply make the correction and move on - no need to note it explicitly.\n+Don't add apologies or preambles, don't be overly self-critical, and don't ruminate or give a detailed account of the mistake or tally past errors.\n+Sometimes, other agents will report incorrect or misleading results - don't always take them at face value immediately.\n+If other agents correct your statements and they are right, then simply update your approach without narrating too much about the correction to the user.\n+This instruction does not apply to thinking blocks.\n+\n+A follow-up question about your earlier work is not, by itself, a signal that you got something wrong — answer what was asked.\n+A statement that was accurate needs no correction: don't re-audit how you phrased it, how you verified it, or limits you already stated.\n+When the user does point to a real error, correct it plainly as above.\n+\n+Do not call the AgentTool unless the user requested it\n+Do not use workflows or deep-research unless the user requested it\n \n gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n",
+      "stats": {
+        "added_chars": 4247,
+        "removed_chars": 957
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.Agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "description"
+      ],
+      "title": "Agent tool description changed (+176 −410 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,9 +6,7 @@\n \n ## When to use\n \n-Reach for this when the task matches an available agent type, when you have independent work to run in parallel, or when answering would mean reading across several files — delegate it and you keep the conclusion, not the file dumps.\n-For a single-fact lookup where you already know the file, symbol, or value, search directly.\n-Once you've delegated a search, don't also run it yourself — wait for the result.\n+For a single-fact lookup where you already know the file, symbol, or value, search directly. Once you've delegated a search, don't also run it yourself — wait for the result.\n \n - The agent's final report is not shown to the user — relay what matters.\n - Use SendMessage with the agent's ID or name to continue a previously spawned agent with its context intact; a new Agent call starts fresh.\n",
+      "stats": {
+        "added_chars": 176,
+        "removed_chars": 410
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Bash.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Bash",
+        "description"
+      ],
+      "title": "Bash tool description changed (+129 −68 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,6 +3,7 @@\n - Working directory persists between calls, but prefer absolute paths — `cd` in a compound command can trigger a permission prompt. Shell state (env vars, functions) does not persist; the shell is initialized from the user's profile.\n - IMPORTANT: Avoid using this tool to run `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or after you have verified that a dedicated tool cannot accomplish your task.\n Instead, use the appropriate dedicated tool as this will provide a much better experience for the user.\n+- Command output is displayed to you, not reliably to the user.\n - `timeout` is in milliseconds: default 120000, max 600000.\n - `run_in_background` runs the command detached: it keeps running across turns and re-invokes you when it exits. No `&` needed.\n \n@@ -11,6 +12,6 @@\n - Use the `gh` CLI for GitHub operations (PRs, issues, API).\n - Commit or push only when the user asks. If on the default branch, branch first.\n - End git commit messages with:\n-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>\n+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n - End PR bodies with:\n 🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+      "stats": {
+        "added_chars": 129,
+        "removed_chars": 68
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Workflow.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Workflow",
+        "description"
+      ],
+      "title": "Workflow tool description changed (+275 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -220,3 +220,5 @@\n Before diagnosing why a completed workflow returned an empty or unexpected result, Read <transcriptDir>/journal.jsonl — it records each agent's actual return value; do not assume cached results are non-empty.\n Date.now()/Math.random()/new Date() are unavailable in scripts (they would break this) — stamp results after the workflow returns, or pass timestamps via args.\n Fallback when no journal is available: Read agent-<id>.jsonl files in the transcript directory and hand-author a continuation script.\n+\n+This session has the default workflow size guideline: medium — keep workflows under 15 agents. This is a guideline, not a hard limit — follow it unless the user's prompt calls for a different scale. The user can raise or remove it with \"Dynamic workflow size\" in /config.\n",
+      "stats": {
+        "added_chars": 275,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "request.betas.fallback-credit-2026-06-01",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "betas",
+        "fallback-credit-2026-06-01"
+      ],
+      "title": "New beta: fallback-credit-2026-06-01",
+      "impact": "notable",
+      "before": null,
+      "after": "fallback-credit-2026-06-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction_command.model",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction_command",
+        "model"
+      ],
+      "title": "Behaviour: compaction_command model changed: \"claude-opus-4-8\" → \"claude-opus-5\"",
+      "impact": "notable",
+      "before": "claude-opus-4-8",
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.model",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "model"
+      ],
+      "title": "Behaviour: subagents model changed: \"claude-opus-4-8\" → \"claude-opus-5\"",
+      "impact": "notable",
+      "before": "claude-opus-4-8",
+      "after": "claude-opus-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.2.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 2 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -35,9 +35,9 @@\n Shell: zsh\n OS Version: Darwin <os-release>\n </env>\n-You are powered by the model named Opus 4.8 (1M context). The exact model ID is claude-opus-4-8[1m].\n+You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n \n-Assistant knowledge cutoff is January 2026.\n+Assistant knowledge cutoff is May 2026.\n \n gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n",
+      "stats": {
+        "added_chars": 135,
+        "removed_chars": 143
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.supported.DirectoryAdded",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "DirectoryAdded"
+      ],
+      "title": "New hook event: DirectoryAdded",
+      "impact": "notable",
+      "before": null,
+      "after": "DirectoryAdded",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.precomputeCompactionEnabled.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "precomputeCompactionEnabled",
+        "description"
+      ],
+      "title": "precomputeCompactionEnabled description changed (+110 −120 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-@internal Precompute the compaction summary in the background before it is needed. Only applies when auto-compact is on.\n+Precompute the compaction summary in the background before it is needed. Only applies when auto-compact is on.\n",
+      "stats": {
+        "added_chars": 110,
+        "removed_chars": 120
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.switchModelsOnFlag.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "switchModelsOnFlag",
+        "description"
+      ],
+      "title": "switchModelsOnFlag description changed (+134 −139 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-When safety measures flag a message, automatically switch to a different model to keep chatting. When off, your session will pause instead.\n+When safeguards flag a message, automatically switch to a different model to keep chatting. When off, your session will pause instead.\n",
+      "stats": {
+        "added_chars": 134,
+        "removed_chars": 139
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.workflowSizeGuideline",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline"
+      ],
+      "title": "New setting: workflowSizeGuideline",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Advisory size guideline for the dynamic workflows Claude writes: \"small\" aims for fewer than 5 agents, \"medium\" (the default) fewer than 15, \"large\" fewer than 50, and \"unrestricted\" sends no guideline. A value here — including from managed settings — takes precedence over the \"Dynamic workflow size\" choice in /config, and that /config row is hidden while a settings file provides the key. This is a guideline, not an enforced limit.",
+        "enum": [
+          "unrestricted",
+          "small",
+          "medium",
+          "large"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISPATCH_V2S",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISPATCH_V2S"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISPATCH_V2S",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISPATCH_V2S",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

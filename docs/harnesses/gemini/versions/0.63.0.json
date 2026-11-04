@@ -1,0 +1,2105 @@
+{
+  "schema_version": 1,
+  "harness": "gemini",
+  "version": "0.63.0",
+  "platform": "",
+  "captured_at": "2026-11-04T16:16:16.239171Z",
+  "capture": {
+    "partial": false,
+    "sections": {
+      "support": "2026-11-04T16:16:16.239171Z",
+      "telemetry": "2026-11-04T16:16:16.239171Z"
+    }
+  },
+  "telemetry": {
+    "surfaces": {
+      "logs/gemini_cli.api_request": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_text": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "role": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.api_response": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "cached_content_token_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "finish_reasons": {
+            "class": "safe",
+            "kinds": [
+              "list"
+            ]
+          },
+          "http.status_code": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "input_token_count": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "output_token_count": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "response_text": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "role": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "status_code": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thoughts_token_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "tool_token_count": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "total_token_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.config": {
+        "keys": {
+          "api_key_enabled": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "approval_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "core_tools_enabled": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "debug_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "embedding_model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extension_ids": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extensions": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extensions_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "file_filtering_respect_git_ignore": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "log_user_prompts_enabled": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "mcp_servers": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "mcp_servers_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mcp_tools": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "mcp_tools_count": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "output_format": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "sandbox_enabled": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "vertex_ai_enabled": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "worktree_active": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.file_operation": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extension": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "lines": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mimetype": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "operation": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.hook_call": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "exit_code": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "hook_event_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_input": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_output": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "stderr": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "stdout": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.model_routing": {
+        "keys": {
+          "approval_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "classifier_threshold": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "decision_model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "enable_numerical_routing": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "failed": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "reasoning": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "routing_latency_ms": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.plan.approval_mode_duration": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.ripgrep_fallback": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.startup_stats": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "is_docker": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "os_platform": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os_release": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "phases": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.tool_call": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "content_length": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "end_time": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extension_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extension_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "function_args": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "function_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "mcp_server_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "metadata": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "start_time": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "tool_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gemini_cli.user_prompt": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "prompt": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "logs/gen_ai.client.inference.operation.details": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.input.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.output.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.output.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.choice.count": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.frequency_penalty": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.max_tokens": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.presence_penalty": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.seed": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.stop_sequences": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.temperature": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.request.top_k": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.request.top_p": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.response.finish_reasons": {
+            "class": "safe",
+            "kinds": [
+              "list"
+            ]
+          },
+          "gen_ai.response.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.system_instructions": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.usage.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "server.address": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "server.port": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.api.request.count": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "status_code": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.api.request.latency": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.file.operation.count": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "extension": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "lines": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mimetype": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "operation": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "programming_language": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.hook_call.count": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.hook_call.latency": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.lines.changed": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "function_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.model_routing.latency": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "routing.approval_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "routing.classifier_threshold": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "routing.decision_model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "routing.decision_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "routing.enable_numerical_routing": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "routing.failed": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "routing.reasoning": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.session.count": {
+        "keys": {
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.startup.duration": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "cpu_usage_system": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cpu_usage_user": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "is_docker": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "os_arch": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os_platform": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os_release": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "phase": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.token.usage": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.tool.call.count": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "function_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "tool_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gemini_cli.tool.call.latency": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "function_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gen_ai.client.operation.duration": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "metrics/gen_ai.client.token.usage": {
+        "keys": {
+          "auth_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.token.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "installation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "interactive": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "resource": {
+        "keys": {
+          "host.arch": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "host.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.command": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.command_args": {
+            "class": "prompt",
+            "kinds": [
+              "list"
+            ]
+          },
+          "process.executable.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.executable.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.owner": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.pid": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "process.runtime.description": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.runtime.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "process.runtime.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/llm_call": {
+        "keys": {
+          "gen_ai.agent.description": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.agent.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.input.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.output.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.prompt.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.system_instructions": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.definitions": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.usage.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
+      "traces/schedule_tool_calls": {
+        "keys": {
+          "gen_ai.agent.description": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.agent.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.input.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.output.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/tool_call": {
+        "keys": {
+          "gen_ai.agent.description": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.agent.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.input.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.output.messages": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.description": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.content_allowed",
+        "label": "Prompts and tool content delivered when allowed",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.content_withheld",
+        "label": "Prompts and tool content withheld when the project says so",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.equivalent",
+        "label": "The same telemetry through the relay as exported directly",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.only_opted_in",
+        "label": "Nothing leaves for sessions no repository opted in to",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.tools_no_token",
+        "label": "Tools the agent runs never inherit the relay's token",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
+}

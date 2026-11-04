@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.153.2",
+  "to": "0.153.3",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.153.2...rust-v0.153.3"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.153.3",
+    "text": "## New Features\n- Added GPT-6-Astra to the Amazon Bedrock model picker for Mantle and Runtime global/US routes. (#42805)\n\n## Bug Fixes\n- Corrected GPT-6-Astra’s guidance for asynchronous clarification questions to use the supported tool and recognize that it accepts text only. (#42809)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.153.2...rust-v0.153.3\n\n- #42805 [0.153 hotfix] Add GPT-6-Astra to Amazon Bedrock catalogs @celia-oai\n- #42809 [0.153 hotfix] Update Astra async-question guidance @rhan-oai"
+  },
+  "summary": {
+    "changes": 2,
+    "categories": {
+      "cli": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 0
+    },
+    "undocumented": 2
+  },
+  "changes": [
+    {
+      "id": "cli.commands.codex mcp-server.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex mcp-server",
+        "description"
+      ],
+      "title": "Description of `codex mcp-server` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Start Codex as an MCP server (stdio)\n+WARNING: proceeding, even though we could not create PATH aliases: operation would block Start Codex as an MCP server (stdio)\n",
+      "stats": {
+        "added_chars": 125,
+        "removed_chars": 36
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.3/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.mcp-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server --help"
+      ],
+      "title": "Full help text of `mcp-server --help` changed (+88 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not create PATH aliases: operation would block\n Start Codex as an MCP server (stdio)\n \n Usage: codex mcp-server [OPTIONS]\n",
+      "stats": {
+        "added_chars": 88,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.153.3/codex-rs/arg0/src/lib.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

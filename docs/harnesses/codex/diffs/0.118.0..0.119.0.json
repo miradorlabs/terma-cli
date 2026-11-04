@@ -1,0 +1,1351 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.118.0",
+  "to": "0.119.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.118.0...rust-v0.119.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.119.0",
+    "text": "## New Features\n\n- Realtime voice sessions now default to the v2 WebRTC path, with configurable transport, voice selection, native TUI media support, and app-server coverage for the new flow (#16960, #17057, #17058, #17093, #17097, #17145, #17165, #17176, #17183, #17188).\n- MCP Apps and custom MCP servers gained richer support, including resource reads, tool-call metadata, custom-server tool search, server-driven elicitations, file-parameter uploads, and more reliable plugin cache refreshes (#16082, #16465, #16944, #17043, #15197, #16191, #16947).\n- Remote/app-server workflows now support egress websocket transport, remote `--cd` forwarding, runtime remote-control enablement, sandbox-aware filesystem APIs, and an experimental `codex exec-server` subcommand (#15951, #16700, #16973, #16751, #17059, #17142, #17162).\n- The TUI can copy the latest agent response with `Ctrl+O`, including better clipboard behavior over SSH and across platforms (#16966).\n- `/resume` can now jump directly to a session by ID or name from the TUI (#17222).\n- TUI notifications are more configurable, including Warp OSC 9 support and an opt-in mode for notifications even while the terminal is focused (#17174, #17175).\n\n## Bug Fixes\n\n- The TUI starts faster by fetching rate limits asynchronously, and `/status` now refreshes stale limits instead of showing frozen or misleading quota information (#16201, #17039).\n- Resume flows are more stable: the picker no longer flashes false empty states, uses fresher thread names, stabilizes timestamp labels, preserves resume hints on zero-token exits, and avoids crashing when resuming the current thread (#16591, #16601, #16822, #16987, #17086).\n- Composer and chat behavior are smoother, including fixed paste teardown, CJK word navigation, stale `/copy` output, percent-decoded local file links, and clearer truncated exec-output hints (#16202, #16829, #16648, #16810, #17076).\n- Fast Mode no longer stays stuck on after `/fast off` in app-server-backed TUI sessions (#16833).\n- MCP status and startup are less noisy and faster: hyphenated server names list tools correctly, `/mcp` avoids slow full inventory probes, disabled servers skip auth probing, and residency headers are honored by `codex mcp-server` (#16674, #16831, #17098, #16952).\n- Sandbox, network, and platform edge cases were tightened, including clearer read-only `apply_patch` errors, refreshed network proxy policy after sandbox changes, suppressed irrelevant bubblewrap warnings, a macOS HTTP-client sandbox panic fix, and Windows firewall address handling (#16885, #17040, #16667, #16670, #17053).\n\n## Documentation\n\n- The README now uses the current ChatGPT Business plan name (#16348).\n- Developer guidance for `argument_comment_lint` was updated to favor getting CI started instead of blocking on slow local lint runs (#16375).\n- Obsolete `codex-cli` README content was removed to avoid stale setup guidance (#17096).\n- `codex exec --help` now shows clearer usage and approval-mode wording (#16881, #16888).\n\n## Chores\n\n- `codex-core` was slimmed down through major crate extractions for MCP, tools, config, model management, auth, feedback, protocol, and related ownership boundaries (#15919, #16379, #16508, #16523, #16962).\n- Rust CI and workspace guardrails were simplified by blocking new crate features and dropping routine `--all-features` runs (#16455, #16473).\n- Core compile times were reduced by removing expensive async-trait expansion from hot tool/task abstractions (#16630, #16631).\n- Bazel diagnostics and dependency wiring improved with compact execution logs, repository-cache persistence, remote downloader support, and several platform-specific build fixes (#16577, #16926, #16928, #16634, #16744).\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.118.0...rust-v0.119.0\n\n- #16308 fix: one shot end of turn @jif-oai\n- #16238 fix: ma2 @jif-oai\n- #16317 chore: clean wait v2 @jif-oai\n- #16318 nit: update aborted line @jif-oai\n- #15771 feat: fork pattern v2 @jif-oai\n- #16322 fix: update fork boundaries computation @jif-oai\n- #16325 feat: restrict spawn_agent v2 to messages @jif-oai\n- #16324 chore: drop interrupt from send_message @jif-oai\n- #16345 fix: fix clippy issue caught by cargo but not bazel @bolinfest\n- #16184 Route TUI `/feedback` submission through the app server @etraut-openai\n- #16330 feat: log db better maintenance @jif-oai\n- #15690 [codex-analytics] thread events @rhan-oai\n- #16363 Fix PR babysitter review comment monitoring @etraut-openai\n- #16356 Refactor external auth to use a single trait @etraut-openai\n- #16366 Fix Windows external bearer refresh test @bolinfest\n- #16353 ci: verify codex-rs Cargo manifests inherit workspace settings @bolinfest\n- #16361 Refactor chatwidget tests into topical modules @etraut-openai\n- #16201 Fix stale /status rate limits in active TUI sessions @etraut-openai\n- #16351 ci: sync Bazel clippy lints and fix uncovered violations @bolinfest\n- #16378 fix: suppress status card expect_used warnings after #16351 @bolinfest\n- #16406 Use message string in v2 spawn_agent @jif-oai\n- #16409 Use message string in v2 send_message @jif-oai\n- #16419 Use message string in v2 assign_task @jif-oai\n- #16424 feat: tasks can't be assigned to root agent @jif-oai\n- #16425 nit: update wait v2 desc @jif-oai\n- #16426 chore: interrupted as state @jif-oai\n- #16427 nit: deny field v2 @jif-oai\n- #16433 chore: drop log DB @jif-oai\n- #16434 feat: auto vaccum state DB @jif-oai\n- #16422 fix(core) rm execute_exec_request sandbox_policy @dylan-hurd-oai\n- #16375 docs: update argument_comment_lint instructions in AGENTS.md @bolinfest\n- #16449 fix: remove unused import @bolinfest\n- #15772 Make fuzzy file search case insensitive @meyers-oai\n- #16455 ci: block new workspace crate features @bolinfest\n- #16456 cloud-tasks: split the mock client out of cloud-tasks-client @bolinfest\n- #16457 tui: remove debug/test-only crate features @bolinfest\n- #16467 tui: remove the voice-input crate feature @bolinfest\n- #16379 Extract tool config into codex-tools @bolinfest\n- #16469 otel: remove the last workspace crate feature @bolinfest\n- #16471 Extract tool spec helpers into codex-tools @bolinfest\n- #16473 ci: stop running rust CI with --all-features @bolinfest\n- #16477 Extract tool discovery helpers into codex-tools @bolinfest\n- #16480 login: treat provider auth refresh_interval_ms=0 as no auto-refresh @bolinfest\n- #16448 fix(guardian): make GuardianAssessmentEvent.action strongly typed @owenlin0\n- #16481 Extract update_plan tool spec into codex-tools @bolinfest\n- #15919 Extract MCP into codex-mcp crate @aibrahim-oai\n- #16482 Remove client_common tool re-exports @bolinfest\n- #16495 fix: remove unused import @bolinfest\n- #16493 Extract built-in tool spec constructors into codex-tools @bolinfest\n- #16273 Fix regression: \"not available in TUI\" error message @etraut-openai\n- #16497 Extract tool-search output helpers into codex-tools @bolinfest\n- #16498 fix: guard guardian_command_source_tool_name with cfg(unix) @bolinfest\n- #16499 Extract tool-suggest wire helpers into codex-tools @bolinfest\n- #16284 Fix TUI app-server permission profile conversions @etraut-openai\n- #16202 Fix paste-driven bottom pane completion teardown @etraut-openai\n- #16504 core: use codex-tools config types directly @bolinfest\n- #16503 Extract request_user_input normalization into codex-tools @bolinfest\n- #16510 core: use codex-mcp APIs directly @bolinfest\n- #16509 Extract code-mode nested tool collection into codex-tools @bolinfest\n- #16512 core: remove cross-crate re-exports from lib.rs @bolinfest\n- #16516 fix: add update to Cargo.lock that was missed in #16512 @bolinfest\n- #16513 Extract tool registry planning into codex-tools @bolinfest\n- #16521 Move tool registry plan tests into codex-tools @bolinfest\n- #16523 [codex] Move config types into codex-config @bolinfest\n- #16524 fix: move some test utilities out of codex-rs/core/src/tools/spec.rs @bolinfest\n- #16529 [codex] Remove codex-core config type shim @bolinfest\n- #16559 chore: memories mini model @jif-oai\n- #16561 fix: race pending @jif-oai\n- #16564 nit: lint @jif-oai\n- #16566 fix: races in end of turn @jif-oai\n- #16567 chore: rework state machine further @jif-oai\n- #16569 nit: state machine desc @jif-oai\n- #16571 chore: rename assign_task for followup_task @jif-oai\n- #16577 ci: upload compact Bazel execution logs for bazel.yml @bolinfest\n- #16581 chore: move codex-exec unit tests into sibling files @bolinfest\n- #16590 Fix non-determinism in rules_rs/crate_git_repository.bzl @tyler-french\n- #16604 test: deflake external bearer auth token tests on Windows @bolinfest\n- #16606 fix: add more detail to test assertion @bolinfest\n- #16608 fix: increase timeout to account for slow PowerShell startup @bolinfest\n- #16591 Fix resume picker initial loading state @etraut-openai\n- #16613 fix: increase another startup timeout for PowerShell @bolinfest\n- #16601 Fix resume picker stale thread names @etraut-openai\n- #16616 Fixed some existing labels and added a few new ones @etraut-openai\n- #16588 Fix stale turn steering during TUI review follow-ups @etraut-openai\n- #16617 fix: add shell fallback paths for pwsh/powershell that work on GitHub Actions Windows runners @bolinfest\n- #16596 Fix fork source display in /status (expose forked_from_id in app server) @etraut-openai\n- #16578 fix(tui): handle zellij redraw and composer rendering @fcoury-oai\n- #16630 core: cut codex-core compile time 63% with native async ToolHandler @bolinfest\n- #16631 core: cut codex-core compile time 48% with native async SessionTask @bolinfest\n- #16492 Auto-trust cwd on thread start @aibrahim-oai\n- #16633 fix: address unused variable on windows @bolinfest\n- #16635 app-server: make thread/shellCommand tests shell-aware @bolinfest\n- #16629 test: use cmd.exe for ProviderAuthScript on Windows @bolinfest\n- #16634 build: fix Bazel lzma-sys wiring @starr-openai\n- #16658 Fix deprecated login --api-key parsing @etraut-openai\n- #16508 extract models manager and related ownership from core @aibrahim-oai\n- #16662 fix: changes to test that should help them pass on Windows under Bazel @bolinfest\n- #16665 fix: use COMSPEC in Windows unicode shell test @bolinfest\n- #16668 fix: use cmd.exe in Windows unicode shell test @bolinfest\n- #16626 remove temporary ownership re-exports @aibrahim-oai\n- #16648 Fix stale /copy output after commentary-only turns @etraut-openai\n- #16674 Fix MCP tool listing for hyphenated server names @etraut-openai\n- #16667 Suppress bwrap warning when sandboxing is bypassed @etraut-openai\n- #16670 Fix macOS sandbox panic in Codex HTTP client @etraut-openai\n- #16699 Fix macOS malloc diagnostics leaking into TUI composer @etraut-openai\n- #16700 Add remote --cd forwarding for app-server sessions @etraut-openai\n- #16707 fix: preserve platform-specific core shell env vars @bolinfest\n- #16715 fix: address clippy violations that sneaked in @bolinfest\n- #16722 fix windows-only clippy lint violation @bolinfest\n- #16710 fix(tui): sort skill mentions by display name first @fcoury-oai\n- #16709 Sanitize forked child history @aibrahim-oai\n- #16711 Fix Windows Bazel app-server trust tests @bolinfest\n- #16720 Remove OPENAI_BASE_URL config fallback @etraut-openai\n- #16528 Codex/windows bazel rust test coverage no rs @bolinfest\n- #16450 bazel: lint rust_test targets in clippy workflow @bolinfest\n- #16735 [codex] allow disabling prompt instruction blocks @tibo-openai\n- #16745 [codex] allow disabling environment context injection @tibo-openai\n- #16725 Preempt mailbox mail after reasoning/commentary items @aibrahim-oai\n- #16755 Use Node 24 for npm publish @aibrahim-oai\n- #16753 [codex] add responses proxy JSON dumps @tibo-openai\n- #16746 Add spawn context for MultiAgentV2 children @aibrahim-oai\n- #16757 Back out \"bazel: lint rust_test targets in clippy workflow (#16450)\" @bolinfest\n- #16737 test: avoid PowerShell startup in Windows auth fixture @bolinfest\n- #16740 ci: align Bazel repo cache and Windows clippy target handling @bolinfest\n- #16758 [codex] add context-window lineage headers @tibo-openai\n- #16763 Add CODEX_SKIP_VENDORED_BWRAP @andmis\n- #15915 [codex-analytics] subagent analytics @rhan-oai\n- #16823 Fix flaky test relating to metadata remote URL @etraut-openai\n- #16825 Fix flaky permissions escalation test on Windows @etraut-openai\n- #16881 Fix misleading codex exec help usage @etraut-openai\n- #16888 Clarify `codex exec` approval help @etraut-openai\n- #16876 [codex] add response proxy subagent header test @tibo-openai\n- #16829 Fix CJK word navigation in the TUI composer @etraut-openai\n- #16833 Fix TUI fast mode toggle regression @etraut-openai\n- #16795 [regression] Fix ephemeral turn backfill in exec @etraut-openai\n- #16822 Fix resume picker timestamp labels and stability @etraut-openai\n- #16813 Annotate skill doc reads with skill names @etraut-openai\n- #16810 (tui): Decode percent-escaped bare local file links @etraut-openai\n- #16877 [codex-backend] Make thread metadata updates tolerate pending backfill @joeytrasatti-openai\n- #16701 feat(requirements): support allowed_approval_reviewers @owenlin0\n- #16925 fix(bazel): fix simdutf @owenlin0\n- #16926 bazel: Always save bazel repository cache @euroelessar\n- #16928 bazel: Enable `--experimental_remote_downloader` @euroelessar\n- #16462 fix(guardian): fix ordering of guardian events @owenlin0\n- #16924 fix(sqlite): don't hard fail migrator if DB is newer @owenlin0\n- #16744 build: restore lzma-sys Bazel wiring for devbox codex run @starr-openai\n- #16764 app-server: centralize AuthManager initialization @euroelessar\n- #16939 Fix clippy warning @mzeng-openai\n- #16923 Revert \"[codex-backend] Make thread metadata updates tolerate pending backfill\" @joeytrasatti-openai\n- #15951 app-server: Add egress websocket transport @euroelessar\n- #16945 [codex] Allow PyTorch libomp shm in Seatbelt @viyatb-oai\n- #16947 feat: fallback curated plugin download from backend endpint. @xl-openai\n- #16191 feat: refresh non-curated cache from plugin list. @xl-openai\n- #16952 Respect residency requirements in mcp-server @etraut-openai\n- #16827 tui: route device-code auth through app server @etraut-openai\n- #16638 [codex-analytics] add protocol-native turn timestamps @rhan-oai\n- #16831 Speed up /mcp inventory listing @etraut-openai\n- #16349 Disable env-bound tools when exec server is none @starr-openai\n- #16957 Promote image_detail_original to experimental @fjord-oai\n- #16962 Refactor config types into a separate crate @pakrym-oai\n- #16153 Add setTimeout support to code mode @pakrym-oai\n- #16961 app-server: Unify config changes handling a bit @euroelessar\n- #16890 Validate exec input before starting app-server @etraut-openai\n- #16082 [mcp] Support MCP Apps part 1. @mzeng-openai\n- #15893 fix: warn when bwrap cannot create user namespaces @viyatb-oai\n- #16946 [codex] Add danger-full-access denylist-only network mode @viyatb-oai\n- #16972 app-server: Fix compilation of a test in mcp_resource @euroelessar\n- #15826 Make AGENTS.md discovery FS-aware @pakrym-oai\n- #16964 Honor null thread instructions @aibrahim-oai\n- #16988 collapse dev message into one @won-openai\n- #16724 [codex] ez - rename env=>request in codex-rs/core/src/unified_exec/process_manager.rs @starr-openai\n- #16999 feat: empty role ok @jif-oai\n- #17002 chore: debug flag to hide some parameters @jif-oai\n- #17005 feat: drop agent ID from v2 @jif-oai\n- #17008 chore: send_message and followup_task do not return anything @jif-oai\n- #17007 chore: hide nickname for debug flag @jif-oai\n- #16442 feat: /feedback cascade @jif-oai\n- #16978 [codex] reduce module visibility @pakrym-oai\n- #17009 chore: keep request_user_input tool to persist cache on multi-agents @jif-oai\n- #16739 Stabilize flaky multi-agent followup interrupt test @etraut-openai\n- #16885 Fix read-only apply_patch rejection message @etraut-openai\n- #16882 Fix nested exec thread ID restore @etraut-openai\n- #16976 Preserve null developer instructions @aibrahim-oai\n- #16987 Fix missing resume hint on zero-token exits @etraut-openai\n- #16912 feat(analytics): generate an installation_id and pass it in responsesapi client_metadata @owenlin0\n- #16956 fix(guardian): don't throw away transcript when over budget @owenlin0\n- #16981 [codex] Make AbsolutePathBuf joins infallible @pakrym-oai\n- #16348 Update README @romainhuet\n- #16977 [codex] Make unified exec tests remote aware @pakrym-oai\n- #16465 [mcp] Support MCP Apps part 2 - Add meta to mcp tool call result. @mzeng-openai\n- #17026 app-server: Move watch_id to request of fs/watch @euroelessar\n- #16980 Add full-ci branch trigger @pakrym-oai\n- #16973 app-server: Allow enabling remote control in runtime @euroelessar\n- #17032 [codex] Fix unified exec test build @pakrym-oai\n- #17031 fix(core) revert Command line in unified exec output @dylan-hurd-oai\n- #17027 [codex] Migrate apply_patch to executor filesystem @pakrym-oai\n- #17044 [app-server-protocol] introduce generic ServerResponse for app-server-protocol @rhan-oai\n- #17047 fix(app-server) revert null instructions changes @dylan-hurd-oai\n- #16960 Add WebRTC transport to realtime start @aibrahim-oai\n- #17053 Fix remote address format to work with Windows Firewall rules. @iceweasel-oai\n- #17048 [codex] Apply patches through executor filesystem @pakrym-oai\n- #16949 Use model metadata for Fast Mode status @pash-openai\n- #17039 fix(tui): reduce startup and new-session latency @fcoury-oai\n- #17052 Add regression tests for JsonSchema @vivi\n- #17059 Add remote exec start script @pakrym-oai\n- #17064 Add project-local codex bug triage skill @etraut-openai\n- #17040 fix: refresh network proxy settings when sandbox mode changes @viyatb-oai\n- #16698 Remove expired April 2nd tooltip copy @etraut-openai\n- #17096 Remove obsolete codex-cli README @etraut-openai\n- #16875 Support anyOf and enum in JsonSchema @vivi\n- #16880 Render function attribute descriptions @vivi\n- #16879 Render namespace description for tools @vivi\n- #16582 feat: single app-server bootstrap in TUI @jif-oai\n- #17117 codex debug 1 (guardian approved) @jif-oai\n- #17119 codex debug 3 (guardian approved) @jif-oai\n- #17121 codex debug 5 (guardian approved) @jif-oai\n- #17123 codex debug 7 (guardian approved) @jif-oai\n- #17125 codex debug 9 (guardian approved) @jif-oai\n- #17127 codex debug 11 (guardian approved) @jif-oai\n- #17129 codex debug 13 (guardian approved) @jif-oai\n- #17131 codex debug 15 (guardian approved) @jif-oai\n- #17118 codex debug 2 (guardian approved) @jif-oai\n- #17120 codex debug 4 (guardian approved) @jif-oai\n- #17122 codex debug 6 (guardian approved) @jif-oai\n- #17124 codex debug 8 (guardian approved) @jif-oai\n- #17126 codex debug 10 (guardian approved) @jif-oai\n- #17128 codex debug 12 (guardian approved) @jif-oai\n- #17130 codex debug 14 (guardian approved) @jif-oai\n- #17071 Configure multi_agent_v2 spawn agent hints @pakrym-oai\n- #17091 Show global AGENTS.md in /status @etraut-openai\n- #17086 Fix TUI crash when resuming the current thread @etraut-openai\n- #17098 Skip MCP auth probing for disabled servers @etraut-openai\n- #17097 Add realtime transport config @aibrahim-oai\n- #17043 [mcp] Support server-driven elicitations @mzeng-openai\n- #17058 Add WebRTC media transport to realtime TUI @aibrahim-oai\n- #17063 Use AbsolutePathBuf for exec cwd plumbing @pakrym-oai\n- #17138 fix(debug-config, guardian): fix /debug-config rendering and guardian… @owenlin0\n- #17046 release ready, enabling only for siwc users @won-openai\n- #16751 Add sandbox support to filesystem APIs @starr-openai\n- #17142 [codex] Support remote exec cwd in TUI startup @pakrym-oai\n- #17149 Fix missing fields @canvrno-oai\n- #17154 Fix ToolsConfigParams initializer in tool registry test @won-openai\n- #17145 Wire realtime WebRTC native media into Bazel @aibrahim-oai\n- #17057 Attach WebRTC realtime starts to sideband websocket @aibrahim-oai\n- #17162 Add top-level exec-server subcommand @starr-openai\n- #17061 Update guardian output schema @maja-openai\n- #17164 Auto-approve MCP server elicitations in Full Access mode @leoshimo-oai\n- #17093 Add WebRTC realtime app-server e2e tests @aibrahim-oai\n- #17174 Support Warp for OSC 9 notifications @etraut-openai\n- #16646 Fix stale thread-name resume lookups @etraut-openai\n- #17165 Move default realtime prompt into core @aibrahim-oai\n- #17176 Add realtime voice selection @aibrahim-oai\n- #17175 Add TUI notification condition config @etraut-openai\n- #17183 Default realtime startup to v2 model @aibrahim-oai\n- #17186 Skip update prompts for source builds @etraut-openai\n- #17188 make webrtc the default experience @aibrahim-oai\n- #17163 [codex] Defer steering until after sampling the model post-compaction @jgershen-oai\n- #17222 feat: /resume per ID/name @jif-oai\n- #17226 feat: advanced announcements per OS and plans @jif-oai\n- #17170 Render statusline context as a meter @etraut-openai\n- #17217 Skip local shell snapshots for remote unified exec @jif-oai\n- #17116 chore: merge name and title @jif-oai\n- #16276 [codex] add memory extensions @kliu128\n- #17168 refactor(proxy): clarify sandbox block messages @viyatb-oai\n- #17076 [codex] Show ctrl + t hint on truncated exec output in TUI @mom-oai\n- #15197 Add Codex Apps sediment file remapping @caseychow-oai\n- #16009 Forward app-server turn clientMetadata to Responses @neil-oai\n- #17256 app-server: Use shared receivers for app-server message processors @euroelessar\n- #16944 [mcp] Expand tool search to custom MCPs. @mzeng-openai\n- #16966 feat(tui): Ctrl+O copy hotkey and harden copy-as-markdown behavior @fcoury-oai\n- #17262 app-server: Fix clippy by removing extra `mut` @euroelessar\n- #17258 Omit empty app-server instruction overrides @aibrahim-oai"
+  },
+  "summary": {
+    "changes": 50,
+    "categories": {
+      "binary": 1,
+      "cli": 24,
+      "config": 19,
+      "request": 4,
+      "storage": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 43,
+      "notable": 7
+    },
+    "undocumented": 23
+  },
+  "changes": [
+    {
+      "id": "tools.spawn_agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "spawn_agent",
+        "description"
+      ],
+      "title": "spawn_agent tool description changed (+803 −808 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,14 +1,6 @@\n \n-        Only use `spawn_agent` if and only if the user explicitly asks for sub-agents, delegation, or parallel agent work.\n-        Requests for depth, thoroughness, research, investigation, or detailed codebase analysis do not count as permission to spawn.\n-        Agent-role guidance below only helps choose which agent to use after spawning is already authorized; it never authorizes spawning by itself.\n-        Spawn a sub-agent for a well-scoped task.\n-Returns the spawned agent id plus the user-facing nickname when available.\n-This spawn_agent tool provides you access to smaller but more efficient sub-agents.\n-A mini model can solve many tasks faster than the main model.\n-You should follow the rules and guidelines below to use this tool.\n-\n-- gpt-5.3-codex (`gpt-5.3-codex`): Latest frontier agentic coding model.\n+        \n+        - gpt-5.3-codex (`gpt-5.3-codex`): Latest frontier agentic coding model.\n Default reasoning effort: medium.\n Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n - gpt-5.4 (`gpt-5.4`): Latest frontier agentic coding model.\n@@ -23,6 +15,13 @@\n - gpt-5.2 (`gpt-5.2`): Latest frontier model with improvements across knowledge, reasoning and coding Default reasoning effort: medium.\n Supported reasoning efforts: low (Balances speed with some reasoning; useful for straightforward queries and short explanations), medium (Provides a solid balance of reasoning depth and latency for general-purpose tasks), high (Maximizes reasoning depth for complex or ambiguous problems), xhigh (Extra high reasoning for complex problems).\n - gpt-5.1-codex-mini (`gpt-5.1-codex-mini`): Optimized for codex. Cheaper, faster, but less capable. Default reasoning effort: medium. Supported reasoning efforts: medium (Dynamically adjusts reasoning based on the task), high (Maximizes reasoning depth for complex or ambiguous problems).\n+        Spawn a sub-agent for a well-scoped task. Returns the spawned agent id plus the user-facing nickname when available.\n+This spawn_agent tool provides you access to smaller but more efficient sub-agents. A mini model can solve many tasks faster than the main model. You should follow the rules and guidelines below to use this tool.\n+\n+Only use `spawn_agent` if and only if the user explicitly asks for sub-agents, delegation, or parallel agent work.\n+Requests for depth, thoroughness, research, investigation, or detailed codebase analysis do not count as permission to spawn.\n+Agent-role guidance below only helps choose which agent to use after spawning is already authorized; it never authorizes spawning by itself.\n+\n ### When to delegate vs. do the subtask yourself\n - First, quickly analyze the overall user task and form a succinct high-level plan.\n Identify which tasks are immediate blockers on the critical path, and which tasks are sidecar tasks that are needed but can run in parallel without blocking the next local step.\n",
+      "stats": {
+        "added_chars": 803,
+        "removed_chars": 808
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tools/src/agent_tool.rs",
+            "line": 618,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/tools/src/agent_tool.rs#L618-L621"
+          },
+          {
+            "path": "codex-rs/tools/src/agent_tool.rs",
+            "line": 612,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/tools/src/agent_tool.rs#L612"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "request.body_keys.client_metadata",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "body_keys",
+        "client_metadata"
+      ],
+      "title": "Request field client_metadata added",
+      "impact": "informational",
+      "before": null,
+      "after": "client_metadata",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "request.headers.user-agent",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "user-agent"
+      ],
+      "title": "Header user-agent: codex_exec/<version> (Mac OS <os-release>; arm64) xterm-2… → codex_exec/<version> (Mac OS <os-release>; arm64) xterm-2…",
+      "impact": "informational",
+      "before": "codex_exec/<version> (Mac OS <os-release>; arm64) xterm-256color (codex-exec; <version>)",
+      "after": "codex_exec/<version> (Mac OS <os-release>; arm64) xterm-256color (codex_exec; <version>)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.identifiers.client_metadata.x-codex-installation-id",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "identifiers",
+        "client_metadata.x-codex-installation-id"
+      ],
+      "title": "Now sends identifier client_metadata.x-codex-installation-id",
+      "impact": "notable",
+      "before": null,
+      "after": "client_metadata.x-codex-installation-id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.identifiers.header:x-codex-window-id",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "identifiers",
+        "header:x-codex-window-id"
+      ],
+      "title": "Now sends identifier header:x-codex-window-id",
+      "impact": "notable",
+      "before": null,
+      "after": "header:x-codex-window-id",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 128,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/core/src/client.rs#L128"
+          },
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 570,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/core/src/client.rs#L570"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex.options.--cd.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex",
+        "options",
+        "--cd",
+        "description"
+      ],
+      "title": "`codex --cd`: description changed (+137 −65 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tell the agent to use the specified directory as its working root\n+Tell the agent to use the specified directory as its working root. In remote mode, the path is forwarded to the server and resolved there\n",
+      "stats": {
+        "added_chars": 137,
+        "removed_chars": 65
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex app-server.options.--listen.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex app-server",
+        "options",
+        "--listen",
+        "description"
+      ],
+      "title": "`codex app-server --listen`: description changed",
+      "impact": "informational",
+      "before": "Transport endpoint URL. Supported values: `stdio://` (default), `ws://IP:PORT`",
+      "after": "Transport endpoint URL. Supported values: `stdio://` (default), `ws://IP:PORT`, `off`",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 487,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/app-server-test-client/src/lib.rs#L487"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 1450,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/app-server-test-client/src/lib.rs#L1450"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex debug prompt-input",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex debug prompt-input"
+      ],
+      "title": "New command: `codex debug prompt-input`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Render the model-visible prompt input list as JSON",
+        "helped": false
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex exec.options.--full-auto.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "options",
+        "--full-auto",
+        "description"
+      ],
+      "title": "`codex exec --full-auto`: description changed",
+      "impact": "informational",
+      "before": "Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox workspace-write)",
+      "after": "Convenience alias for low-friction sandboxed automatic execution (--sandbox workspace-write)",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 667,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L667"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 681,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L681"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.usage.Usage: codex exec [OPTIONS] [PROMPT]",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "usage",
+        "Usage: codex exec [OPTIONS] [PROMPT]"
+      ],
+      "title": "Usage of `codex exec` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: codex exec [OPTIONS] [PROMPT]",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 667,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L667"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 681,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L681"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.usage.codex exec [OPTIONS] <COMMAND> [ARGS]",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "usage",
+        "codex exec [OPTIONS] <COMMAND> [ARGS]"
+      ],
+      "title": "Usage of `codex exec` added",
+      "impact": "informational",
+      "before": null,
+      "after": "codex exec [OPTIONS] <COMMAND> [ARGS]",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 667,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L667"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 681,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L681"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec.usage.Usage: codex exec [OPTIONS] [PROMPT] [COMMAND]",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec",
+        "usage",
+        "Usage: codex exec [OPTIONS] [PROMPT] [COMMAND]"
+      ],
+      "title": "Usage of `codex exec` removed",
+      "impact": "notable",
+      "before": "Usage: codex exec [OPTIONS] [PROMPT] [COMMAND]",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 636,
+            "url": "https://github.com/openai/codex/blob/rust-v0.118.0/codex-rs/cli/src/main.rs#L636"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 650,
+            "url": "https://github.com/openai/codex/blob/rust-v0.118.0/codex-rs/cli/src/main.rs#L650"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server"
+      ],
+      "title": "New command: `codex exec-server`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "[EXPERIMENTAL] Run the standalone exec-server binary",
+        "helped": true,
+        "options": {
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          },
+          "--listen": {
+            "default": "ws://127.0.0.1:0",
+            "description": "Transport endpoint URL. Supported values: `ws://IP:PORT` (default)",
+            "names": [
+              "--listen"
+            ],
+            "value": "<URL>"
+          }
+        },
+        "usage": [
+          "Usage: codex exec-server [OPTIONS]"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1015,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/main.rs#L1015"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex fork.options.--cd.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex fork",
+        "options",
+        "--cd",
+        "description"
+      ],
+      "title": "`codex fork --cd`: description changed (+137 −65 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tell the agent to use the specified directory as its working root\n+Tell the agent to use the specified directory as its working root. In remote mode, the path is forwarded to the server and resolved there\n",
+      "stats": {
+        "added_chars": 137,
+        "removed_chars": 65
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex resume.options.--cd.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex resume",
+        "options",
+        "--cd",
+        "description"
+      ],
+      "title": "`codex resume --cd`: description changed (+137 −65 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tell the agent to use the specified directory as its working root\n+Tell the agent to use the specified directory as its working root. In remote mode, the path is forwarded to the server and resolved there\n",
+      "stats": {
+        "added_chars": 137,
+        "removed_chars": 65
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1373 −1205 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,26 +6,27 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  exec        Run Codex non-interactively [aliases: e]\n-  review      Run a code review non-interactively\n-  login       Manage login\n-  logout      Remove stored authentication credentials\n-  mcp         Manage external MCP servers for Codex\n-  mcp-server  Start Codex as an MCP server (stdio)\n-  app-server  [experimental] Run the app server or related tooling\n-  app         Launch the Codex desktop app (downloads the macOS installer if missing)\n-  completion  Generate shell completion scripts\n-  sandbox     Run commands within a Codex-provided sandbox\n-  debug       Debugging tools\n-  apply       Apply the latest diff produced by Codex agent as a `git apply` to your local working\n-              tree [aliases: a]\n-  resume      Resume a previous interactive session (picker by default; use --last to continue the\n-              most recent)\n-  fork        Fork a previous interactive session (picker by default; use --last to fork the most\n-              recent)\n-  cloud       [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  features    Inspect feature flags\n-  help        Print this message or the help of the given subcommand(s)\n+  exec         Run Codex non-interactively [aliases: e]\n+  review       Run a code review non-interactively\n+  login        Manage login\n+  logout       Remove stored authentication credentials\n+  mcp          Manage external MCP servers for Codex\n+  mcp-server   Start Codex as an MCP server (stdio)\n+  app-server   [experimental] Run the app server or related tooling\n+  app          Launch the Codex desktop app (downloads the macOS installer if missing)\n+  completion   Generate shell completion scripts\n+  sandbox      Run commands within a Codex-provided sandbox\n+  debug        Debugging tools\n+  apply        Apply the latest diff produced by Codex agent as a `git apply` to your local working\n+               tree [aliases: a]\n+  resume       Resume a previous interactive session (picker by default; use --last to continue the\n+               most recent)\n+  fork         Fork a previous interactive session (picker by default; use --last to fork the most\n+               recent)\n+  cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+  exec-server  [EXPERIMENTAL] Run the standalone exec-server binary\n+  features     Inspect feature flags\n+  help         Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [PROMPT]\n@@ -101,7 +102,8 @@\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n \n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root\n+          Tell the agent to use the specified directory as its working root. In remote mode, the\n+          path is forwarded to the server and resolved there\n \n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n",
+      "stats": {
+        "added_chars": 1373,
+        "removed_chars": 1205
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+1373 −1205 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,26 +4,27 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  exec        Run Codex non-interactively [aliases: e]\n-  review      Run a code review non-interactively\n-  login       Manage login\n-  logout      Remove stored authentication credentials\n-  mcp         Manage external MCP servers for Codex\n-  mcp-server  Start Codex as an MCP server (stdio)\n-  app-server  [experimental] Run the app server or related tooling\n-  app         Launch the Codex desktop app (downloads the macOS installer if missing)\n-  completion  Generate shell completion scripts\n-  sandbox     Run commands within a Codex-provided sandbox\n-  debug       Debugging tools\n-  apply       Apply the latest diff produced by Codex agent as a `git apply` to your local working\n-              tree [aliases: a]\n-  resume      Resume a previous interactive session (picker by default; use --last to continue the\n-              most recent)\n-  fork        Fork a previous interactive session (picker by default; use --last to fork the most\n-              recent)\n-  cloud       [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  features    Inspect feature flags\n-  help        Print this message or the help of the given subcommand(s)\n+  exec         Run Codex non-interactively [aliases: e]\n+  review       Run a code review non-interactively\n+  login        Manage login\n+  logout       Remove stored authentication credentials\n+  mcp          Manage external MCP servers for Codex\n+  mcp-server   Start Codex as an MCP server (stdio)\n+  app-server   [experimental] Run the app server or related tooling\n+  app          Launch the Codex desktop app (downloads the macOS installer if missing)\n+  completion   Generate shell completion scripts\n+  sandbox      Run commands within a Codex-provided sandbox\n+  debug        Debugging tools\n+  apply        Apply the latest diff produced by Codex agent as a `git apply` to your local working\n+               tree [aliases: a]\n+  resume       Resume a previous interactive session (picker by default; use --last to continue the\n+               most recent)\n+  fork         Fork a previous interactive session (picker by default; use --last to fork the most\n+               recent)\n+  cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+  exec-server  [EXPERIMENTAL] Run the standalone exec-server binary\n+  features     Inspect feature flags\n+  help         Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [PROMPT]  Optional user prompt to start the session\n@@ -67,7 +68,8 @@\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root\n+          Tell the agent to use the specified directory as its working root. In remote mode, the\n+          path is forwarded to the server and resolved there\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n",
+      "stats": {
+        "added_chars": 1373,
+        "removed_chars": 1205
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server --help"
+      ],
+      "title": "Full help text of `app-server --help` changed (+95 −88 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -23,7 +23,7 @@\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n       --listen <URL>\n-          Transport endpoint URL. Supported values: `stdio://` (default), `ws://IP:PORT`\n+          Transport endpoint URL. Supported values: `stdio://` (default), `ws://IP:PORT`, `off`\n           \n           [default: stdio://]\n \n",
+      "stats": {
+        "added_chars": 95,
+        "removed_chars": 88
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+124 −117 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -17,8 +17,8 @@\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --listen <URL>\n-          Transport endpoint URL. Supported values: `stdio://` (default), `ws://IP:PORT` [default:\n-          stdio://]\n+          Transport endpoint URL. Supported values: `stdio://` (default), `ws://IP:PORT`, `off`\n+          [default: stdio://]\n       --analytics-default-enabled\n           Controls whether analytics are enabled by default\n       --ws-auth <MODE>\n",
+      "stats": {
+        "added_chars": 124,
+        "removed_chars": 117
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.debug --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "debug --help"
+      ],
+      "title": "Full help text of `debug --help` changed (+190 −120 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,8 +3,9 @@\n Usage: codex debug [OPTIONS] <COMMAND>\n \n Commands:\n-  app-server  Tooling: helps debug the app server\n-  help        Print this message or the help of the given subcommand(s)\n+  app-server    Tooling: helps debug the app server\n+  prompt-input  Render the model-visible prompt input list as JSON\n+  help          Print this message or the help of the given subcommand(s)\n \n Options:\n   -c, --config <key=value>\n",
+      "stats": {
+        "added_chars": 190,
+        "removed_chars": 120
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.debug -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "debug -h"
+      ],
+      "title": "Full help text of `debug -h` changed (+190 −120 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,8 +3,9 @@\n Usage: codex debug [OPTIONS] <COMMAND>\n \n Commands:\n-  app-server  Tooling: helps debug the app server\n-  help        Print this message or the help of the given subcommand(s)\n+  app-server    Tooling: helps debug the app server\n+  prompt-input  Render the model-visible prompt input list as JSON\n+  help          Print this message or the help of the given subcommand(s)\n \n Options:\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n",
+      "stats": {
+        "added_chars": 190,
+        "removed_chars": 120
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+165 −146 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,7 @@\n Run Codex non-interactively\n \n-Usage: codex exec [OPTIONS] [PROMPT] [COMMAND]\n+Usage: codex exec [OPTIONS] [PROMPT]\n+       codex exec [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n   resume  Resume a previous session by id or pick the most recent with --last\n@@ -50,7 +51,7 @@\n           Configuration profile from config.toml to specify default options\n \n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n+          Convenience alias for low-friction sandboxed automatic execution (--sandbox\n           workspace-write)\n \n       --dangerously-bypass-approvals-and-sandbox\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec/src/cli.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/exec/src/cli.rs#L11"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+165 −146 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,7 @@\n Run Codex non-interactively\n \n-Usage: codex exec [OPTIONS] [PROMPT] [COMMAND]\n+Usage: codex exec [OPTIONS] [PROMPT]\n+       codex exec [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n   resume  Resume a previous session by id or pick the most recent with --last\n@@ -36,7 +37,7 @@\n   -p, --profile <CONFIG_PROFILE>\n           Configuration profile from config.toml to specify default options\n       --full-auto\n-          Convenience alias for low-friction sandboxed automatic execution (-a on-request, --sandbox\n+          Convenience alias for low-friction sandboxed automatic execution (--sandbox\n           workspace-write)\n       --dangerously-bypass-approvals-and-sandbox\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec/src/cli.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/exec/src/cli.rs#L11"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "[EXPERIMENTAL] Run the standalone exec-server binary\n\nUsage: codex exec-server [OPTIONS]\n\nOptions:\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --listen <URL>\n          Transport endpoint URL. Supported values: `ws://IP:PORT` (default)\n          \n          [default: ws://127.0.0.1:0]\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "[EXPERIMENTAL] Run the standalone exec-server binary\n\nUsage: codex exec-server [OPTIONS]\n\nOptions:\n  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                            nested values. The `value` portion is parsed as TOML. If it fails to\n                            parse as TOML, the raw string is used as a literal\n      --listen <URL>        Transport endpoint URL. Supported values: `ws://IP:PORT` (default)\n                            [default: ws://127.0.0.1:0]\n      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n  -h, --help                Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+156 −75 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -86,7 +86,8 @@\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n \n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root\n+          Tell the agent to use the specified directory as its working root. In remote mode, the\n+          path is forwarded to the server and resolved there\n \n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n",
+      "stats": {
+        "added_chars": 156,
+        "removed_chars": 75
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+156 −75 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -50,7 +50,8 @@\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root\n+          Tell the agent to use the specified directory as its working root. In remote mode, the\n+          path is forwarded to the server and resolved there\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n",
+      "stats": {
+        "added_chars": 156,
+        "removed_chars": 75
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+156 −75 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -89,7 +89,8 @@\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n \n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root\n+          Tell the agent to use the specified directory as its working root. In remote mode, the\n+          path is forwarded to the server and resolved there\n \n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n",
+      "stats": {
+        "added_chars": 156,
+        "removed_chars": 75
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+156 −75 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -52,7 +52,8 @@\n           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY\n           DANGEROUS. Intended solely for running in environments that are externally sandboxed\n   -C, --cd <DIR>\n-          Tell the agent to use the specified directory as its working root\n+          Tell the agent to use the specified directory as its working root. In remote mode, the\n+          path is forwarded to the server and resolved there\n       --search\n           Enable live web search. When enabled, the native Responses `web_search` tool is available\n           to the model (no per‑call approval)\n",
+      "stats": {
+        "added_chars": 156,
+        "removed_chars": 75
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.features.general_analytics",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.general_analytics"
+      ],
+      "title": "New setting: features.general_analytics",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 654,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/features/src/lib.rs#L654"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.type",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2",
+        "type"
+      ],
+      "title": "Type of features.multi_agent_v2: boolean → boolean|object",
+      "impact": "notable",
+      "before": "boolean",
+      "after": "boolean|object",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/features/src/lib.rs#L760"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.remote_control",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.remote_control"
+      ],
+      "title": "New setting: features.remote_control",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 872,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/features/src/lib.rs#L872"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.include_apps_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "include_apps_instructions"
+      ],
+      "title": "New setting: include_apps_instructions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether to inject the `<apps_instructions>` developer block.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.include_environment_context",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "include_environment_context"
+      ],
+      "title": "New setting: include_environment_context",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether to inject the `<environment_context>` user block.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.include_permissions_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "include_permissions_instructions"
+      ],
+      "title": "New setting: include_permissions_instructions",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Whether to inject the `<permissions instructions>` developer block.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>",
+        "description"
+      ],
+      "title": "mcp_servers.<name> description changed (+287 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n+Raw MCP config shape used for deserialization and JSON Schema generation.\n \n+Keep `TryFrom<RawMcpServerConfig> for McpServerConfig` exhaustively destructuring this struct so new TOML fields cannot be added here without updating the validation/mapping logic that produces [`McpServerConfig`].\n",
+      "stats": {
+        "added_chars": 287,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.auth.refresh_interval_ms.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.auth.refresh_interval_ms",
+        "description"
+      ],
+      "title": "model_providers.<name>.auth.refresh_interval_ms description changed (+141 −62 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum age for the cached token before rerunning the command.\n+Maximum age for the cached token before rerunning the command. Set to `0` to disable proactive refresh and only rerun after a 401 retry path.\n",
+      "stats": {
+        "added_chars": 141,
+        "removed_chars": 62
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.notice.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "notice",
+        "description"
+      ],
+      "title": "notice description changed (+109 −118 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Collection of in-product notices (different from notifications) See [`crate::config::types::Notices`] for more details\n+Collection of in-product notices (different from notifications) See [`crate::types::Notice`] for more details\n",
+      "stats": {
+        "added_chars": 109,
+        "removed_chars": 118
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.profiles.<name>.include_apps_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.include_apps_instructions"
+      ],
+      "title": "New setting: profiles.<name>.include_apps_instructions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.profiles.<name>.include_environment_context",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.include_environment_context"
+      ],
+      "title": "New setting: profiles.<name>.include_environment_context",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.profiles.<name>.include_permissions_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.include_permissions_instructions"
+      ],
+      "title": "New setting: profiles.<name>.include_permissions_instructions",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.realtime.transport",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "realtime.transport"
+      ],
+      "title": "New setting: realtime.transport",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "webrtc",
+          "websocket"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 86,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/mcp_cmd.rs#L86"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 525,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/cli/src/mcp_cmd.rs#L525"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.realtime.voice",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "realtime.voice"
+      ],
+      "title": "New setting: realtime.voice",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "alloy",
+          "arbor",
+          "ash",
+          "ballad",
+          "breeze",
+          "cedar",
+          "coral",
+          "cove",
+          "echo",
+          "ember",
+          "juniper",
+          "maple",
+          "marin",
+          "sage",
+          "shimmer",
+          "sol",
+          "spruce",
+          "vale",
+          "verse"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 1023,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/core/src/config/edit.rs#L1023"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.notification_condition",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.notification_condition"
+      ],
+      "title": "New setting: tui.notification_condition",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "unfocused",
+        "description": "Controls whether TUI notifications are delivered only when the terminal is unfocused or regardless of focus. Defaults to `unfocused`.",
+        "enum": [
+          "unfocused",
+          "always"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/types.rs",
+            "line": 509,
+            "url": "https://github.com/openai/codex/blob/rust-v0.119.0/codex-rs/config/src/types.rs#L509"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.notification_method.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.notification_method",
+        "description"
+      ],
+      "title": "tui.notification_method description changed (+74 −84 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Notification method to use for unfocused terminal notifications. Defaults to `auto`.\n+Notification method to use for terminal notifications. Defaults to `auto`.\n",
+      "stats": {
+        "added_chars": 74,
+        "removed_chars": 84
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.notifications.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.notifications",
+        "description"
+      ],
+      "title": "tui.notifications description changed (+62 −93 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Enable desktop notifications from the TUI when the terminal is unfocused. Defaults to `true`.\n+Enable desktop notifications from the TUI. Defaults to `true`.\n",
+      "stats": {
+        "added_chars": 62,
+        "removed_chars": 93
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.status_line.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.status_line",
+        "description"
+      ],
+      "title": "tui.status_line description changed (+139 −161 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,3 @@\n Ordered list of status line item identifiers.\n \n-When set, the TUI renders the selected items as the status line. When unset, the TUI defaults to: `model-with-reasoning`, `context-remaining`, and `current-dir`.\n+When set, the TUI renders the selected items as the status line. When unset, the TUI defaults to: `model-with-reasoning` and `current-dir`.\n",
+      "stats": {
+        "added_chars": 139,
+        "removed_chars": 161
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.OPENAI_BASE_URL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "OPENAI_BASE_URL"
+      ],
+      "title": "Environment variable no longer read: OPENAI_BASE_URL",
+      "impact": "informational",
+      "before": "OPENAI_BASE_URL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 150,
+            "url": "https://github.com/openai/codex/blob/rust-v0.118.0/codex-rs/core/src/config/mod.rs#L150"
+          },
+          {
+            "path": "codex-rs/feedback/src/feedback_diagnostics.rs",
+            "line": 3,
+            "url": "https://github.com/openai/codex/blob/rust-v0.118.0/codex-rs/feedback/src/feedback_diagnostics.rs#L3"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed: \"\\u003ccodex-home\\u003e/logs_1.sqlite\" → \"\\u003ccodex-home\\u003e/logs_2.sqlite\"",
+      "impact": "informational",
+      "before": "<codex-home>/logs_1.sqlite",
+      "after": "<codex-home>/logs_2.sqlite",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 132697616 → 151626736",
+      "impact": "informational",
+      "before": 132697616,
+      "after": 151626736,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.144.2",
+  "to": "0.144.3",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.144.2...rust-v0.144.3"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.144.3",
+    "text": "## Chores\n\n- Published a version-only release with no merged pull request changes since `rust-v0.144.2`.\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.144.2...rust-v0.144.3"
+  },
+  "summary": {
+    "changes": 4,
+    "categories": {
+      "behavior": 1,
+      "caching": 1,
+      "cli": 1,
+      "hooks": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 2
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns"
+      ],
+      "title": "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "breakpoints": [
+          [],
+          [],
+          []
+        ],
+        "stable_cache_key": true,
+        "stable_prefix_chars": 674,
+        "turns": 3
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox removed",
+      "impact": "notable",
+      "before": {
+        "approval": "never",
+        "model": "gpt-5.6-sol",
+        "models": [
+          "gpt-5.6-sol"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control"
+      ],
+      "title": "Hook events.UserPromptSubmit.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "blocks the prompt; message not shown to the model",
+        "json_decision": "blocks the prompt; message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1235,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.3/codex-rs/analytics/src/events.rs#L1235"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 444,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.3/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L444"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+0 −105 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not create PATH aliases: No such file or directory (os error 2)\n [EXPERIMENTAL] Run the standalone exec-server service\n \n Usage: codex exec-server [OPTIONS]\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 105
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 178,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.2/codex-rs/arg0/src/lib.rs#L178"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

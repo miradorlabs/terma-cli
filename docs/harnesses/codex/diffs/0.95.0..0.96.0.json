@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.95.0",
+  "to": "0.96.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.95.0...rust-v0.96.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.96.0",
+    "text": "## New Features\n- Added `thread/compact` to the v2 app-server API as an async trigger RPC, so clients can start compaction immediately and track completion separately. (#10445)\n- Added websocket-side rate limit signaling via a new `codex.rate_limits` event, with websocket parity for ETag/reasoning metadata handling. (#10324)\n- Enabled `unified_exec` on all non-Windows platforms. (#10641)\n- Constrained requirement values now include source provenance, enabling source-aware config debugging in UI flows like `/debug-config`. (#10568)\n\n## Bug Fixes\n- Fixed `Esc` handling in the TUI `request_user_input` overlay: when notes are open, `Esc` now exits notes mode instead of interrupting the session. (#10569)\n- Thread listing now queries the state DB first (including archived threads) and falls back to filesystem traversal only when needed, improving listing correctness and resilience. (#10544)\n- Fixed thread path lookup to require that the resolved file actually exists, preventing invalid thread-id resolutions. (#10618)\n- Dynamic tool injection now runs in a single transaction to avoid partial state updates. (#10614)\n- Refined `request_rule` guidance used in approval-policy prompting to correct rule behavior. (#10379, #10598)\n\n## Documentation\n- Updated app-server docs for `thread/compact` to clarify its asynchronous behavior and thread-busy lifecycle. (#10445)\n- Updated TUI docs to match the mode-specific `Esc` behavior in `request_user_input`. (#10569)\n\n## Chores\n- Migrated state DB helpers to a versioned SQLite filename scheme and cleaned up legacy state files during runtime initialization. (#10623)\n- Expanded runtime telemetry with websocket timing metrics and simplified internal metadata flow in core client plumbing. (#10577, #10589)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.95.0...rust-v0.96.0\n\n- #10569 tui: make Esc clear request_user_input notes while notes are shown @charley-oai\n- #10577 feat: log webscocket timing into runtime metrics @apanasenko-oai\n- #10445 Add thread/compact v2  @aibrahim-oai\n- #10589 Move metadata calculation out of client @pakrym-oai\n- #10379 fix(core) updated request_rule guidance @dylan-hurd-oai\n- #10598 fix(core) Request Rule guidance tweak @dylan-hurd-oai\n- #10544 Prefer state DB thread listings before filesystem @jif-oai\n- #10614 fix: single transaction for dyn tools injection @jif-oai\n- #10568 Requirements: add source to constrained requirement values @gt-oai\n- #10611 chore: simplify user message detection @jif-oai\n- #10618 fix: make sure file exist in `find_thread_path_by_id_str_in_subdir` @jif-oai\n- #10619 nit: cleaning @jif-oai\n- #10324 Add a codex.rate_limits event for websockets @rasmusrygaard\n- #10623 Migrate state DB path helpers to versioned filename @jif-oai\n- #10638 Update tests to stop using sse_completed fixture @pakrym-oai\n- #10641 feat: land unified_exec @jif-oai"
+  },
+  "summary": {
+    "changes": 4,
+    "categories": {
+      "request": 1,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 4
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "tools.shell_command",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "shell_command"
+      ],
+      "title": "Tool removed: shell_command",
+      "impact": "notable",
+      "before": {
+        "description": "Runs a shell command and returns its output.\n- Always set the `workdir` param when using the shell_command function. Do not use `cd` unless absolutely necessary.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "The shell script to execute in the user's default shell",
+              "type": "string"
+            },
+            "justification": {
+              "description": "Only set if sandbox_permissions is \\\"require_escalated\\\". \n                    Request approval from the user to run this command outside the sandbox. \n                    Phrased as a simple question that summarizes the purpose of the \n                    command as it relates to the task at hand - e.g. 'Do you want to \n                    fetch and pull the latest version of this git branch?'",
+              "type": "string"
+            },
+            "login": {
+              "description": "Whether to run the shell with login shell semantics. Defaults to true.",
+              "type": "boolean"
+            },
+            "prefix_rule": {
+              "description": "Only specify when sandbox_permissions is `require_escalated`. \n                    Suggest a prefix command pattern that will allow you to fulfill similar requests from the user in the future.\n                    Should be a short but reasonable prefix, e.g. [\\\"git\\\", \\\"pull\\\"] or [\\\"uv\\\", \\\"run\\\"] or [\\\"pytest\\\"].",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "sandbox_permissions": {
+              "description": "Sandbox permissions for the command. Set to \"require_escalated\" to request running without sandbox restrictions; defaults to \"use_default\".",
+              "type": "string"
+            },
+            "timeout_ms": {
+              "description": "The timeout for the command in milliseconds",
+              "type": "number"
+            },
+            "workdir": {
+              "description": "The working directory to execute the command in",
+              "type": "string"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "name": "shell_command",
+        "sha256": "a9cf49874c3fa5602de1ae692a7251dbcf4d73711b53e2c453e1b4f07e0d57ad"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/parallel.rs",
+            "line": 131,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/core/src/tools/parallel.rs#L131"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 416,
+            "url": "https://github.com/openai/codex/blob/rust-v0.95.0/codex-rs/core/src/tools/spec.rs#L416"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.exec_command",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "exec_command"
+      ],
+      "title": "New tool: exec_command",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Runs a command in a PTY, returning output or a session ID for ongoing interaction.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "cmd": {
+              "description": "Shell command to execute.",
+              "type": "string"
+            },
+            "justification": {
+              "description": "Only set if sandbox_permissions is \\\"require_escalated\\\". \n                    Request approval from the user to run this command outside the sandbox. \n                    Phrased as a simple question that summarizes the purpose of the \n                    command as it relates to the task at hand - e.g. 'Do you want to \n                    fetch and pull the latest version of this git branch?'",
+              "type": "string"
+            },
+            "login": {
+              "description": "Whether to run the shell with -l/-i semantics. Defaults to true.",
+              "type": "boolean"
+            },
+            "max_output_tokens": {
+              "description": "Maximum number of tokens to return. Excess output will be truncated.",
+              "type": "number"
+            },
+            "prefix_rule": {
+              "description": "Only specify when sandbox_permissions is `require_escalated`. \n                    Suggest a prefix command pattern that will allow you to fulfill similar requests from the user in the future.\n                    Should be a short but reasonable prefix, e.g. [\\\"git\\\", \\\"pull\\\"] or [\\\"uv\\\", \\\"run\\\"] or [\\\"pytest\\\"].",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "sandbox_permissions": {
+              "description": "Sandbox permissions for the command. Set to \"require_escalated\" to request running without sandbox restrictions; defaults to \"use_default\".",
+              "type": "string"
+            },
+            "shell": {
+              "description": "Shell binary to launch. Defaults to the user's default shell.",
+              "type": "string"
+            },
+            "tty": {
+              "description": "Whether to allocate a TTY for the command. Defaults to false (plain pipes); set to true to open a PTY and access TTY process.",
+              "type": "boolean"
+            },
+            "workdir": {
+              "description": "Optional working directory to run the command in; defaults to the turn cwd.",
+              "type": "string"
+            },
+            "yield_time_ms": {
+              "description": "How long to wait (in milliseconds) for output before yielding.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "cmd"
+          ],
+          "type": "object"
+        },
+        "name": "exec_command",
+        "sha256": "90ebca0dc7fa053223144bb9d4aedbe6816e1e3fafc73096c2ac37c9a837172e"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/unified_exec.rs",
+            "line": 128,
+            "url": "https://github.com/openai/codex/blob/rust-v0.96.0/codex-rs/core/src/tools/handlers/unified_exec.rs#L128"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 252,
+            "url": "https://github.com/openai/codex/blob/rust-v0.96.0/codex-rs/core/src/tools/spec.rs#L252"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.write_stdin",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "write_stdin"
+      ],
+      "title": "New tool: write_stdin",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Writes characters to an existing unified exec session and returns recent output.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "chars": {
+              "description": "Bytes to write to stdin (may be empty to poll).",
+              "type": "string"
+            },
+            "max_output_tokens": {
+              "description": "Maximum number of tokens to return. Excess output will be truncated.",
+              "type": "number"
+            },
+            "session_id": {
+              "description": "Identifier of the running unified exec session.",
+              "type": "number"
+            },
+            "yield_time_ms": {
+              "description": "How long to wait (in milliseconds) for output before yielding.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "session_id"
+          ],
+          "type": "object"
+        },
+        "name": "write_stdin",
+        "sha256": "3fe748a58739d98bf501e925482d9c4303e80853275eb43cb6041c2e556ce89b"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/unified_exec.rs",
+            "line": 206,
+            "url": "https://github.com/openai/codex/blob/rust-v0.96.0/codex-rs/core/src/tools/handlers/unified_exec.rs#L206"
+          },
+          {
+            "path": "codex-rs/core/src/tools/spec.rs",
+            "line": 299,
+            "url": "https://github.com/openai/codex/blob/rust-v0.96.0/codex-rs/core/src/tools/spec.rs#L299"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "request.identifiers.header:x-codex-turn-metadata",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "identifiers",
+        "header:x-codex-turn-metadata"
+      ],
+      "title": "Now sends identifier header:x-codex-turn-metadata",
+      "impact": "notable",
+      "before": null,
+      "after": "header:x-codex-turn-metadata",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 71,
+            "url": "https://github.com/openai/codex/blob/rust-v0.96.0/codex-rs/core/src/client.rs#L71"
+          },
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 674,
+            "url": "https://github.com/openai/codex/blob/rust-v0.96.0/codex-rs/core/src/client.rs#L674"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

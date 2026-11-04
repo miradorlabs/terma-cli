@@ -1,0 +1,2095 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.241",
+  "to": "2.1.242",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 102,
+    "categories": {
+      "binary": 1,
+      "config": 99,
+      "tools": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 11,
+      "notable": 91
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "tools.ScheduleWakeup.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ScheduleWakeup",
+        "description"
+      ],
+      "title": "ScheduleWakeup tool description changed (+462 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,6 +8,11 @@\n For an autonomous /loop (no user prompt), pass the literal sentinel `<<autonomous-loop-dynamic>>` as `prompt` instead — the runtime resolves it back to the autonomous-loop instructions at fire time.\n (There is a similar `<<autonomous-loop>>` sentinel for CronCreate-based autonomous loops; do not confuse the two — ScheduleWakeup always uses the `-dynamic` variant.) To end the loop, call this tool with `stop: true` (omit every other field) — the loop ends immediately and no further wakeups fire.\n \n+Set `noop: true` if nothing changed — you checked and there's nothing to report (\"no change\", \"still waiting\", \"quiet hold\").\n+Set `noop: false` if something happened worth keeping — you edited a file, posted a message, advanced state, or surfaced a finding.\n+Consecutive `noop: true` ticks are collapsed in the user's terminal view and tracked as a streak, so long quiet holds stay legible to the user without scrolling.\n+Omit `noop` when stopping (`stop: true`).\n+\n ## Picking delaySeconds\n \n This session's requests use the default 5-minute Anthropic prompt-cache TTL. Sleeping past 300 seconds means the next wake-up reads your full conversation context uncached — slower and more expensive. So the natural breakpoints:\n",
+      "stats": {
+        "added_chars": 462,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ScheduleWakeup.input_schema.properties.noop",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "ScheduleWakeup",
+        "input_schema",
+        "properties",
+        "noop"
+      ],
+      "title": "ScheduleWakeup tool parameter noop added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "true = nothing changed (you checked and there is nothing to report). false = something happened worth keeping (edited a file, posted a message, advanced state, surfaced a finding). Consecutive noop:true ticks are collapsed in the user's terminal view and tracked as a streak. Required unless `stop` is true.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.60s",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "60s"
+      ],
+      "title": "Setting askUserQuestionTimeout lost value 60s",
+      "impact": "notable",
+      "before": "60s",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.5m",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "5m"
+      ],
+      "title": "Setting askUserQuestionTimeout lost value 5m",
+      "impact": "notable",
+      "before": "5m",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.10m",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "10m"
+      ],
+      "title": "Setting askUserQuestionTimeout lost value 10m",
+      "impact": "notable",
+      "before": "10m",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.enum.never",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "enum",
+        "never"
+      ],
+      "title": "Setting askUserQuestionTimeout lost value never",
+      "impact": "notable",
+      "before": "never",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoUpdatesChannel.enum.latest",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "autoUpdatesChannel",
+        "enum",
+        "latest"
+      ],
+      "title": "Setting autoUpdatesChannel lost value latest",
+      "impact": "notable",
+      "before": "latest",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoUpdatesChannel.enum.stable",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "autoUpdatesChannel",
+        "enum",
+        "stable"
+      ],
+      "title": "Setting autoUpdatesChannel lost value stable",
+      "impact": "notable",
+      "before": "stable",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoUpdatesChannel.enum.rc",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "autoUpdatesChannel",
+        "enum",
+        "rc"
+      ],
+      "title": "Setting autoUpdatesChannel lost value rc",
+      "impact": "notable",
+      "before": "rc",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.crossSessionInbound.enum.accept",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound",
+        "enum",
+        "accept"
+      ],
+      "title": "Setting crossSessionInbound lost value accept",
+      "impact": "notable",
+      "before": "accept",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.crossSessionInbound.enum.hold",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound",
+        "enum",
+        "hold"
+      ],
+      "title": "Setting crossSessionInbound lost value hold",
+      "impact": "notable",
+      "before": "hold",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.crossSessionInbound.enum.refuse",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "crossSessionInbound",
+        "enum",
+        "refuse"
+      ],
+      "title": "Setting crossSessionInbound lost value refuse",
+      "impact": "notable",
+      "before": "refuse",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.daemonColdStart.enum.transient",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "daemonColdStart",
+        "enum",
+        "transient"
+      ],
+      "title": "Setting daemonColdStart lost value transient",
+      "impact": "notable",
+      "before": "transient",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.daemonColdStart.enum.ask",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "daemonColdStart",
+        "enum",
+        "ask"
+      ],
+      "title": "Setting daemonColdStart lost value ask",
+      "impact": "notable",
+      "before": "ask",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.defaultShell.enum.bash",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "defaultShell",
+        "enum",
+        "bash"
+      ],
+      "title": "Setting defaultShell lost value bash",
+      "impact": "notable",
+      "before": "bash",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.defaultShell.enum.powershell",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "defaultShell",
+        "enum",
+        "powershell"
+      ],
+      "title": "Setting defaultShell lost value powershell",
+      "impact": "notable",
+      "before": "powershell",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.60s",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "60s"
+      ],
+      "title": "Setting dialogExpiry lost value 60s",
+      "impact": "notable",
+      "before": "60s",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.5m",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "5m"
+      ],
+      "title": "Setting dialogExpiry lost value 5m",
+      "impact": "notable",
+      "before": "5m",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.10m",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "10m"
+      ],
+      "title": "Setting dialogExpiry lost value 10m",
+      "impact": "notable",
+      "before": "10m",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.dialogExpiry.enum.never",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dialogExpiry",
+        "enum",
+        "never"
+      ],
+      "title": "Setting dialogExpiry lost value never",
+      "impact": "notable",
+      "before": "never",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableArtifact.deprecated",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "disableArtifact",
+        "deprecated"
+      ],
+      "title": "Setting disableArtifact deprecated",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableArtifact.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "disableArtifact",
+        "description"
+      ],
+      "title": "disableArtifact description changed (+107 −66 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Disable the Artifact tool (also via CLAUDE_CODE_DISABLE_ARTIFACT).\n+Deprecated: use enableArtifact: false. Still honored — true disables the Artifact tool; false is ignored.\n",
+      "stats": {
+        "added_chars": 107,
+        "removed_chars": 66
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableAutoMode.enum.disable",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "disableAutoMode",
+        "enum",
+        "disable"
+      ],
+      "title": "Setting disableAutoMode lost value disable",
+      "impact": "notable",
+      "before": "disable",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.editorMode.enum.normal",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "editorMode",
+        "enum",
+        "normal"
+      ],
+      "title": "Setting editorMode lost value normal",
+      "impact": "notable",
+      "before": "normal",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.editorMode.enum.vim",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "editorMode",
+        "enum",
+        "vim"
+      ],
+      "title": "Setting editorMode lost value vim",
+      "impact": "notable",
+      "before": "vim",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.effortLevel.enum.low",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "low"
+      ],
+      "title": "Setting effortLevel lost value low",
+      "impact": "notable",
+      "before": "low",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.effortLevel.enum.medium",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "medium"
+      ],
+      "title": "Setting effortLevel lost value medium",
+      "impact": "notable",
+      "before": "medium",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.effortLevel.enum.high",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "high"
+      ],
+      "title": "Setting effortLevel lost value high",
+      "impact": "notable",
+      "before": "high",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.effortLevel.enum.xhigh",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "enum",
+        "xhigh"
+      ],
+      "title": "Setting effortLevel lost value xhigh",
+      "impact": "notable",
+      "before": "xhigh",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.enableArtifact.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enableArtifact",
+        "description"
+      ],
+      "title": "enableArtifact description changed (+192 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Enable or disable the Artifact tool for this user. Unset defaults to enabled once the feature is available.\n+Turn the Artifact tool on or off. Off in any of managed, --settings, or user settings wins; project and local settings can only turn it off. Unset defaults to on once the feature is available.\n",
+      "stats": {
+        "added_chars": 192,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.feedbackDrafts.enum.notify",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "feedbackDrafts",
+        "enum",
+        "notify"
+      ],
+      "title": "Setting feedbackDrafts lost value notify",
+      "impact": "notable",
+      "before": "notify",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.feedbackDrafts.enum.quiet",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "feedbackDrafts",
+        "enum",
+        "quiet"
+      ],
+      "title": "Setting feedbackDrafts lost value quiet",
+      "impact": "notable",
+      "before": "quiet",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.feedbackDrafts.enum.off",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "feedbackDrafts",
+        "enum",
+        "off"
+      ],
+      "title": "Setting feedbackDrafts lost value off",
+      "impact": "notable",
+      "before": "off",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.fileSuggestion.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "fileSuggestion.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting fileSuggestion.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.forceLoginMethod.enum.claudeai",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "forceLoginMethod",
+        "enum",
+        "claudeai"
+      ],
+      "title": "Setting forceLoginMethod lost value claudeai",
+      "impact": "notable",
+      "before": "claudeai",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.forceLoginMethod.enum.console",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "forceLoginMethod",
+        "enum",
+        "console"
+      ],
+      "title": "Setting forceLoginMethod lost value console",
+      "impact": "notable",
+      "before": "console",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.forceLoginMethod.enum.gateway",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "forceLoginMethod",
+        "enum",
+        "gateway"
+      ],
+      "title": "Setting forceLoginMethod lost value gateway",
+      "impact": "notable",
+      "before": "gateway",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.keybindingFlavor.enum.classic",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "keybindingFlavor",
+        "enum",
+        "classic"
+      ],
+      "title": "Setting keybindingFlavor lost value classic",
+      "impact": "notable",
+      "before": "classic",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.keybindingFlavor.enum.readline",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "keybindingFlavor",
+        "enum",
+        "readline"
+      ],
+      "title": "Setting keybindingFlavor lost value readline",
+      "impact": "notable",
+      "before": "readline",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.managedSourcesBehavior",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "managedSourcesBehavior"
+      ],
+      "title": "New setting: managedSourcesBehavior",
+      "impact": "informational",
+      "before": null,
+      "after": {},
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelPicker",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelPicker"
+      ],
+      "title": "New setting: modelPicker",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Curate the /model picker: an ordered list of models with your own labels, independent of the built-in lineup and of Claude Code releases. availableModels still applies to these rows. Honored from managed, --settings/SDK, and user settings only (not from a project checkout); the highest-precedence of those that defines modelPicker wins outright (no merging across sources). Typically set in managed settings by enterprise administrators.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelPricing",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelPricing"
+      ],
+      "title": "New setting: modelPricing",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting modelProposedGoals lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.alwaysAsk",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "alwaysAsk"
+      ],
+      "title": "Setting modelProposedGoals lost value alwaysAsk",
+      "impact": "notable",
+      "before": "alwaysAsk",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelProposedGoals.enum.disabled",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "modelProposedGoals",
+        "enum",
+        "disabled"
+      ],
+      "title": "Setting modelProposedGoals lost value disabled",
+      "impact": "notable",
+      "before": "disabled",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.parentSettingsBehavior.enum.first-wins",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "parentSettingsBehavior",
+        "enum",
+        "first-wins"
+      ],
+      "title": "Setting parentSettingsBehavior lost value first-wins",
+      "impact": "notable",
+      "before": "first-wins",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.parentSettingsBehavior.enum.merge",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "parentSettingsBehavior",
+        "enum",
+        "merge"
+      ],
+      "title": "Setting parentSettingsBehavior lost value merge",
+      "impact": "notable",
+      "before": "merge",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.${…}\\WindowsPowerShell\\v1.0",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "${…}\\WindowsPowerShell\\v1.0"
+      ],
+      "title": "Setting permissions.defaultMode gained value ${…}\\WindowsPowerShell\\v1.0",
+      "impact": "informational",
+      "before": null,
+      "after": "${…}\\WindowsPowerShell\\v1.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.acceptEdits",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "acceptEdits"
+      ],
+      "title": "Setting permissions.defaultMode lost value acceptEdits",
+      "impact": "notable",
+      "before": "acceptEdits",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting permissions.defaultMode lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.bypassPermissions",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "bypassPermissions"
+      ],
+      "title": "Setting permissions.defaultMode lost value bypassPermissions",
+      "impact": "notable",
+      "before": "bypassPermissions",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.default",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "default"
+      ],
+      "title": "Setting permissions.defaultMode lost value default",
+      "impact": "notable",
+      "before": "default",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.dontAsk",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "dontAsk"
+      ],
+      "title": "Setting permissions.defaultMode lost value dontAsk",
+      "impact": "notable",
+      "before": "dontAsk",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.plan",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "plan"
+      ],
+      "title": "Setting permissions.defaultMode lost value plan",
+      "impact": "notable",
+      "before": "plan",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.disableBypassPermissionsMode.enum.disable",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "permissions.disableBypassPermissionsMode",
+        "enum",
+        "disable"
+      ],
+      "title": "Setting permissions.disableBypassPermissionsMode lost value disable",
+      "impact": "notable",
+      "before": "disable",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.policyHelper.enum./",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "policyHelper",
+        "enum",
+        "/"
+      ],
+      "title": "Setting policyHelper gained value /",
+      "impact": "informational",
+      "before": null,
+      "after": "/",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting preferredNotifChannel lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.iterm2",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "iterm2"
+      ],
+      "title": "Setting preferredNotifChannel lost value iterm2",
+      "impact": "notable",
+      "before": "iterm2",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.terminal_bell",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "terminal_bell"
+      ],
+      "title": "Setting preferredNotifChannel lost value terminal_bell",
+      "impact": "notable",
+      "before": "terminal_bell",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.iterm2_with_bell",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "iterm2_with_bell"
+      ],
+      "title": "Setting preferredNotifChannel lost value iterm2_with_bell",
+      "impact": "notable",
+      "before": "iterm2_with_bell",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.kitty",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "kitty"
+      ],
+      "title": "Setting preferredNotifChannel lost value kitty",
+      "impact": "notable",
+      "before": "kitty",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.ghostty",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "ghostty"
+      ],
+      "title": "Setting preferredNotifChannel lost value ghostty",
+      "impact": "notable",
+      "before": "ghostty",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.preferredNotifChannel.enum.notifications_disabled",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "preferredNotifChannel",
+        "enum",
+        "notifications_disabled"
+      ],
+      "title": "Setting preferredNotifChannel lost value notifications_disabled",
+      "impact": "notable",
+      "before": "notifications_disabled",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.promptCacheTtl",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "promptCacheTtl"
+      ],
+      "title": "New setting: promptCacheTtl",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Prompt cache TTL for the main conversation (interactive, -p and SDK turns, plus the helpers that run inline with it): \"5m\" or \"1h\". Unset = automatic: 1 hour on a Claude subscription within its usage limits, 5 minutes on an API key, Bedrock, Vertex or Foundry. 1-hour cache writes are billed at a higher rate; the cache stays warm across longer breaks. The CLAUDE_CODE_PROMPT_CACHE_TTL environment variable takes precedence."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.spinnerVerbs.mode.enum.append",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "spinnerVerbs.mode",
+        "enum",
+        "append"
+      ],
+      "title": "Setting spinnerVerbs.mode lost value append",
+      "impact": "notable",
+      "before": "append",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.spinnerVerbs.mode.enum.replace",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "spinnerVerbs.mode",
+        "enum",
+        "replace"
+      ],
+      "title": "Setting spinnerVerbs.mode lost value replace",
+      "impact": "notable",
+      "before": "replace",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.statusLine.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "statusLine.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting statusLine.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentPromptCacheTtl",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "subagentPromptCacheTtl"
+      ],
+      "title": "New setting: subagentPromptCacheTtl",
+      "impact": "informational",
+      "before": null,
+      "after": {},
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentStatusLine.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "subagentStatusLine.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting subagentStatusLine.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.teammateMode.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting teammateMode lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.teammateMode.enum.tmux",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "tmux"
+      ],
+      "title": "Setting teammateMode lost value tmux",
+      "impact": "notable",
+      "before": "tmux",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.teammateMode.enum.iterm2",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "iterm2"
+      ],
+      "title": "Setting teammateMode lost value iterm2",
+      "impact": "notable",
+      "before": "iterm2",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.teammateMode.enum.in-process",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "teammateMode",
+        "enum",
+        "in-process"
+      ],
+      "title": "Setting teammateMode lost value in-process",
+      "impact": "notable",
+      "before": "in-process",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.auto",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting theme lost value auto",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.dark",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "dark"
+      ],
+      "title": "Setting theme lost value dark",
+      "impact": "notable",
+      "before": "dark",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.light",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "light"
+      ],
+      "title": "Setting theme lost value light",
+      "impact": "notable",
+      "before": "light",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.light-daltonized",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "light-daltonized"
+      ],
+      "title": "Setting theme lost value light-daltonized",
+      "impact": "notable",
+      "before": "light-daltonized",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.dark-daltonized",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "dark-daltonized"
+      ],
+      "title": "Setting theme lost value dark-daltonized",
+      "impact": "notable",
+      "before": "dark-daltonized",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.light-ansi",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "light-ansi"
+      ],
+      "title": "Setting theme lost value light-ansi",
+      "impact": "notable",
+      "before": "light-ansi",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.theme.enum.dark-ansi",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "theme",
+        "enum",
+        "dark-ansi"
+      ],
+      "title": "Setting theme lost value dark-ansi",
+      "impact": "notable",
+      "before": "dark-ansi",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.off",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "off"
+      ],
+      "title": "Setting totalTokensReminder lost value off",
+      "impact": "notable",
+      "before": "off",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.infinite",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "infinite"
+      ],
+      "title": "Setting totalTokensReminder lost value infinite",
+      "impact": "notable",
+      "before": "infinite",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.fixed",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "fixed"
+      ],
+      "title": "Setting totalTokensReminder lost value fixed",
+      "impact": "notable",
+      "before": "fixed",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.countdown",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "countdown"
+      ],
+      "title": "Setting totalTokensReminder lost value countdown",
+      "impact": "notable",
+      "before": "countdown",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.totalTokensReminder.enum.padded-countdown",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "totalTokensReminder",
+        "enum",
+        "padded-countdown"
+      ],
+      "title": "Setting totalTokensReminder lost value padded-countdown",
+      "impact": "notable",
+      "before": "padded-countdown",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.tui.enum.default",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "tui",
+        "enum",
+        "default"
+      ],
+      "title": "Setting tui lost value default",
+      "impact": "notable",
+      "before": "default",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.tui.enum.fullscreen",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "tui",
+        "enum",
+        "fullscreen"
+      ],
+      "title": "Setting tui lost value fullscreen",
+      "impact": "notable",
+      "before": "fullscreen",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.viewMode.enum.default",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "viewMode",
+        "enum",
+        "default"
+      ],
+      "title": "Setting viewMode lost value default",
+      "impact": "notable",
+      "before": "default",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.viewMode.enum.verbose",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "viewMode",
+        "enum",
+        "verbose"
+      ],
+      "title": "Setting viewMode lost value verbose",
+      "impact": "notable",
+      "before": "verbose",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.viewMode.enum.focus",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "viewMode",
+        "enum",
+        "focus"
+      ],
+      "title": "Setting viewMode lost value focus",
+      "impact": "notable",
+      "before": "focus",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.voice.mode.enum.hold",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "voice.mode",
+        "enum",
+        "hold"
+      ],
+      "title": "Setting voice.mode lost value hold",
+      "impact": "notable",
+      "before": "hold",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.voice.mode.enum.tap",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "voice.mode",
+        "enum",
+        "tap"
+      ],
+      "title": "Setting voice.mode lost value tap",
+      "impact": "notable",
+      "before": "tap",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.unrestricted",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "unrestricted"
+      ],
+      "title": "Setting workflowSizeGuideline lost value unrestricted",
+      "impact": "notable",
+      "before": "unrestricted",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.small",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "small"
+      ],
+      "title": "Setting workflowSizeGuideline lost value small",
+      "impact": "notable",
+      "before": "small",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.medium",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "medium"
+      ],
+      "title": "Setting workflowSizeGuideline lost value medium",
+      "impact": "notable",
+      "before": "medium",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.workflowSizeGuideline.enum.large",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "workflowSizeGuideline",
+        "enum",
+        "large"
+      ],
+      "title": "Setting workflowSizeGuideline lost value large",
+      "impact": "notable",
+      "before": "large",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.worktree.baseRef.enum.fresh",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "worktree.baseRef",
+        "enum",
+        "fresh"
+      ],
+      "title": "Setting worktree.baseRef lost value fresh",
+      "impact": "notable",
+      "before": "fresh",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.worktree.baseRef.enum.head",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "worktree.baseRef",
+        "enum",
+        "head"
+      ],
+      "title": "Setting worktree.baseRef lost value head",
+      "impact": "notable",
+      "before": "head",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.worktree.bgIsolation.enum.worktree",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "worktree.bgIsolation",
+        "enum",
+        "worktree"
+      ],
+      "title": "Setting worktree.bgIsolation lost value worktree",
+      "impact": "notable",
+      "before": "worktree",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.worktree.bgIsolation.enum.none",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "worktree.bgIsolation",
+        "enum",
+        "none"
+      ],
+      "title": "Setting worktree.bgIsolation lost value none",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "env_vars"
+      ],
+      "title": "Environment variables: +21 −5",
+      "impact": "informational",
+      "before": [
+        "BUN_FEEDBACK_URL",
+        "BUN_INSTALL",
+        "CLAUDE_CODE_DISABLE_ARTIFACT",
+        "CLAUDE_PREVIEW_CLASSIFIER_FLOOR",
+        "FORCE_PROMPT_CACHING_5M"
+      ],
+      "after": [
+        "CLAUDE_CODE_ARTIFACT_TYPE_CATALOG",
+        "CLAUDE_CODE_ARTIFACT_TYPE_CLOUD_CREATE",
+        "CLAUDE_CODE_DIR_SYNC_ARCHIVE",
+        "CLAUDE_CODE_DIR_SYNC_ENGINE",
+        "CLAUDE_CODE_DIR_SYNC_FFWD",
+        "CLAUDE_CODE_DISABLE_HOME_SETTINGS_SEED",
+        "CLAUDE_CODE_DISABLE_MEMORY_RO_UNSAVED_NOTICE",
+        "CLAUDE_CODE_FEDERATION_CACHE_DIR",
+        "CLAUDE_CODE_HANDBACK_PROVENANCE",
+        "CLAUDE_CODE_HOME_SEED_HOLD_TIMEOUT_MS",
+        "CLAUDE_CODE_HOME_SEED_VERDICT_TIMEOUT_MS",
+        "CLAUDE_CODE_HOOKS_SAME_THREAD",
+        "CLAUDE_CODE_LEGACY_BUNDLE",
+        "CLAUDE_CODE_PROMPT_CACHE_TTL",
+        "CLAUDE_CODE_RESUME_TOLERATES_CONTEXT_APPENDS",
+        "CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL",
+        "CLAUDE_CODE_WORKFLOW_PROMPT_PROVENANCE",
+        "CLAUDE_RUNNER_STALL_GIVEUP",
+        "CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS",
+        "ENABLE_LSP_TOOL",
+        "WINDIR"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 325055632 → 361529696",
+      "impact": "informational",
+      "before": 325055632,
+      "after": 361529696,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

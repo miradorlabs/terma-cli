@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.266",
+  "to": "2.1.267",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `maxEffortLevel` setting (top-level or per model under `modelSettings`): caps the effort level on every provider, including Bedrock, Vertex and Foundry; users can still pick a lower level\n- Added `--system-prompt-snapshot off` to render the system prompt fresh on every request instead of reusing the conversation's recorded prompt (for iterating on prompt text)\n- Fixed Cowork scheduled tasks in the cloud failing at startup for organizations whose managed settings require sandboxing\n- Fixed `/context` and other local command output rendering blank on mobile clients\n- Fixed shift+enter and option+backspace not working after reconnecting to a tmux or ssh session inside an agent view\n- Fixed the dim last-prompt header not appearing at the top of the conversation when scrolling up in fullscreen mode\n- Fixed Workflow `agent()` calls with large output schemas being refused in auto mode instead of being checked by the safety classifier\n- Fixed a case where a marketplace entry path containing a backslash could bypass the containment check for fetched marketplaces on macOS and Linux\n- Fixed expired AWS or Google Cloud credentials under a host app such as Claude Desktop retrying ten times with a generic \"request failed\" before the re-authenticate error appeared\n- Fixed resuming a session after `/compact` or another slash command ran via `-p --resume`: a spurious \"Continue from where you left off.\" turn is no longer inserted\n- Fixed resuming a large session (transcript over 5 MB): parallel tool calls and their hook output are no longer dropped from the reloaded conversation\n- Fixed managed `allowedHttpHookUrls`, `httpHookAllowedEnvVars` and `allowedChannelPlugins` to admit nothing, not everything, when unreadable\n- Fixed `/login` on machines whose managed settings require Claude apps gateway sign-in: Esc now closes the dialog instead of doing nothing\n- Fixed artifact publishes cut off by a dropped connection mid-upload: they now retry once when Claude Code can tell the upload never completed, instead of reporting an unknown outcome\n- Fixed `effort:` frontmatter on custom commands, skills, and subagents being ignored on models whose default effort is still pinned (Opus 4.7, Opus 4.8, Fable 5)\n- Fixed artifact publish failing with an unhelpful error when the page file isn't valid UTF-8 or contains a replacement character (U+FFFD); the error now names the line and column to fix\n- Fixed `claude agents` `@` directory menu not listing repositories created after the session started\n- Fixed Remote Control clients that join a Claude Desktop or VS Code session showing a stale permission mode until it was changed again\n- Fixed `claude remote-control` exiting and dropping every attached session when its server credential expires (about 30 days after start); the host now re-registers and keeps going\n- Fixed the usage-limit warning flickering on and off during a session when requests for different models or modes report different limit windows\n- Fixed earlier reasoning being dropped when an MCP server re-sends, or a built-in tool re-renders, a tool the model already loaded\n- Fixed a tool that disappears mid-conversation, from a disconnected MCP server or an upgrade, rewriting the tool list and discarding earlier thinking\n- Fixed a background worker forked from a conversation adding EnterWorktree to the conversation's tool block mid-session, which broke prompt-cache reuse\n- Fixed mid-session MCP and plugin tools being added to the tool list in sessions without ToolSearch, which broke prompt-cache reuse; supported models now receive them as deferred definitions\n- Fixed switching models with /model re-sending every tool definition (a prompt-cache miss); commit and PR attribution text now arrives as a conversation note that updates on model changes\n- Fixed resumed sessions rewriting the inline tool set when an MCP connector reconnects at a different moment than before\n- Fixed resumed sessions re-rendering tool descriptions instead of replaying the recorded ones when the first turn ran a tool\n- Fixed prompt-cache misses and dropped extended thinking when a claude.ai connector's tools change between a session and its resume\n- Fixed resumed sessions rewriting earlier MCP tool announcements (and dropping extended thinking) before their connectors reconnect\n- Fixed a prompt-cache break when a print-mode (`-p`) conversation is resumed interactively: the system prompt prefix no longer changes\n- Improved the `/diff` panel: it no longer flashes \"0 files changed\" and a spinner before settling, and its empty state is centered in the panel\n- Improved the Bash tool's description guidance so Claude describes what a command does in plain words instead of echoing the command\n- Improved sandbox guidance so Claude suggests `/copy` when clipboard commands such as `pbcopy` fail inside the sandbox\n- Improved `--resume` first-render time for sessions with many Bash tool calls\n- Improved prompt input responsiveness: keystrokes no longer occasionally wait a frame behind spinner or streaming repaints\n- Improved prompt-cache stability: subagents and sessions started with `--system-prompt` or `--append-system-prompt` now record the system prompt and tool definitions once instead of re-rendering them\n- Improved Artifact tool publish errors: when a publish is refused, the message now says why and what to do about it\n- Self-hosted runner: Changed `--use-anthropic-git-proxy` to be reported to the server at registration and to print a warning for each session that still clones through the legacy git proxy\n- Gateway: Changed `forward_user_identity` upstreams to return a 429 as-is to a developer whose email was forwarded, instead of failing over to the next upstream, so the proxy's per-user limits hold\n- [VSCode] Fixed the extension host hanging at 100% CPU when forking, editing an earlier message, or rewinding in a conversation whose saved transcript contains a cyclic parent link\n- [VSCode] Fixed pasting a screenshot on WSL2/WSLg inserting raw image bytes into the chat input; the image is now attached when the clipboard provides it, otherwise the paste is ignored\n- [VSCode] Fixed chat diff blocks always rendering with a dark editor theme; they now follow the active VS Code color theme, including high contrast\n- [VSCode] Fixed mixed right-to-left and English text rendering in the wrong order while typing in the message input\n- [VSCode] Fixed accepting an edit in the diff view on a file with Windows (CRLF) line endings failing with \"String not found in file\"\n- [VSCode] Fixed @-mentions dropping files whose paths contain spaces\n- [VSCode] Fixed the sessions list view failing to load in windows connected over Remote-SSH when the workspace folder exists only on the remote host\n- [VSCode] Fixed runaway ripgrep processes when viewing files in large or symlink-heavy workspaces\n- [Claude Code on the web] Fixed GitHub Enterprise Server sessions showing your GitHub account as disconnected once its token expired; PR and issue operations now refresh it automatically\n- [Claude Code on the web] Fixed `gh` and GitHub API calls failing in organizations without the Claude GitHub App; they now use your connected GitHub account and say so when none is connected\n- [Claude Tag] Added a \"Use a custom connector\" link to the preset connection forms in Claude Tag admin settings, so you can switch to a custom connection without starting over\n- [Claude Tag] Fixed Claude replying \"The API rejected the request as invalid\" when the organization has run out of usage credits; the reply now says so and explains how to add more\n- [Claude Tag] Fixed thread requests to edit or delete a message Claude posted at the channel's top level being answered with a correction instead of reaching the session that posted it\n- [Claude Tag] Fixed **Connect** on Tool access requests under Admin settings > Review requests failing with \"Authorization failed\" or showing the requested access bundle as deleted"
+  },
+  "summary": {
+    "changes": 15,
+    "categories": {
+      "config": 13,
+      "hooks": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 14,
+      "notable": 1
+    },
+    "undocumented": 11
+  },
+  "changes": [
+    {
+      "id": "tools.Bash.input_schema.properties.description.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Bash",
+        "input_schema",
+        "properties",
+        "description",
+        "description"
+      ],
+      "title": "Bash tool parameter description: description changed (+167 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,7 @@\n Clear, concise description of what this command does in active voice. Never use words like \"complex\" or \"risk\" in the description - just describe what it does.\n \n+Say what the command does in plain words: do not echo the command's text, its flags, or file paths - the user reads this description, often without seeing the command.\n+\n For simple commands (git, npm, standard CLI tools), keep it brief (5-10 words):\n - ls → \"List files in current directory\"\n - git status → \"Show working tree status\"\n",
+      "stats": {
+        "added_chars": 167,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostModelSwitch.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "PostModelSwitch hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.maxEffortLevel",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "maxEffortLevel"
+      ],
+      "title": "New setting: maxEffortLevel",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum effort level. Anything above it (an /effort or /model pick, --effort, CLAUDE_CODE_EFFORT_LEVEL, a model default) is clamped to it, on every provider including Bedrock, Vertex and Foundry. Combines with an organization's per-model effort cap by taking the lower of the two; across settings files the lowest value wins, and modelSettings.<model>.maxEffortLevel replaces it per model. Enforced client-side: an effort supplied through CLAUDE_CODE_EXTRA_BODY is not clamped.",
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.acceptEdits",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "acceptEdits"
+      ],
+      "title": "Setting permissions.defaultMode gained value acceptEdits",
+      "impact": "informational",
+      "before": null,
+      "after": "acceptEdits",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.auto",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "auto"
+      ],
+      "title": "Setting permissions.defaultMode gained value auto",
+      "impact": "informational",
+      "before": null,
+      "after": "auto",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.bypassPermissions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "bypassPermissions"
+      ],
+      "title": "Setting permissions.defaultMode gained value bypassPermissions",
+      "impact": "informational",
+      "before": null,
+      "after": "bypassPermissions",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.default",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "default"
+      ],
+      "title": "Setting permissions.defaultMode gained value default",
+      "impact": "informational",
+      "before": null,
+      "after": "default",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.dontAsk",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "dontAsk"
+      ],
+      "title": "Setting permissions.defaultMode gained value dontAsk",
+      "impact": "informational",
+      "before": null,
+      "after": "dontAsk",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode.enum.plan",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode",
+        "enum",
+        "plan"
+      ],
+      "title": "Setting permissions.defaultMode gained value plan",
+      "impact": "informational",
+      "before": null,
+      "after": "plan",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.secDefault",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "secDefault"
+      ],
+      "title": "New setting: secDefault",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Whether the bundled sec-default plugin holds the outermost seat of the hooks-module chain, ahead of prependPlugins: it keeps the organization's classic (settings) hooks, prompt content, managed settings and tool policy out of reach of the plugins a person installs. Seated by default, wherever hooks modules can load, on a machine with managed settings and for a Team or Enterprise organization; false unseats it. Only honored from managed settings; ignored, with a warning, in user, project, local and --settings sources.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_HOT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_HOT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_HOT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_HOT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DESKTOP_APP_VERSION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DESKTOP_APP_VERSION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DESKTOP_APP_VERSION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DESKTOP_APP_VERSION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MODEL_CAPABILITIES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MODEL_CAPABILITIES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MODEL_CAPABILITIES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MODEL_CAPABILITIES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_ADOPT_MCP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_TOOLS_ADOPT_MCP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_ADOPT_MCP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_TOOLS_ADOPT_MCP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SENDMESSAGE_HANDBACK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SENDMESSAGE_HANDBACK"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SENDMESSAGE_HANDBACK",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SENDMESSAGE_HANDBACK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

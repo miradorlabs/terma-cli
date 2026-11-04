@@ -1,0 +1,607 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.233",
+  "to": "2.1.234",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added the optional `CLAUDE_CODE_PROJECT_DIR_NAME` environment variable: hosts that give each session its own config directory can choose a short name for the per-project transcript directory\n- Added the `selection:clear` keybinding action, so a key can be bound to clear an in-app text selection; also works in the agents view\n- Added a GitLab merge request badge to the footer and statusline: repos with a GitLab remote and an authenticated glab CLI show MR !N with draft/pending/green states\n- Claude Code now continues your session automatically when a claude.ai usage limit resets; turn it off in `/config` (\"Continue automatically at usage limit\")\n- Claude is now told to use your account email only to identify you, and not to send it to unrelated services unless you ask\n- Security: remote file reads, session restore, CLAUDE.md includes, workflow scripts and file uploads now reject Windows NT-namespace (`\\??\\`) paths, hardening the remaining pre-approval file accesses against the NTLM credential-leak vector\n- Fixed auto mode in very long sessions repeatedly re-checking and denying sandboxed commands' network access after the conversation had been compacted\n- Fixed session-scoped permission answers (including denies) being dropped when answering background subagent tool permission prompts\n- Fixed a crash when an API response on the non-streaming fallback path (typically via third-party gateways) contained a thinking block missing its thinking field or a text block missing its text field\n- Fixed markdown rendering becoming extremely slow for some messages containing unusual Unicode sequences\n- Fixed `SendMessage` rejecting a recipient copied from `ListAgents` when the session name is at the 200-character cap or emoji-heavy\n- Fixed repository detection mis-reading the host of git remotes with unusual userinfo, producing links and repo-specific behavior for the wrong host\n- Fixed MCP diagnostics printing resolved secrets: scope-conflict warnings now show the configured `${VAR}` form, and connection-failure details show only the server origin\n- Fixed `strictKnownMarketplaces` allowlists accepting SCP-style git marketplace sources whose host differs from the one git would actually connect to\n- Fixed modal text such as the `/login` OAuth URL losing characters when copied in fullscreen\n- Fixed a `---` horizontal rule in rendered markdown running into the line after it\n- Fixed consecutive shell commands splitting into multiple \"Ran 1 shell command\" rows when todo/task updates were interleaved between them\n- Fixed dialogs like `/permissions` opened while a `!` shell command was running being dismissed when the command finished\n- Fixed a queued `!` shell command being sent to the model as plain text after pressing up-arrow to edit the queued input\n- Fixed queued messages reappearing in the prompt history while still queued, Esc while selecting a queued message no longer interrupts the turn, and `!` mode no longer sticks after a mid-turn submit\n- Fixed accepting the \"Try the new fullscreen renderer?\" prompt restarting the session without its permission mode (e.g. `--dangerously-skip-permissions`), tool allow/deny rules, model or effort flags\n- Fixed `/tui` dropping launch `--allowed-tools`/`--disallowed-tools` rules when it restarts; it now declines to switch, with the reason, when the session has restrictions a restart can't carry over\n- Fixed trust prompts omitting the repository-wide scope warning when the directory was first seen before the repository existed there\n- Fixed a case where an IDE diff tab closing during a permission re-prompt could answer the new prompt with the previous input\n- Fixed: files sent to the user during Remote Control sessions hosted by Claude Code Desktop or VS Code now upload, so they open on phone and web instead of showing an empty card\n- Fixed: after `/login` while `CLAUDE_CODE_OAUTH_TOKEN` is set, the stale-token reminder no longer leaks into Claude's automatically resumed turn — it now appears only to you\n- Fixed: permission previews now relay only to channel servers admitted by the inbound trust gate, and a server's explicit permission-capability opt-out is honored\n- Fixed: credential masking on relayed permission previews can no longer hide commands, paths, or destinations from the approver; oversized private-key blocks now redact under full-strength redaction\n- Fixed: provider API tokens that mask on permission previews now mask even when directly followed by shell delimiters\n- Fixed Claude Desktop inter-session messages being silently dropped by the recipient session when cross-session messaging read as disabled, which left the sender's query \"thinking\" for many minutes\n- Remote Control: signing this computer in to a different claude.ai account or organization now stops the running session within seconds and says why, instead of a misleading HTTP 404 hours later\n- Remote Control sessions started from Claude Code Desktop or VS Code now keep phones and claude.ai/code updated on the session's permission mode (and claude.ai/code on the model) as they change\n- Remote Control: effort picks made on a phone or on claude.ai/code now apply to terminal- and Desktop/VS Code-hosted sessions, and the session publishes its effort level to connected clients\n- `SendMessage` and `ListAgents` now say when your account's session list was too long to check completely, instead of treating unseen sessions as absent\n- Expired Anthropic profile credential now points you at `/login` when a claude.ai login would take precedence\n- Improved the transcript: your own prompts now render markdown (highlighted code blocks, inline code, lists) the same way replies do\n- Improved the \"API returned an empty or malformed response\" error to say what came back (content type, body kind, size, request ID) and why the original streaming request failed\n- Improved auto-generated session titles to read as short, specific names (e.g. \"Login button bug\") rather than sentences restating your request (e.g. \"Fix the login button on mobile\")\n- Reduced the context cost of loading the built-in `claude-api` skill from ~200k+ tokens to ~25k by loading reference docs on demand\n- `/permissions` can now be opened while Claude is working — rule changes apply to the rest of the current turn\n- `/add-dir <path>` can now be used while Claude is working; `/add-dir`, `/autocompact`, `/theme`, `/help`, `/config` and `/advisor` dialogs open mid-turn in the fullscreen TUI\n- `/goal` now clears itself with a notice when a turn dies on an unrecoverable error (e.g. revoked auth, an exhausted credit balance, or a context overflow) instead of staying armed\n- `/goal`: when background tasks keep a goal waiting for 30+ minutes, Claude now checks in on them instead of waiting indefinitely (set `CLAUDE_CODE_GOAL_CHECKIN_MINUTES=0` to opt out)\n- `claude setup-token` now rejects unexpected extra arguments instead of silently ignoring them\n- Changed Esc in fullscreen mode to no longer clear a mouse text selection: it interrupts or dismisses as usual and the selection stays highlighted\n- Removed the redundant \"Allowed by auto mode classifier\" line that auto mode showed under every Agent tool call\n- Removed the \"Default teammate model\" setting from `/config`; agent-team teammates now use the leader's model unless the spawn names one\n- Dimmed the elapsed-time counter on the running tool header so it no longer competes with the bold counts\n- Background task notifications delivered between turns are now sent to the model inside `<system-reminder>` tags, matching mid-turn delivery\n- Mantle: skip the admin-pin availability probe at startup when a main-loop model is already picked\n- Windows: startup no longer stalls on repeated rename retries when `~/.claude.json` is read-only"
+  },
+  "summary": {
+    "changes": 29,
+    "categories": {
+      "config": 11,
+      "hooks": 16,
+      "tools": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 27,
+      "notable": 2
+    },
+    "undocumented": 23
+  },
+  "changes": [
+    {
+      "id": "tools.SendMessage.input_schema.properties.to.allOf",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "to",
+        "allOf"
+      ],
+      "title": "SendMessage tool parameter to: allOf added",
+      "impact": "notable",
+      "before": null,
+      "after": [
+        {
+          "pattern": "^[^\\n\\r]*$"
+        },
+        {
+          "pattern": "^[\\s\\S]{0,300}$"
+        }
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.SendMessage.input_schema.properties.to.pattern",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "SendMessage",
+        "input_schema",
+        "properties",
+        "to",
+        "pattern"
+      ],
+      "title": "SendMessage tool parameter to: pattern removed",
+      "impact": "notable",
+      "before": "^[^\\n\\r]{0,200}$",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.message",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.message"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.message added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_calls[].tool_input.message",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.status",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.status"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.status added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_calls[].tool_input.status",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.autoContinueAtUsageLimit",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "autoContinueAtUsageLimit"
+      ],
+      "title": "New setting: autoContinueAtUsageLimit",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "When a claude.ai usage limit stops your session, wait for the limit to reset and continue the task automatically. When off, the limit dialog offers the wait as a choice instead.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.policyHelpers.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "policyHelpers",
+        "description"
+      ],
+      "title": "policyHelpers description changed (+256 −159 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n @internal Per-OS variant of policyHelper, keyed by platform: macos, linux, windows, wsl, plus an optional \"default\" entry that is a STATIC settings payload (a JSON object of managed settings, not a helper).\n-Each per-OS entry carries a helper (\"path\", with timeoutMs/refreshIntervalMs), its own static \"defaultSettings\" payload, or both; an entry may be payload-only.\n+Each per-OS entry carries a helper — a \"path\", or an inline \"script\" + \"interpreter\" delivered to a fixed interpreter over stdin, either with timeoutMs/refreshIntervalMs — its own static \"defaultSettings\" payload, or both; an entry may be payload-only.\n Selection for a platform walks its chain (the platform's own entry; on wsl the linux entry next): the first helper on the chain wins over policyHelper; if no helper is configured — or the selected helper fails at startup or refresh — the first payload applies (the chain's \"defaultSettings\" in platform-specific-first order, then the top-level \"default\", applied with no process spawned; unrecognized platforms reach only \"default\"); with no payload either, policyHelper.\n Honored only from admin-controlled policy sources.\n",
+      "stats": {
+        "added_chars": 256,
+        "removed_chars": 159
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.syncClaudeAiSkills",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "syncClaudeAiSkills"
+      ],
+      "title": "New setting: syncClaudeAiSkills",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Set to false to turn off syncing of the skills you have enabled on claude.ai. In your user settings (or managed settings): nothing more is downloaded, previously synced skills (~/.claude/skills/synced) can no longer be run, are hidden from every session started afterwards, and are moved to ~/.claude/skills/.trash at the next launch (deleted after cleanupPeriodDays; re-downloaded, not restored, if you re-enable). In .claude/settings.local.json or --settings: downloads stop and synced skills are blocked and hidden for sessions in that workspace or invocation only (nothing is moved). Not read from project settings (.claude/settings.json). Only false is honored — the feature is enabled server-side for your account, so setting true does not turn it on early. While it is on, synced skills are available in every session, re-synced every 10 minutes, and removed when you disable them on claude.ai. Only applies when signed in with your Claude account.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_ASSETS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_ASSETS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_ASSETS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_ASSETS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_NARRATION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_NARRATION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ENABLE_NARRATION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ENABLE_NARRATION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_EVAL_ALLOW_ARTIFACT_PUBLISH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_EVAL_ALLOW_ARTIFACT_PUBLISH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_EVAL_ALLOW_ARTIFACT_PUBLISH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_EVAL_ALLOW_ARTIFACT_PUBLISH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_EVAL_ALLOW_FLAG_OVERRIDES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_EVAL_ALLOW_FLAG_OVERRIDES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_EVAL_ALLOW_FLAG_OVERRIDES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_EVAL_ALLOW_FLAG_OVERRIDES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_EVAL_ARTIFACT_STUB_DIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_EVAL_ARTIFACT_STUB_DIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_EVAL_ARTIFACT_STUB_DIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_EVAL_ARTIFACT_STUB_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_GOAL_CHECKIN_MINUTES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_GOAL_CHECKIN_MINUTES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_GOAL_CHECKIN_MINUTES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_GOAL_CHECKIN_MINUTES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PROJECT_DIR_NAME",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PROJECT_DIR_NAME"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PROJECT_DIR_NAME",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PROJECT_DIR_NAME",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SLACK_TAG_TOKEN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SLACK_TAG_TOKEN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SLACK_TAG_TOKEN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SLACK_TAG_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

@@ -1,0 +1,367 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.144.0",
+  "to": "0.144.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.144.0...rust-v0.144.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.144.1",
+    "text": "## Bug Fixes\n\n- Fixed standalone installs failing when GitHub returns compact or reordered release metadata. (#31913)\n- Ensured macOS package installs expose the code-mode host alongside the `codex` executable. (#31913)\n- Kept code mode working when the companion host binary is unavailable by falling back to the embedded runtime. (#31913)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.144.0...rust-v0.144.1\n\n- #31913 [0.144] Backport installer and code-mode reliability fixes @bolinfest"
+  },
+  "summary": {
+    "changes": 14,
+    "categories": {
+      "behavior": 9,
+      "caching": 1,
+      "hooks": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 14
+    },
+    "undocumented": 14
+  },
+  "changes": [
+    {
+      "id": "caching.across_turns",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns"
+      ],
+      "title": "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "breakpoints": [
+          [],
+          [],
+          []
+        ],
+        "stable_cache_key": true,
+        "stable_prefix_chars": 675,
+        "turns": 3
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "compaction"
+      ],
+      "title": "Behaviour: compaction added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "model": "gpt-5.6-sol",
+        "prompt": "You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.\n\nInclude:\n- Current progress and key decisions made\n- Important context, constraints, or user preferences\n- What remains to be done (clear next steps)\n- Any critical data, examples, or references needed to continue\n\nBe concise, structured, and focused on helping the next LLM seamlessly continue the work.\n",
+        "reported_input_tokens": 995000,
+        "tools": 0,
+        "trigger": "auto"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.approval",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "approval"
+      ],
+      "title": "Behaviour: sandbox approval removed",
+      "impact": "notable",
+      "before": "never",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model removed",
+      "impact": "notable",
+      "before": "gpt-5.6-sol",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.provider",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "provider"
+      ],
+      "title": "Behaviour: sandbox provider removed",
+      "impact": "notable",
+      "before": "telemetry_fixture",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.reasoning effort",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning effort"
+      ],
+      "title": "Behaviour: sandbox reasoning effort removed",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries removed",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox removed",
+      "impact": "notable",
+      "before": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.session id",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "session id"
+      ],
+      "title": "Behaviour: sandbox session id removed",
+      "impact": "notable",
+      "before": "<uuid>",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.workdir",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "workdir"
+      ],
+      "title": "Behaviour: sandbox workdir removed",
+      "impact": "notable",
+      "before": "<repo>",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control removed",
+      "impact": "notable",
+      "before": {
+        "exit_2": "blocks the tool; message to the model",
+        "json_decision": "blocks the tool; message to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1229,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/analytics/src/events.rs#L1229"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 426,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L426"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control removed",
+      "impact": "notable",
+      "before": {
+        "additional_context": "reaches the model",
+        "exit_2": "message not shown to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1234,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/analytics/src/events.rs#L1234"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 441,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L441"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control removed",
+      "impact": "notable",
+      "before": {
+        "exit_2": "keeps the turn going; message to the model",
+        "json_decision": "keeps the turn going; message to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1238,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/analytics/src/events.rs#L1238"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 453,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L453"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control"
+      ],
+      "title": "Hook events.UserPromptSubmit.control removed",
+      "impact": "notable",
+      "before": {
+        "additional_context": "reaches the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1235,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/analytics/src/events.rs#L1235"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 444,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L444"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

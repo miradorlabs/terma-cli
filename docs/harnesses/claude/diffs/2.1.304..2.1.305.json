@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.304",
+  "to": "2.1.305",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `sandbox.allowNestedUserNamespaces` so sandboxed commands on Linux can create user namespaces (Chromium, rootless podman); this lets them get around the sandbox's file protections\n- Added `CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS` so unattended retry mode (`CLAUDE_CODE_RETRY_WATCHDOG`) notices a usage limit that was lifted before its reset\n- Fixed every request failing on Vertex, Bedrock and other providers when the endpoint or a gateway rejects tool search, and behind gateways with ToolSearch disallowed or left out of `--tools` (a 2.1.304 regression): Claude Code now retries without it\n- Fixed `/effort` and `/autocompact` settings not applying when the model name differed from a `modelOverrides` value by letter case or a `[1m]` tag\n- Fixed new worktrees in a bare repository sometimes starting from local HEAD instead of the default branch, and unchanged subagent worktrees sometimes not being cleaned up\n- Fixed Bash commands on a full disk failing with a raw `ENOSPC` file path: the error now says the disk is full and that nothing ran\n- Fixed an MCP server passed by a cloud session or by the SDK's `setMcpServers` being replaced later in the session by a same-named server from your own settings\n- Fixed Claude naming the wrong model for a subagent's work after the subagent switched to a fallback model\n- Fixed cloud sessions and teammates not telling Claude when a compaction had to leave the oldest messages out of its summary to fit\n- Fixed more cases of scheduled Cowork cloud sessions waiting five minutes for each subagent whose WebFetch needed a URL approval that nobody was there to give\n- Fixed Workflow resume re-running already-completed `pipeline()` and `parallel()` agents instead of serving them from the run's journal\n- Fixed Remote Control leaving empty \"(session)\" entries in `/resume` after switching conversations with `/resume`\n- Fixed `/usage` rows being cut off in narrow terminals\n- Fixed startup warnings printing as raw text above the logo: they now go to the debug log, and permission rules that restrict nothing show as warning rows under the banner\n- Fixed screen reader mode: search boxes now say \"Search:\" instead of a symbol VoiceOver read as \"telephone recorder\", and highlighted prompt text, such as Ctrl+R search matches and \"ultrathink\", no longer has spaces inside words\n- Self-hosted runner: Fixed a start script that shares only its stdout with the runner or orchestrator failing with `Resource temporarily unavailable` when `TERM` is set (a 2.1.300 regression)\n- Self-hosted runner: Fixed repository access failing since 2.1.296 when a git credential helper or askpass program reads its settings through `GIT_CONFIG`\n- Self-hosted runner: Fixed the orchestrator reporting a spawn-runner hook as timed out when a runner it started in the background kept its output open\n- Improved `/usage`: each warning is now a one-line fix that names its source, and `f` applies the fixes; the same fixes appear in VS Code and `/doctor`\n- Improved MCP consent dialogs so an Enter meant for the prompt is less likely to be taken as Accept\n- Improved a mod's `Image` to draw its picture in iTerm2 3.5 and later with fullscreen rendering, where it showed only its `alt` text\n- Remote Control: Improved the spawn-mode messages: pressing `w` now says the new mode is saved for the folder, and a later `claude remote-control` start that uses the saved mode says where it came from\n- Changed `allowedMcpServers` to stop filtering `managed-mcp.json` stdio servers that use `${VAR}` only in `env`: one your allowlist left out now loads on upgrade; use `deniedMcpServers` to keep it off\n- Changed plugins that Claude Desktop mounts by path to no longer keep their `allowed-tools` when your organization's managed settings set `allowManagedPermissionRulesOnly`\n- Changed the `/artifacts` delete confirmation to take 1 or Enter to keep, 2 to delete, and Esc to cancel; `y` and `n` no longer answer it\n- Changed a mod's docked pane to stay within 45% of the terminal's width, including a width kept from a wider terminal\n- [VSCode] Added a \"Running start-up hooks\" spinner status, with a screen reader announcement, while SessionStart or Setup hooks run\n- [VSCode] Fixed the spinner cutting off \"Compacting...\" when your `spinnerVerbs` setting replaces the built-in verbs with short ones\n- [VSCode] Changed the message shown when a session does not start in time and no hook is running: it now leads with the output logs and lists causes instead of pointing to sign-in and network first\n- [Cloud sessions] Fixed the Cloud environments admin page wrongly refusing to save an existing environment with an \"installs packages\" error\n- [Cloud sessions] Improved deleting a self-hosted environment so the dialog and error messages say what blocks the delete and what it will affect\n- [Claude Tag] Added public Slack channels Claude hasn't joined to the Claude Tag admin Add place search, so admins can set one up from there\n- [Claude Tag] Fixed Claude Tag access bundles so a repository that moved to another GitHub account can be added again\n- [Claude Tag] Fixed a routine set up in a Slack DM thread no longer posting after another routine in that thread restarted the conversation; both now keep posting there\n- [Claude Tag] Fixed routines set up in a Slack thread reporting success without posting after the conversation ended; those runs are now skipped and the creator is told\n- [Claude Tag] Improved Claude Tag admin pages in large organizations so plugin, skill and bundle edits work while the channel list is still loading\n- [Code Review] Fixed Code Review sometimes not reviewing the newest commit when several pushes landed on a pull request during a review\n- [Code Review] Changed Code Review re-reviews so they no longer open with LGTM while earlier blocking findings are still open"
+  },
+  "summary": {
+    "changes": 19,
+    "categories": {
+      "config": 19
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 16,
+      "notable": 3
+    },
+    "undocumented": 15
+  },
+  "changes": [
+    {
+      "id": "config.options.allowedMcpServers.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedMcpServers",
+        "description"
+      ],
+      "title": "allowedMcpServers description changed (+383 −365 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n Enterprise allowlist of the MCP servers users may use.\n-Governs servers users add (user, project and local config, --mcp-config, agent frontmatter, plugins, claude.ai connectors); servers the organization itself delivers (managedMcpServers, and managed-mcp.json entries that use no ${VAR} expansion) are allowed without being listed; a managed-mcp.json entry that uses ${VAR} expansion is still checked against this list.\n+Governs servers users add (user, project and local config, --mcp-config, agent frontmatter, plugins, claude.ai connectors); servers the organization itself delivers (managedMcpServers, and managed-mcp.json entries with no ${VAR} in their command, args, url or header values) are allowed without being listed; a managed-mcp.json entry with ${VAR} in any of those must match this list.\n If undefined, all servers are allowed.\n If empty array, users can use no servers of their own.\n Denylist takes precedence - if a server is on both lists, it is denied.\n",
+      "stats": {
+        "added_chars": 383,
+        "removed_chars": 365
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.attributionProject",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "attributionProject"
+      ],
+      "title": "New setting: attributionProject",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "The claude.ai Project this session names for your organization's usage reports: the Project's UUID, or its ID starting with \"claude_proj_\". An empty string names none and stops lower-precedence files from naming one; the organization default still applies. Sent only when Claude Code uses your claude.ai login, connects directly to the Anthropic API, is not in a cloud session, and CLAUDE_CODE_ATTRIBUTION_HEADER is not 0. CLAUDE_CODE_ATTRIBUTION_PROJECT takes precedence over it. Set in managed settings, it overrides people's own settings files. A project's .claude/settings.json and settings.local.json count only once the folder is trusted; for runs in a folder nobody has trusted, such as CI, use CLAUDE_CODE_ATTRIBUTION_PROJECT.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.attributionProjectPolicy",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "attributionProjectPolicy"
+      ],
+      "title": "New setting: attributionProjectPolicy",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Your organization's default for attributionProject. Only honored from managed settings (server-managed, MDM / OS policy, or managed-settings.json); ignored in user, project, local and --settings sources.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "command"
+      ],
+      "title": "New setting: command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Shell command to run as a persistent background monitor. Each stdout line is delivered to the model as a <task_notification> event; the process runs for the session lifetime. ${CLAUDE_PLUGIN_ROOT}, ${CLAUDE_PLUGIN_DATA}, ${CLAUDE_PROJECT_DIR}, ${user_config.*}, and ${ENV_VAR} are substituted. Runs in the session cwd (the named --project-config-root when a host set one) — prefix with `cd \"${CLAUDE_PLUGIN_ROOT}\" && ` if the script needs its own directory.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.description",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "description"
+      ],
+      "title": "New setting: description",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Short human-readable description of what is being monitored (shown in task panel and notification summary).",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.name",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "name"
+      ],
+      "title": "New setting: name",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Identifier for this monitor, unique within the plugin. Used to dedupe so re-arming (plugin reload, repeat skill invoke) does not spawn duplicates.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.permissions.axScreenReader.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "permissions.axScreenReader",
+        "description"
+      ],
+      "title": "permissions.axScreenReader description changed (+212 −173 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Render screen-reader friendly output (flat text, no decorative borders or animations). Overridden by the CLAUDE_AX_SCREEN_READER env var and the --ax-screen-reader CLI flag.\n+Render screen-reader friendly output (flat text, no decorative borders or animations). Overridden by the CLAUDE_AX_SCREEN_READER env var and the --ax-screen-reader CLI flag. Ignored in project and local settings.\n",
+      "stats": {
+        "added_chars": 212,
+        "removed_chars": 173
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.policyHelper.refreshIntervalMs.enum.60000",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "policyHelper.refreshIntervalMs",
+        "enum",
+        "60000"
+      ],
+      "title": "Setting policyHelper.refreshIntervalMs lost value 60000",
+      "impact": "notable",
+      "before": 60000,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.policyHelper.timeoutMs.enum.1000",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "policyHelper.timeoutMs",
+        "enum",
+        "1000"
+      ],
+      "title": "Setting policyHelper.timeoutMs lost value 1000",
+      "impact": "notable",
+      "before": 1000,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.when",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "when"
+      ],
+      "title": "New setting: when",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "always",
+        "description": "Arm trigger. \"always\" arms at session start and on plugin reload. \"on-skill-invoke:<skill>\" arms the first time that skill is dispatched (via Skill tool or slash command).",
+        "enum": [
+          "always"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_REPLY_TURN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_REPLY_TURN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_REPLY_TURN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_REPLY_TURN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_TURN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_TURN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_TURN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_EMAIL_SENDER_TURN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_EARLY_SYNC_AFTER_SETTINGS_REFUSAL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_EARLY_SYNC_AFTER_SETTINGS_REFUSAL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CCR_EARLY_SYNC_AFTER_SETTINGS_REFUSAL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CCR_EARLY_SYNC_AFTER_SETTINGS_REFUSAL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_EVENT_FLUSH_POLICY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_EVENT_FLUSH_POLICY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CCR_EVENT_FLUSH_POLICY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CCR_EVENT_FLUSH_POLICY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CONSENT_POINTERLESS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CONSENT_POINTERLESS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CONSENT_POINTERLESS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CONSENT_POINTERLESS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENTRYPOINT_ON_REQUESTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENTRYPOINT_ON_REQUESTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ENTRYPOINT_ON_REQUESTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ENTRYPOINT_ON_REQUESTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RETRY_WATCHDOG_USAGE_LIMIT_RECHECK_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.API_TIMEOUT_MS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "API_TIMEOUT_MS"
+      ],
+      "title": "Environment variable no longer read: API_TIMEOUT_MS",
+      "impact": "informational",
+      "before": "API_TIMEOUT_MS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SETTLE_TOUCHED_FILES",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SETTLE_TOUCHED_FILES"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_SETTLE_TOUCHED_FILES",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_SETTLE_TOUCHED_FILES",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

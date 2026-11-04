@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.138.0",
+  "to": "0.139.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.138.0...rust-v0.139.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.139.0",
+    "text": "## New Features\n- Code mode can now call standalone web search directly, including from nested JavaScript tool calls, and receive plaintext search results. (#26719)\n- Tool and connector input schemas now preserve `oneOf` and `allOf`, and large schemas keep more shallow structure when compacted, improving compatibility with richer MCP tools. (#24118, #27084)\n- `codex doctor` now includes editor and pager environment details in the local report while redacting raw values in JSON output. (#27081)\n- Plugin marketplace automation is more informative and responsive: `codex plugin marketplace list --json` now includes each marketplace source, and plugin lists can return from the cached remote catalog before refreshing in the background. (#27009, #26932)\n\n## Bug Fixes\n- `codex resume --last \"...\"` and `codex fork --last \"...\"` now treat the trailing argument as the initial prompt instead of misreading it as a session ID. (#26818)\n- MCP startup warnings from subagents now stay in the thread that owns them, avoiding duplicate parent-thread alerts and stuck startup spinners in the TUI. (#26639)\n- Image edits now use the exact referenced image file paths instead of guessing from conversation history, so attached-image edits land on the intended input. (#26486)\n- Bare URLs with `~` in the path are now linkified end to end in the TUI instead of being truncated before the tilde. (#27088)\n- Thread resets such as `/new`, `/clear`, and `/fork` no longer drop cloud-managed requirements or feature flags during TUI config reloads. (#25177)\n- Sandbox execution now preserves approved escalation decisions and enforces configured proxy-only networking more consistently. (#24981, #27035)\n\n## Chores\n- Release builds once again publish separate symbol archives with line tables, improving post-release crash symbolication without bringing back the earlier full-debug build slowdown. (#26202)\n- The embedded V8 toolchain was updated to `rusty_v8` 149.2.0. (#26464)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.138.0...rust-v0.139.0\n\n- #26741 fix(remote-control): preserve enrollment on generic websocket 404s @apanasenko-oai\n- #26804 fix(core-plugins): send Codex product SKU to plugin-service @ericning-o\n- #26464 build(v8): update rusty_v8 to 149.2.0 @cconger\n- #26895 ci: use bazel environment for BuildBuddy secret @bolinfest\n- #24981 fix: preserve approval sandbox decisions in unified exec @bolinfest\n- #26818 fix(tui): accept prompts with resume and fork @fcoury-oai\n- #24820 deps: update starlark to 0.14.2 @bolinfest\n- #26639 fix(tui): scope MCP startup status by thread @fcoury-oai\n- #26719 [codex] Enable standalone web search in code mode @rka-oai\n- #26632 feat: add v2 agent residency lru @jif-oai\n- #26974 Ignore proc-macro-error2 advisory @jif-oai\n- #26969 feat: count V2 concurrency by active execution @jif-oai\n- #26994 Rename multi-agent v2 close_agent to interrupt_agent @jif-oai\n- #26997 Avoid reopening v2 descendants on resume @jif-oai\n- #26821 [codex] Exclude external tool output from memories @rka-oai\n- #26202 [codex] Restore release symbol artifacts with line tables @nornagon-openai\n- #26852 fix(app-server): avoid blocking connection cleanup @apanasenko-oai\n- #26923 Add HTTP window ID to Responses client metadata @ningyi-oai\n- #26680 [codex-analytics] report compaction analytics details @rhan-oai\n- #26637 [codex] Speed up external agent session imports @stefanstokic-oai\n- #27009 [plugins] Expose marketplace source in marketplace list JSON @mpc-oai\n- #27024 ci: template custom runner names by repo @bolinfest\n- #26230 fix: preserve auto review across config and delegation @viyatb-oai\n- #27038 [codex] Clarify PR babysitter state mutations @anp-oai\n- #27037 [codex] Calm multi-agent v2 usage prompts @jif-oai\n- #26687 Pair thread environment settings @pakrym-oai\n- #27054 cli: add -P sandbox permissions profile alias @bolinfest\n- #27035 Enforce configured network proxy in codex sandbox @viyatb-oai\n- #26486 Route image edits through referenced file paths @won-openai\n- #27060 [codex-analytics] stop sending codex error subreason @rhan-oai\n- #27044 [codex] Require complete main-agent skill reads @fchen-oai\n- #24118 feat: support oneOf and allOf in tool input schemas @celia-oai\n- #26934 [codex] Prune stale curated plugin caches @xl-openai\n- #26932 Use cached remote plugin catalog for plugin list @xl-openai\n- #26091 [codex] Add OTEL counter descriptions @richardopenai\n- #27081 feat(doctor): report editor and pager environment @fcoury-oai\n- #27084 chore: preserve one more schema layer during large tool compaction @celia-oai\n- #26840 Add typed file URIs @anp-oai\n- #27088 fix(tui): linkify complete bare URLs with tildes @fcoury-oai\n- #27068 Show effective sandbox modes in /debug-config @canvrno-oai\n- #27092 Add extra config to StoredThread, leave empty for now @kumquatexpress\n- #27096 Update web search citation prompt @yuning-oai\n- #25177 Preserve cloud requirements across TUI thread resets @canvrno-oai\n- #27106 [codex] Remove remote compaction failure log @pakrym-oai"
+  },
+  "summary": {
+    "changes": 7,
+    "categories": {
+      "binary": 1,
+      "caching": 1,
+      "cli": 3,
+      "prompt": 1,
+      "request": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 4,
+      "notable": 3
+    },
+    "undocumented": 6
+  },
+  "changes": [
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+742 −350 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -22,16 +22,19 @@\n - Trigger rules: If the user names a skill (with `$SkillName` or plain text) OR the task clearly matches a skill's description shown above, you must use that skill for that turn. Multiple mentions mean use them all. Do not carry skills across turns unless re-mentioned.\n - Missing/blocked: If a named skill isn't in the list or the path can't be read, say so briefly and continue with the best fallback.\n - How to use a skill (progressive disclosure):\n-  1) After deciding to use a skill, open its `SKILL.md`. Read only enough to follow the workflow.\n+  1) After deciding to use a skill, the main agent must open and read its `SKILL.md` completely before taking task actions. If a read is truncated or paginated, continue until EOF.\n   2) When `SKILL.md` references relative paths (e.g., `scripts/foo.py`), resolve them relative to the skill directory listed above first, and only consider other paths if needed.\n-  3) If `SKILL.md` points to extra folders such as `references/`, load only the specific files needed for the request; don't bulk-load everything.\n+  3) If `SKILL.md` points to extra folders such as `references/`, use its routing instructions to identify the files required for the task.\n+The main agent must read each required instruction or reference file itself before acting on it.\n+Do not delegate reading, summarizing, or interpreting skill instructions to a subagent.\n+Subagents may still perform task work when the selected skill allows it.\n   4) If `scripts/` exist, prefer running or patching them instead of retyping large code blocks.\n   5) If `assets/` or templates exist, reuse them instead of recreating from scratch.\n - Coordination and sequencing:\n   - If multiple skills apply, choose the minimal set that covers the request and state the order you'll use them.\n   - Announce which skill(s) you're using and why (one short line). If you skip an obvious skill, say why.\n - Context hygiene:\n-  - Keep context small: summarize long sections instead of pasting them; only load extra files when needed.\n+  - Progressive disclosure applies to selecting relevant files, not partially reading a selected instruction file. Do not load unrelated references, scripts, or assets.\n   - Avoid deep reference-chasing: prefer opening only files directly linked from `SKILL.md` unless you're blocked.\n   - When variants exist (frameworks, providers, domains), pick only the relevant reference file(s) and note that choice.\n - Safety and fallback: If a skill can't be applied cleanly (missing files, unclear instructions), state the issue, pick the next-best approach, and continue.\n",
+      "stats": {
+        "added_chars": 742,
+        "removed_chars": 350
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core-skills/src/render.rs",
+            "line": 31,
+            "url": "https://github.com/openai/codex/blob/rust-v0.139.0/codex-rs/core-skills/src/render.rs#L31-L33"
+          },
+          {
+            "path": "codex-rs/core-skills/src/render.rs",
+            "line": 50,
+            "url": "https://github.com/openai/codex/blob/rust-v0.139.0/codex-rs/core-skills/src/render.rs#L50"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 7004 → 7442",
+      "impact": "notable",
+      "before": 7004,
+      "after": 7442,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "request.identifiers.client_metadata.x-codex-window-id",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "identifiers",
+        "client_metadata.x-codex-window-id"
+      ],
+      "title": "Now sends identifier client_metadata.x-codex-window-id",
+      "impact": "notable",
+      "before": null,
+      "after": "client_metadata.x-codex-window-id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex sandbox.options.--permissions-profile.names.-P",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "options",
+        "--permissions-profile",
+        "names",
+        "-P"
+      ],
+      "title": "`codex sandbox --permissions-profile` gained alias `-P`",
+      "impact": "informational",
+      "before": null,
+      "after": "-P",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1474,
+            "url": "https://github.com/openai/codex/blob/rust-v0.139.0/codex-rs/app-server/src/config/external_agent_config.rs#L1474"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 382,
+            "url": "https://github.com/openai/codex/blob/rust-v0.139.0/codex-rs/cli/src/doctor.rs#L382"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+34 −34 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -15,7 +15,7 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --permissions-profile <NAME>\n+  -P, --permissions-profile <NAME>\n           Named permissions profile to apply from the active configuration stack\n \n       --enable <FEATURE>\n",
+      "stats": {
+        "added_chars": 34,
+        "removed_chars": 34
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+34 −34 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,7 +10,7 @@\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n-      --permissions-profile <NAME>\n+  -P, --permissions-profile <NAME>\n           Named permissions profile to apply from the active configuration stack\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 34,
+        "removed_chars": 34
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.sdk.tokio",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "tokio"
+      ],
+      "title": "Binary sdk.tokio: 1.49.0 → 1.52.3",
+      "impact": "informational",
+      "before": "1.49.0",
+      "after": "1.52.3",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

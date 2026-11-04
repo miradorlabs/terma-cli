@@ -1,0 +1,826 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.157.1",
+  "to": "0.158.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.157.1...rust-v0.158.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.158.0",
+    "text": "## New Features\r\n\r\n- Configure copy-on-select and right-click paste in the fullscreen TUI. Copied transcript selections now preserve Markdown formatting. (#47639, #47896, #48118)\r\n- Connect to MCP servers that require pre-registered OAuth client secrets, including through `codex mcp add --oauth-client-secret`. (#47891)\r\n- Secure direct exec-server WebSocket connections with bearer tokens, including connections configured through app-server. (#47601, #47648)\r\n- Image generation and editing can explicitly request transparent backgrounds, and edits now accept file-backed conversation images. (#47484, #47956)\r\n- Terminal input approval is enabled by default for commands running with elevated permissions; runtime-only grants no longer cause unnecessary reviews. (#47799, #48073)\r\n\r\n## Bug Fixes\r\n\r\n- Fixed Windows sandbox failures involving ordinary Windows 10 paths, rejected stored credentials, and large permission policies. (#47672, #47695, #47919)\r\n- Fixed Linux sandbox startup with nested writable roots and preserved Git metadata protections across writable roots on Linux and macOS. (#47623, #47974)\r\n- macOS patch operations now recognize system path aliases covered by existing permissions, avoiding unnecessary approval prompts. (#47879)\r\n- Approval reviews now retry when new user input arrives, so a status question does not automatically abort a pending action. (#47819)\r\n- Mermaid flowcharts now render quoted labels and ampersands; unsupported diagrams explain why they fall back to source. (#47572, #47678)\r\n- Command completion events now include early output and report process-launch failures to clients. (#47529, #47665)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.157.0...rust-v0.158.0\r\n\r\n- #47441 Use secondary text styling for the transcript footer shortcut hint @etraut-openai\r\n- #47447 Extract WebSocket authentication into `codex-websocket-auth` @euroelessar\r\n- #47458 Parallelize instruction refresh and tool preparation @hlevy-openai\r\n- #47484 Add explicit background control to image generation @alicec-oai\r\n- #47520 Route session agent operations through `AgentControl` @jif-oai\r\n- #47529 Emit command lifecycle events for unified exec launch failures @steipete-oai\r\n- #47536 Route agent lookups and V2 context through `AgentControl` @jif-oai\r\n- #47539 Test interrupted one-shot command launch failure persistence @jif-oai\r\n- #47540 Add an option to disable multi-agent v2 direct messaging @jif-oai\r\n- #47565 Classify rollout read failures by reason and progress @jif-oai\r\n- #47568 Record sandbox backends in command execution analytics @iceweasel-oai\r\n- #47571 Wait for idle before injecting remote compaction test history @felixxia-oai\r\n- #47572 Explain Mermaid rendering fallbacks in the TUI @etraut-openai\r\n- #47582 Retain assistant context for Guardian authorization reviews @felixxia-oai\r\n- #47584 Preserve streamed assistant message order in retained context @felixxia-oai\r\n- #47585 Preserve delivered assistant messages in Guardian retained context @felixxia-oai\r\n- #47589 Keep unfinished link destinations out of rich streaming previews @etraut-openai\r\n- #47590 Serialize numeric custom reasoning effort as JSON numbers @dylan-hurd-oai\r\n- #47591 Stream daemon executable hashing off the async runtime @etraut-openai\r\n- #47596 Refresh realtime context for each model request @reia-oai\r\n- #47597 Guard prerelease channel and canary updates against older versions @imac-oai\r\n- #47601 Add opt-in WebSocket authentication to exec-server @euroelessar\r\n- #47603 Add a reap-only drop policy for child processes @charliemarsh-oai\r\n- #47604 Extend child commands with session and descriptor controls @charliemarsh-oai\r\n- #47605 Route pipe processes through the shared child launcher @charliemarsh-oai\r\n- #47610 Use native POSIX spawning for command hooks @charliemarsh-oai\r\n- #47611 Use the shared process launcher for Unix shell snapshots @charliemarsh-oai\r\n- #47612 Launch Linux pipe processes through a fresh setup helper @freeqaz-openai\r\n- #47613 Expand Linux spawn-helper lifecycle test coverage @charliemarsh-oai\r\n- #47617 Route Linux PTY launches through the process setup helper @charliemarsh-oai\r\n- #47618 Prefer Shift-arrow hints for queued messages and questions @imac-oai\r\n- #47619 Add bounded buffering for global operation metrics @celia-oai\r\n- #47620 Add portable project trust lookup APIs @seanh-oai\r\n- #47623 Fix read-only metadata mount ordering for nested writable roots @jif-oai\r\n- #47624 Recognize `user_message` tools in Guardian authorization context @ankushg\r\n- #47625 Allow history and notes without experimental context capability @pmccrary-oai\r\n- #47629 Route V2 child loading through `AgentControl` @jif-oai\r\n- #47630 Bind Guardian reviews to the action's target environment @jif-oai\r\n- #47633 Route message board agent resolution through the selected controller @jif-oai\r\n- #47635 Overlap startup WebSocket preconnect with tool discovery @bromano-oai\r\n- #47638 Classify retryable exec-server preparation errors by type @mtsui-oai\r\n- #47639 Add configurable copy-on-select for transcript selections @fcoury-oai\r\n- #47641 Honor Retry-After and preserve server retry deadlines @anp-oai\r\n- #47642 Add model-specific prefixes to indirect tool descriptions @rhan-oai\r\n- #47647 Apply Guardian computer-use review to the Browser connector @johnl-oai\r\n- #47648 Support bearer tokens for app-server executor connections @euroelessar\r\n- #47649 Add opt-in OTLP logging for final agent responses @xli-oai\r\n- #47653 Attach inherited rollout history to diagnostic reports @dkovalenko-oai\r\n- #47654 Make Linux descriptor cleanup fork-safe @yuzhu-oai\r\n- #47655 Bump the exec-server stable compatibility test to Codex 0.156.1 @imac-oai\r\n- #47657 Restrict the default Bedrock GovCloud model catalog @jackz100\r\n- #47662 Expose tool dispatch and timing observations to extensions @euroelessar\r\n- #47663 Preserve managed network policy in route-aware transports @jackz100\r\n- #47665 Preserve early unified exec output in completion events @sdcoffey\r\n- #47670 Support model-specific descriptions for agent message board tools @eknight-oai\r\n- #47672 Fix no-reparse directory opens on Windows 10 @zm-oai\r\n- #47673 Clarify registered Windows sandbox setup errors @zm-oai\r\n- #47677 Support model catalog overrides for MCP resource tool specs @rhan-oai\r\n- #47678 Support quoted labels and ampersands in Mermaid flowcharts @etraut-openai\r\n- #47679 Add extension hooks for model requests and response streams @euroelessar\r\n- #47680 Add exec-server RPC timing and process startup tracing @anp-oai\r\n- #47683 Add executor capability discovery V2 infrastructure @TAFOYA-OAI\r\n- #47686 Make thread-owned Guardian context always enabled @felixxia-oai\r\n- #47688 Remove legacy Guardian authorization evidence paths @felixxia-oai\r\n- #47689 Make Guardian thread context capture unconditional @felixxia-oai\r\n- #47690 Remove obsolete Guardian context capture mode branches @felixxia-oai\r\n- #47691 Materialize rollout persistence for pending inter-agent messages @dermanyang-oai\r\n- #47693 Configure curl retries for DotSlash installation in CI @anp-oai\r\n- #47695 Repair rejected Windows sandbox credentials during provisioning @zm-oai\r\n- #47696 Avoid the shutdown timeout in the lagged-event test @jgershen-oai\r\n- #47698 Allow WebSocket test server shutdown while waiting for requests @jgershen-oai\r\n- #47701 Allow idle threads to prewarm and repair WebSocket connections @vkg-oai\r\n- #47703 Preserve account network policy for ChatGPT backend requests @jackz100\r\n- #47704 Fix spawn flag typing and isolate project configuration tests @seanh-oai\r\n- #47709 Route resume prewarm through the cached WebSocket session @vkg-oai\r\n- #47712 Update unified exec output buffers atomically @sdcoffey\r\n- #47713 Reduce dependency coupling in shared configuration crates @aibrahim-oai\r\n- #47714 Preserve tool result metadata more selectively under size limits @ningyi-oai\r\n- #47717 Avoid recursive TUI event dispatch for model picker selections @etraut-openai\r\n- #47741 Attribute tool telemetry to the invoking turn's product SKU @rennie-openai\r\n- #47742 Honor network policy in history notes and image generation extensions @jackz100\r\n- #47745 Skip startup prewarm preparation when the WebSocket is ready @vkg-oai\r\n- #47748 Align Cargo and Bazel Rust debug information defaults @aibrahim-oai\r\n- #47751 Reduce generic code duplication in RPC and Markdown rendering @aibrahim-oai\r\n- #47755 Centralize typed app-server response decoding @aibrahim-oai\r\n- #47757 Refactor tool telemetry product SKU matching to use an allowlist @rennie-openai\r\n- #47758 Preserve more tool metadata within outgoing message budgets @ningyi-oai\r\n- #47773 Honor catalog schemas for asynchronous user input @rhan-oai\r\n- #47797 Support close-on-exec attachments without changing PTY semantics @jif-oai\r\n- #47799 Enable terminal input approval by default @jif-oai\r\n- #47808 Allow hosts to provide agent controllers through ThreadManager @jif-oai\r\n- #47811 Preserve explicit user goal updates in Guardian authorization @felixxia-oai\r\n- #47813 Fix sleep interruption test event handling and fixture lifetime @felixxia-oai\r\n- #47814 Fix a lost wakeup in the unified exec termination test @felixxia-oai\r\n- #47817 Stabilize thread resume and memory dual-write tests @jif-oai\r\n- #47819 Retry Guardian reviews when authorization changes @teddywyly-oai\r\n- #47820 Add integration coverage for host agent controllers @jif-oai\r\n- #47824 Allow four concurrent threads in the multi-agent resume test @felixxia-oai\r\n- #47828 Wait for login completion in recommended plugin tests @felixxia-oai\r\n- #47830 Bind Guardian async scores to target environment permissions @jif-oai\r\n- #47832 Stabilize Rosetta test timing and retry delay telemetry @jif-oai\r\n- #47847 Keep the TUI responsive during clipboard copies @fcoury-oai\r\n- #47851 Preserve human overrides across repeated heartbeat instructions @felixxia-oai\r\n- #47852 Avoid blocking async proxy resolution on the system proxy cache @jif-oai\r\n- #47856 Initialize media estimates outside the global cache lock @jif-oai\r\n- #47858 Validate loaded plugins outside the cache lock @jif-oai\r\n- #47861 Avoid nested read locking when rendering browser sign-in @jif-oai\r\n- #47867 Render remote permission paths using executor context @iceweasel-oai\r\n- #47870 Add opt-in OTLP logging for Guardian assessments @jif-oai\r\n- #47871 Fix PID reservation test race and update guardian heartbeat snapshot @jif-oai\r\n- #47873 Measure deferred tool namespace fragments before and after truncation @mzeng-openai\r\n- #47879 Fix macOS system-alias matching in patch permission checks @felixxia-oai\r\n- #47881 Use Tokio's clock for TUI paste timing @charliemarsh-oai\r\n- #47886 Preserve diagnostic logs when SQLite logging fails @dkovalenko-oai\r\n- #47887 Warn users when SQLite diagnostic log writes fail @dkovalenko-oai\r\n- #47889 Include TUI client logs in diagnostic uploads @etraut-openai\r\n- #47891 Support client secrets for pre-registered MCP OAuth clients @willwang-openai\r\n- #47894 Clean up temporary Codex homes after TUI tests @fcoury-oai\r\n- #47896 Preserve Markdown formatting when copying transcript selections @fcoury-oai\r\n- #47898 Preserve local-binding inheritance in environment network policies @seanh-oai\r\n- #47899 Add diagnostic reasons to MCP attribution errors @peilin-openai\r\n- #47900 Default local threads to paginated history @owenlin0\r\n- #47901 Add bounded credential-storage telemetry helpers @celia-oai\r\n- #47902 Avoid repeated table clones during config merging @imac-oai\r\n- #47903 Move config key alias normalization ahead of merging @imac-oai\r\n- #47904 Support nested canonical paths in config key aliases @imac-oai\r\n- #47908 Alias `tui.whimsy` to `tui.effects.starfield` @imac-oai\r\n- #47912 Fix attestation routing during thread startup @charliemarsh-oai\r\n- #47913 Add an opt-in flag to defer mailbox preemption @jif-oai\r\n- #47915 Reuse verified V8 checksum manifests from the artifact cache @aibrahim-oai\r\n- #47918 Parameterize the turn-start originator header test @aibrahim-oai\r\n- #47919 Transport large Windows sandbox launch payloads through the environment @malsamiri-oai\r\n- #47920 Allow directory moves under global Seatbelt basename denies @chess-oai\r\n- #47922 Allow full-access Windows setup to provision through registered Core @zm-oai\r\n- #47924 Make project trust lookup paths explicit and defer root resolution @seanh-oai\r\n- #47926 Retry file blob uploads on HTTP 502 and 504 @mtsui-oai\r\n- #47927 Use `127.0.0.1` for local login redirects @willwang-openai\r\n- #47932 Remove GPT-5.4 from bundled catalogs and preserve migration prompts @andrewgu-oai\r\n- #47934 Apply the unchanged-model compaction shortcut to all session sources @hlevy-openai\r\n- #47935 Allow cached catalogs to satisfy MCP startup readiness @hlevy-openai\r\n- #47936 Make MCP and Code Mode input schema budgets configurable @vivi\r\n- #47937 Add direct replies for thread settings updates @sayan-oai\r\n- #47939 Separate selected plugin identities from MCP contributions @sayan-oai\r\n- #47943 Remove unused Windows world-writable audit code @iceweasel-oai\r\n- #47945 Parameterize the thread initialization analytics test by originator @eddie-openai\r\n- #47946 Add an in-memory agent message board for ephemeral sessions @jif-oai\r\n- #47947 Expand root authorization context to 16 messages @felixxia-oai\r\n- #47951 Use prebuilt V8 archives for Bazel on macOS and GNU Linux @aibrahim-oai\r\n- #47952 Prune expired in-memory message board registry entries @jif-oai\r\n- #47954 Move fullscreen startup tips into the transcript @etraut-openai\r\n- #47956 Support file references in image edit requests @kchainani-oai\r\n- #47957 Bound tool-call observations to the outgoing Responses message budget @ningyi-oai\r\n- #47962 Request transparent huge pages for Cargo and eligible Bazel rustc jobs @aibrahim-oai\r\n- #47964 Preserve the client-agent header for Amazon Bedrock Runtime @celia-oai\r\n- #47967 Surface Flex capacity failures as a distinct terminal error @sdcoffey\r\n- #47968 Handle Btrfs device mismatches when masking daemon sockets @etraut-openai\r\n- #47970 Expose current environment selections for a running turn @sayan-oai\r\n- #47971 Add Pro Max plan support and update Pro display names @etraut-openai\r\n- #47974 Preserve Git directory protections across writable roots @aionescu-oai\r\n- #47975 Prevent stale voice answers from reappearing during speech recovery @etraut-openai\r\n- #47981 Prepare MCP calls directly from advertised tool identities @hlevy-openai\r\n- #47984 Add multi-agent spawn latency and failure metrics @owenlin0\r\n- #47988 Reuse MCP handlers across equivalent bindings @hlevy-openai\r\n- #47989 Add startup-only PID namespace inheritance to exec-server @open-matt\r\n- #48004 Respect configured authentication in the thread manager sample @celia-oai\r\n- #48015 Validate tool suggestion install URLs before showing the app link @aionescu-oai\r\n- #48017 Test same-cell permission grants and strict review in code mode @anp-oai\r\n- #48035 Remove plugin extension metadata from discovery and summaries @victor-openai\r\n- #48060 Deduplicate retained instructions across Guardian reviews @felixxia-oai\r\n- #48069 Handle early command yields in the Guardian network approval test @jif-oai\r\n- #48072 Skip message-board notification previews when there are no recipients @jif-oai\r\n- #48073 Avoid stdin approval for runtime-only permission grants @jif-oai\r\n- #48077 Add Serde support to agent message board request types @jif-oai\r\n- #48078 Replay exec-server shell snapshots through unnamed files @jif-oai\r\n- #48098 Preserve recent authorization context for Guardian reviews @felixxia-oai\r\n- #48099 Honor shell environment policy in legacy snapshots @jif-oai\r\n- #48100 Add an HTTP client for remote agent message boards @jif-oai\r\n- #48101 Show multiline command previews in `/ps` @etraut-openai\r\n- #48109 Deduplicate retained instructions against Guardian transcripts @felixxia-oai\r\n- #48110 Deduplicate retained instructions in async Guardian context @felixxia-oai\r\n- #48115 Preserve user text parts during local compaction @felixxia-oai\r\n- #48116 Allow reasoning shortcuts to reach Max @etraut-openai\r\n- #48118 Add configurable right-click paste to the fullscreen TUI @fcoury-oai\r\n- #48119 Prevent worker completion races in the guardian authorization test @felixxia-oai\r\n- #48121 Keep startup drafts visible during command center session handoff @etraut-openai\r\n- #48123 Add early yielding for code-mode observations @pakrym-oai\r\n- #48130 Use request notifications in the cloud config loader lifetime test @felixxia-oai\r\n- #48132 Allow Left to open the command center from read-only conversations @etraut-openai"
+  },
+  "summary": {
+    "changes": 27,
+    "categories": {
+      "cli": 13,
+      "config": 14
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 25,
+      "notable": 2
+    },
+    "undocumented": 8
+  },
+  "changes": [
+    {
+      "id": "cli.commands.codex app-server.options.--ws-auth.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex app-server",
+        "options",
+        "--ws-auth",
+        "description"
+      ],
+      "title": "`codex app-server --ws-auth`: description changed",
+      "impact": "informational",
+      "before": "Websocket auth mode for non-loopback listeners",
+      "after": "Authentication mode for incoming WebSocket connections",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-daemon/src/backend/pid.rs",
+            "line": 376,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/app-server-daemon/src/backend/pid.rs#L376"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/backend/pid.rs",
+            "line": 383,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/app-server-daemon/src/backend/pid.rs#L383"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--linux-sandbox-pid-namespace",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--linux-sandbox-pid-namespace"
+      ],
+      "title": "New flag `codex exec-server --linux-sandbox-pid-namespace`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "isolate",
+        "description": "Linux PID namespace: isolate (default) or inherit. Inherit allows signals to other same-UID processes; enable only when provisioning a dedicated environment",
+        "names": [
+          "--linux-sandbox-pid-namespace"
+        ],
+        "value": "<MODE>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-audience",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-audience"
+      ],
+      "title": "New flag `codex exec-server --ws-audience`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Expected audience for signed JWT bearer tokens",
+        "names": [
+          "--ws-audience"
+        ],
+        "value": "<AUDIENCE>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-auth",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-auth"
+      ],
+      "title": "New flag `codex exec-server --ws-auth`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "choices": [
+          "capability-token",
+          "signed-bearer-token"
+        ],
+        "description": "Authentication mode for incoming WebSocket connections",
+        "names": [
+          "--ws-auth"
+        ],
+        "value": "<MODE>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-issuer",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-issuer"
+      ],
+      "title": "New flag `codex exec-server --ws-issuer`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Expected issuer for signed JWT bearer tokens",
+        "names": [
+          "--ws-issuer"
+        ],
+        "value": "<ISSUER>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-max-clock-skew-seconds",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-max-clock-skew-seconds"
+      ],
+      "title": "New flag `codex exec-server --ws-max-clock-skew-seconds`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum clock skew when validating signed JWT bearer tokens",
+        "names": [
+          "--ws-max-clock-skew-seconds"
+        ],
+        "value": "<SECONDS>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-shared-secret-file",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-shared-secret-file"
+      ],
+      "title": "New flag `codex exec-server --ws-shared-secret-file`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Absolute path to the shared secret file for signed JWT bearer tokens",
+        "names": [
+          "--ws-shared-secret-file"
+        ],
+        "value": "<PATH>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-token-file",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-token-file"
+      ],
+      "title": "New flag `codex exec-server --ws-token-file`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Absolute path to the capability-token file",
+        "names": [
+          "--ws-token-file"
+        ],
+        "value": "<PATH>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--ws-token-sha256",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--ws-token-sha256"
+      ],
+      "title": "New flag `codex exec-server --ws-token-sha256`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Hex-encoded SHA-256 digest of the capability token",
+        "names": [
+          "--ws-token-sha256"
+        ],
+        "value": "<HEX>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1800,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/cli/src/main.rs#L1800"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server --help"
+      ],
+      "title": "Full help text of `app-server --help` changed (+64 −56 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -55,7 +55,7 @@\n           See https://developers.openai.com/codex/config-advanced/#metrics for more details.\n \n       --ws-auth <MODE>\n-          Websocket auth mode for non-loopback listeners\n+          Authentication mode for incoming WebSocket connections\n           \n           [possible values: capability-token, signed-bearer-token]\n \n",
+      "stats": {
+        "added_chars": 64,
+        "removed_chars": 56
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+100 −92 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -31,7 +31,7 @@\n       --analytics-default-enabled\n           Controls whether analytics are enabled by default\n       --ws-auth <MODE>\n-          Websocket auth mode for non-loopback listeners [possible values: capability-token,\n+          Authentication mode for incoming WebSocket connections [possible values: capability-token,\n           signed-bearer-token]\n       --ws-token-file <PATH>\n           Absolute path to the capability-token file\n",
+      "stats": {
+        "added_chars": 100,
+        "removed_chars": 92
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+1085 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -22,16 +22,45 @@\n           Error out when config.toml contains fields that are not recognized by this version of\n           Codex\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --linux-sandbox-pid-namespace <MODE>\n+          Linux PID namespace: isolate (default) or inherit. Inherit allows signals to other\n+          same-UID processes; enable only when provisioning a dedicated environment\n+          \n+          [default: isolate]\n+\n       --concurrent-requests <COUNT>\n           Maximum number of requests to process concurrently on each connection\n           \n           [default: 1]\n \n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-\n       --listen <URL>\n           Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n+\n+      --ws-auth <MODE>\n+          Authentication mode for incoming WebSocket connections\n+          \n+          [possible values: capability-token, signed-bearer-token]\n+\n+      --ws-token-file <PATH>\n+          Absolute path to the capability-token file\n+\n+      --ws-token-sha256 <HEX>\n+          Hex-encoded SHA-256 digest of the capability token\n+\n+      --ws-shared-secret-file <PATH>\n+          Absolute path to the shared secret file for signed JWT bearer tokens\n+\n+      --ws-issuer <ISSUER>\n+          Expected issuer for signed JWT bearer tokens\n+\n+      --ws-audience <AUDIENCE>\n+          Expected audience for signed JWT bearer tokens\n+\n+      --ws-max-clock-skew-seconds <SECONDS>\n+          Maximum clock skew when validating signed JWT bearer tokens\n \n       --remote <URL>\n           Register this exec-server as a remote environment using the given base URL\n",
+      "stats": {
+        "added_chars": 1085,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+1085 −127 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -16,12 +16,31 @@\n       --strict-config\n           Error out when config.toml contains fields that are not recognized by this version of\n           Codex\n-      --concurrent-requests <COUNT>\n-          Maximum number of requests to process concurrently on each connection [default: 1]\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --linux-sandbox-pid-namespace <MODE>\n+          Linux PID namespace: isolate (default) or inherit. Inherit allows signals to other\n+          same-UID processes; enable only when provisioning a dedicated environment [default:\n+          isolate]\n+      --concurrent-requests <COUNT>\n+          Maximum number of requests to process concurrently on each connection [default: 1]\n       --listen <URL>\n           Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n+      --ws-auth <MODE>\n+          Authentication mode for incoming WebSocket connections [possible values: capability-token,\n+          signed-bearer-token]\n+      --ws-token-file <PATH>\n+          Absolute path to the capability-token file\n+      --ws-token-sha256 <HEX>\n+          Hex-encoded SHA-256 digest of the capability token\n+      --ws-shared-secret-file <PATH>\n+          Absolute path to the shared secret file for signed JWT bearer tokens\n+      --ws-issuer <ISSUER>\n+          Expected issuer for signed JWT bearer tokens\n+      --ws-audience <AUDIENCE>\n+          Expected audience for signed JWT bearer tokens\n+      --ws-max-clock-skew-seconds <SECONDS>\n+          Maximum clock skew when validating signed JWT bearer tokens\n       --remote <URL>\n           Register this exec-server as a remote environment using the given base URL\n       --remote-transport <REMOTE_TRANSPORT>\n",
+      "stats": {
+        "added_chars": 1085,
+        "removed_chars": 127
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.features.code_mode.tool_input_schema_max_bytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode.tool_input_schema_max_bytes"
+      ],
+      "title": "New setting: features.code_mode.tool_input_schema_max_bytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum UTF-8 bytes per rendered tool input type, with a 16,000-byte minimum and default. For ordinary MCP tools, this is also at least their server's explicitly configured input limit.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 127,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/core/src/config/edit/document_helpers.rs#L127"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.defer_mailbox_preemption",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.defer_mailbox_preemption"
+      ],
+      "title": "New setting: features.defer_mailbox_preemption",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1325,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/features/src/lib.rs#L1325"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.guardianv2.thread_context.deprecated",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.thread_context",
+        "deprecated"
+      ],
+      "title": "Setting features.guardianv2.thread_context deprecated",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/render_observability.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/ext/skills/src/render_observability.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.guardianv2.thread_context.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.thread_context",
+        "description"
+      ],
+      "title": "features.guardianv2.thread_context description changed (+72 −120 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Use thread-owned context for sync and async Guardian. Defaults to true. Independent of the Guardian v2 `enabled` toggle.\n+Deprecated and ignored; thread-owned Guardian context is always enabled.\n",
+      "stats": {
+        "added_chars": 72,
+        "removed_chars": 120
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/managed_features.rs",
+            "line": 228,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/core/src/config/managed_features.rs#L228"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.disable_direct_message",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2.disable_direct_message"
+      ],
+      "title": "New setting: features.multi_agent_v2.disable_direct_message",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Disable the model's direct-message tools; spawning and automatic child results remain available.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.message_board_in_memory",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2.message_board_in_memory"
+      ],
+      "title": "New setting: features.multi_agent_v2.message_board_in_memory",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Keep the message board in memory for a training session, including ephemeral sessions.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.oauth.client_secret",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.oauth.client_secret"
+      ],
+      "title": "New setting: mcp_servers.<name>.oauth.client_secret",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "OAuth client secret used for token exchange with a pre-registered client.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/plugin_config.rs",
+            "line": 285,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/codex-mcp/src/plugin_config.rs#L285"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 170,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/core/src/config/edit/document_helpers.rs#L170"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.startup_readiness",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.startup_readiness"
+      ],
+      "title": "New setting: mcp_servers.<name>.startup_readiness",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether startup requires a live connection or can use a valid cached tool catalog.",
+        "enum": [
+          "connection",
+          "catalog"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 121,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/core/src/config/edit/document_helpers.rs#L121"
+          },
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs",
+            "line": 106,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs#L106"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.tool_input_schema_max_bytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.tool_input_schema_max_bytes"
+      ],
+      "title": "New setting: mcp_servers.<name>.tool_input_schema_max_bytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "UTF-8 byte threshold for compacting each ordinary MCP tool input schema. Defaults to 5,000 bytes. Code Mode also uses an explicitly configured limit when rendering each tool's input type. Larger limits preserve more parameter descriptions.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 127,
+            "url": "https://github.com/openai/codex/blob/rust-v0.158.0/codex-rs/core/src/config/edit/document_helpers.rs#L127"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.log_agent_responses",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.log_agent_responses"
+      ],
+      "title": "New setting: otel.log_agent_responses",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Opt in to logging final main-agent and spawned-subagent responses to an OTLP log exporter. Defaults to false. Response text can be sensitive and is capped at 64 KiB.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.log_guardian_assessments",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.log_guardian_assessments"
+      ],
+      "title": "New setting: otel.log_guardian_assessments",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Opt in to logging completed Guardian assessments to an OTLP log exporter. Defaults to false. Rationales can be sensitive and are capped at 64 KiB.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.copy_on_select",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.copy_on_select"
+      ],
+      "title": "New setting: tui.copy_on_select",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "auto",
+        "description": "Copy selected transcript text when the mouse button is released. Defaults to `auto`: enabled except in direct terminals known to forward their native copy shortcut (Ghostty 1.2+, Kitty on macOS, Windows Terminal, and VS Code on Windows). Unknown terminals, Ghostty without a recognized version, and tmux/Zellij default to copying.",
+        "enum": [
+          "auto",
+          "always",
+          "never"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.right_click_paste",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.right_click_paste"
+      ],
+      "title": "New setting: tui.right_click_paste",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": "auto",
+        "description": "Right-click text paste fallback. Defaults to `auto` (Windows/WSL/Linux). `on` also enables macOS; neither mode reads over SSH or in recognized VS Code terminals. This controls the fullscreen fallback, not the terminal's own paste binding.",
+        "enum": [
+          "auto",
+          "on",
+          "off"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.PUBLIC",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "PUBLIC"
+      ],
+      "title": "Environment variable no longer read: PUBLIC",
+      "impact": "informational",
+      "before": "PUBLIC",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/windows-sandbox-rs/src/audit.rs",
+            "line": 62,
+            "url": "https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/windows-sandbox-rs/src/audit.rs#L62"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

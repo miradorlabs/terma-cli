@@ -1,0 +1,772 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.267",
+  "to": "2.1.268",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added to the Claude apps gateway: with `pricing:` set in `gateway.yaml`, signed-in Claude Code clients receive the same rates through managed settings, so `/cost` and telemetry match the spend meter\n- Added a startup warning for gateways when `access_control.allow_cidrs` is empty, and a one-time warning the first time a request arrives from a public address\n- Added the `gatewayInternalNetworks` managed setting, letting administrators allow `/login` to a Claude apps gateway on their organization's own public IPv4 block\n- Added `claude self-hosted-runner --remove-session-state` (default off): delete each session's per-session directories under `<base-dir>/_sessions/` when the session ends\n- Added `configDirectory` to the output of `claude auth status --json`\n- Added `--json` to `claude plugin install`, `uninstall`, `update`, `enable` and `disable`, and `errorDetails`/`noteDetails` to each row of `claude plugin list --json`\n- Added browser-tab icons for published artifacts, chosen by Claude to match each page\n- Fixed every turn failing with HTTP 400 on third-party Anthropic-compatible endpoints (`ANTHROPIC_BASE_URL`) since 2.1.265: a regex in the Artifact tool's input schema that those endpoints reject\n- Fixed WebFetch hanging indefinitely on a server that keeps the response open without finishing; a fetch now fails after 300 seconds. Set `CLAUDE_CODE_WEBFETCH_DEADLINE_MS` to override the deadline (0 turns it off)\n- Fixed a respawned in-process teammate picking up tools or a system prompt from a same-named agent file in a folder you have not trusted\n- Fixed sustained high CPU usage: a busy loop in long-running idle sessions no longer pins a CPU core, and rapid terminal focus reports during a session recap no longer keep the CPU high\n- Fixed Claude sometimes replying \"your message came through empty\" after an MCP tool call\n- Fixed deny and ask permission rules on symlinked directories (`/etc`, `/tmp`, `/var` on macOS; `/bin` on Linux) not applying when a path was given by its real location, and Bash commands ignoring deny rules written on a symlinked path spelling\n- Fixed a case where a Read or Edit deny rule did not apply when an `env -C`, `eval` or similar command the permission checker cannot analyze was on the same line\n- Fixed plugin and marketplace errors showing a token or password from a git source URL\n- Fixed `/mcp` and `/plugin` server details, `claude mcp list`/`get`, and MCP login errors showing secrets resolved from `${VAR}` placeholders in MCP configs\n- Fixed prompt caching and extended thinking breaking mid-session for SDK sessions using `excludeDynamicSections`: the first message is no longer re-rendered each request\n- Fixed entitled users being told a model is restricted after restart or in the Desktop Code tab when a cached model-access denial was stale\n- Fixed a running session silently switching to the organization's default model when another Claude Code process refreshed a stale model-access entry\n- Fixed long-context 429s on Fable models showing the usage-credits consent prompt instead of the 1M-context message on Pro and Team plans\n- Fixed workload identity federation via a profile (as claude-code-action configures it): processes sharing the profile could fail mid-run with `401 … jti reused`\n- Fixed MCP server OAuth sign-in failing with \"No available ports for OAuth redirect\" when the local callback port range can't be bound\n- Fixed the conversation summary produced by `/compact` and auto-compact mangling text that contained `$` sequences\n- Fixed resuming a conversation that ended with `/compact`: its restored-file notes now load in the same order on every resume\n- Fixed SDK prompt suggestions, side questions and `/rename` sending the conversation from before a compaction\n- Fixed `@` file and `/` command suggestions not appearing after recalling a previous prompt with the up arrow and editing it\n- Fixed `claude agents`: pressing ← again at a natural pace to go back to the agent list no longer gets ignored until you pause for over a second\n- Fixed `claude agents` session delete getting stuck when a worktree can't be removed: the message names the cause and next step, and for a git worktree ctrl+x again deletes the directory anyway\n- Fixed background agent and workflow rows in the agents panel expanding to many lines when their text contained line breaks\n- Fixed Claude in Slack sessions losing their Slack tools when org managed settings set an MCP allowlist\n- Fixed Claude in Chrome asking to allow the host \"https\" when a navigation URL had a scheme but a host that could not be parsed\n- Fixed the spinner wrapping onto several lines when the current task's label is long; the label and the \"Next:\" task line now stay within one terminal row\n- Fixed the `/bug` and `/feedback` description field showing no cursor when the terminal's native cursor is enabled\n- Fixed Remote Control sessions served by `claude remote-control` showing a generated name instead of their session title in `ListAgents`\n- Fixed `claude plugin validate` rejecting plugin paths whose directory name begins with two dots, which the plugin loader accepts\n- Fixed plugins silently skipping a default monitors file or root SKILL.md that could not be checked\n- Fixed WebFetch's error for localhost and other dotless hostnames to explain why the URL is refused and suggest curl\n- Fixed PermissionRequest hooks not firing in `--print` mode\n- Fixed policy-helper warnings not printing on headless (`-p`) runs\n- Fixed `/resume` listing a `/fork` background session under its parent's name instead of its own `⑂` fork name\n- Fixed `/remote-control` and other claude.ai-gated commands to suggest `/login` when signed out instead of showing a Claude for Enterprise migration message\n- Fixed `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` not extending SessionEnd hooks that have no per-hook `timeout` (they were still cancelled after 1.5 seconds)\n- Fixed `/autofix-pr` and other cloud-session commands saying to retry or install the Claude GitHub App when no GitHub account is connected; they now point to `/web-setup` or the web connect page\n- Fixed cloud-session commands such as `/teleport` and `/remote-env` to explain when an organization policy turns them off, instead of answering \"Unknown command\"\n- Fixed Bash sandbox instructions over-stating confinement: no unenforced path lists when filesystem isolation is off, and strict mode no longer claims commands can never run unsandboxed\n- Improved fullscreen mode: adding or removing a prompt line (Shift+Enter) now repaints as fast as typing a character instead of re-rendering the visible transcript\n- Improved `--continue` / `--resume`: the conversation appears immediately instead of waiting for SessionStart hooks, and the first message no longer re-reads the whole transcript\n- Improved responsiveness during tool-heavy turns by no longer redrawing the transcript for a hidden per-tool-batch reminder\n- Improved startup time in projects with `.claude/workflows/` scripts: listing them no longer parses each script\n- Improved auto mode denials: the message Claude receives now names the rule that blocked the action and asks Claude to try a safer method and finish unrelated work before stopping to ask you\n- Improved Claude in Chrome: long page reads now stay inline instead of being saved to a file and read back\n- Improved the MEMORY.md truncation warning to say how many lines were cut and where the cut starts\n- Improved the terminal permission prompt for artifacts: it now leads with the ask's question\n- Improved the prompt footer: an editor or `/diff` selection now shows inside the prompt input, and fullscreen mode shows Remote Control status in the header instead of the footer\n- Improved the \"Usage credits required for 1M context\" message to say that usage credits turned on mid-session take effect after restarting Claude Code\n- Improved `/plugin`: installing, enabling or disabling a plugin now takes effect when you close the menu; `/reload-plugins` is no longer needed afterwards\n- Changed the system prompt on Bedrock, Vertex and Foundry to deliver environment, model and settings details as attachments, matching first-party sessions\n- Changed Bedrock, Vertex and Foundry sessions to keep the tool list byte-stable across a conversation (late-connecting tools load deferred instead of rewriting it), matching first-party sessions\n- Changed the task-tracking tools (TaskCreate/Get/Update/List, TodoWrite) to be offered only on Claude 3.x, Opus 4.0–4.7, Sonnet 4.0–4.6, Haiku 4.5; set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` elsewhere\n- Changed the artifact data-edit permission prompt in the terminal to a card that shows the document count and who can open the artifact\n- Changed local Cowork sessions set to skip all approvals: the Artifact tool now refuses a local file outside the session's folders, or behind a symlink, instead of reading it without asking\n- Changed plain `WebFetch` deny and ask rules to no longer apply to Artifact tool reads and updates; use an `Artifact` rule (or `WebFetch(domain:claude.ai)`) to block or gate them\n- Changed the \"N MCP servers need authentication\" startup notice to announce each server once instead of at every launch\n- [VSCode] Fixed the session list, settings toggles, and chat tabs when `CLAUDE_CONFIG_DIR` is set in a settings file or the `environmentVariables` setting\n- [VSCode] Fixed the model pill, model picker and command menu going blank in open tabs for a few seconds after a login, logout or account switch\n- [VSCode] Fixed Auto disappearing from the mode picker in new-tab or just-reloaded conversations when a project or local setting overrides the model named in `~/.claude/settings.json`\n- [VSCode] Fixed session names reverting to the last prompt after a window reload when a SessionStart hook is configured\n- [VSCode] Fixed the footer's model pill and Remote Control pill waiting for the new tab's Claude process to start when another tab in the window is already up\n- [VSCode] Fixed a second Claude process running through its full startup when a session tab's launch arrived more than half a second after its config read\n- [VSCode] Fixed resuming a session from the session list ignoring `claudeCode.preferredLocation: \"sidebar\"` (it always opened a panel), and programmatic opens resetting that setting to \"panel\"\n- [VSCode] Fixed Windows issues: the WSL install prompt no longer appears on machines without WSL installed, and IDE diagnostics are now returned correctly for Windows files when WSL is installed\n- [VSCode] Fixed the custom style builder saving a User level style in a folder the CLI does not read when `CLAUDE_CONFIG_DIR` is set through settings\n- [VSCode] Added Left and Right arrow keys to change where an always-allow permission rule is saved, for keyboard and screen reader users\n- [VSCode] Added a \"Claude Code: Focus last message\" command that moves keyboard focus to the newest message in the conversation, for keyboard and screen reader users\n- [VSCode] Changed the Manage plugins dialog to apply installs, enables, disables and uninstalls to open sessions without a restart\n- [VSCode] Changed some artifact permission prompts to omit the \"don't ask again\" choice, matching the terminal\n- [Claude Code on the web] Fixed cloud sessions running longer than about six hours silently losing files saved to persisted session folders; saves now persist for up to a day\n- [Claude Code on the web] Fixed \"Invalid effort level\" errors when a routine resumes a session, or a session starts with no set effort, in orgs where an admin caps a model's effort\n- [Claude Code on the web] Improved routine creation from a conversation: when the new routine has no connectors, Claude now says so and how to add them instead of only confirming it\n- [Claude Tag] Fixed the admin settings page hanging on a loading skeleton or going blank after a transient load failure; a section that fails to load now shows a Retry button\n- [Claude Tag] Added a link from a Slack channel's configure page back to the organization's Claude in Slack admin settings\n- [Claude Tag] Fixed a Slack Enterprise Grid channel losing its Claude settings (repository, environment, access) after a Slack admin moved it to another workspace\n- [Claude Tag] Improved how Claude explains a blocked action: it now says whether a permission check, its own decision to confirm first, or missing access stopped it\n- [Claude Tag] Improved reply speed: Claude now runs several read-only lookups (searching Slack, reading a thread, finding people) at once instead of one after another\n- [Claude Tag] Improved formatting of comparisons: sentence-length comparisons now come as lists instead of wide tables that scroll sideways, and long table cells wrap\n- [Claude Tag] Fixed `@Claude !restart` in a thread with its own session sometimes also posting a contradictory \"this thread is handled by the channel session\" notice\n- [Claude Tag] Improved the message shown when your Claude account is in a different organization than the Slack workspace: it now explains how to connect the workspace to your org\n- [Claude Tag] Fixed Markdown links whose URL is wrapped in angle brackets showing as literal bracket text in Slack instead of a clickable link\n- [Claude Tag] Fixed a workspace guest's top-level @mention in a channel where guests may use Claude sometimes getting a \"your Slack account isn't connected\" reply instead of an answer\n- [Claude Tag] Fixed a channel's long-running session being replaced with a fresh one mid-conversation; the scheduled refresh now waits until the channel and its threads are quiet\n- [Claude Tag] Fixed channel-settings cards clicked more than once telling the proposing session the change was refused after it had already applied; the outcome is now sent once\n- [Claude Tag] Changed memory in public channels: each channel now keeps its own notes, and Claude no longer recalls notes it saved in other public channels; workspace notes stay shared\n- [Code Review] Added a note under the still-open findings list in follow-up reviews: resolving a finding's thread, not just replying to it, stops later reviews from counting it as open\n- [Code Review] Fixed reviews sometimes ending as incomplete when one of the agents verifying a finding failed midway; the review now replaces that agent and reaches a verdict\n- [Code Review] Fixed a push-triggered review that was queued behind a running review still posting after the pull request had been converted to draft\n- [Code Review] Fixed reviews ignoring a directory's CLAUDE.md conventions when the PR edited a root file (e.g. README.md) that only shares a name with a file that CLAUDE.md lists"
+  },
+  "summary": {
+    "changes": 35,
+    "categories": {
+      "cli": 3,
+      "config": 13,
+      "hooks": 3,
+      "network": 1,
+      "prompt": 12,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 13,
+      "notable": 22
+    },
+    "undocumented": 15
+  },
+  "changes": [
+    {
+      "id": "prompt.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Injected context changed (+457 −207 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,9 +1,19 @@\n <system-reminder>\n As you answer the user's questions, you can use the following context:\n-# currentDate\n-Today's date is <date>.\n+# gitStatus\n+This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n-      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n-</system-reminder>\n+Current branch: main\n \n+Main branch (you will usually use this for PRs): main\n \n+Git user: Terma Live\n+\n+Status:\n+(clean)\n+\n+Recent commits:\n+<commit> init\n+\n+IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n+</system-reminder>\n",
+      "stats": {
+        "added_chars": 457,
+        "removed_chars": 207
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.context.1.cache",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "cache"
+      ],
+      "title": "Injected context removed",
+      "impact": "notable",
+      "before": {
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.context.1.role",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "role"
+      ],
+      "title": "Injected context changed",
+      "impact": "notable",
+      "before": "system",
+      "after": "user",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Injected context changed (+353 −7046 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,51 +1,8 @@\n-Available agent types for the Agent tool:\n-- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n-- Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps.\n-It reads excerpts rather than whole files, so it locates code; it doesn't review or audit it.\n-Specify search breadth: \"medium\" for moderate exploration, \"very thorough\" for multiple locations and naming conventions.\n-(Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n-- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks.\n-When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.\n-(Tools: *)\n-- Plan: Software architect agent for designing implementation plans.\n-Use this when you need to plan the implementation strategy for a task.\n-Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.\n-(Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n-- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n-\n-The following skills are available for use with the Skill tool:\n-\n-- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n-Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard.\n-When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments.\n-Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own.\n-Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules.\n-A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's.\n-Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n-- update-config: Use this skill to configure the Claude Code harness via settings.json.\n-Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them.\n-Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files.\n-Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\".\n-For simple settings like theme/model, suggest the /config command.\n-- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n-- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last.\n-Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.\n-- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n-- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n-- loop: Run a prompt or slash command on a recurring interval (e.g.\n-/loop 5m /foo).\n-Omit the interval to let the model self-pace.\n-- When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g.\n-\"check the deploy every 5 minutes\", \"keep running /babysit-prs\").\n-Do NOT invoke for one-off tasks.\n-- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\n-TRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\n-SKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n-- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n-- run: Launch and drive this project's app to see a change working.\n-Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n-First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n-- init: Initialize a new CLAUDE.md file with codebase documentation\n-- security-review: Complete a security review of the pending changes on the current branch\n+<system-reminder>\n+Attribution for git commits and pull requests you create from here on (this replaces any earlier attribution guidance):\n+- End git commit messages with:\n+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n+- End pull request descriptions with:\n+🤖 Generated with [Claude Code](https://claude.com/claude-code)\n+</system-reminder>\n \n-<total_tokens>15000000 tokens left</total_tokens>\n",
+      "stats": {
+        "added_chars": 353,
+        "removed_chars": 7046
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.context.2",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "context",
+        "2"
+      ],
+      "title": "Injected context block added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "cache": {
+          "ttl": "5m",
+          "type": "ephemeral"
+        },
+        "chars": 7462,
+        "role": "system",
+        "sha256": "f267c9ca9c5008846c306c37295162a1208c09ba3216a31009d25c1656c59bc0",
+        "text": "# Environment\nYou have been invoked in the following environment: \n - Primary working directory: <repo>\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin <os-release>\n\nYou are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m]. Assistant knowledge cutoff is May 2026.\n\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps. It reads excerpts rather than whole files, so it locates code; it doesn't review or audit it. Specify search breadth: \"medium\" for moderate exploration, \"very thorough\" for multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nThe following skills are available for use with the Skill tool:\n\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n\n<total_tokens>15000000 tokens left</total_tokens>\n\nToday's date is <date>."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+457 −207 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,9 +1,19 @@\n <system-reminder>\n As you answer the user's questions, you can use the following context:\n-# currentDate\n-Today's date is <date>.\n+# gitStatus\n+This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n \n-      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n-</system-reminder>\n+Current branch: main\n \n+Main branch (you will usually use this for PRs): main\n \n+Git user: Terma Live\n+\n+Status:\n+(clean)\n+\n+Recent commits:\n+<commit> init\n+\n+IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n+</system-reminder>\n",
+      "stats": {
+        "added_chars": 457,
+        "removed_chars": 207
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.context.1.cache",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "cache"
+      ],
+      "title": "Interactive session's injected context removed",
+      "impact": "notable",
+      "before": {
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.context.1.role",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "role"
+      ],
+      "title": "Interactive session's injected context changed",
+      "impact": "notable",
+      "before": "system",
+      "after": "user",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.context.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+353 −8268 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,56 +1,8 @@\n-Available agent types for the Agent tool:\n-- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n-- claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI, early-access enablement) and the `/skill-doctor` report.\n-**IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.\n-(Tools: Bash, Read, WebFetch, WebSearch)\n-- Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps.\n-It reads excerpts rather than whole files, so it locates code; it doesn't review or audit it.\n-Specify search breadth: \"medium\" for moderate exploration, \"very thorough\" for multiple locations and naming conventions.\n-(Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n-- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks.\n-When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.\n-(Tools: *)\n-- Plan: Software architect agent for designing implementation plans.\n-Use this when you need to plan the implementation strategy for a task.\n-Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.\n-(Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n-- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n-\n-When you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n-\n-The following skills are available for use with the Skill tool:\n-\n-- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack.\n-Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard.\n-When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments.\n-Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own.\n-Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules.\n-A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's.\n-Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n-- update-config: Use this skill to configure the Claude Code harness via settings.json.\n-Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them.\n-Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files.\n-Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\".\n-For simple settings like theme/model, suggest the /config command.\n-- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n-- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last.\n-Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.\n-- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n-- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n-- loop: Run a prompt or slash command on a recurring interval (e.g.\n-/loop 5m /foo).\n-Omit the interval to let the model self-pace.\n-- When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g.\n-\"check the deploy every 5 minutes\", \"keep running /babysit-prs\").\n-Do NOT invoke for one-off tasks.\n-- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\n-TRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\n-SKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n-- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n-- run: Launch and drive this project's app to see a change working.\n-Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n-First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n-- init: Initialize a new CLAUDE.md file with codebase documentation\n-- security-review: Complete a security review of the pending changes on the current branch\n+<system-reminder>\n+Attribution for git commits and pull requests you create from here on (this replaces any earlier attribution guidance):\n+- End git commit messages with:\n+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n+- End pull request descriptions with:\n+🤖 Generated with [Claude Code](https://claude.com/claude-code)\n+</system-reminder>\n \n-<total_tokens>15000000 tokens left</total_tokens>\n",
+      "stats": {
+        "added_chars": 353,
+        "removed_chars": 8268
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.context.2",
+      "category": "prompt",
+      "op": "added",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "2"
+      ],
+      "title": "Interactive session's injected context added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "cache": {
+          "ttl": "5m",
+          "type": "ephemeral"
+        },
+        "chars": 8689,
+        "role": "system",
+        "sha256": "0bf33f4db223ee284918e968cf1c561f0d5b90397f4b26b55276a9597827b6b4",
+        "text": "# Environment\nYou have been invoked in the following environment: \n - Primary working directory: <repo>\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin <os-release>\n\nYou are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m]. Assistant knowledge cutoff is May 2026.\n\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- claude-code-guide: Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI, early-access enablement) and the `/skill-doctor` report. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage. (Tools: Bash, Read, WebFetch, WebSearch)\n- Explore: Read-only search agent for broad fan-out searches — when answering means sweeping many files, directories, or naming conventions and you only need the conclusion, not the file dumps. It reads excerpts rather than whole files, so it locates code; it doesn't review or audit it. Specify search breadth: \"medium\" for moderate exploration, \"very thorough\" for multiple locations and naming conventions. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- Plan: Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs. (Tools: All tools except Agent, Artifact, ArtifactComments, ArtifactData, ArtifactCheck, ExitPlanMode, Edit, Write, NotebookEdit)\n- statusline-setup: Use this agent to configure the user's Claude Code status line setting. (Tools: Read, Edit)\n\nWhen you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently.\n\nThe following skills are available for use with the Skill tool:\n\n- dataviz: Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".\n- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.\n- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: \"rebind ctrl+s\", \"add a chord shortcut\", \"change the submit key\", \"customize keybindings\".\n- code-review: Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.\n- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.\n- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\n- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace. - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. \"check the deploy every 5 minutes\", \"keep running /babysit-prs\"). Do NOT invoke for one-off tasks.\n- claude-api: Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).\n- workflow-authoring: Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\n- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n- init: Initialize a new CLAUDE.md file with codebase documentation\n- security-review: Complete a security review of the pending changes on the current branch\n\n<total_tokens>15000000 tokens left</total_tokens>\n\nToday's date is <date>."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+0 −615 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -58,14 +58,6 @@\n If one names a file, function, or flag, verify it still exists before recommending it.\n \n # Environment\n-You have been invoked in the following environment: \n- - Primary working directory: <repo>\n- - Is a git repository: true\n- - Platform: darwin\n- - Shell: zsh\n- - OS Version: Darwin <os-release>\n- - You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n- - Assistant knowledge cutoff is May 2026.\n  - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5: 'claude-opus-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n  - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8.\n@@ -110,17 +102,3 @@\n Do not use the Agent tool, workflows, or deep-research unless the user, a CLAUDE.md file, or a skill asks for it\n \n <total_tokens>15000000 tokens left</total_tokens>\n-\n-gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n-\n-Current branch: main\n-\n-Main branch (you will usually use this for PRs): main\n-\n-Git user: Terma Live\n-\n-Status:\n-(clean)\n-\n-Recent commits:\n-<commit> init\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 615
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+0 −615 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -57,14 +57,6 @@\n If one names a file, function, or flag, verify it still exists before recommending it.\n \n # Environment\n-You have been invoked in the following environment: \n- - Primary working directory: <repo>\n- - Is a git repository: true\n- - Platform: darwin\n- - Shell: zsh\n- - OS Version: Darwin <os-release>\n- - You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].\n- - Assistant knowledge cutoff is May 2026.\n  - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5: 'claude-opus-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n  - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast and is available on Opus 5/4.8.\n@@ -109,17 +101,3 @@\n Do not use the Agent tool, workflows, or deep-research unless the user, a CLAUDE.md file, or a skill asks for it\n \n <total_tokens>15000000 tokens left</total_tokens>\n-\n-gitStatus: This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\n-\n-Current branch: main\n-\n-Main branch (you will usually use this for PRs): main\n-\n-Git user: Terma Live\n-\n-Status:\n-(clean)\n-\n-Recent commits:\n-<commit> init\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 615
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Bash.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Bash",
+        "description"
+      ],
+      "title": "Bash tool description changed (+132 −183 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,7 +11,4 @@\n - Interactive flags (`-i`, e.g. `git rebase -i`, `git add -i`) are not supported in this environment.\n - Use the `gh` CLI for GitHub operations (PRs, issues, API).\n - Commit or push only when the user asks. If on the default branch, branch first.\n-- End git commit messages with:\n-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n-- End PR bodies with:\n-🤖 Generated with [Claude Code](https://claude.com/claude-code)\n+- End git commit messages and PR bodies with the attribution lines given in the conversation's system-reminder, when one is present.\n",
+      "stats": {
+        "added_chars": 132,
+        "removed_chars": 183
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.Read.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Read",
+        "description"
+      ],
+      "title": "Read tool description changed (+117 −165 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -2,7 +2,7 @@\n \n - `file_path` must be an absolute path.\n - Reads up to 2000 lines by default.\n-- You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters\n+- When you already know which part of the file you need, only read that part. This can be important for larger files.\n - Results are returned using cat -n format, with line numbers starting at 1\n - Reads images (PNG, JPG, …) and presents them visually. Reads PDFs via the `pages` parameter (e.g. \"1-5\", max 20 pages/request; required for PDFs over 10 pages). Reads Jupyter notebooks (.ipynb) as cells with outputs.\n - Reading a directory, a missing file, or an empty file returns an error or system reminder rather than content.\n",
+      "stats": {
+        "added_chars": 117,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "tools.WebFetch.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "WebFetch",
+        "description"
+      ],
+      "title": "WebFetch tool description changed (+94 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,6 @@\n Fetches a URL, converts the page to markdown, and answers `prompt` against it using a small fast model.\n \n - Fails on authenticated/private URLs — use an authenticated MCP tool or `gh` for those instead.\n+- Fails on localhost and other hostnames without a dot; for a local server, use curl via Bash.\n - HTTP is upgraded to HTTPS. Cross-host redirects are returned to you rather than followed; call again with the redirect URL.\n - Responses are cached for 15 minutes per URL.\n",
+      "stats": {
+        "added_chars": 94,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostModelSwitch.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "PostModelSwitch hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.exit_2",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "exit_2"
+      ],
+      "title": "UserPromptSubmit hook control (exit_2): blocks the prompt; message not shown to the model → does not block the prompt; message not shown to the model",
+      "impact": "notable",
+      "before": "blocks the prompt; message not shown to the model",
+      "after": "does not block the prompt; message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.json_decision",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "json_decision"
+      ],
+      "title": "UserPromptSubmit hook control (json_decision): blocks the prompt; message not shown to the model → does not block the prompt; message not shown to the model",
+      "impact": "notable",
+      "before": "blocks the prompt; message not shown to the model",
+      "after": "does not block the prompt; message not shown to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude rm.usage.Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>] [--force-remove-worktree <worktree-id>]",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude rm",
+        "usage",
+        "Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>] [--force-remove-worktree <worktree-id>]"
+      ],
+      "title": "Usage of `claude rm` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>] [--force-remove-worktree <worktree-id>]",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude rm.usage.Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>]",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "claude rm",
+        "usage",
+        "Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>]"
+      ],
+      "title": "Usage of `claude rm` removed",
+      "impact": "notable",
+      "before": "Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>]",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.rm --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "rm --help"
+      ],
+      "title": "Full help text of `rm --help` changed (+459 −65 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,6 @@\n-Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>]\n+Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>] [--force-remove-worktree <worktree-id>]\n \n   Delete a background session and its worktree. Unlike `stop`, works on already-exited sessions.\n   --discard-unpushed <commit>@<worktree-id>  also discard the worktree's unpushed commits (and any uncommitted changes) while it is still the same worktree at that commit — pass the value a previous 'claude rm <id>' reported\n+  --force-remove-worktree <worktree-id>      delete the worktree directory even though the WorktreeRemove hook or git couldn't remove it (its repository must list it as a worktree, or have dropped it in a removal that couldn't delete it; no uncommitted changes to tracked files; the branch is kept) — pass the value a previous 'claude rm <id>' reported\n \n",
+      "stats": {
+        "added_chars": 459,
+        "removed_chars": 65
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.appendPlugins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "appendPlugins"
+      ],
+      "title": "New setting: appendPlugins",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Managed plugins (plugin@marketplace ids that managed enabledPlugins sets true) whose hooks run last among plugins, innermost, in the listed order: the last id listed sits just above the built-in plugins and sees each event as every other plugin left it. Only honored from managed settings (or, on a machine with none, from user settings for your own plugins); ignored in project, local and --settings sources.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.gatewayInternalNetworks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "gatewayInternalNetworks"
+      ],
+      "title": "New setting: gatewayInternalNetworks",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "IPv4 CIDR blocks (at most 4, each /8 to /32, not overlapping) your Cloud gateway sits in: the public block your organization numbers its internal network from, which lets /login reach a gateway there. A block must lie entirely outside private space, where /login accepts a gateway without this key. /login accepts a gateway inside a listed block over a direct connection only, and only when this machine's own address on that connection is inside the same block, so /login must happen from a machine whose own address is inside the block (not through a proxy, VPN pool, container or NAT segment outside it). A bar against copied settings files, not proof of location. Honored only from admin-controlled managed settings (MDM / managed-settings.json / policy helper); ignored in user, project, and remote-delivered settings.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.prependPlugins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "prependPlugins"
+      ],
+      "title": "New setting: prependPlugins",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Managed plugins (plugin@marketplace ids that managed enabledPlugins sets true) whose hooks run first, outermost, in the listed order: the first id listed sees every event before any other plugin and every result after it. Managed plugins not listed here or in appendPlugins follow the listed ones; user, project and marketplace plugins come after those; then appendPlugins; then the built-in plugins. The bundled sec-default@builtin seats itself outermost (on a machine with managed settings and for Team and Enterprise organizations) unless this list is set, in which case list sec-default@builtin where it should sit or leave it out. Any other id that is not an enabled managed plugin is skipped; an id listed in both keys is prepended. Only honored from managed settings (or, on a machine with none, from user settings for your own plugins); ignored in project, local and --settings sources.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.secDefault",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "secDefault"
+      ],
+      "title": "Setting no longer read: secDefault",
+      "impact": "notable",
+      "before": {
+        "description": "@internal Whether the bundled sec-default plugin holds the outermost seat of the hooks-module chain, ahead of prependPlugins: it keeps the organization's classic (settings) hooks, prompt content, managed settings and tool policy out of reach of the plugins a person installs. Seated by default, wherever hooks modules can load, on a machine with managed settings and for a Team or Enterprise organization; false unseats it. Only honored from managed settings; ignored, with a warning, in user, project, local and --settings sources.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CHROME_PAIRED_DEVICE_ID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CHROME_PAIRED_DEVICE_ID"
+      ],
+      "title": "New environment variable: CLAUDE_CHROME_PAIRED_DEVICE_ID",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CHROME_PAIRED_DEVICE_ID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ATTRIBUTION_ANNOUNCEMENT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ATTRIBUTION_ANNOUNCEMENT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ATTRIBUTION_ANNOUNCEMENT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ATTRIBUTION_ANNOUNCEMENT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_QUESTION_OPTIONAL_DESCRIPTIONS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_QUESTION_OPTIONAL_DESCRIPTIONS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_QUESTION_OPTIONAL_DESCRIPTIONS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_QUESTION_OPTIONAL_DESCRIPTIONS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RESUME_REASON",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RESUME_REASON"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RESUME_REASON",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RESUME_REASON",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SYNC_REUSE_WITHIN_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SYNC_REUSE_WITHIN_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SYNC_REUSE_WITHIN_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SYNC_REUSE_WITHIN_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WEBFETCH_DEADLINE_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WEBFETCH_DEADLINE_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WEBFETCH_DEADLINE_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WEBFETCH_DEADLINE_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
+      ],
+      "title": "New environment variable: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+      "impact": "informational",
+      "before": null,
+      "after": "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_REMOVE_SESSION_STATE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_REMOVE_SESSION_STATE"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_REMOVE_SESSION_STATE",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_REMOVE_SESSION_STATE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CARVED_SLATE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CARVED_SLATE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_CARVED_SLATE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_CARVED_SLATE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "network.egress.POST api.anthropic.com/api/event_logging/v2/batch",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "egress",
+        "POST api.anthropic.com/api/event_logging/v2/batch"
+      ],
+      "title": "Network request no longer made: POST api.anthropic.com/api/event_logging/v2/batch",
+      "impact": "notable",
+      "before": {
+        "body_keys": [
+          "events"
+        ],
+        "host": "api.anthropic.com",
+        "method": "POST",
+        "path": "/api/event_logging/v2/batch",
+        "when": "before"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

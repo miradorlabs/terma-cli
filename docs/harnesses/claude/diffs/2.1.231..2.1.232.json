@@ -1,0 +1,403 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.231",
+  "to": "2.1.232",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Subagent forking is now on by default: a `subagent_type: \"fork\"` subagent inherits the full conversation and prompt cache, and non-teammate agent spawns in interactive sessions now run in the background by default\n- Type `@` in the prompt to mention another Claude session by name; Claude then uses `SendMessage` to reach that session directly\n- `SendMessage` now delivers to a bare name that exactly matches one live session, instead of asking to confirm with a ref first\n- Interactive sessions on one machine now keep unique names: starting or renaming a session to a name another live session already uses gives it a `name-word-word` variant and tells you\n- Added `/config` rows for \"Dialog expiry\" and \"Messages from your other sessions\" (cross-session inbound accept/hold/refuse)\n- Added secret redaction for GitLab token families (`glrt-`, `gloas-`, `glptt-`, `glagent-`, `glimt-`, `glsoat-`, `glcbt-`, `glft-`, `glffct-`) and full redaction of routable `glpat-`/`gldt-` tokens; the `glab` CLI config store gets the same sandbox and credential-path protection as `gh`\n- Added GitLab support to plugin marketplaces: bare `gitlab.com` repo URLs (including nested subgroups) now clone like `github.com` URLs, and clone auth-failure hints name your actual git host\n- Settings: `additionalMarketplaces` and `allowedMarketplaces` are now accepted as friendlier aliases for `extraKnownMarketplaces` and `strictKnownMarketplaces`\n- Enterprise policy: a url-typed `blockedMarketplaces` entry for a bare repo URL keeps blocking that URL when the CLI classifies it as a git clone\n- Gateway: the `desktop:` overlay now accepts every released Desktop setting (was 11 hand-listed keys), validated at boot against Desktop's own schema; unknown or invalid keys fail boot\n- Gateway: empty `managed.policies[].match.groups`/`admin.admin_groups` entries and malformed `email_domain` values (empty, or containing `@`, whitespace, or commas) now fail at boot instead of silently matching no one or granting admin access\n- Fable 5 is offered as an advisor in `/advisor` again for organizations with Fable access, with usage-credits consent set up through `/model fable`\n- Fixed a PowerShell permission bypass where variable-writing parameters could silently overwrite `$PSDefaultParameterValues` and redirect later commands' file access\n- Fixed a Windows permission bypass where Git Bash followed Cygwin-style symlinks that path validation saw as regular files; writes through them now require permission approval\n- Fixed nested git repositories inheriting trust from a parent directory; each repository now requires its own trust confirmation\n- Fixed MCP connections hanging for the full 30-second connect timeout when a server fails to answer or sends a malformed reply to the protocol-version probe\n- Fixed Remote Control sessions hosted by a bridge inside a cloud session inheriting that session's transcript or credentials\n- Fixed Remote Control sessions started from Claude Desktop or an IDE appearing as a new claude.ai session each time the local session was resumed; they now reattach to the existing one\n- Fixed Remote Control sessions appearing unreachable to newly attached clients while idle\n- Fixed Remote Control bridge sessions not restoring conversation history when the session worker restarts\n- Remote Control: resuming a conversation whose session was deleted from claude.ai or the app now starts a replacement instead of failing with a message about your login (regressed in v2.1.227)\n- Fixed Cloud gateway `/login` exiting silently or leaving an unresponsive terminal after \"Press Enter to continue\" when managed settings failed to load; the reason is now shown\n- Fixed voice mode on native builds getting stuck on \"listening…\" when the voice service rejected the connection; the rejection is now shown immediately\n- Fixed mTLS client certificate rotation requiring a restart; Claude Code now reloads the rotated cert and key automatically on connection errors\n- Fixed malformed AWS or Vertex region values being used to build request URLs; they now fall back to the default region\n- Fixed stream idle timeout errors failing the request instead of recovering on Bedrock, Vertex, and gateway deployments\n- Fixed content-sized overlays containing truncated text rendering one column too wide, and start-truncated text collapsing to an ellipsis\n- Fixed a stray garbled character where a long shell-command or agent-description preview was cut off mid-emoji\n- Fixed a startup race that could silently unregister a plugin marketplace due to concurrent writes to `known_marketplaces.json`\n- Fixed `/update` and `/tui` refusing to restart while work that survives the relaunch was running\n- Fixed usage-limit guidance suggesting unavailable slash commands in SDK and remote sessions\n- Fixed the consent message for interactive `--advisor fable` launches, which told you to run `/model fable` in an interactive session that had just exited\n- Improved fullscreen streaming: long sessions stay responsive because the whole conversation is no longer re-normalized on every update\n- Improved the managed settings approval dialog: shows endpoint URLs, uses clearer wording for telemetry-only changes, skips routine OpenTelemetry options, and requires approval for server-managed sandbox binary overrides (`sandbox.bwrapPath`, `sandbox.socatPath`, `sandbox.ripgrep`)\n- `/feedback` and `/bug` now open immediately when invoked while Claude is responding, instead of waiting for the turn to finish\n- `/plugin install plugin@marketplace` now refreshes the marketplace first, so newly published plugins install without a manual marketplace update\n- `/code-review` at high, xhigh, and max effort now runs in a background agent like the other levels\n- Pasted and clipboard images are read without blocking the event loop\n- Remote Control now keeps reconnecting for about 30 minutes after a network blip and no longer drops after a few blips spread across an hour\n- Remote Control: resuming a conversation no longer silently takes Remote Control away from another Claude Code on the same machine that still has it; run `/remote-control` there to move it\n- Updated agent panel: completed subagents hide immediately with a `/tasks` footer hint, and the \"↓ N more\" overflow indicator moved left for visibility\n- Remote Control: the terminal now says whether a session was taken over by another device, ended from another app, or deleted, and stops suggesting a reconnect that would undo it\n- Bash input redirections (`< file`) are now permission-checked like their argument spellings on all platforms\n- Shortened the message shown when resuming a completed background agent\n- Cowork sessions no longer inline external @-imports from user-scope memory files\n- Hardened the auto-generated cross-session messaging socket directory on shared `/tmp`: a pre-planted symlink or another user's directory is now refused instead of used\n- Hardened the Linux filesystem sandbox against a protected-path bypass\n- Changed `sandbox.ripgrep` to be honored only from user, managed, and `--settings` settings; project settings can no longer override the sandbox's ripgrep binary\n- Removed the startup tip suggesting you create custom subagents, and the matching nudge in the `/powerup` tour"
+  },
+  "summary": {
+    "changes": 20,
+    "categories": {
+      "config": 20
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 19,
+      "notable": 1
+    },
+    "undocumented": 16
+  },
+  "changes": [
+    {
+      "id": "config.options.additionalMarketplaces",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces"
+      ],
+      "title": "New setting: additionalMarketplaces",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.allowedMarketplaces",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "allowedMarketplaces"
+      ],
+      "title": "New setting: allowedMarketplaces",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.policyHelpers.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "policyHelpers",
+        "description"
+      ],
+      "title": "policyHelpers description changed (+890 −283 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Per-OS variant of policyHelper, keyed by platform: macos, linux, windows, wsl. The entry for the current platform wins over policyHelper; a platform with no entry falls back to policyHelper (wsl falls back to the linux entry first). Honored only from admin-controlled policy sources.\n+@internal Per-OS variant of policyHelper, keyed by platform: macos, linux, windows, wsl, plus an optional \"default\" entry that is a STATIC settings payload (a JSON object of managed settings, not a helper).\n+Each per-OS entry carries a helper (\"path\", with timeoutMs/refreshIntervalMs), its own static \"defaultSettings\" payload, or both; an entry may be payload-only.\n+Selection for a platform walks its chain (the platform's own entry; on wsl the linux entry next): the first helper on the chain wins over policyHelper; if no helper is configured — or the selected helper fails at startup or refresh — the first payload applies (the chain's \"defaultSettings\" in platform-specific-first order, then the top-level \"default\", applied with no process spawned; unrecognized platforms reach only \"default\"); with no payload either, policyHelper.\n+Honored only from admin-controlled policy sources.\n",
+      "stats": {
+        "added_chars": 890,
+        "removed_chars": 283
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.ripgrep.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.ripgrep",
+        "description"
+      ],
+      "title": "sandbox.ripgrep description changed (+0 −56 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Custom ripgrep configuration for bundled ripgrep support\n+\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 56
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.strictPluginOnlyCustomization.enum./",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "strictPluginOnlyCustomization",
+        "enum",
+        "/"
+      ],
+      "title": "Setting strictPluginOnlyCustomization gained value /",
+      "impact": "informational",
+      "before": null,
+      "after": "/",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_API_HOST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_API_HOST"
+      ],
+      "title": "New environment variable: ANTHROPIC_API_HOST",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_API_HOST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_ASSETS_HOST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_ASSETS_HOST"
+      ],
+      "title": "New environment variable: ANTHROPIC_ASSETS_HOST",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_ASSETS_HOST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_TELEMETRY_GROUP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_TELEMETRY_GROUP"
+      ],
+      "title": "New environment variable: ANTHROPIC_TELEMETRY_GROUP",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_TELEMETRY_GROUP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_TIER_NAMES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_TIER_NAMES"
+      ],
+      "title": "New environment variable: ANTHROPIC_TIER_NAMES",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_TIER_NAMES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BundleV2",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "BundleV2"
+      ],
+      "title": "New environment variable: BundleV2",
+      "impact": "informational",
+      "before": null,
+      "after": "BundleV2",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_AI_IMPORT_SHAPE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_AI_IMPORT_SHAPE"
+      ],
+      "title": "New environment variable: CLAUDE_AI_IMPORT_SHAPE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_AI_IMPORT_SHAPE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_COMMENT_FAST_ACK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_COMMENT_FAST_ACK"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_COMMENT_FAST_ACK",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_COMMENT_FAST_ACK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_MTLS_RELOAD_ON_STALE_CONNECTION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_MTLS_RELOAD_ON_STALE_CONNECTION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_MTLS_RELOAD_ON_STALE_CONNECTION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_MTLS_RELOAD_ON_STALE_CONNECTION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HARBOR_KITE_CLOUD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HARBOR_KITE_CLOUD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HARBOR_KITE_CLOUD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HARBOR_KITE_CLOUD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WEB_FETCH_AGENT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WEB_FETCH_AGENT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WEB_FETCH_AGENT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WEB_FETCH_AGENT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_APP_SANDBOX_WILDCARD_HOST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_APP_SANDBOX_WILDCARD_HOST"
+      ],
+      "title": "New environment variable: MCP_APP_SANDBOX_WILDCARD_HOST",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_APP_SANDBOX_WILDCARD_HOST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MCP_SERVERS_GROUP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "MCP_SERVERS_GROUP"
+      ],
+      "title": "New environment variable: MCP_SERVERS_GROUP",
+      "impact": "informational",
+      "before": null,
+      "after": "MCP_SERVERS_GROUP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ParseTask",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "ParseTask"
+      ],
+      "title": "Environment variable no longer read: ParseTask",
+      "impact": "informational",
+      "before": "ParseTask",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.USE_BUILTIN_RIPGREP",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "USE_BUILTIN_RIPGREP"
+      ],
+      "title": "Environment variable no longer read: USE_BUILTIN_RIPGREP",
+      "impact": "informational",
+      "before": "USE_BUILTIN_RIPGREP",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.VOICE_STREAM_BASE_URL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "VOICE_STREAM_BASE_URL"
+      ],
+      "title": "Environment variable no longer read: VOICE_STREAM_BASE_URL",
+      "impact": "informational",
+      "before": "VOICE_STREAM_BASE_URL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

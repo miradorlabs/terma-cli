@@ -1,0 +1,2856 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "claude",
+    "name": "Claude Code",
+    "vendor": "Anthropic",
+    "homepage": "https://claude.com/claude-code",
+    "source": null,
+    "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "latest": "2.1.318",
+    "support": "supported",
+    "versions_tracked": 100,
+    "first_tracked": "2026-07-09",
+    "last_change": {
+      "from": "2.1.317",
+      "to": "2.1.318",
+      "at": "2026-11-04T16:16:16.239171Z",
+      "released_at": "2026-11-03T21:55:17.247Z",
+      "changes": 26,
+      "categories": {
+        "config": 26
+      }
+    }
+  },
+  "versions": [
+    {
+      "version": "2.1.318",
+      "released_at": "2026-11-03T21:55:17.247Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.317",
+      "changes": 26,
+      "categories": {
+        "config": 26
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 26,
+        "notable": 0
+      },
+      "undocumented": 26,
+      "highlights": [
+        "attributionProject description changed (+179 −139 chars)",
+        "attributionProjectPolicy.default description changed (+185 −145 chars)",
+        "cleanupPeriodDays description changed (+276 −198 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.317",
+      "released_at": "2026-11-02T23:57:53.069Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.316",
+      "changes": 49,
+      "categories": {
+        "config": 1,
+        "prompt": 2,
+        "telemetry": 46
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 47,
+        "notable": 2
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Interactive system prompt changed (+265 −188 chars)",
+        "System prompt changed (+265 −188 chars)",
+        "New telemetry field: anthropic.custom_base_url on logs/api_request"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.316",
+      "released_at": "2026-10-31T00:42:05.743Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.315",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.315",
+      "released_at": "2026-10-30T21:05:24.08Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.314",
+      "changes": 23,
+      "categories": {
+        "binary": 1,
+        "config": 19,
+        "hooks": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 3
+      },
+      "undocumented": null,
+      "highlights": [
+        "Interactive system prompt changed (+0 −94 chars)",
+        "System prompt changed (+0 −94 chars)",
+        "SessionEnd hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.314",
+      "released_at": "2026-10-30T00:12:56.911Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.312",
+      "changes": 18,
+      "categories": {
+        "cli": 3,
+        "config": 11,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 4
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Injected context changed (+0 −49 chars)",
+        "Interactive session's injected context changed (+0 −49 chars)",
+        "Interactive system prompt changed (+188 −49 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.312",
+      "released_at": "2026-10-27T18:36:10.16Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.311",
+      "changes": 6,
+      "categories": {
+        "config": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 0
+      },
+      "undocumented": 6,
+      "highlights": [
+        "sandbox.credentials.envVars[].name description changed (+26 −0 chars)",
+        "sandbox.credentials.files[].path description changed (+82 −212 chars)",
+        "New environment variable: CLAUDE_CODE_HOST_GUARDS_ARTIFACTS_MCP"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.311",
+      "released_at": "2026-10-26T19:47:57.395Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.310",
+      "changes": 11,
+      "categories": {
+        "binary": 1,
+        "cli": 3,
+        "config": 1,
+        "network": 2,
+        "prompt": 2,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 5
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Injected context changed (+689 −492 chars)",
+        "Interactive session's injected context changed (+689 −492 chars)",
+        "Bash tool description changed (+392 −235 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.310",
+      "released_at": "2026-10-23T21:20:46.54Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.309",
+      "changes": 12,
+      "categories": {
+        "config": 6,
+        "network": 2,
+        "prompt": 2,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 6
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Injected context changed (+7 −0 chars)",
+        "Interactive session's injected context changed (+7 −0 chars)",
+        "Bash tool description changed (+362 −279 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.309",
+      "released_at": "2026-10-22T20:34:13.713Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.308",
+      "changes": 16,
+      "categories": {
+        "cli": 4,
+        "config": 10,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 2
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Bash tool description changed (+281 −0 chars)",
+        "Usage of `claude ultrareview` removed",
+        "New flag `claude ultrareview --trust-workspace`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.308",
+      "released_at": "2026-10-22T04:19:48.902Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.307",
+      "changes": 3,
+      "categories": {
+        "config": 2,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "New environment variable: BUN_ENV",
+        "Environment variable no longer read: BUN_ENVprocess",
+        "On-disk telemetry added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.307",
+      "released_at": "2026-10-21T20:47:18.383Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.306",
+      "changes": 21,
+      "categories": {
+        "config": 19,
+        "request": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 6
+      },
+      "undocumented": 17,
+      "highlights": [
+        "Agent tool description changed (+1639 −410 chars)",
+        "Beta dropped: prompt-caching-scope-2026-01-05",
+        "Setting no longer read: command"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.306",
+      "released_at": "2026-10-21T02:28:47.495Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.305",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.305",
+      "released_at": "2026-10-20T19:29:36.816Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.304",
+      "changes": 19,
+      "categories": {
+        "config": 19
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 3
+      },
+      "undocumented": 15,
+      "highlights": [
+        "New setting: attributionProjectPolicy",
+        "Setting policyHelper.refreshIntervalMs lost value 60000",
+        "Setting policyHelper.timeoutMs lost value 1000"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.304",
+      "released_at": "2026-10-19T19:47:15.337Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.303",
+      "changes": 93,
+      "categories": {
+        "behavior": 12,
+        "cli": 9,
+        "config": 17,
+        "hooks": 24,
+        "prompt": 17,
+        "request": 1,
+        "tools": 13
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 31,
+        "notable": 62
+      },
+      "undocumented": 39,
+      "highlights": [
+        "Injected context changed (+627 −268 chars)",
+        "Interactive session's injected context changed (+652 −268 chars)",
+        "Interactive system prompt added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.303",
+      "released_at": "2026-10-18T21:15:23.178Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.302",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.302",
+      "released_at": "2026-10-16T16:48:28.057Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.301",
+      "changes": 21,
+      "categories": {
+        "binary": 2,
+        "config": 6,
+        "model": 1,
+        "prompt": 1,
+        "request": 3,
+        "support": 4,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 9,
+        "notable": 12
+      },
+      "undocumented": 13,
+      "highlights": [
+        "Model parameter safeguards removed",
+        "Injected context changed (+0 −476 chars)",
+        "Agent tool description changed (+609 −282 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.301",
+      "released_at": "2026-10-15T14:34:23.33Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "unsupported",
+      "previous": "2.1.300",
+      "changes": 8,
+      "categories": {
+        "config": 4,
+        "support": 4
+      },
+      "impact": {
+        "breaking": 4,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Terma: Prompts and tool content withheld when the project says so now fails on linux/amd64",
+        "Terma: A session resumed outside the repository stays out now fails on linux/amd64",
+        "Terma: Telemetry reaches the project through the local relay now fails on linux/amd64"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.300",
+      "released_at": "2026-10-14T14:27:26.554Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.299",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "config": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 0
+      },
+      "undocumented": 5,
+      "highlights": [
+        "`claude --restricted`: description changed (+308 −314 chars)",
+        "Full help text of `--help` changed (+966 −972 chars)",
+        "New environment variable: CLAUDE_CODE_ATTACHMENTS_BY_PATH"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.299",
+      "released_at": "2026-10-14T00:23:19.588Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.296",
+      "changes": 39,
+      "categories": {
+        "config": 35,
+        "network": 2,
+        "request": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 32,
+        "notable": 7
+      },
+      "undocumented": 32,
+      "highlights": [
+        "CronCreate tool description changed (+400 −202 chars)",
+        "Beta dropped: mid-conversation-system-2026-04-07",
+        "Setting no longer read: entries"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.296",
+      "released_at": "2026-10-09T16:58:10.924Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.295",
+      "changes": 25,
+      "categories": {
+        "config": 23,
+        "model": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 14
+      },
+      "undocumented": 20,
+      "highlights": [
+        "Built-in price for claude-sonnet-5-5 changed",
+        "Read tool parameter allow_large added",
+        "Setting no longer read: detail"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.295",
+      "released_at": "2026-10-08T18:22:58.621Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.294",
+      "changes": 31,
+      "categories": {
+        "config": 27,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 10
+      },
+      "undocumented": 25,
+      "highlights": [
+        "Injected context changed (+268 −249 chars)",
+        "Interactive session's injected context changed (+268 −249 chars)",
+        "Interactive system prompt changed (+97 −78 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.294",
+      "released_at": "2026-10-08T03:42:57.084Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "2.1.293",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.293",
+      "released_at": "2026-10-07T17:18:04.464Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.292",
+      "changes": 12,
+      "categories": {
+        "config": 6,
+        "hooks": 1,
+        "model": 3,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 5
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Model alias \"haiku\": claude-haiku-4-5-20251001 → claude-haiku-5-5",
+        "Built-in price for claude-haiku-4-5-20251001 removed",
+        "Built-in price for claude-haiku-5-5 added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.292",
+      "released_at": "2026-10-06T17:10:31.715Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.291",
+      "changes": 8,
+      "categories": {
+        "config": 5,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 3
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Agent tool parameter effort added",
+        "Bash tool description changed (+279 −280 chars)",
+        "Bash tool parameter run_in_background: description changed (+181 −182 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.291",
+      "released_at": "2026-10-06T03:32:36.856Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.290",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.290",
+      "released_at": "2026-10-05T18:12:44.907Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.289",
+      "changes": 39,
+      "categories": {
+        "cli": 8,
+        "config": 27,
+        "prompt": 2,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 33,
+        "notable": 6
+      },
+      "undocumented": 32,
+      "highlights": [
+        "Injected context changed (+841 −379 chars)",
+        "Interactive session's injected context changed (+841 −379 chars)",
+        "TaskStop tool description changed (+84 −98 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.289",
+      "released_at": "2026-10-03T20:12:02.717Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.288",
+      "changes": 6,
+      "categories": {
+        "config": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 0
+      },
+      "undocumented": 6,
+      "highlights": [
+        "enabledPlugins.<name>.serverCommand description changed (+75 −75 chars)",
+        "enabledPlugins.<name>.serverName description changed (+49 −58 chars)",
+        "enabledPlugins.<name>.serverUrl description changed (+98 −98 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.288",
+      "released_at": "2026-10-02T18:30:40.093Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.287",
+      "changes": 19,
+      "categories": {
+        "binary": 1,
+        "cli": 6,
+        "config": 9,
+        "prompt": 2,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 4
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Injected context changed (+147 −0 chars)",
+        "Interactive session's injected context changed (+147 −0 chars)",
+        "Command removed: `claude project`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.287",
+      "released_at": "2026-10-01T16:59:25.986Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.286",
+      "changes": 10,
+      "categories": {
+        "cli": 2,
+        "config": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 2
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Flag removed: `claude --client-data-url`",
+        "Setting blockedMarketplaces[].source lost value url",
+        "Full help text of `--help` changed (+0 −437 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.286",
+      "released_at": "2026-09-30T17:14:38.859Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.285",
+      "changes": 15,
+      "categories": {
+        "cli": 2,
+        "config": 10,
+        "network": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 3
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Injected context changed (+249 −0 chars)",
+        "Interactive session's injected context changed (+249 −0 chars)",
+        "New network request: POST api.anthropic.com/api/event_logging/v2/batch"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.285",
+      "released_at": "2026-09-29T17:32:09.173Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.284",
+      "changes": 54,
+      "categories": {
+        "behavior": 4,
+        "binary": 2,
+        "cli": 4,
+        "config": 28,
+        "model": 1,
+        "network": 1,
+        "prompt": 6,
+        "request": 5,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 35,
+        "notable": 19
+      },
+      "undocumented": 32,
+      "highlights": [
+        "Model parameter safeguards added",
+        "Injected context changed (+173 −147 chars)",
+        "Injected context changed (+55 −68 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.284",
+      "released_at": "2026-09-28T17:11:59.75Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.283",
+      "changes": 25,
+      "categories": {
+        "binary": 1,
+        "cli": 2,
+        "config": 14,
+        "model": 5,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 17,
+        "notable": 8
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Model alias \"opusplan\": claude-sonnet-5 → claude-sonnet-5-5",
+        "Model alias \"sonnet\": claude-sonnet-5 → claude-sonnet-5-5",
+        "Model alias \"sonnet[1m]\": claude-sonnet-5 → claude-sonnet-5-5"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.283",
+      "released_at": "2026-09-25T18:46:11.33Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.282",
+      "changes": 18,
+      "categories": {
+        "cli": 2,
+        "config": 15,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 2
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Interactive session's injected context changed (+476 −0 chars)",
+        "New setting: deniedModels",
+        "New flag `claude --client-data-url`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.282",
+      "released_at": "2026-09-24T15:56:22.706Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.281",
+      "changes": 17,
+      "categories": {
+        "config": 16,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 2
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Beta dropped: fallback-credit-2026-06-01",
+        "New setting: allowClaudeInChromeWithManagedMcp",
+        "allowManagedPermissionRulesOnly description changed (+403 −104 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.281",
+      "released_at": "2026-09-23T17:01:17.78Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.280",
+      "changes": 20,
+      "categories": {
+        "cli": 3,
+        "config": 15,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 0
+      },
+      "undocumented": 14,
+      "highlights": [
+        "PostToolUse hook payload field tool_response.originalCwdMissing added",
+        "PostToolUse hook payload field tool_response.restoredCwd added",
+        "`claude --agents`: description changed (+177 −126 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.280",
+      "released_at": "2026-09-22T15:44:39.443Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.278",
+      "changes": 37,
+      "categories": {
+        "behavior": 2,
+        "cli": 3,
+        "config": 16,
+        "model": 7,
+        "prompt": 7,
+        "request": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 18
+      },
+      "undocumented": 22,
+      "highlights": [
+        "Model alias \"opus\": claude-opus-5 → claude-opus-5-5",
+        "Model alias \"opus[1m]\": claude-opus-5 → claude-opus-5-5",
+        "Default model: claude-opus-5 → claude-opus-5-5"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.278",
+      "released_at": "2026-09-19T01:48:59.758Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.277",
+      "changes": 1,
+      "categories": {
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "On-disk telemetry removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.277",
+      "released_at": "2026-09-18T16:22:26.548Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.276",
+      "changes": 14,
+      "categories": {
+        "behavior": 1,
+        "config": 8,
+        "hooks": 2,
+        "prompt": 1,
+        "storage": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 6
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Interactive system prompt removed",
+        "Tool removed: TaskOutput",
+        "Behaviour: compaction_command tools changed: 24 → 23"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.276",
+      "released_at": "2026-09-18T01:39:31.986Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.275",
+      "changes": 2,
+      "categories": {
+        "behavior": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 2
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Behaviour: compaction_command tools changed: 25 → 24",
+        "Behaviour: subagents tools advisor removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.275",
+      "released_at": "2026-09-17T20:20:31.805Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.274",
+      "changes": 16,
+      "categories": {
+        "behavior": 2,
+        "config": 13,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 4
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Behaviour: compaction_command tools changed: 24 → 25",
+        "Behaviour: subagents tools advisor added",
+        "Setting policyHelper.refreshIntervalMs lost value 60000"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.274",
+      "released_at": "2026-09-16T22:36:09.883Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.273",
+      "changes": 21,
+      "categories": {
+        "cli": 1,
+        "config": 17,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 18,
+        "notable": 3
+      },
+      "undocumented": 17,
+      "highlights": [
+        "Injected context changed (+379 −332 chars)",
+        "Interactive session's injected context changed (+379 −332 chars)",
+        "SendMessage tool description changed (+324 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.273",
+      "released_at": "2026-09-15T18:06:34.098Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.272",
+      "changes": 3,
+      "categories": {
+        "config": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "New environment variable: CLAUDE_CODE_BRIDGE_CHILD_MACHINE_SETTINGS",
+        "New environment variable: CLAUDE_CODE_GATEWAY_HINT_HEADERS",
+        "New environment variable: CLAUDE_CODE_OCHRE_KITE"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.272",
+      "released_at": "2026-09-14T23:34:13.565Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.271",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.271",
+      "released_at": "2026-09-14T19:45:19.456Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.270",
+      "changes": 19,
+      "categories": {
+        "behavior": 4,
+        "caching": 1,
+        "config": 11,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 8
+      },
+      "undocumented": 13,
+      "highlights": [
+        "DesignSync tool description changed (+208 −190 chars)",
+        "SendMessage tool description changed (+728 −180 chars)",
+        "Workflow tool description changed (+275 −275 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.270",
+      "released_at": "2026-09-12T18:52:44.937Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.269",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "PostModelSwitch hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.269",
+      "released_at": "2026-09-11T18:12:49.253Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.268",
+      "changes": 56,
+      "categories": {
+        "behavior": 6,
+        "binary": 1,
+        "caching": 1,
+        "cli": 2,
+        "config": 17,
+        "hooks": 24,
+        "network": 1,
+        "prompt": 3,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 44,
+        "notable": 12
+      },
+      "undocumented": 45,
+      "highlights": [
+        "Injected context changed (+353 −119 chars)",
+        "Interactive session's injected context changed (+353 −119 chars)",
+        "Interactive session's injected context changed (+860 −885 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.268",
+      "released_at": "2026-09-10T18:41:11.77Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.267",
+      "changes": 35,
+      "categories": {
+        "cli": 3,
+        "config": 13,
+        "hooks": 3,
+        "network": 1,
+        "prompt": 12,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 22
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Injected context changed (+457 −207 chars)",
+        "Injected context removed",
+        "Injected context changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.267",
+      "released_at": "2026-09-09T18:25:42.82Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.266",
+      "changes": 15,
+      "categories": {
+        "config": 13,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 1
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Bash tool parameter description: description changed (+167 −0 chars)",
+        "PostModelSwitch hook payload field prompt_id added",
+        "New setting: maxEffortLevel"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.266",
+      "released_at": "2026-09-08T23:32:32.88Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.265",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.265",
+      "released_at": "2026-09-08T19:05:16.492Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.263",
+      "changes": 24,
+      "categories": {
+        "behavior": 2,
+        "caching": 1,
+        "cli": 8,
+        "config": 12,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 10
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Caching across_turns.stable_prefix_chars: 834 → 1255",
+        "Behaviour: compaction_command prompt changed",
+        "Behaviour: subagents system 2 text changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.263",
+      "released_at": "2026-09-06T02:07:58.391Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.261",
+      "changes": 1,
+      "categories": {
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "New environment variable: CLAUDE_CODE_POLISHED_DEWDROP"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.261",
+      "released_at": "2026-09-04T17:49:34.927Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.260",
+      "changes": 7,
+      "categories": {
+        "config": 6,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 1
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Setting keybindingFlavor deprecated",
+        "PostModelSwitch hook payload field prompt_id added",
+        "New setting: bashOutputMaxChars"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.260",
+      "released_at": "2026-09-03T22:32:02.087Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.259",
+      "changes": 5,
+      "categories": {
+        "cli": 3,
+        "config": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 1
+      },
+      "undocumented": 3,
+      "highlights": [
+        "Usage of `claude rm` removed",
+        "Usage of `claude rm` added",
+        "Full help text of `rm --help` changed (+291 −21 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.259",
+      "released_at": "2026-09-02T21:21:42.115Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.258",
+      "changes": 13,
+      "categories": {
+        "cli": 4,
+        "config": 9
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 1
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Default of `claude ultrareview --timeout`: 30 → 45",
+        "New flag `claude --permission-prompts`",
+        "Full help text of `--help` changed (+572 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.258",
+      "released_at": "2026-09-01T22:25:07.449Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.257",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "PostModelSwitch hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.257",
+      "released_at": "2026-09-01T17:15:33.223Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.252",
+      "changes": 38,
+      "categories": {
+        "cli": 3,
+        "config": 30,
+        "hooks": 1,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 32,
+        "notable": 6
+      },
+      "undocumented": 21,
+      "highlights": [
+        "Injected context changed (+258 −164 chars)",
+        "Interactive session's injected context changed (+258 −164 chars)",
+        "Interactive system prompt changed (+407 −411 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.252",
+      "released_at": "2026-08-31T17:07:28.168Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.251",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.251",
+      "released_at": "2026-08-28T15:34:26.421Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.250",
+      "changes": 45,
+      "categories": {
+        "behavior": 2,
+        "caching": 2,
+        "cli": 14,
+        "config": 18,
+        "hooks": 6,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 36,
+        "notable": 9
+      },
+      "undocumented": 23,
+      "highlights": [
+        "Injected context changed (+302 −0 chars)",
+        "Interactive session's injected context changed (+302 −0 chars)",
+        "Agent tool parameter model: description changed (+357 −256 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.250",
+      "released_at": "2026-08-27T22:27:48.314Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.248",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.248",
+      "released_at": "2026-08-27T20:35:36.671Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.247",
+      "changes": 126,
+      "categories": {
+        "binary": 1,
+        "caching": 4,
+        "cli": 4,
+        "config": 103,
+        "hooks": 1,
+        "prompt": 5,
+        "tools": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 104,
+        "notable": 22
+      },
+      "undocumented": 85,
+      "highlights": [
+        "Injected context added",
+        "Injected context changed (+427 −147 chars)",
+        "Interactive session's injected context added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.247",
+      "released_at": "2026-08-26T18:02:01.046Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.246",
+      "changes": 12,
+      "categories": {
+        "config": 12
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 1
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Setting modelProposedGoals lost value 16",
+        "Setting fileSuggestion.type gained value command",
+        "spinnerTipsOverride description changed (+264 −115 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.246",
+      "released_at": "2026-08-25T19:17:34.421Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.245",
+      "changes": 31,
+      "categories": {
+        "binary": 2,
+        "config": 26,
+        "network": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 25,
+        "notable": 6
+      },
+      "undocumented": 31,
+      "highlights": [
+        "Injected context changed (+455 −0 chars)",
+        "Interactive session's injected context changed (+455 −0 chars)",
+        "Setting modelSettings lost value /"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.245",
+      "released_at": "2026-08-25T04:45:52.102Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.243",
+      "changes": 2,
+      "categories": {
+        "config": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "New environment variable: BUN_FEEDBACK_URL",
+        "New environment variable: BUN_INSTALL"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.243",
+      "released_at": "2026-08-24T23:10:45.498Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.242",
+      "changes": 1,
+      "categories": {
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Environment variable no longer read: ENABLE_LSP_TOOL"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.242",
+      "released_at": "2026-08-24T19:16:14.767Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.241",
+      "changes": 102,
+      "categories": {
+        "binary": 1,
+        "config": 99,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 91
+      },
+      "undocumented": null,
+      "highlights": [
+        "ScheduleWakeup tool description changed (+462 −0 chars)",
+        "ScheduleWakeup tool parameter noop added",
+        "Setting askUserQuestionTimeout lost value 60s"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.241",
+      "released_at": "2026-08-22T23:58:33.046Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.240",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.240",
+      "released_at": "2026-08-22T13:03:23.566Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.239",
+      "changes": 4,
+      "categories": {
+        "config": 2,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+        "New environment variable: CLAUDE_CODE_SABLE_THRUSH"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.239",
+      "released_at": "2026-08-21T17:18:54.506Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.238",
+      "changes": 10,
+      "categories": {
+        "config": 4,
+        "hooks": 1,
+        "model": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 5
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Built-in price for claude-sonnet-5 changed",
+        "Built-in price for claude-sonnet-5 changed",
+        "Built-in price for claude-sonnet-5 changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.238",
+      "released_at": "2026-08-20T18:01:54.712Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.237",
+      "changes": 16,
+      "categories": {
+        "cli": 3,
+        "config": 10,
+        "hooks": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 3
+      },
+      "undocumented": 14,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+        "SessionEnd hook payload field prompt_id removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.237",
+      "released_at": "2026-08-19T23:57:54.833Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.236",
+      "changes": 9,
+      "categories": {
+        "caching": 4,
+        "config": 1,
+        "hooks": 2,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 6
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Injected context removed",
+        "Interactive session's injected context removed",
+        "Caching across_turns.breakpoints: [[\"messages[1].content[0]\",\"system[1]\",\"system[2]\"],[\"mes… → [[\"messages[0].content[1]\",\"system[1]\",\"system[2]\"],[\"mes…"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.236",
+      "released_at": "2026-08-19T18:45:14.539Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.235",
+      "changes": 10,
+      "categories": {
+        "config": 8,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 2
+      },
+      "undocumented": 9,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
+        "New environment variable: ANTHROPIC_DEFAULT_MODEL"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.235",
+      "released_at": "2026-08-18T18:24:10.21Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.234",
+      "changes": 6,
+      "categories": {
+        "cli": 2,
+        "config": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Description of `claude plugin eval` changed",
+        "Full help text of `plugin --help` changed (+675 −530 chars)",
+        "New setting: spellcheck"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.234",
+      "released_at": "2026-08-17T18:19:13.187Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.233",
+      "changes": 29,
+      "categories": {
+        "config": 11,
+        "hooks": 16,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 27,
+        "notable": 2
+      },
+      "undocumented": 23,
+      "highlights": [
+        "SendMessage tool parameter to: allOf added",
+        "SendMessage tool parameter to: pattern removed",
+        "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.233",
+      "released_at": "2026-08-14T18:50:44.102Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.232",
+      "changes": 41,
+      "categories": {
+        "behavior": 1,
+        "cli": 2,
+        "config": 9,
+        "hooks": 17,
+        "prompt": 8,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 29
+      },
+      "undocumented": 34,
+      "highlights": [
+        "Injected context changed (+49 −0 chars)",
+        "Interactive session's injected context changed (+934 −732 chars)",
+        "Interactive system prompt changed (+49 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.232",
+      "released_at": "2026-08-13T21:30:53.194Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.231",
+      "changes": 20,
+      "categories": {
+        "config": 20
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 1
+      },
+      "undocumented": 16,
+      "highlights": [
+        "New setting: allowedMarketplaces",
+        "New setting: additionalMarketplaces",
+        "policyHelpers description changed (+890 −283 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.231",
+      "released_at": "2026-08-13T08:27:21.757Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.229",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.229",
+      "released_at": "2026-08-12T19:28:48.616Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.228",
+      "changes": 13,
+      "categories": {
+        "config": 11,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 1
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Workflow tool description changed (+128 −123 chars)",
+        "SessionEnd hook payload field prompt_id added",
+        "New setting: disableCommandPluginSources"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.228",
+      "released_at": "2026-08-11T17:45:45.882Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.227",
+      "changes": 41,
+      "categories": {
+        "config": 15,
+        "hooks": 25,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 40,
+        "notable": 1
+      },
+      "undocumented": 40,
+      "highlights": [
+        "New setting: policyHelpers",
+        "Header x-stainless-package-version: 0.94.0 → 0.112.1",
+        "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.227",
+      "released_at": "2026-08-10T20:56:57.591Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.226",
+      "changes": 19,
+      "categories": {
+        "cli": 3,
+        "config": 10,
+        "hooks": 1,
+        "prompt": 2,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 6
+      },
+      "undocumented": 19,
+      "highlights": [
+        "Interactive system prompt changed (+839 −862 chars)",
+        "System prompt changed (+839 −862 chars)",
+        "Agent tool description changed (+193 −97 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.226",
+      "released_at": "2026-08-08T01:53:22.182Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.225",
+      "changes": 1,
+      "categories": {
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.225",
+      "released_at": "2026-08-07T23:08:56.171Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.224",
+      "changes": 3,
+      "categories": {
+        "config": 2,
+        "hooks": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+        "New environment variable: CLAUDE_REMOTE_TOOLS_BRIDGE_URL",
+        "New environment variable: CLAUDE_WORKSHOP_PROGRESS"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.224",
+      "released_at": "2026-08-07T01:36:32.682Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.223",
+      "changes": 21,
+      "categories": {
+        "behavior": 1,
+        "cli": 4,
+        "config": 3,
+        "hooks": 13
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 20,
+        "notable": 1
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Behaviour: compaction_command tools changed: 27 → 28",
+        "InstructionsLoaded hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+        "MessageDisplay hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.223",
+      "released_at": "2026-08-05T22:51:13.206Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.222",
+      "changes": 12,
+      "categories": {
+        "config": 9,
+        "hooks": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 2
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Injected context changed (+0 −78 chars)",
+        "Interactive session's injected context changed (+0 −78 chars)",
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.222",
+      "released_at": "2026-08-04T20:37:17.953Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.221",
+      "changes": 5,
+      "categories": {
+        "cli": 3,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 2
+      },
+      "undocumented": 3,
+      "highlights": [
+        "SendMessage tool parameter summary: description changed (+199 −84 chars)",
+        "SendMessage tool parameter to: pattern added",
+        "New command: `claude import`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.221",
+      "released_at": "2026-08-03T22:16:25.561Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.220",
+      "changes": 23,
+      "categories": {
+        "binary": 1,
+        "cli": 2,
+        "config": 18,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 21,
+        "notable": 2
+      },
+      "undocumented": 20,
+      "highlights": [
+        "Interactive system prompt changed (+169 −173 chars)",
+        "System prompt changed (+169 −173 chars)",
+        "New flag `claude --autocompact`"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.220",
+      "released_at": "2026-07-24T23:11:21.821Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.219",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.219",
+      "released_at": "2026-07-24T16:11:49.832Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.218",
+      "changes": 22,
+      "categories": {
+        "behavior": 3,
+        "config": 4,
+        "hooks": 2,
+        "model": 5,
+        "prompt": 4,
+        "request": 1,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 17
+      },
+      "undocumented": 10,
+      "highlights": [
+        "Model alias \"opus\": claude-opus-4-8 → claude-opus-5",
+        "Model alias \"opus[1m]\": claude-opus-4-8 → claude-opus-5",
+        "Default model: claude-opus-4-8 → claude-opus-5"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.218",
+      "released_at": "2026-07-22T19:55:32.144Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.217",
+      "changes": 12,
+      "categories": {
+        "config": 8,
+        "hooks": 1,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 4
+      },
+      "undocumented": 11,
+      "highlights": [
+        "Injected context changed (+0 −488 chars)",
+        "Interactive session's injected context changed (+0 −488 chars)",
+        "Skill tool description changed (+174 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.217",
+      "released_at": "2026-07-21T19:55:38.926Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.216",
+      "changes": 17,
+      "categories": {
+        "behavior": 2,
+        "config": 13,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 14,
+        "notable": 3
+      },
+      "undocumented": 14,
+      "highlights": [
+        "Workflow tool description changed (+188 −173 chars)",
+        "Behaviour: compaction outcome changed: \"compacted\" → \"refused\"",
+        "Behaviour: compaction reason added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.216",
+      "released_at": "2026-07-20T20:19:37.447Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.215",
+      "changes": 5,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 2
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Skill tool description changed (+1237 −1692 chars)",
+        "SessionEnd hook payload field prompt_id removed",
+        "New environment variable: CLAUDE_CODE_FLEETVIEW_SIMPLE"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.215",
+      "released_at": "2026-07-19T00:53:37.17Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.214",
+      "changes": 6,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 2
+      },
+      "undocumented": 6,
+      "highlights": [
+        "Injected context changed (+0 −826 chars)",
+        "Interactive session's injected context changed (+0 −826 chars)",
+        "SessionEnd hook payload field prompt_id added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.214",
+      "released_at": "2026-07-18T00:13:41.661Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.213",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.213",
+      "released_at": "2026-07-17T22:26:26.753Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.212",
+      "changes": 41,
+      "categories": {
+        "cli": 3,
+        "config": 17,
+        "hooks": 21
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 40,
+        "notable": 1
+      },
+      "undocumented": null,
+      "highlights": [
+        "SessionEnd hook payload field prompt_id removed",
+        "CwdChanged hook environment variable CLAUDE_PID added",
+        "InstructionsLoaded hook environment variable CLAUDE_PID added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.212",
+      "released_at": "2026-07-16T19:20:24.324Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.211",
+      "changes": 13,
+      "categories": {
+        "caching": 4,
+        "cli": 4,
+        "config": 2,
+        "prompt": 2,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 7
+      },
+      "undocumented": 9,
+      "highlights": [
+        "Injected context added",
+        "Interactive session's injected context added",
+        "ReportFindings tool parameter findings: items.properties.short_summary added"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.211",
+      "released_at": "2026-07-15T19:24:07.013Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.210",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "config": 4,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 1
+      },
+      "undocumented": 4,
+      "highlights": [
+        "Agent tool description changed (+428 −300 chars)",
+        "New flag `claude --forward-subagent-text`",
+        "Full help text of `--help` changed (+311 −0 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.210",
+      "released_at": "2026-07-14T19:39:21.73Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.209",
+      "changes": 4,
+      "categories": {
+        "config": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "New setting: processWrapper",
+        "New environment variable: CLAUDE_CODE_DISABLE_MEMORY_STREAM_LIST",
+        "New environment variable: CLAUDE_CODE_DISABLE_ORG_MEMORY"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.209",
+      "released_at": "2026-07-14T04:45:37.792Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.208",
+      "changes": 3,
+      "categories": {
+        "config": 1,
+        "hooks": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 3,
+        "notable": 0
+      },
+      "undocumented": 3,
+      "highlights": [
+        "PostToolBatch hook payload field tool_calls[].tool_input.message added",
+        "PostToolBatch hook payload field tool_calls[].tool_input.status added",
+        "New environment variable: CLAUDE_CODE_ARTIFACT_MCP"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.208",
+      "released_at": "2026-07-13T21:31:27.921Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.207",
+      "changes": 15,
+      "categories": {
+        "cli": 1,
+        "config": 9,
+        "hooks": 3,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 11,
+        "notable": 4
+      },
+      "undocumented": 12,
+      "highlights": [
+        "Interactive system prompt changed (+359 −0 chars)",
+        "System prompt changed (+359 −0 chars)",
+        "PostToolBatch hook payload field tool_calls[].tool_input.message removed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.207",
+      "released_at": "2026-07-10T22:25:09.43Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.206",
+      "changes": 12,
+      "categories": {
+        "config": 10,
+        "hooks": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 2
+      },
+      "undocumented": 11,
+      "highlights": [
+        "ScheduleWakeup tool description changed (+230 −200 chars)",
+        "SessionEnd hook payload field prompt_id removed",
+        "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.206",
+      "released_at": "2026-07-09T17:54:03.009Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": "valid"
+    }
+  ]
+}

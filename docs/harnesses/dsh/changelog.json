@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "harness": "dsh",
+  "versions": {
+    "0.2.1-rc.2": {
+      "url": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.2",
+      "text": "[中文](#cn-v0.2.1-rc.2-community) | [English](#en-v0.2.1-rc.2-community)\r\n\r\n<h3 id=\"cn-v0.2.1-rc.2-community\">新增功能</h3>\r\n\r\n- 适配 DeepSeek-V4.1-Flash-1017 上线 @LegGasai\r\n- 适配 DeepSeek Search 与 Fetch API，可在网页搜索设置中开启 @yudshj, @LegGasai\r\n\r\n<h3 id=\"en-v0.2.1-rc.2-community\">New Features</h3>\r\n\r\n- Add support for DeepSeek-V4.1-Flash-1017. by @LegGasai\r\n- Add support for DeepSeek Search and Fetch APIs, which can be enabled in Web Search settings. by @yudshj, @LegGasai\r\n\r\nFull Changelog: [dsh-v0.2.1-rc.1...dsh-v0.2.1-rc.2](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.1...dsh-v0.2.1-rc.2)"
+    },
+    "0.2.1-rc.5": {
+      "url": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.5",
+      "text": "[中文](#cn-v0.2.1-rc.5-community) | [English](#en-v0.2.1-rc.5-community)\n\n<h3 id=\"cn-v0.2.1-rc.5-community\">体验优化</h3>\n\n- 优化对话中思考内容的展示效果。 @LegGasai\n\n<h3 id=\"en-v0.2.1-rc.5-community\">Improvements</h3>\n\n- Improve how thinking content is displayed in conversations. by @LegGasai\n\nFull Changelog: [dsh-v0.2.1-rc.4...dsh-v0.2.1-rc.5](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.4...dsh-v0.2.1-rc.5)"
+    }
+  }
+}

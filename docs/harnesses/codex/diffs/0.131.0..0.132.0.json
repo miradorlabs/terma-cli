@@ -1,0 +1,320 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.131.0",
+  "to": "0.132.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.131.0...rust-v0.132.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.132.0",
+    "text": "## New Features\n- The Python SDK now supports first-class authentication, including API key login, ChatGPT browser and device-code flows, account inspection, and logout APIs. (#23093)\n- Python turn APIs are easier to use for text-only workflows: you can pass a plain string as input, and handle-based runs now return a richer `TurnResult` with collected items, timing, and usage data. (#23151, #23162)\n- `codex exec resume` now accepts `--output-schema`, so resumed automations can keep session context while still enforcing structured JSON output. (#23123)\n- TUI startup is faster because terminal capability probes are now batched instead of waiting on several serial checks before the first interactive frame. (#23175)\n- Remote executor registration can now use standard Codex auth instead of a separate registry credential flow. (#22769)\n- App-server turns can preserve requested image fidelity, including original-resolution local images, across user inputs and image-producing tools. (#20693)\n\n## Bug Fixes\n- Goal continuations now stop when they hit usage limits or a repeated blocker instead of looping and burning more tokens, and completion responses phrase usage more naturally. (#23094, #22907)\n- The session picker is easier to trust: renamed threads now show `name (thread-id)` in resume hints, and pasted text works in the picker search box. (#23234, #23338)\n- Multi-session TUI flows are more reliable: in-progress MCP calls stay marked as active during replay, and elicitation replies are sent back to the thread that requested them. (#23236, #23241)\n- Remote sessions now keep websocket connections alive and show repo-relative diff paths again instead of `/tmp/...`-prefixed paths. (#23226, #23261)\n- Windows installs are more robust: `codex doctor` now detects npm-managed installs correctly, and MSVC release binaries no longer depend on separately installed VC++ runtime DLLs. (#22967, #22905)\n- TUI polish fixes include immediate shutdown feedback on exit, hiding the ChatGPT usage link for non-OpenAI providers, and keeping a cleared Fast tier from reappearing after side-thread resume. (#23323, #23127, #23121)\n\n## Documentation\n- The Python SDK docs, FAQ, and examples were refreshed around the new auth flow and turn APIs, with clearer setup guidance and simpler text-only examples. (#22941, #23093, #23151, #23162)\n\n## Chores\n- Memory summaries are now versioned and rebuilt when the stored format is stale, which should keep long-lived memory context leaner and more predictable. (#23148)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.131.0...rust-v0.132.0\n\n- #20693 Preserve image detail in app-server inputs @fjord-oai\n- #22891 tui: pass active permission profiles through app commands @bolinfest\n- #22924 app-server-protocol: remove PermissionProfile from API @bolinfest\n- #22941 [codex] Refine Python SDK user-facing docs @aibrahim-oai\n- #22967 Fix Windows doctor npm root probe @etraut-openai\n- #22920 core: set permission profiles from snapshots @bolinfest\n- #22939 [codex] Split Python SDK helper logic @aibrahim-oai\n- #22907 Improve goal completion usage reporting @etraut-openai\n- #23030 test: construct permission profiles directly @bolinfest\n- #22769 exec-server: support auth-backed remote executor registration @miz-openai\n- #22946 [codex] preserve MCP result meta in McpToolCallItemResult @miaolin-oai\n- #23069 multiagent: trim model-visible description, cap to 5 models @sayan-oai\n- #22913 [1 of 4] tui: route primary settings writes through app server @etraut-openai\n- #23093 sdk/python: add first-class login support @aibrahim-oai\n- #23151 [codex] Return TurnResult from Python turn handles @aibrahim-oai\n- #23147 Make multi-agent v2 tool namespace configurable @jif-oai\n- #23036 test: reduce core sandbox policy test setup @bolinfest\n- #23162 [codex] Accept string input for Python turns @aibrahim-oai\n- #23226 Add exec-server websocket keepalive @starr-openai\n- #23148 Densify and version memory summaries @jif-oai\n- #22448 [codex] Add installed-plugin mention API @xli-oai\n- #23288 chore: goal ext skeleton @jif-oai\n- #23291 Make extension lifecycle hooks async @jif-oai\n- #23293 feat: add extension event sink capability @jif-oai\n- #23295 chore: isolate thread goal storage behind GoalStore @jif-oai\n- #23301 chore: goal resumed metrics @jif-oai\n- #23305 chore: make token usage async @jif-oai\n- #23306 Emit goal update events from goal extension tools @jif-oai\n- #23121 tui: keep cleared Fast tier from reappearing after side-thread resume @etraut-openai\n- #23123 Support --output-schema for exec resume @etraut-openai\n- #23128 Fix TUI stream cleanup after turn errors @etraut-openai\n- #23127 Hide ChatGPT usage link for non-OpenAI status @etraut-openai\n- #23175 [1 of 2] Optimize TUI startup terminal probes @etraut-openai\n- #22706 [codex] Remove legacy shell output formatting paths @pakrym-oai\n- #23332 nit: read prompt @jif-oai\n- #22905 windows: link MSVC release binaries with static CRT @iceweasel-oai\n- #23323 fix(tui): show shutdown feedback on exit @fcoury-oai\n- #23261 Fix remote turn diff display roots @starr-openai\n- #22569 Simplify legacy Windows sandbox ACL persistence @iceweasel-oai\n- #23273 Upload rust full CI JUnit reports @starr-openai\n- #22893 fix: harden plugin creator sharing validation @efrazer-oai\n- #23094 goal: pause continuation loops on usage limits and blockers @etraut-openai\n- #23234 Clarify resume hints for renamed threads @etraut-openai\n- #23241 TUI: route elicitation responses to request thread @etraut-openai\n- #23236 TUI: replay in-progress MCP calls as started @etraut-openai\n- #23088 goals: keep pause transitions explicit @etraut-openai\n- #23338 feat(tui): handle paste in session picker @fcoury-oai\n- #23335 feat(app-server): add optional thread_id to experimentalFeature/list @owenlin0"
+  },
+  "summary": {
+    "changes": 11,
+    "categories": {
+      "binary": 2,
+      "cli": 4,
+      "config": 1,
+      "prompt": 1,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 6,
+      "notable": 5
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+385 −429 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,8 +8,8 @@\n (file: <codex-home>/skills/.system/imagegen/SKILL.md)\n - openai-docs: Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains.\n (file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n-- plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, and baseline placeholders you can edit before publishing or testing.\n-Use when Codex needs to create a new personal plugin, add optional plugin structure, or generate or update personal or repo-root `.agents/plugins/marketplace.json` entries for plugin ordering and availability metadata.\n+- plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n+Use when Codex needs to create a new personal plugin, add optional plugin structure, or generate or update marketplace entries for plugin ordering and availability metadata.\n (file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n - skill-creator: Guide for creating effective skills.\n This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n",
+      "stats": {
+        "added_chars": 385,
+        "removed_chars": 429
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.spawn_agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "spawn_agent",
+        "description"
+      ],
+      "title": "spawn_agent tool description changed (+641 −2100 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,26 +1,11 @@\n \n         \n         Available model overrides (optional; inherited parent model is preferred):\n-- GPT-5.5 (`gpt-5.5`): Frontier model for complex coding, research, and real-world work.\n-Default reasoning effort: medium.\n-Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-Supported service tiers: priority (Fast: 1.5x speed, increased usage).\n-- gpt-5.4 (`gpt-5.4`): Strong model for everyday coding.\n-Default reasoning effort: medium.\n-Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-Supported service tiers: priority (Fast: 1.5x speed, increased usage).\n-- GPT-5.4-Mini (`gpt-5.4-mini`): Small, fast, and cost-efficient model for simpler coding tasks.\n-Default reasoning effort: medium.\n-Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-Supported service tiers: none.\n-- gpt-5.3-codex (`gpt-5.3-codex`): Coding-optimized model.\n-Default reasoning effort: medium.\n-Supported reasoning efforts: low (Fast responses with lighter reasoning), medium (Balances speed and reasoning depth for everyday tasks), high (Greater reasoning depth for complex problems), xhigh (Extra high reasoning depth for complex problems).\n-Supported service tiers: none.\n-- gpt-5.2 (`gpt-5.2`): Optimized for professional work and long-running agents.\n-Default reasoning effort: medium.\n-Supported reasoning efforts: low (Balances speed with some reasoning; useful for straightforward queries and short explanations), medium (Provides a solid balance of reasoning depth and latency for general-purpose tasks), high (Maximizes reasoning depth for complex or ambiguous problems), xhigh (Extra high reasoning for complex problems).\n-Supported service tiers: none.\n+- `gpt-5.5`: Frontier model for complex coding, research, and real-world work. Reasoning efforts: low, medium (default), high, xhigh. Service tiers: priority.\n+- `gpt-5.4`: Strong model for everyday coding. Reasoning efforts: low, medium (default), high, xhigh. Service tiers: priority.\n+- `gpt-5.4-mini`: Small, fast, and cost-efficient model for simpler coding tasks. Reasoning efforts: low, medium (default), high, xhigh.\n+- `gpt-5.3-codex`: Coding-optimized model. Reasoning efforts: low, medium (default), high, xhigh.\n+- `gpt-5.2`: Optimized for professional work and long-running agents. Reasoning efforts: low, medium (default), high, xhigh.\n         Spawn a sub-agent for a well-scoped task. Returns the spawned agent id plus the user-facing nickname when available. Spawned agents inherit your current model by default. Omit `model` to use that preferred default; set `model` only when an explicit override is needed.\n This spawn_agent tool provides you access to sub-agents that inherit your current model by default. Do not set the `model` field unless the user explicitly asks for a different model or there is a clear task-specific reason. You should follow the rules and guidelines below to use this tool.\n \n",
+      "stats": {
+        "added_chars": 641,
+        "removed_chars": 2100
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.view_image.input_schema.properties.detail.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "view_image",
+        "input_schema",
+        "properties",
+        "detail",
+        "description"
+      ],
+      "title": "view_image tool parameter detail: description changed (+94 −85 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n Optional detail override.\n-The only supported value is `original`; omit this field for default resized behavior.\n+Supported values are `high` and `original`; omit this field for default high resized behavior.\n Use `original` to preserve the file's original resolution instead of resizing to fit.\n This is important when high-fidelity image perception or precise localization is needed, especially for CUA agents.\n",
+      "stats": {
+        "added_chars": 94,
+        "removed_chars": 85
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.view_image.input_schema.properties.detail.enum",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "view_image",
+        "input_schema",
+        "properties",
+        "detail",
+        "enum"
+      ],
+      "title": "view_image tool parameter detail: enum added",
+      "impact": "notable",
+      "before": null,
+      "after": [
+        "high",
+        "original"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/config_errors.rs",
+            "line": 21,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server/src/request_processors/config_errors.rs#L21"
+          },
+          {
+            "path": "codex-rs/code-mode/src/runtime/value.rs",
+            "line": 111,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/code-mode/src/runtime/value.rs#L111"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--use-agent-identity-auth",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--use-agent-identity-auth"
+      ],
+      "title": "New flag `codex exec-server --use-agent-identity-auth`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote registration",
+        "names": [
+          "--use-agent-identity-auth"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1396,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/cli/src/main.rs#L1396"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1913,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/cli/src/main.rs#L1913"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+112 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -29,6 +29,9 @@\n       --name <NAME>\n           Human-readable executor name\n \n+      --use-agent-identity-auth\n+          Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote registration\n+\n   -h, --help\n           Print help (see a summary with '-h')\n \n",
+      "stats": {
+        "added_chars": 112,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+1293 −1001 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,16 +3,21 @@\n Usage: codex exec-server [OPTIONS]\n \n Options:\n-  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n-                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n-                            nested values. The `value` portion is parsed as TOML. If it fails to\n-                            parse as TOML, the raw string is used as a literal\n-      --listen <URL>        Transport endpoint URL. Supported values: `ws://IP:PORT` (default),\n-                            `stdio`, `stdio://`\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --remote <URL>        Register this exec-server as a remote executor using the given base URL\n-      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-      --executor-id <ID>    Executor id to attach to when registering remotely\n-      --name <NAME>         Human-readable executor name\n-  -h, --help                Print help (see more with '--help')\n+  -c, --config <key=value>       Override a configuration value that would otherwise be loaded from\n+                                 `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to\n+                                 override nested values. The `value` portion is parsed as TOML. If\n+                                 it fails to parse as TOML, the raw string is used as a literal\n+      --listen <URL>             Transport endpoint URL. Supported values: `ws://IP:PORT` (default),\n+                                 `stdio`, `stdio://`\n+      --enable <FEATURE>         Enable a feature (repeatable). Equivalent to `-c\n+                                 features.<name>=true`\n+      --remote <URL>             Register this exec-server as a remote executor using the given base\n+                                 URL\n+      --disable <FEATURE>        Disable a feature (repeatable). Equivalent to `-c\n+                                 features.<name>=false`\n+      --executor-id <ID>         Executor id to attach to when registering remotely\n+      --name <NAME>              Human-readable executor name\n+      --use-agent-identity-auth  Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote\n+                                 registration\n+  -h, --help                     Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 1293,
+        "removed_chars": 1001
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+0 −97 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not update PATH: No such file or directory (os error 2)\n Run commands within a Codex-provided sandbox\n \n Usage: codex sandbox [OPTIONS] <COMMAND>\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 97
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.131.0/codex-rs/arg0/src/lib.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.multi_agent_v2.tool_namespace",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.multi_agent_v2.tool_namespace"
+      ],
+      "title": "New setting: features.multi_agent_v2.tool_namespace",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/tools.rs",
+            "line": 42,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/codex-mcp/src/tools.rs#L42"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "binary.signing.notarized",
+      "category": "binary",
+      "op": "added",
+      "path": [
+        "binary",
+        "signing",
+        "notarized"
+      ],
+      "title": "Code signature notarized: none → true",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.signing.status",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "signing",
+        "status"
+      ],
+      "title": "Code signature status: rejected → valid",
+      "impact": "notable",
+      "before": "rejected",
+      "after": "valid",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

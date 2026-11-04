@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.100.0",
+  "to": "0.101.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.100.0...rust-v0.101.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.101.0",
+    "text": "## Bug Fixes\r\n- Model resolution now preserves the requested model slug when selecting by prefix, so model references stay stable instead of being rewritten. (#11602)\r\n- Developer messages are now excluded from phase-1 memory input, reducing noisy or irrelevant content entering memory. (#11608)\r\n- Memory phase processing concurrency was reduced to make consolidation/staging more stable under load. (#11614)\r\n\r\n## Chores\r\n- Cleaned and simplified the phase-1 memory pipeline code paths. (#11605)\r\n- Minor repository maintenance: formatting and test-suite hygiene updates in remote model tests. (#11619)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.100.0...rust-v0.101.0\r\n\r\n- #11605 chore: drop and clean from phase 1 @jif-oai\r\n- #11602 fix(core) model_info preserves slug @dylan-hurd-oai\r\n- #11608 exclude developer messages from phase-1 memory input @wendyjiao-openai\r\n- #11591 Add cwd to memory files @wendyjiao-openai\r\n- #11614 chore: reduce concurrency of memories @jif-oai\r\n- #11619 fix: fmt @jif-oai"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

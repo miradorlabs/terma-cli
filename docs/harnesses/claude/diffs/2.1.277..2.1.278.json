@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.277",
+  "to": "2.1.278",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Changed auto mode for Claude API and Enterprise users, and on Bedrock, Vertex, Foundry and gateways, to default to the server-side classifier, which does not charge for classifier overhead (`CLAUDE_CODE_AUTO_MODE_SERVER=0` opts out on Bedrock, Vertex, Foundry and gateways); warns on billed fallback. See https://code.claude.com/docs/en/auto-mode-classifier-billing\n- Added an `Auto mode server` row to `/status` showing whether this session's auto mode classifier runs on the server"
+  },
+  "summary": {
+    "changes": 1,
+    "categories": {
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 0
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "storage.telemetry",
+      "category": "storage",
+      "op": "removed",
+      "path": [
+        "storage",
+        "telemetry"
+      ],
+      "title": "On-disk telemetry removed",
+      "impact": "informational",
+      "before": {
+        "files": 1,
+        "format": "jsonl",
+        "path": "<claude-config>/telemetry/1p_failed_events.<session>.<uuid>.json",
+        "record_types": {
+          "(untyped)": [
+            "event_data",
+            "event_data.additional_metadata",
+            "event_data.betas",
+            "event_data.client_timestamp",
+            "event_data.client_type",
+            "event_data.device_id",
+            "event_data.entrypoint",
+            "event_data.env",
+            "event_data.env.arch",
+            "event_data.env.build_time",
+            "event_data.env.deployment_environment",
+            "event_data.env.is_ci",
+            "event_data.env.is_claubbit",
+            "event_data.env.is_claude_ai_auth",
+            "event_data.env.is_claude_code_action",
+            "event_data.env.is_claude_code_remote",
+            "event_data.env.is_conductor",
+            "event_data.env.is_github_action",
+            "event_data.env.is_local_agent_mode",
+            "event_data.env.is_running_with_bun",
+            "event_data.env.node_version",
+            "event_data.env.package_managers",
+            "event_data.env.platform",
+            "event_data.env.platform_raw",
+            "event_data.env.runtimes",
+            "event_data.env.shell",
+            "event_data.env.terminal",
+            "event_data.env.vcs",
+            "event_data.env.version",
+            "event_data.env.version_base",
+            "event_data.event_id",
+            "event_data.event_name",
+            "event_data.is_interactive",
+            "event_data.model",
+            "event_data.process",
+            "event_data.session_id",
+            "event_data.user_type",
+            "event_type"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

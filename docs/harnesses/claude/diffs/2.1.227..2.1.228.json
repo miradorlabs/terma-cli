@@ -1,0 +1,820 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.227",
+  "to": "2.1.228",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Fixed interactive sessions that could stop redrawing entirely, while the process kept running, after a rare internal layout error\n- Fixed `git` / Git Bash not being found on Windows when Claude Code is launched from a parent folder of the git installation\n- Fixed `/tui` reverting the session to an earlier model when `/model` had been changed since the last response\n- Fixed cross-session messaging sometimes starting without an inbox in the first session after install or upgrade\n- Fixed Remote Control `/resume` while connected leaking the resumed conversation's title or history into the connected session\n- Fixed `claude self-hosted-runner` sessions failing on every fresh runner when the `checkout` hook fails for a repository the session doesn't push to; that repository is now skipped with a warning\n- Fixed self-hosted runners ending sessions in the gap between a background task finishing and the follow-up turn starting\n- Fixed session cleanup deleting contents inside a project's memory folder\n- Fixed background plugin-cache cleanup deleting a plugin's cache when its only version is a symlinked development checkout\n- Fixed a settings-merge issue where a marketplace entry redefined in a higher-precedence settings tier could inherit another tier's custom headers; marketplace entries now merge as whole entries\n- Fixed the deferred-tools reminder occasionally being sent to the model twice after a skill invocation\n- Hardened skills synced from claude.ai: they no longer shadow local commands or MCP prompts, their descriptions are sanitized and labeled, and on your machine their bodies don't run `!` commands or expand `@` files\n- Improved cross-session messages: the sender and body now display inline instead of a collapsed line, and messages to Remote Control sessions on other machines show your Remote Control session name as the sender\n- Improved Vertex AI credential handling: expired or missing Google Cloud credentials now fail within seconds instead of retrying for minutes\n- Improved compaction progress: the retry countdown and stall hint now appear during compaction instead of only a progress bar\n- Updated terminal title busy-spinner glyphs to reduce tab-bar jitter on some terminals\n- Changed the Write tool so newer models can overwrite an existing file they haven't read this session, matching the Edit tool's rules; older models still require the read first\n- Removed the outdated note about auto mode sessions costing slightly more from the first-use notice for Pro, Max, and Team plans"
+  },
+  "summary": {
+    "changes": 41,
+    "categories": {
+      "config": 15,
+      "hooks": 25,
+      "request": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 40,
+      "notable": 1
+    },
+    "undocumented": 40
+  },
+  "changes": [
+    {
+      "id": "request.headers.x-stainless-package-version",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "x-stainless-package-version"
+      ],
+      "title": "Header x-stainless-package-version: 0.94.0 → 0.112.1",
+      "impact": "informational",
+      "before": "0.94.0",
+      "after": "0.112.1",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.InstructionsLoaded.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "InstructionsLoaded",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "InstructionsLoaded hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "MessageDisplay",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "MessageDisplay hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PermissionDenied.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionDenied",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PermissionDenied hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostCompact.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostCompact",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostCompact hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolBatch hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreCompact.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreCompact",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PreCompact hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PreToolUse hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SessionStart hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Setup.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Setup",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "Setup hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "Stop hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SubagentStop.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStop",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SubagentStop hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptExpansion.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptExpansion",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "UserPromptExpansion hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.policyHelpers",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "policyHelpers"
+      ],
+      "title": "New setting: policyHelpers",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Per-OS variant of policyHelper, keyed by platform: macos, linux, windows, wsl. The entry for the current platform wins over policyHelper; a platform with no entry falls back to policyHelper (wsl falls back to the linux entry first). Honored only from admin-controlled policy sources.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_COWORK_FRAME_ARTIFACTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_COWORK_FRAME_ARTIFACTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_COWORK_FRAME_ARTIFACTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_COWORK_FRAME_ARTIFACTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.BAT_THEME",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BAT_THEME"
+      ],
+      "title": "Environment variable no longer read: BAT_THEME",
+      "impact": "informational",
+      "before": "BAT_THEME",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COLORTERM",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COLORTERM"
+      ],
+      "title": "Environment variable no longer read: COLORTERM",
+      "impact": "informational",
+      "before": "COLORTERM",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.EDITOR",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "EDITOR"
+      ],
+      "title": "Environment variable no longer read: EDITOR",
+      "impact": "informational",
+      "before": "EDITOR",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.FALLBACK_FOR_ALL_PRIMARY_MODELS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "FALLBACK_FOR_ALL_PRIMARY_MODELS"
+      ],
+      "title": "Environment variable no longer read: FALLBACK_FOR_ALL_PRIMARY_MODELS",
+      "impact": "informational",
+      "before": "FALLBACK_FOR_ALL_PRIMARY_MODELS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.IS_DEMO",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "IS_DEMO"
+      ],
+      "title": "Environment variable no longer read: IS_DEMO",
+      "impact": "informational",
+      "before": "IS_DEMO",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LC_TERMINAL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "LC_TERMINAL"
+      ],
+      "title": "Environment variable no longer read: LC_TERMINAL",
+      "impact": "informational",
+      "before": "LC_TERMINAL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.MAX_STRUCTURED_OUTPUT_RETRIES",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "MAX_STRUCTURED_OUTPUT_RETRIES"
+      ],
+      "title": "Environment variable no longer read: MAX_STRUCTURED_OUTPUT_RETRIES",
+      "impact": "informational",
+      "before": "MAX_STRUCTURED_OUTPUT_RETRIES",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.PREFIX",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "PREFIX"
+      ],
+      "title": "Environment variable no longer read: PREFIX",
+      "impact": "informational",
+      "before": "PREFIX",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TERMUX_VERSION",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "TERMUX_VERSION"
+      ],
+      "title": "Environment variable no longer read: TERMUX_VERSION",
+      "impact": "informational",
+      "before": "TERMUX_VERSION",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TERM_PROGRAM_VERSION",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "TERM_PROGRAM_VERSION"
+      ],
+      "title": "Environment variable no longer read: TERM_PROGRAM_VERSION",
+      "impact": "informational",
+      "before": "TERM_PROGRAM_VERSION",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TMPDIR",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "TMPDIR"
+      ],
+      "title": "Environment variable no longer read: TMPDIR",
+      "impact": "informational",
+      "before": "TMPDIR",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.VISUAL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "VISUAL"
+      ],
+      "title": "Environment variable no longer read: VISUAL",
+      "impact": "informational",
+      "before": "VISUAL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.ZED_TERM",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "ZED_TERM"
+      ],
+      "title": "Environment variable no longer read: ZED_TERM",
+      "impact": "informational",
+      "before": "ZED_TERM",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

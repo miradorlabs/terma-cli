@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "t3",
+    "name": "T3 Code",
+    "vendor": "Ping Labs",
+    "homepage": "https://github.com/pingdotgg/t3code",
+    "source": {
+      "repo": "pingdotgg/t3code",
+      "url": "https://github.com/pingdotgg/t3code",
+      "language": "typescript"
+    },
+    "changelog": "https://github.com/pingdotgg/t3code/releases",
+    "latest": "0.0.45",
+    "support": "supported",
+    "versions_tracked": 1,
+    "first_tracked": "2026-10-02",
+    "last_change": null
+  },
+  "versions": [
+    {
+      "version": "0.0.45",
+      "released_at": "2026-10-02T18:17:11.449Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    }
+  ]
+}

@@ -1,0 +1,2042 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.132.0",
+  "to": "0.133.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.132.0...rust-v0.133.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.133.0",
+    "text": "## New Features\n- Goals are now enabled by default, backed by dedicated storage, and track progress across active turns. (#23300, #23685, #23696, #23732)\n- `codex remote-control` now runs like a foreground command, waits for readiness, reports machine status, and keeps explicit daemon-style `start`/`stop` commands. (#22878)\n- Permission profiles gained list APIs, inheritance, managed `requirements.toml` support, runtime refresh behavior, and stronger Windows sandbox integration. (#22928, #23412, #22270, #23433, #22931, #23715)\n- Plugin discovery is easier to inspect, with marketplace-aware list output, installed versions, visible marketplace roots, and remote collection support. (#23372, #23584, #23727, #23730)\n- Extensions can observe more lifecycle events, including subagent start/stop, tool execution, turn metadata, and async approval/turn processing. (#22782, #22873, #23309, #23688, #23690, #23692)\n\n## Bug Fixes\n- Fixed TUI startup choosing the wrong working directory when reusing a local app-server socket. (#23538)\n- Fixed plan-mode free-form answers so modified Enter keys, like Shift+Enter, no longer submit unexpectedly. (#23536)\n- Removed stale background terminal poll events after a process exits. (#23231)\n- Preserved raw code-mode exec output unless an explicit output token limit is requested. (#23564)\n- Made AGENTS instruction loading more reliable, including local global reads and warnings for invalid UTF-8 instead of silent drops. (#23343, #23232)\n- Fixed app-server startup/shutdown races, empty resume/fork paths, plugin upgrade failures, and realtime v1 websocket compatibility. (#23516, #23578, #23400, #23356, #23771)\n\n## Documentation\n- Added clearer plugin-creator guidance for updating and reinstalling local personal plugins. (#23542)\n- Expanded app-server/API docs and schema coverage around managed permission profile requirements. (#23433, #23555)\n\n## Chores\n- Added a canonical Codex package archive pipeline and moved installers, npm packages, DotSlash, and SDK runtimes toward that shared layout. (#23513, #23582, #23586, #23596, #23635, #23636, #23637, #23638, #23786)\n- Fixed Linux Python runtime wheel tags so glibc-based systems can install the runtime artifacts. (#21812)\n- Improved release and CI reliability with package-builder tests, prebuilt resource packaging, DotSlash zstd handling, platform-sharded Rust tests, and Codex Linux release runners. (#23760, #23759, #23752, #23358, #23761)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.132.0...rust-v0.133.0\n\n- #23343 codex: route global AGENTS reads through LOCAL_FS @starr-openai\n- #22380 fix: default unknown tool schemas to empty schemas @celia-oai\n- #23309 Add tool lifecycle extension contributor @jif-oai\n- #23253 Reduce rust-ci-full Windows nextest timeout flakes @starr-openai\n- #22878 Improve `codex remote-control` CLI UX @owenlin0\n- #21812 Publish Linux runtime wheels with glibc-compatible tags @aibrahim-oai\n- #22709 [codex] Trim unused TurnContextItem fields @pakrym-oai\n- #23353 Include plugin id in plugin MCP tool metadata @mzeng-openai\n- #22728 [codex] Move pending input into input queue @pakrym-oai\n- #23371 fix(tui): warn on unsupported iTerm2 pet versions @fcoury-oai\n- #23376 [codex-analytics] preserve user thread source for exec threads @marksteinbrick-oai\n- #23360 app-server: use profile ids in v2 permission params @bolinfest\n- #23384 [codex] Remove external websocket session resets @pakrym-oai\n- #22721 cleanup: Remove skill env var dependency prompting @xl-openai\n- #23389 Remove ToolSearch feature toggle @sayan-oai\n- #23080 [1 of 7] Add thread settings to UserInput @etraut-openai\n- #23081 [2 of 7] Remove UserInputWithTurnContext @etraut-openai\n- #23075 [3 of 7] Remove UserTurn @etraut-openai\n- #23396 [codex] Extract turn skill and plugin injections @pakrym-oai\n- #23356 fix(plugins): keep version upgrades additive @iceweasel-oai\n- #22508 [5 of 7] Replace OverrideTurnContext with ThreadSettings @etraut-openai\n- #22086 CI: Customize v8 building @cconger\n- #23390 Remove explicit connector tool undeferral @sayan-oai\n- #22928 core: expose permission profile picker metadata @viyatb-oai\n- #23352 Preserve context baselines for full-history agent forks @jif-oai\n- #23300 feat: dedicated goal DB @jif-oai\n- #22835 Remove ToolsConfig from tool planning @jif-oai\n- #22870 Add `body_after_prefix` auto-compact token limit scope @jif-oai\n- #23144 Defer v1 multi-agent tools behind tool search @jif-oai\n- #23409 [codex] Allow empty turn/start requests @pakrym-oai\n- #23388 [codex] Move hook request plumbing into hook runtime @pakrym-oai\n- #23405 [codex] Preserve steer input as user input @pakrym-oai\n- #22914 [2 of 4] tui: route app and skill enablement through app server @etraut-openai\n- #23397 [codex] Make contextual user fragments dyn-renderable @pakrym-oai\n- #23475 chore: namespace v1 sub-agent tools @jif-oai\n- #23493 Make `deny` canonical for filesystem permission entries @viyatb-oai\n- #22929 Harden CLI rate limit window labels @ase-openai\n- #22782 Add SubagentStart hook @abhinav-oai\n- #23513 build: add Codex package builder @bolinfest\n- #23369 Make local environment optional in EnvironmentManager @starr-openai\n- #23327 Refactor exec-server websocket pump @starr-openai\n- #23536 fix(tui): preserve modified enter in plan questions @fcoury-oai\n- #23400 Fix empty rollout path app-server handling @wiltzius-openai\n- #23551 Route local-only app-server gating through processors @starr-openai\n- #23372 Split plugin install discovery into list and request tools @mzeng-openai\n- #23516 fix: serialize unix app-server startup @efrazer-oai\n- #22169 [codex] Honor role-defined spawn service tiers @aibrahim-oai\n- #23555 Add CUA requirements subsection for locked computer use @adams-oai\n- #23538 Fix: TUI starting in wrong CWD @canvrno-oai\n- #23526 build: fetch rg for Codex packages @bolinfest\n- #23573 Remove unused ARC monitor path @mzeng-openai\n- #23576 test: fix multi-agent service tier assertion @bolinfest\n- #23541 build: default Codex package target and output @bolinfest\n- #23358 Fan out rust-ci-full nextest by platform @starr-openai\n- #23593 feat: expose codex-app-server version flag @bolinfest\n- #23412 feat: add permission profile list api @viyatb-oai\n- #23535 Move plugin and skill warmup into session startup @aibrahim-oai\n- #23231 Fix stale background terminal poll events @etraut-openai\n- #23564 [codex] Preserve raw code-mode exec output by default @aibrahim-oai\n- #23232 Warn on invalid UTF-8 in AGENTS.md files @etraut-openai\n- #23584 feat: Add vertical remote plugin collection support @xl-openai\n- #23586 build: package prebuilt Codex entrypoints @bolinfest\n- #23582 ci: build Codex package archives in release workflow @bolinfest\n- #23596 runtime: detect Codex package layout @bolinfest\n- #23500 add encryptedcontent to functioncalloutput @sayan-oai\n- #23633 Migrate exec-server remote registration to environments @richardopenai\n- #23451 Add timeout for remote compaction requests @jif-oai\n- #23667 feat: rename 1 @jif-oai\n- #23669 feat: rename 3 @jif-oai\n- #23668 feat: rename 2 @jif-oai\n- #23675 fix: main @jif-oai\n- #23685 feat: wire goal extension tools to the dedicated goal store @jif-oai\n- #23690 feat: async approval contrib @jif-oai\n- #23692 feat: async turn item process @jif-oai\n- #23688 feat: expose turn-start metadata to extensions @jif-oai\n- #23605 [codex] Hide deferred tools from code mode prompt @pakrym-oai\n- #23634 runtime: use install context for bundled bwrap @bolinfest\n- #23635 release: publish Codex package archive checksums @bolinfest\n- #23592 feat: Add btw alias for side slash command @anp-oai\n- #23696 feat: account active goal progress in the goal extension @jif-oai\n- #23176 [2 of 2] Start fresh TUI thread in background @etraut-openai\n- #23578 fix(app-server): speed up shutdown @fcoury-oai\n- #22896 windows-sandbox: add resolved permissions helper @bolinfest\n- #23502 Add thread/settings/update app-server API @etraut-openai\n- #23507 Sync TUI thread settings through app server @etraut-openai\n- #23666 feat: add turn_id and truncation_policy to extension tool calls @jif-oai\n- #23636 install: consume Codex package archives @bolinfest\n- #23717 [codex] Preserve failed goal accounting flushes @jif-oai\n- #23655 add standalone websearch api client @sayan-oai\n- #23724 Fix thread settings clippy failure @etraut-openai\n- #23637 npm: ship platform packages in Codex package layout @bolinfest\n- #23729 fix(config): resolve cloud requirements deny-read globs @viyatb-oai\n- #23638 dotslash: publish Codex entrypoints from package archives @bolinfest\n- #22918 windows-sandbox: send permission profiles to elevated runner @bolinfest\n- #23735 windows-sandbox: share bundled helper lookup @bolinfest\n- #18868 Add MITM hook config model @evawong-oai\n- #22270 feat(permissions): resolve permission profile inheritance @viyatb-oai\n- #23719 cli: add strict config to exec-server @bolinfest\n- #23542 [skills] Create a personal update flow for plugin creator @caseychow-oai\n- #21272 Support compact SessionStart hooks @abhinav-oai\n- #20659 Wire MITM hooks into runtime enforcement @evawong-oai\n- #23752 release: use DotSlash zstd for package archives @bolinfest\n- #22923 windows-sandbox: drive write roots from resolved permissions @bolinfest\n- #23761 chore: use Codex Linux runners for Rust releases @bolinfest\n- #23759 release: package prebuilt resource binaries @bolinfest\n- #23167 windows-sandbox: feed setup from resolved permissions @bolinfest\n- #22931 core: refresh active permission profiles at runtime @viyatb-oai\n- #22873 Add SubagentStop hook @abhinav-oai\n- #23727 feat(plugins): tabulate plugin list output @caseychow-oai\n- #23732 Make goals feature on by default and no longer experimental @etraut-openai\n- #23537 Honor client-resolved service tier defaults @shijie-oai\n- #23771 [codex] Fix realtime v1 websocket compatibility @guinness-oai\n- #23764 Remove Windows sandbox resource stamping @iceweasel-oai\n- #23730 [codex] List marketplaces considered by plugin discovery @caseychow-oai\n- #23760 ci: run Codex package builder tests @bolinfest\n- #23737 [codex] Add plugin id to MCP tool call items @mzeng-openai\n- #18240 Use named MITM permissions config @evawong-oai\n- #23774 [codex] Reject read-only fallback with approvals disabled @viyatb-oai\n- #23714 windows-sandbox: add profile-native elevated APIs @bolinfest\n- #23433 feat: support managed permission profiles in requirements.toml @viyatb-oai\n- #23715 core: pass permission profiles to Windows runner @bolinfest\n- #23786 sdk: launch packaged Codex runtimes @bolinfest"
+  },
+  "summary": {
+    "changes": 58,
+    "categories": {
+      "behavior": 8,
+      "cli": 11,
+      "config": 22,
+      "hooks": 6,
+      "prompt": 1,
+      "storage": 1,
+      "tools": 9
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 33,
+      "notable": 25
+    },
+    "undocumented": 27
+  },
+  "changes": [
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+276 −173 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,7 +9,7 @@\n - openai-docs: Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains.\n (file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n-Use when Codex needs to create a new personal plugin, add optional plugin structure, or generate or update marketplace entries for plugin ordering and availability metadata.\n+Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n (file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n - skill-creator: Guide for creating effective skills.\n This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n",
+      "stats": {
+        "added_chars": 276,
+        "removed_chars": 173
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.close_agent",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "close_agent"
+      ],
+      "title": "Tool removed: close_agent",
+      "impact": "notable",
+      "before": {
+        "description": "Close an agent and any open descendants when they are no longer needed, and return the target agent's previous status before shutdown was requested. Don't keep agents open for too long if they are not needed anymore.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "description": "Agent id to close (from spawn_agent).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "type": "object"
+        },
+        "name": "close_agent",
+        "sha256": "9147e549b4d7877e1a50f5e15e6f40ab680385d3fd3fbac4bcdb4f79a2ba1189"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2310,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/reducer.rs#L2310"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/close_agent.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/tools/handlers/multi_agents/close_agent.rs#L11"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.resume_agent",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "resume_agent"
+      ],
+      "title": "Tool removed: resume_agent",
+      "impact": "notable",
+      "before": {
+        "description": "Resume a previously closed agent by id so it can receive send_input and wait_agent calls.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Agent id to resume.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "name": "resume_agent",
+        "sha256": "c31555d10e9e2e35cf70dc3774085327da0367e0ded06447ba67c4c6d3380576"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/reducer.rs#L2308"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/resume_agent.rs",
+            "line": 13,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/tools/handlers/multi_agents/resume_agent.rs#L13"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.send_input",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "send_input"
+      ],
+      "title": "Tool removed: send_input",
+      "impact": "notable",
+      "before": {
+        "description": "Send a message to an existing agent. Use interrupt=true to redirect work immediately. You should reuse the agent by send_input if you believe your assigned task is highly dependent on the context of a previous task.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "interrupt": {
+              "description": "When true, stop the agent's current task and handle this immediately. When false (default), queue this message.",
+              "type": "boolean"
+            },
+            "items": {
+              "description": "Structured input items. Use this to pass explicit mentions (for example app:// connector paths).",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "image_url": {
+                    "description": "Image URL when type is image.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Display name when type is skill or mention.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path when type is local_image/skill, or structured mention target such as app://<connector-id> or plugin://<plugin-name>@<marketplace-name> when type is mention.",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Text content when type is text.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Input item type: text, image, local_image, skill, or mention.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "Legacy plain-text message to send to the agent. Use either message or items.",
+              "type": "string"
+            },
+            "target": {
+              "description": "Agent id to message (from spawn_agent).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "type": "object"
+        },
+        "name": "send_input",
+        "sha256": "efd7328cb462063c5f65d2db851ff075ae24b6285df9d69e447b0830540c8005"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2307,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/reducer.rs#L2307"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/send_input.rs",
+            "line": 12,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/tools/handlers/multi_agents/send_input.rs#L12"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.spawn_agent",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "spawn_agent"
+      ],
+      "title": "Tool removed: spawn_agent",
+      "impact": "notable",
+      "before": {
+        "description": "\n        \n        Available model overrides (optional; inherited parent model is preferred):\n- `gpt-5.5`: Frontier model for complex coding, research, and real-world work. Reasoning efforts: low, medium (default), high, xhigh. Service tiers: priority.\n- `gpt-5.4`: Strong model for everyday coding. Reasoning efforts: low, medium (default), high, xhigh. Service tiers: priority.\n- `gpt-5.4-mini`: Small, fast, and cost-efficient model for simpler coding tasks. Reasoning efforts: low, medium (default), high, xhigh.\n- `gpt-5.3-codex`: Coding-optimized model. Reasoning efforts: low, medium (default), high, xhigh.\n- `gpt-5.2`: Optimized for professional work and long-running agents. Reasoning efforts: low, medium (default), high, xhigh.\n        Spawn a sub-agent for a well-scoped task. Returns the spawned agent id plus the user-facing nickname when available. Spawned agents inherit your current model by default. Omit `model` to use that preferred default; set `model` only when an explicit override is needed.\nThis spawn_agent tool provides you access to sub-agents that inherit your current model by default. Do not set the `model` field unless the user explicitly asks for a different model or there is a clear task-specific reason. You should follow the rules and guidelines below to use this tool.\n\nOnly use `spawn_agent` if and only if the user explicitly asks for sub-agents, delegation, or parallel agent work.\nRequests for depth, thoroughness, research, investigation, or detailed codebase analysis do not count as permission to spawn.\nAgent-role guidance below only helps choose which agent to use after spawning is already authorized; it never authorizes spawning by itself.\n\n### When to delegate vs. do the subtask yourself\n- First, quickly analyze the overall user task and form a succinct high-level plan. Identify which tasks are immediate blockers on the critical path, and which tasks are sidecar tasks that are needed but can run in parallel without blocking the next local step. As part of that plan, explicitly decide what immediate task you should do locally right now. Do this planning step before delegating to agents so you do not hand off the immediate blocking task to a submodel and then waste time waiting on it.\n- Use a subagent when a subtask is easy enough for it to handle and can run in parallel with your local work. Prefer delegating concrete, bounded sidecar tasks that materially advance the main task without blocking your immediate next local step.\n- Do not delegate urgent blocking work when your immediate next step depends on that result. If the very next action is blocked on that task, the main rollout should usually do it locally to keep the critical path moving.\n- Keep work local when the subtask is too difficult to delegate well and when it is tightly coupled, urgent, or likely to block your immediate next step.\n\n### Designing delegated subtasks\n- Subtasks must be concrete, well-defined, and self-contained.\n- Delegated subtasks must materially advance the main task.\n- Do not duplicate work between the main rollout and delegated subtasks.\n- Avoid issuing multiple delegate calls on the same unresolved thread unless the new delegated task is genuinely different and necessary.\n- Narrow the delegated ask to the concrete output you need next.\n- For coding tasks, prefer delegating concrete code-change worker subtasks over read-only explorer analysis when the subagent can make a bounded patch in a clear write scope.\n- When delegating coding work, instruct the submodel to edit files directly in its forked workspace and list the file paths it changed in the final answer.\n- For code-edit subtasks, decompose work so each delegated task has a disjoint write set.\n\n### After you delegate\n- Call wait_agent very sparingly. Only call wait_agent when you need the result immediately for the next critical-path step and you are blocked until it returns.\n- Do not redo delegated subagent tasks yourself; focus on integrating results or tackling non-overlapping work.\n- While the subagent is running in the background, do meaningful non-overlapping work immediately.\n- Do not repeatedly wait by reflex.\n- When a delegated coding task returns, quickly review the uploaded changes, then integrate or refine them.\n\n### Parallel delegation patterns\n- Run multiple independent information-seeking subtasks in parallel when you have distinct questions that can be answered independently.\n- Split implementation into disjoint codebase slices and spawn multiple agents for them in parallel when the write scopes do not overlap.\n- Delegate verification only when it can run in parallel with ongoing implementation and is likely to catch a concrete risk before final integration.\n- The key is to find opportunities to spawn multiple independent subtasks in parallel within the same round, while ensuring each subtask is well-defined, self-contained, and materially advances the main task.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "agent_type": {
+              "description": "Optional type name for the new agent. If omitted, `default` is used.\nAvailable roles:\ndefault: {\nDefault agent.\n}\nexplorer: {\nUse `explorer` for specific codebase questions.\nExplorers are fast and authoritative.\nThey must be used to ask specific, well-scoped questions on the codebase.\nRules:\n- In order to avoid redundant work, you should avoid exploring the same problem that explorers have already covered. Typically, you should trust the explorer results without additional verification. You are still allowed to inspect the code yourself to gain the needed context!\n- You are encouraged to spawn up multiple explorers in parallel when you have multiple distinct questions to ask about the codebase that can be answered independently. This allows you to get more information faster without waiting for one question to finish before asking the next. While waiting for the explorer results, you can continue working on other local tasks that do not depend on those results. This parallelism is a key advantage of delegation, so use it whenever you have multiple questions to ask.\n- Reuse existing explorers for related questions.\n}\nworker: {\nUse for execution and production work.\nTypical tasks:\n- Implement part of a feature\n- Fix tests or bugs\n- Split large refactors into independent chunks\nRules:\n- Explicitly assign **ownership** of the task (files / responsibility). When the subtask involves code changes, you should clearly specify which files or modules the worker is responsible for. This helps avoid merge conflicts and ensures accountability. For example, you can say \"Worker 1 is responsible for updating the authentication module, while Worker 2 will handle the database layer.\" By defining clear ownership, you can delegate more effectively and reduce coordination overhead.\n- Always tell workers they are **not alone in the codebase**, and they should not revert the edits made by others, and they should adjust their implementation to accommodate the changes made by others. This is important because there may be multiple workers making changes in parallel, and they need to be aware of each other's work to avoid conflicts and ensure a cohesive final product.\n}",
+              "type": "string"
+            },
+            "fork_context": {
+              "description": "When true, fork the current thread history into the new agent before sending the initial prompt. This must be used when you want the new agent to have exactly the same context as you.",
+              "type": "boolean"
+            },
+            "items": {
+              "description": "Structured input items. Use this to pass explicit mentions (for example app:// connector paths).",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "image_url": {
+                    "description": "Image URL when type is image.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Display name when type is skill or mention.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path when type is local_image/skill, or structured mention target such as app://<connector-id> or plugin://<plugin-name>@<marketplace-name> when type is mention.",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Text content when type is text.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Input item type: text, image, local_image, skill, or mention.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "Initial plain-text task for the new agent. Use either message or items.",
+              "type": "string"
+            },
+            "model": {
+              "description": "Optional model override for the new agent. Leave unset to inherit the same model as the parent, which is the preferred default. Only set this when the user explicitly asks for a different model or the task clearly requires one.",
+              "type": "string"
+            },
+            "reasoning_effort": {
+              "description": "Optional reasoning effort override for the new agent. Replaces the inherited reasoning effort.",
+              "type": "string"
+            },
+            "service_tier": {
+              "description": "Optional service tier override for the new agent. Leave unset unless the user explicitly asks for one.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "spawn_agent",
+        "sha256": "34f749bf23cea0edf736a6f2d3a141703c26c4444601f2c70258b9282bc1ed68"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2306,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/reducer.rs#L2306"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/spawn.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/tools/handlers/multi_agents/spawn.rs#L28"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.wait_agent",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "wait_agent"
+      ],
+      "title": "Tool removed: wait_agent",
+      "impact": "notable",
+      "before": {
+        "description": "Wait for agents to reach a final status. Completed statuses may include the agent's final message. Returns empty status when timed out. Once the agent reaches a final status, a notification message will be received containing the same completed status.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "targets": {
+              "description": "Agent ids to wait on. Pass multiple ids to wait for whichever finishes first.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "timeout_ms": {
+              "description": "Optional timeout in milliseconds. Defaults to 30000, min 10000, max 3600000. Prefer longer waits (minutes) to avoid busy polling.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "targets"
+          ],
+          "type": "object"
+        },
+        "name": "wait_agent",
+        "sha256": "9909d9479465b17272e90ef32e19588a5fa08707381d609aa867c136dccae7c5"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 2309,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/reducer.rs#L2309"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents/wait.rs",
+            "line": 33,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/tools/handlers/multi_agents/wait.rs#L33"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.create_goal",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "create_goal"
+      ],
+      "title": "New tool: create_goal",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if a goal exists; use update_goal only for status.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "objective": {
+              "description": "Required. The concrete objective to start pursuing. This starts a new active goal only when no goal is currently defined; if a goal already exists, this tool fails.",
+              "type": "string"
+            },
+            "token_budget": {
+              "description": "Optional positive token budget for the new active goal.",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "objective"
+          ],
+          "type": "object"
+        },
+        "name": "create_goal",
+        "sha256": "407af15f2fc1b28758fd0ebb335c0405a5198b97ed319873b93391c5972ae06f"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/goal_spec.rs",
+            "line": 13,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/core/src/tools/handlers/goal_spec.rs#L13"
+          },
+          {
+            "path": "codex-rs/ext/goal/src/spec.rs",
+            "line": 10,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/ext/goal/src/spec.rs#L10"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.get_goal",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "get_goal"
+      ],
+      "title": "New tool: get_goal",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "required": [],
+          "type": "object"
+        },
+        "name": "get_goal",
+        "sha256": "460d7ce06591cae242849cc2a71b7ca991fe5aa56b89ecf686daced9ee843386"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/goal_spec.rs",
+            "line": 12,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/core/src/tools/handlers/goal_spec.rs#L12"
+          },
+          {
+            "path": "codex-rs/ext/goal/src/spec.rs",
+            "line": 9,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/ext/goal/src/spec.rs#L9"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "tools.tool_search",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "tool_search"
+      ],
+      "title": "New tool: tool_search",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "# Tool discovery\n\nSearches over deferred tool metadata with BM25 and exposes matching tools for the next model call.\n\nYou have access to tools from the following sources:\n- Multi-agent tools: Spawn and manage sub-agents.\nSome of the tools may not have been provided to you upfront, and you should use this tool (`tool_search`) to search for the required tools. For MCP tool discovery, always use `tool_search` instead of `list_mcp_resources` or `list_mcp_resource_templates`.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "limit": {
+              "description": "Maximum number of tools to return (defaults to 8).",
+              "type": "number"
+            },
+            "query": {
+              "description": "Search query for deferred tools.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "name": "tool_search",
+        "sha256": "4dbf693f0bc2a2c110db65678ea9d3460bd2bc9aa14b6f68965b957b51c706ca",
+        "type": "tool_search"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 225,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L225"
+          },
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 2407,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/core/src/config/mod.rs#L2407"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.update_goal",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "update_goal"
+      ],
+      "title": "New tool: update_goal",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Update the existing goal.\nUse this tool only to mark the goal achieved or genuinely blocked.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to pause, resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "description": "Required. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+              "enum": [
+                "complete",
+                "blocked"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        "name": "update_goal",
+        "sha256": "328b3429abf14697e84e81b298255f2e6cbbeacc7505cb55e1ab601f655ad904"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/goal_spec.rs",
+            "line": 14,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/core/src/tools/handlers/goal_spec.rs#L14"
+          },
+          {
+            "path": "codex-rs/ext/goal/src/spec.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/ext/goal/src/spec.rs#L11"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.approval",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "approval"
+      ],
+      "title": "Behaviour: sandbox approval added",
+      "impact": "notable",
+      "before": null,
+      "after": "never",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model added",
+      "impact": "notable",
+      "before": null,
+      "after": "gpt-5.5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.provider",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "provider"
+      ],
+      "title": "Behaviour: sandbox provider added",
+      "impact": "notable",
+      "before": null,
+      "after": "telemetry_fixture",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning effort",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning effort"
+      ],
+      "title": "Behaviour: sandbox reasoning effort added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.session id",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "session id"
+      ],
+      "title": "Behaviour: sandbox session id added",
+      "impact": "notable",
+      "before": null,
+      "after": "<uuid>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.workdir",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "workdir"
+      ],
+      "title": "Behaviour: sandbox workdir added",
+      "impact": "notable",
+      "before": null,
+      "after": "<repo>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.control.json_decision",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "json_decision"
+      ],
+      "title": "PreToolUse hook control (json_decision) removed",
+      "impact": "notable",
+      "before": "does not block the tool; message not shown to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 986,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L986"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 403,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L403"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.additional_context",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "additional_context"
+      ],
+      "title": "SessionStart hook control (additional_context) removed",
+      "impact": "notable",
+      "before": "ignored",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 991,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L991"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 418,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L418"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.control.json_decision",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "json_decision"
+      ],
+      "title": "Stop hook control (json_decision) removed",
+      "impact": "notable",
+      "before": "lets the turn stop; message not shown to the model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 993,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L993"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 424,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L424"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.additional_context",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "additional_context"
+      ],
+      "title": "UserPromptSubmit hook control (additional_context) removed",
+      "impact": "notable",
+      "before": "ignored",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 992,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L992"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 421,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L421"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.supported.SubagentStart",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "SubagentStart"
+      ],
+      "title": "New hook event: SubagentStart",
+      "impact": "notable",
+      "before": null,
+      "after": "SubagentStart",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 993,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/events.rs#L993"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 435,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L435"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.supported.SubagentStop",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "SubagentStop"
+      ],
+      "title": "New hook event: SubagentStop",
+      "impact": "notable",
+      "before": null,
+      "after": "SubagentStop",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 994,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/events.rs#L994"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 438,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L438"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--environment-id",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--environment-id"
+      ],
+      "title": "New flag `codex exec-server --environment-id`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Environment id to attach to when registering remotely",
+        "names": [
+          "--environment-id"
+        ],
+        "value": "<ID>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1381,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/main.rs#L1381"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--executor-id",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--executor-id"
+      ],
+      "title": "Flag removed: `codex exec-server --executor-id`",
+      "impact": "notable",
+      "before": {
+        "description": "Executor id to attach to when registering remotely",
+        "names": [
+          "--executor-id"
+        ],
+        "value": "<ID>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1396,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/cli/src/main.rs#L1396"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1913,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/cli/src/main.rs#L1913"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--name.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--name",
+        "description"
+      ],
+      "title": "`codex exec-server --name`: description changed",
+      "impact": "informational",
+      "before": "Human-readable executor name",
+      "after": "Human-readable environment name",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1381,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/main.rs#L1381"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--remote.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--remote",
+        "description"
+      ],
+      "title": "`codex exec-server --remote`: description changed",
+      "impact": "informational",
+      "before": "Register this exec-server as a remote executor using the given base URL",
+      "after": "Register this exec-server as a remote environment using the given base URL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1381,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/main.rs#L1381"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--strict-config",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--strict-config"
+      ],
+      "title": "New flag `codex exec-server --strict-config`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Error out when config.toml contains fields that are not recognized by this version of Codex",
+        "names": [
+          "--strict-config"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1381,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/cli/src/main.rs#L1381"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex remote-control.options.--json",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex remote-control",
+        "options",
+        "--json"
+      ],
+      "title": "New flag `codex remote-control --json`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Emit machine-readable JSON",
+        "names": [
+          "--json"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/common.rs",
+            "line": 820,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/common.rs#L820"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/common.rs",
+            "line": 826,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/common.rs#L826"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+483 −340 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,23 +11,27 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --listen <URL>\n-          Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --remote <URL>\n-          Register this exec-server as a remote executor using the given base URL\n+      --listen <URL>\n+          Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n-      --executor-id <ID>\n-          Executor id to attach to when registering remotely\n+      --remote <URL>\n+          Register this exec-server as a remote environment using the given base URL\n \n+      --environment-id <ID>\n+          Environment id to attach to when registering remotely\n+\n       --name <NAME>\n-          Human-readable executor name\n+          Human-readable environment name\n \n       --use-agent-identity-auth\n           Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote registration\n",
+      "stats": {
+        "added_chars": 483,
+        "removed_chars": 340
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+597 −432 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,16 +7,18 @@\n                                  `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to\n                                  override nested values. The `value` portion is parsed as TOML. If\n                                  it fails to parse as TOML, the raw string is used as a literal\n-      --listen <URL>             Transport endpoint URL. Supported values: `ws://IP:PORT` (default),\n-                                 `stdio`, `stdio://`\n+      --strict-config            Error out when config.toml contains fields that are not recognized\n+                                 by this version of Codex\n       --enable <FEATURE>         Enable a feature (repeatable). Equivalent to `-c\n                                  features.<name>=true`\n-      --remote <URL>             Register this exec-server as a remote executor using the given base\n-                                 URL\n+      --listen <URL>             Transport endpoint URL. Supported values: `ws://IP:PORT` (default),\n+                                 `stdio`, `stdio://`\n       --disable <FEATURE>        Disable a feature (repeatable). Equivalent to `-c\n                                  features.<name>=false`\n-      --executor-id <ID>         Executor id to attach to when registering remotely\n-      --name <NAME>              Human-readable executor name\n+      --remote <URL>             Register this exec-server as a remote environment using the given\n+                                 base URL\n+      --environment-id <ID>      Environment id to attach to when registering remotely\n+      --name <NAME>              Human-readable environment name\n       --use-agent-identity-auth  Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote\n                                  registration\n   -h, --help                     Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 597,
+        "removed_chars": 432
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+80 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not update PATH: operation would block\n Manage login\n \n Usage: codex login [OPTIONS] [COMMAND]\n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/arg0/src/lib.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control --help"
+      ],
+      "title": "Full help text of `remote-control --help` changed (+48 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -16,6 +16,9 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --json\n+          Emit machine-readable JSON\n+\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n",
+      "stats": {
+        "added_chars": 48,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control -h"
+      ],
+      "title": "Full help text of `remote-control -h` changed (+54 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,6 +12,7 @@\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n+      --json                Emit machine-readable JSON\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 54,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStart",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart"
+      ],
+      "title": "New setting: hooks.SubagentStart",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 993,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/events.rs#L993"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 435,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L435"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server/src/config/external_agent_config.rs#L1589"
+          },
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1239,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/config/src/config_requirements.rs#L1239"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].async"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 582,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L582"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 588,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L588"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].command"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 458,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L458"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 459,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L459"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].commandWindows",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].commandWindows"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].commandWindows",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 462,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L462"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 463,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L463"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 469,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L469"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 470,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L470"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].type"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 220,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/events.rs#L220"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].matcher"
+      ],
+      "title": "New setting: hooks.SubagentStart[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 557,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L557"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 643,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L643"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop"
+      ],
+      "title": "New setting: hooks.SubagentStop",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 994,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/events.rs#L994"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 438,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L438"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server/src/config/external_agent_config.rs#L1589"
+          },
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1239,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/config/src/config_requirements.rs#L1239"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].async"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 582,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L582"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 588,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L588"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].command"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 458,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L458"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 459,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L459"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].commandWindows",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].commandWindows"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].commandWindows",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 462,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L462"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 463,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L463"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 469,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L469"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 470,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L470"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].type"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 220,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/analytics/src/events.rs#L220"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].matcher"
+      ],
+      "title": "New setting: hooks.SubagentStop[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 557,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L557"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 643,
+            "url": "https://github.com/openai/codex/blob/rust-v0.133.0/codex-rs/external-agent-migration/src/lib.rs#L643"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.model_auto_compact_token_limit_scope",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_auto_compact_token_limit_scope"
+      ],
+      "title": "New setting: model_auto_compact_token_limit_scope",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Controls whether the auto-compaction limit applies to the full context or only to tokens after the carried prefix in the current compaction window.",
+        "enum": [
+          "total",
+          "body_after_prefix"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.service_tier.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "service_tier",
+        "description"
+      ],
+      "title": "service_tier description changed (+129 −117 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Optional explicit service tier request id for new turns (for example `priority` or `flex`; legacy `fast` also works).\n+Optional explicit service tier request id for new turns (for example `default`, `priority`, or `flex`; legacy `fast` also works).\n",
+      "stats": {
+        "added_chars": 129,
+        "removed_chars": 117
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE"
+      ],
+      "title": "Environment variable no longer read: CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE",
+      "impact": "informational",
+      "before": "CODEX_ARC_MONITOR_ENDPOINT_OVERRIDE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 17,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/arc_monitor.rs#L17"
+          },
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 116,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/arc_monitor.rs#L116"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_ARC_MONITOR_TOKEN",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_ARC_MONITOR_TOKEN"
+      ],
+      "title": "Environment variable no longer read: CODEX_ARC_MONITOR_TOKEN",
+      "impact": "informational",
+      "before": "CODEX_ARC_MONITOR_TOKEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 18,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/arc_monitor.rs#L18"
+          },
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 111,
+            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/core/src/arc_monitor.rs#L111"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "storage.goals",
+      "category": "storage",
+      "op": "added",
+      "path": [
+        "storage",
+        "goals"
+      ],
+      "title": "On-disk goals added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "files": 3,
+        "format": "sqlite",
+        "path": "<codex-home>/goals_1.sqlite",
+        "paths": [
+          "<codex-home>/goals_1.sqlite",
+          "<codex-home>/goals_1.sqlite-shm",
+          "<codex-home>/goals_1.sqlite-wal"
+        ],
+        "tables": {
+          "_sqlx_migrations": [
+            "checksum",
+            "description",
+            "execution_time",
+            "installed_on",
+            "success",
+            "version"
+          ],
+          "thread_goals": [
+            "created_at_ms",
+            "goal_id",
+            "objective",
+            "status",
+            "thread_id",
+            "time_used_seconds",
+            "token_budget",
+            "tokens_used",
+            "updated_at_ms"
+          ]
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

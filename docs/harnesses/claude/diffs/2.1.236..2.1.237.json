@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.236",
+  "to": "2.1.237",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Fixed prompt caching for sessions using an LLM gateway or custom base URL\n- Added a built-in \"Concise\" output style: Claude leads with results and skips preamble and narration, while doing the work just as thoroughly. Select it under Output style in /config."
+  },
+  "summary": {
+    "changes": 9,
+    "categories": {
+      "caching": 4,
+      "config": 1,
+      "hooks": 2,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 3,
+      "notable": 6
+    },
+    "undocumented": 9
+  },
+  "changes": [
+    {
+      "id": "prompt.context.1.cache",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "context",
+        "1",
+        "cache"
+      ],
+      "title": "Injected context removed",
+      "impact": "notable",
+      "before": {
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.interactive.context.1.cache",
+      "category": "prompt",
+      "op": "removed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "1",
+        "cache"
+      ],
+      "title": "Interactive session's injected context removed",
+      "impact": "notable",
+      "before": {
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.breakpoints",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "breakpoints"
+      ],
+      "title": "Caching across_turns.breakpoints: [[\"messages[1].content[0]\",\"system[1]\",\"system[2]\"],[\"mes… → [[\"messages[0].content[1]\",\"system[1]\",\"system[2]\"],[\"mes…",
+      "impact": "notable",
+      "before": [
+        [
+          "messages[1].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[2].content[0]",
+          "messages[3].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[4].content[0]",
+          "messages[5].content[0]",
+          "system[1]",
+          "system[2]"
+        ]
+      ],
+      "after": [
+        [
+          "messages[0].content[1]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[2].content[0]",
+          "messages[3].content[0]",
+          "system[1]",
+          "system[2]"
+        ],
+        [
+          "messages[4].content[0]",
+          "messages[5].content[0]",
+          "system[1]",
+          "system[2]"
+        ]
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 562 → 493",
+      "impact": "notable",
+      "before": 562,
+      "after": 493,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.breakpoints.messages[1].content[0]",
+      "category": "caching",
+      "op": "removed",
+      "path": [
+        "caching",
+        "breakpoints",
+        "messages[1].content[0]"
+      ],
+      "title": "Cache breakpoint messages[1].content[0] removed",
+      "impact": "notable",
+      "before": {
+        "at": "messages[1].content[0]",
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.breakpoints.messages[0].content[1]",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "breakpoints",
+        "messages[0].content[1]"
+      ],
+      "title": "Cache breakpoint messages[0].content[1] added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "at": "messages[0].content[1]",
+        "ttl": "5m",
+        "type": "ephemeral"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_POLL_EVENTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_POLL_EVENTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_POLL_EVENTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_POLL_EVENTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

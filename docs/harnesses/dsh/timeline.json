@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "harness": "dsh",
+  "steps": [
+    {
+      "version": "0.2.1-rc.5",
+      "previous": "0.2.1-rc.2",
+      "changes": []
+    },
+    {
+      "version": "0.2.1-rc.2",
+      "previous": "0.2.0-rc.2",
+      "changes": []
+    }
+  ]
+}

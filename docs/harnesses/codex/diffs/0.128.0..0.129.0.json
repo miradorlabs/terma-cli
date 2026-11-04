@@ -1,0 +1,5663 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.128.0",
+  "to": "0.129.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.128.0...rust-v0.129.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.129.0",
+    "text": "## New Features\n- The TUI now supports modal Vim editing in the composer, including `/vim`, default-mode config, and Vim-specific keymap contexts. (#18595)\n- TUI workflows are easier to resume and copy from with a redesigned resume/fork picker, raw scrollback mode, `/ide` context injection, and workspace-aware `/diff`. (#20065, #20819, #20294, #21001)\n- The status line can show theme-aware colors plus optional PR and branch-change summaries, and `/keymap debug` helps inspect terminal key events. (#19631, #20892, #20794)\n- Plugin management now supports workspace sharing, share access controls, source filtering, local share path tracking, marketplace removal/upgrades, remote bundle sync, and admin-disabled status handling. (#20278, #21124, #21419, #20560, #19843, #20478, #20268, #20298)\n- Hooks can be browsed and toggled from `/hooks`, can run before/after compaction, and can add `PreToolUse` context; Codex Apps auth and eligible MCP elicitations now surface through TUI/Guardian flows. (#19882, #19905, #20692, #19193, #19431)\n- Experimental goals are now discoverable, stay paused across resume unless the user opts back in, and show clearer validation and multi-day duration output. (#20083, #20790, #20746, #20558)\n\n## Bug Fixes\n- `/copy` works better in tmux, Alt+Enter and modified Delete/Backspace keys behave correctly, and Windows typing/paste latency was reduced. (#20207, #20535, #21058, #18914)\n- Large paste placeholders and Ctrl+C-stashed drafts now survive clear/editor workflows without corrupting draft history. (#21091, #21190, #21351, #21397)\n- TUI startup and accessibility were tightened by bounding terminal probes, clearing the first inline viewport render, and honoring `animations = false` for live rows. (#20654, #21450, #20564)\n- Linux sandbox startup is more reliable across older `bwrap`, slow mount probes, symlink-protected paths, and shared `/tmp` setups. (#20628, #20111, #21127, #21234)\n- Windows sandbox and exec policy now handle named pipes, ConPTY teardown, PowerShell-wrapped allow rules, worktree `safe.directory`, and unsafe Git options more reliably. (#20270, #20685, #20336, #21409, #21275)\n- Fixed custom CA login behind TLS-inspecting proxies, Bedrock runtime endpoint reporting, dangerous project config keys, heredoc redirect approval matching, and unbounded MCP/hook output growth. (#20676, #20275, #20098, #20113, #20260, #21069)\n\n## Documentation\n- Updated the embedded OpenAI Docs sample skill so API-key setup guidance stays aligned with other docs variants. (#21263)\n- Documented how generated git commit attribution is gated by `codex_git_commit` and configured in `config.toml`. (#21379)\n- Removed local-only planning/spec docs and redirected config docs toward the maintained external documentation surface. (#20896)\n\n## Chores\n- Linux releases now build, publish, bundle, and verify a standalone `bwrap` fallback for npm and DotSlash installs. (#21255, #21256, #21257, #21312, #21285)\n- Vendored Bubblewrap was updated to 0.11.2, including upstream security changes around setuid support. (#21389)\n- Windows Bazel CI now uses faster cross-compilation for tests, clippy, and release-build checks, and Bazel now runs sharded Rust integration tests. (#20585, #20701, #21057)\n- App-server and protocol internals were split and slimmed down, including transport extraction, protocol module decomposition, thread/message history moves, and tool-handler cleanup. (#20324, #20325, #20348, #20545, #21251, #21278, #21395)\n- Analytics and diagnostics coverage expanded for tool lifecycles, goals, plugin skills, thread sources, service tiers, and PR issue labeling. (#17089, #17090, #20799, #20923, #20949, #20969, #20893)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.128.0...rust-v0.129.0\n\n- #20278 feat: Add workspace plugin sharing APIs @xl-openai\n- #20334 Make missing config clears no-ops @etraut-openai\n- #20246 Gate multi-agent v2 tools independently of collab @jif-oai\n- #20361 realtime: rename provider session ids @aibrahim-oai\n- #20260 fix(core): truncate large mcp tool outputs in rollouts @owenlin0\n- #20083 Mark goals feature as experimental @etraut-openai\n- #19843 /plugins: remove marketplace @canvrno-oai\n- #20458 [Extension] Allowlist Chrome Extension in the tool_suggest tool @teddywyly-oai\n- #20324 Remove core protocol dependency [1/2] @etraut-openai\n- #20299 Move item event mapping into app-server-protocol @pakrym-oai\n- #20325 Remove core protocol dependency [2/2] @etraut-openai\n- #20471 Stop emitting item/fileChange/outputDelta output delta notifications @pakrym-oai\n- #20245 [Codex] Add browser use external feature flag @khoi-oai\n- #19882 Add /hooks browser for lifecycle hooks @abhinav-oai\n- #20275 fix: show correct Bedrock runtime endpoint in /status @celia-oai\n- #20270 [codex] Fix elevated Windows sandbox named-pipe access @iceweasel-oai\n- #20463 feat(rollouts): store EventMsg::ApplyPatchEnd in limited history mode @owenlin0\n- #20101 install WFP filters for Windows sandbox setup @iceweasel-oai\n- #20474 [plugin] Add Canva to suggesteable list. @mzeng-openai\n- #20379 Send external import completion for sync imports @alexsong-oai\n- #19280 [codex] Migrate thread turns list to thread store @wiltzius-openai\n- #20348 Move plugin out of core. @xl-openai\n- #19160 Make apply_patch streaming parser stateful @akshaynathan\n- #20504 fix flaky test falls_back_to_registered_fallback_port_when_default_po… @owenlin0\n- #20098 fix: ignore dangerous project-level config keys @owenlin0\n- #20268 Sync remote installed plugin bundles @xli-oai\n- #20502 fix(tui): set persist_extended_history: false @owenlin0\n- #20069 Bypass review for always-allow MCP tools in auto-review @maja-openai\n- #18595 feat(tui): add vim composer mode @fcoury-oai\n- #20267 Emit analytics for remote plugin installs @xli-oai\n- #20499 fix(app-server): mark thread/turns/list and exclude_turns as experime… @owenlin0\n- #20522 Alias codex_hooks feature as hooks @abhinav-oai\n- #20336 execpolicy: unwrap PowerShell -Command wrappers on Windows @iceweasel-oai\n- #20113 fix(exec_policy) heredoc parsing file_redirect @dylan-hurd-oai\n- #20341 app-server: switch remote control to protocol v3 segmentation @euroelessar\n- #20300 [codex-analytics] centralize thread analytics state @rhan-oai\n- #20484 [codex] Improve PR babysitter CI diagnostics and guardrails @wiltzius-openai\n- #20298 Surface admin-disabled remote plugin status @xli-oai\n- #20511 [codex] Remove unused event messages @pakrym-oai\n- #19474 Make thread store process-scoped @wiltzius-openai\n- #20558 Format multi-day goal durations in the TUI @etraut-openai\n- #19631 Color TUI statusline from active theme @etraut-openai\n- #20265 Refresh remote plugin cache on auth changes @xli-oai\n- #20150 Add remote plugin skill read API @xli-oai\n- #20560 feat: Track local paths for shared plugins @xl-openai\n- #20600 chore: allow memories edition @jif-oai\n- #20602 feat: ad-hoc instructions @jif-oai\n- #20610 chore: improve remember prompt @jif-oai\n- #20606 feat: seed ad-hoc memory extension instructions @jif-oai\n- #20405 feat: export and replay effective config locks @jif-oai\n- #20540 Move apply-patch file changes into turn items @pakrym-oai\n- #20564 Enforce `animations = false` for screen readers @etraut-openai\n- #20523 Remove no-tool goal continuation suppression @etraut-openai\n- #20627 fix: cargo deny @jif-oai\n- #20545 app-server: move transport into dedicated crate @euroelessar\n- #20294 Add /ide context support to the TUI @etraut-openai\n- #20630 [codex] Add Codex environment config @pakrym-oai\n- #20524 deprecate legacy notify @abhinav-oai\n- #20486 [codex] Migrate loaded thread/read history to ThreadStore @wiltzius-openai\n- #20281 Use selected turn environments for runtime context @starr-openai\n- #20535 fix(tui): restore alt-enter newline alias @fcoury-oai\n- #20650 fix: reduce ConfigBuilder::build stack usage @jif-oai\n- #20478 /plugins: add marketplace upgrade flow @canvrno-oai\n- #20512 [codex] Emit image view as core item @pakrym-oai\n- #20562 Use the 2025-06-18 elicitation capability shape @abhinav-oai\n- #20674 Clear live hook rows when turns finalize @abhinav-oai\n- #20646 Surface multi-environment choices in environment context @starr-openai\n- #20542 Prune unused code-mode globals @cconger\n- #20585 ci: cross-compile Windows Bazel tests @bolinfest\n- #20701 ci: cross-compile Windows Bazel clippy @bolinfest\n- #20676 Fix custom CA login behind TLS-inspecting proxies @jgershen-oai\n- #20654 fix(tui): bound startup terminal probes @fcoury-oai\n- #20566 [tool_suggest] More prompt polishes. @mzeng-openai\n- #20751 Bound websocket request sends with idle timeout @pakrym-oai\n- #20893 [codex] Add issue labeler area labels @etraut-openai\n- #20896 Remove local docs and specs @etraut-openai\n- #20897 [codex] Refactor app-server dispatch result flow @pakrym-oai\n- #20677 [codex] Emit MCP tool calls as turn items @pakrym-oai\n- #20973 feat: support template interpolation in multi-agent usage hints @jif-oai\n- #20622 feat: memories mcp v1 @jif-oai\n- #20773 feat: add remote compaction v2 Responses client path @jif-oai\n- #20986 feat: add line offsets to memory read MCP @jif-oai\n- #20991 feat: add max_lines to memories MCP read @jif-oai\n- #20993 feat: paginate MCP memories list @jif-oai\n- #20994 feat: make memories MCP list shallow @jif-oai\n- #20996 feat: paginate memories MCP search results @jif-oai\n- #20997 feat: add context lines to memories MCP search @jif-oai\n- #20998 nit: renaming @jif-oai\n- #21004 feat: support multi-query memories search @jif-oai\n- #21006 nit: legacy @jif-oai\n- #20815 Speed up /side parent restore replay @etraut-openai\n- #20790 Keep paused goals paused on thread resume @etraut-openai\n- #20940 [codex] Split app-server request processors @pakrym-oai\n- #21023 typo @jif-oai\n- #21012 memories/mcp: generate tool schemas with schemars @jif-oai\n- #21010 memories-mcp: reject symlink traversal in local backend @jif-oai\n- #20989 core: share responses request builder with compact requests @jif-oai\n- #20853 [mcp-apps] Persist MCP Apps specific tool call end event. @mzeng-openai\n- #20750 Unify skip-review handling for approval_mode = \"approve\" @mzeng-openai\n- #20682 feat(app-server): always return limited thread history @owenlin0\n- #20628 fix(linux-sandbox): fall back when system bwrap lacks perms @viyatb-oai\n- #20794 feat(tui): add keymap debug inspector @fcoury-oai\n- #21034 tui: retire /approvals and rename /autoreview to /approve @won-openai\n- #20669 Prepare selected environment plumbing @starr-openai\n- #20685 Fix Windows PTY teardown by preserving ConPTY ownership @iceweasel-oai\n- #20663 Add stdio exec-server listener @starr-openai\n- #20561 state: pass state db handles through consumers @euroelessar\n- #21054 rollout: store web search and mcp tool calls @owenlin0\n- #20892 feat(tui): add PR summary statusline items @fcoury-oai\n- #20798 feat(tui): improve TUI keymap coverage @fcoury-oai\n- #21053 Use MCP server instructions in deferred namespace descriptions @sayan-oai\n- #21026 core: preserve last model ids in feedback tags @sayan-oai\n- #21060 core: fix apply_patch request permissions test @bolinfest\n- #20060 Add reasoning effort to turn tracing spans @charley-openai\n- #21058 fix(tui): support modified backspace/delete keys @fcoury-oai\n- #21057 bazel: run sharded rust integration tests @bolinfest\n- #18914 fix(tui): use shared paste burst interval on Windows @fcoury-oai\n- #20715 Make realtime sideband startup async @kmeelu-oai\n- #20514 [codex-analytics] add item lifecycle timing @rhan-oai\n- #20722 Remove remote plugin uninstall prefix gate @xli-oai\n- #19040 [codex] Add unsandboxed process exec API @euroelessar\n- #21105 [network-proxy] Cover DNS timeout blocking @evawong-oai\n- #21059 Rename agent identity login surface to access token @shijie-oai\n- #20576 codex: route metadata updates through ThreadStore @wiltzius-openai\n- #20923 Add plugin ID to skill analytics @alexsong-oai\n- #21122 Add turn_id to Codex skill invocation analytics @edwardysun3\n- #20575 codex: migrate (more) app-server thread history reads to ThreadStore @wiltzius-openai\n- #21069 Spill large hook outputs from context @abhinav-oai\n- #20969 1- Add model service tiers metadata @aibrahim-oai\n- #21170 tools: remove unused experimental `list_dir` tool @jif-oai\n- #21201 memories-mcp: hide dot paths from list, read, and search @jif-oai\n- #21204 feat: support windowed multi-query memory search @jif-oai\n- #21205 feat: add normalized matching to memory search @jif-oai\n- #20207 fix(tui): make /copy work inside tmux without passthrough @fcoury-oai\n- #20799 Add goal lifecycle metrics @etraut-openai\n- #20746 Validate /goal objective length in TUI @etraut-openai\n- #20708 Add Windows sandbox readiness RPC @iceweasel-oai\n- #20692 Support PreToolUse additionalContext @abhinav-oai\n- #21091 [codex] Fix TUI large paste placeholder numbering after Ctrl+C @canvrno-oai\n- #21089 [codex] Fix fork --last cwd filtering @canvrno-oai\n- #21152 revert legacy notify deprecation @abhinav-oai\n- #21190 fix(tui): external editor expansion for same-size large pastes @fcoury-oai\n- #20111 fix(sandboxing): Bound advisory system bwrap startup probe @viyatb-oai\n- #21220 chore: add minimal proxy egress diagnostics @viyatb-oai\n- #20819 feat(tui): add raw scrollback mode @fcoury-oai\n- #21225 app-server: ignore persist_extended_history param @owenlin0\n- #17089 [codex-analytics] add tool item event schemas @rhan-oai\n- #20647 Route process tools to selected environments @starr-openai\n- #20321 hook trust metadata and enforcement @abhinav-oai\n- #21221 [codex] Use shared app-server JSON-RPC error helpers @pakrym-oai\n- #21063 add turn items view to app-server turns @rhan-oai\n- #21001 feat(tui): route /diff through workspace commands @fcoury-oai\n- #20065 feat(tui): redesign session picker @fcoury-oai\n- #21127 fix(linux-sandbox): avoid panic on bwrap build failures @viyatb-oai\n- #21234 fix(linux-sandbox): isolate Linux sandbox synthetic mount registry per user for shared codex use case @viyatb-oai\n- #20687 [codex] Split tool handlers by tool name @pakrym-oai\n- #21113 Auto-deny MCP elicitations for Xcode 26.4 clients @etraut-openai\n- #21243 [codex] fix TUI turn items view fixtures @fcoury-oai\n- #21146 Enable V8 sandboxing for source-built builds @cconger\n- #20689 Inject state DB, agent graph store @rasmusrygaard\n- #19575 Add cloud executor registration to exec-server @miz-openai\n- #20577 codex: use ThreadStore history for core review forks @wiltzius-openai\n- #21261 fix build @bolinfest\n- #21251 chore(app-server-protocol): split v2 API definitions into modules @owenlin0\n- #21259 ci: trigger rusty-v8 releases from tags @cconger\n- #21255 linux-sandbox: use standalone bundled bwrap @bolinfest\n- #21256 release: publish standalone bwrap artifacts @bolinfest\n- #21260 [codex] Move thread naming to app server @pakrym-oai\n- #21219 Add model and reasoning effort to MCP turn metadata @mchen-oai\n- #21275 Share Git safe-command logic on Windows @iceweasel-oai\n- #21257 release/npm: bundle standalone bwrap on Linux @bolinfest\n- #21276 [codex] Remove unused ListModels op @pakrym-oai\n- #21282 [codex] Remove legacy ListSkills op @pakrym-oai\n- #21271 Expose plugin manifest keywords in app server @alfozan\n- #20949 [codex-analytics] rework thread_source for thread analytics @rhan-oai\n- #21124 feat: Add plugin share access controls @xl-openai\n- #20724 app-server: align dynamic tool identifiers with Responses API @eternal-openai\n- #21055 Preserve session MCP config on refresh @aaronl-openai\n- #21277 [mcp] Return Accept early per feedback. @mzeng-openai\n- #21285 fix(bwrap): emit libcap after standalone archive @viyatb-oai\n- #21312 release: bundle bwrap with Linux codex DotSlash artifact @bolinfest\n- #19193 Support Codex Apps auth elicitations @mzeng-openai\n- #20437 feat: add `session_id` @jif-oai\n- #21328 test: isolate app-server-client in-process test state @jif-oai\n- #21329 feat: include thread ID in MCP turn metadata @jif-oai\n- #21332 feat: return session ID from thread/fork @jif-oai\n- #21337 Revert \"feat: support template interpolation in multi-agent usage hints\" @jif-oai\n- #21249 Propagate cache key and service tiers in compact @aibrahim-oai\n- #21182 Move installation ID resolution out of core startup @jif-oai\n- #21214 chore: spawn MCP for memories @jif-oai\n- #21336 feat(app-server): move v2 `sessionId` onto `Thread` @jif-oai\n- #21350 [codex] fix builtin MCP Windows path test @jif-oai\n- #20971 2- Use string service tiers in session protocol @aibrahim-oai\n- #21278 Move message history out of core @pakrym-oai\n- #21284 [codex] Add response.processed websocket request @pakrym-oai\n- #21367 rollout: coalesce thread updated_at touches @jif-oai\n- #21378 feat: move auto vaccum @jif-oai\n- #21263 [codex] Coordinate OpenAI docs sample with API key setup @mifan-oai\n- #21351 fix(tui): keep Ctrl-C stashed drafts after /clear @fcoury-oai\n- #21389 vendor: update bubblewrap to 0.11.2 @bolinfest\n- #21281 Remove core MCP list tools op @pakrym-oai\n- #21381 [codex] Handle git pagination flags by position @iceweasel-oai\n- #21397 fix(tui): persist ctrl-c draft via app event @fcoury-oai\n- #19431 Route opted-in MCP elicitations through Guardian @cd-oai\n- #21107 Avoid noisy OTEL diagnostics in codex exec @cpaasch-oai\n- #21390 Avoid hard-coded environment context shell @starr-openai\n- #21090 [codex] Dedupe fallback model metadata warnings @canvrno-oai\n- #21395 [codex] Split tool handlers into separate files @pakrym-oai\n- #21401 [codex-tui] pass thread source for tui threads @rhan-oai\n- #17090 [codex-analytics] emit tool item events from item lifecycle @rhan-oai\n- #21409 [codex] Fix Windows sandbox git safe.directory for worktrees @iceweasel-oai\n- #21379 Document Codex git commit attribution config @henzelmann-oai\n- #21287 Move skills watcher to app-server @pakrym-oai\n- #21416 [codex] Move tool specs into core handlers @pakrym-oai\n- #21419 feat: Add marketplace source filtering and plugin share context @xl-openai\n- #19905 Add compact lifecycle hooks (started by vincentkoc - external contrib) @eternal-openai\n- #21460 Revert \"Move skills watcher to app-server\" @pakrym-oai\n- #21450 fix(tui): clear first inline viewport render @fcoury-oai\n- #21427 [codex] Delete tool handler plan indirection @pakrym-oai\n- #21423 [codex] Add OpenAI Developers to tool suggest allowlist @mifan-oai\n- #21340 [codex] allow shared config reads in app-server queue @xli-oai\n- #21441 [codex] Parallelize skills list cwd loading @xli-oai\n- #21481 Revert state DB injection and agent graph store @pakrym-oai"
+  },
+  "summary": {
+    "changes": 171,
+    "categories": {
+      "behavior": 1,
+      "cli": 13,
+      "config": 95,
+      "hooks": 61,
+      "request": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 102,
+      "notable": 69
+    },
+    "undocumented": 100
+  },
+  "changes": [
+    {
+      "id": "request.identifiers.header:thread_id",
+      "category": "request",
+      "op": "added",
+      "path": [
+        "request",
+        "identifiers",
+        "header:thread_id"
+      ],
+      "title": "Now sends identifier header:thread_id",
+      "impact": "notable",
+      "before": null,
+      "after": "header:thread_id",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-api/src/requests/headers.rs",
+            "line": 11,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-api/src/requests/headers.rs#L11"
+          },
+          {
+            "path": "codex-rs/feedback/src/lib.rs",
+            "line": 467,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/feedback/src/lib.rs#L467"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output removed",
+      "impact": "notable",
+      "before": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40163,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "TE…102500 tokens truncated…9",
+        "truncation": "middle"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "does not block the tool; message not shown to the model",
+        "json_decision": "does not block the tool; message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 880,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L880"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 374,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L374"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.LOGNAME",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "LOGNAME"
+      ],
+      "title": "PreToolUse hook environment variable LOGNAME removed",
+      "impact": "notable",
+      "before": "LOGNAME",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 114,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/protocol/src/shell_environment.rs#L114"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/utils.rs",
+            "line": 132,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/rmcp-client/src/utils.rs#L132"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.PATH",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "PATH"
+      ],
+      "title": "PreToolUse hook environment variable PATH removed",
+      "impact": "notable",
+      "before": "PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 476,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L476"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 480,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L480"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.fired",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "fired"
+      ],
+      "title": "PreToolUse hook fired: true → false",
+      "impact": "informational",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 880,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L880"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 374,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L374"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.cwd",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "cwd"
+      ],
+      "title": "PreToolUse hook payload field cwd removed",
+      "impact": "notable",
+      "before": "cwd",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 517,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L517"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.hook_event_name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "hook_event_name"
+      ],
+      "title": "PreToolUse hook payload field hook_event_name removed",
+      "impact": "notable",
+      "before": "hook_event_name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.model",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "model"
+      ],
+      "title": "PreToolUse hook payload field model removed",
+      "impact": "notable",
+      "before": "model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 8676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server/src/codex_message_processor.rs#L8676"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.permission_mode",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "permission_mode"
+      ],
+      "title": "PreToolUse hook payload field permission_mode removed",
+      "impact": "notable",
+      "before": "permission_mode",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.session_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "session_id"
+      ],
+      "title": "PreToolUse hook payload field session_id removed",
+      "impact": "notable",
+      "before": "session_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/main.rs#L308"
+          },
+          {
+            "path": "codex-rs/codex-api/src/requests/headers.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/requests/headers.rs#L8"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_input",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_input"
+      ],
+      "title": "PreToolUse hook payload field tool_input removed",
+      "impact": "notable",
+      "before": "tool_input",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_input.command",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_input.command"
+      ],
+      "title": "PreToolUse hook payload field tool_input.command removed",
+      "impact": "notable",
+      "before": "tool_input.command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1002,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1002"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1003,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1003"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_name"
+      ],
+      "title": "PreToolUse hook payload field tool_name removed",
+      "impact": "notable",
+      "before": "tool_name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/tools.rs",
+            "line": 33,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-mcp/src/tools.rs#L33"
+          },
+          {
+            "path": "codex-rs/core/src/arc_monitor.rs",
+            "line": 342,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/core/src/arc_monitor.rs#L342"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.tool_use_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "tool_use_id"
+      ],
+      "title": "PreToolUse hook payload field tool_use_id removed",
+      "impact": "notable",
+      "before": "tool_use_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.transcript_path",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "transcript_path"
+      ],
+      "title": "PreToolUse hook payload field transcript_path removed",
+      "impact": "notable",
+      "before": "transcript_path",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.turn_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "turn_id"
+      ],
+      "title": "PreToolUse hook payload field turn_id removed",
+      "impact": "notable",
+      "before": "turn_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/background_requests.rs",
+            "line": 652,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/tui/src/app/background_requests.rs#L652"
+          },
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 290,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/reducer.rs#L290"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.matcher",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "matcher"
+      ],
+      "title": "PreToolUse hook takes a matcher: true → none",
+      "impact": "notable",
+      "before": true,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 671,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L671"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 970,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L970"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.stdin",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "stdin"
+      ],
+      "title": "Hook events.PreToolUse.stdin removed",
+      "impact": "notable",
+      "before": "json",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 671,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L671"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 970,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L970"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "additional_context": "ignored",
+        "exit_2": "message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 885,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L885"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 389,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L389"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.env.LOGNAME",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "LOGNAME"
+      ],
+      "title": "SessionStart hook environment variable LOGNAME removed",
+      "impact": "notable",
+      "before": "LOGNAME",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 114,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/protocol/src/shell_environment.rs#L114"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/utils.rs",
+            "line": 132,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/rmcp-client/src/utils.rs#L132"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.env.PATH",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "PATH"
+      ],
+      "title": "SessionStart hook environment variable PATH removed",
+      "impact": "notable",
+      "before": "PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 476,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L476"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 480,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L480"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.fired",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "fired"
+      ],
+      "title": "SessionStart hook fired: true → false",
+      "impact": "informational",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 885,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L885"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 389,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L389"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.cwd",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "cwd"
+      ],
+      "title": "SessionStart hook payload field cwd removed",
+      "impact": "notable",
+      "before": "cwd",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 517,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L517"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.hook_event_name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "hook_event_name"
+      ],
+      "title": "SessionStart hook payload field hook_event_name removed",
+      "impact": "notable",
+      "before": "hook_event_name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.model",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "model"
+      ],
+      "title": "SessionStart hook payload field model removed",
+      "impact": "notable",
+      "before": "model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 8676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server/src/codex_message_processor.rs#L8676"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.permission_mode",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "permission_mode"
+      ],
+      "title": "SessionStart hook payload field permission_mode removed",
+      "impact": "notable",
+      "before": "permission_mode",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.session_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "session_id"
+      ],
+      "title": "SessionStart hook payload field session_id removed",
+      "impact": "notable",
+      "before": "session_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/main.rs#L308"
+          },
+          {
+            "path": "codex-rs/codex-api/src/requests/headers.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/requests/headers.rs#L8"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.source",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "source"
+      ],
+      "title": "SessionStart hook payload field source removed",
+      "impact": "notable",
+      "before": "source",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1188,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server/src/config/external_agent_config.rs#L1188"
+          },
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1199,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server/src/config/external_agent_config.rs#L1199"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.SessionStart.keys.transcript_path",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "keys",
+        "transcript_path"
+      ],
+      "title": "SessionStart hook payload field transcript_path removed",
+      "impact": "notable",
+      "before": "transcript_path",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.matcher",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "matcher"
+      ],
+      "title": "SessionStart hook takes a matcher: true → none",
+      "impact": "notable",
+      "before": true,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 674,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L674"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 979,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L979"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.stdin",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "stdin"
+      ],
+      "title": "Hook events.SessionStart.stdin removed",
+      "impact": "notable",
+      "before": "json",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 674,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L674"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 979,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L979"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "lets the turn stop; message not shown to the model",
+        "json_decision": "lets the turn stop; message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 887,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L887"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 395,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L395"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.env.LOGNAME",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "LOGNAME"
+      ],
+      "title": "Stop hook environment variable LOGNAME removed",
+      "impact": "notable",
+      "before": "LOGNAME",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 114,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/protocol/src/shell_environment.rs#L114"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/utils.rs",
+            "line": 132,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/rmcp-client/src/utils.rs#L132"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.env.PATH",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "PATH"
+      ],
+      "title": "Stop hook environment variable PATH removed",
+      "impact": "notable",
+      "before": "PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 476,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L476"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 480,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L480"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.fired",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "fired"
+      ],
+      "title": "Stop hook fired: true → false",
+      "impact": "informational",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 887,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L887"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 395,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L395"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.cwd",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "cwd"
+      ],
+      "title": "Stop hook payload field cwd removed",
+      "impact": "notable",
+      "before": "cwd",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 517,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L517"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.hook_event_name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "hook_event_name"
+      ],
+      "title": "Stop hook payload field hook_event_name removed",
+      "impact": "notable",
+      "before": "hook_event_name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.last_assistant_message",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "last_assistant_message"
+      ],
+      "title": "Stop hook payload field last_assistant_message removed",
+      "impact": "notable",
+      "before": "last_assistant_message",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.model",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "model"
+      ],
+      "title": "Stop hook payload field model removed",
+      "impact": "notable",
+      "before": "model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 8676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server/src/codex_message_processor.rs#L8676"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.permission_mode",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "permission_mode"
+      ],
+      "title": "Stop hook payload field permission_mode removed",
+      "impact": "notable",
+      "before": "permission_mode",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.session_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "session_id"
+      ],
+      "title": "Stop hook payload field session_id removed",
+      "impact": "notable",
+      "before": "session_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/main.rs#L308"
+          },
+          {
+            "path": "codex-rs/codex-api/src/requests/headers.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/requests/headers.rs#L8"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.stop_hook_active",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "stop_hook_active"
+      ],
+      "title": "Stop hook payload field stop_hook_active removed",
+      "impact": "notable",
+      "before": "stop_hook_active",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 546,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/core/src/session/turn.rs#L546"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.transcript_path",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "transcript_path"
+      ],
+      "title": "Stop hook payload field transcript_path removed",
+      "impact": "notable",
+      "before": "transcript_path",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.keys.turn_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "keys",
+        "turn_id"
+      ],
+      "title": "Stop hook payload field turn_id removed",
+      "impact": "notable",
+      "before": "turn_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/background_requests.rs",
+            "line": 652,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/tui/src/app/background_requests.rs#L652"
+          },
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 290,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/reducer.rs#L290"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.matcher",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "matcher"
+      ],
+      "title": "Stop hook takes a matcher: false → none",
+      "impact": "notable",
+      "before": false,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L676"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 985,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L985"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.Stop.stdin",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "stdin"
+      ],
+      "title": "Hook events.Stop.stdin removed",
+      "impact": "notable",
+      "before": "json",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L676"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 985,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L985"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control"
+      ],
+      "title": "Hook events.UserPromptSubmit.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "additional_context": "ignored",
+        "exit_2": "does not block the prompt; message not shown to the model",
+        "json_decision": "does not block the prompt; message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 886,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L886"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 392,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L392"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.LOGNAME",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "LOGNAME"
+      ],
+      "title": "UserPromptSubmit hook environment variable LOGNAME removed",
+      "impact": "notable",
+      "before": "LOGNAME",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 114,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/protocol/src/shell_environment.rs#L114"
+          },
+          {
+            "path": "codex-rs/rmcp-client/src/utils.rs",
+            "line": 132,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/rmcp-client/src/utils.rs#L132"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.PATH",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "PATH"
+      ],
+      "title": "UserPromptSubmit hook environment variable PATH removed",
+      "impact": "notable",
+      "before": "PATH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 476,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L476"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 480,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-test-client/src/lib.rs#L480"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.fired",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "fired"
+      ],
+      "title": "UserPromptSubmit hook fired: true → false",
+      "impact": "informational",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 886,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L886"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 392,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L392"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.cwd",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "cwd"
+      ],
+      "title": "UserPromptSubmit hook payload field cwd removed",
+      "impact": "notable",
+      "before": "cwd",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 517,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L517"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/mcp_cmd.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.hook_event_name",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "hook_event_name"
+      ],
+      "title": "UserPromptSubmit hook payload field hook_event_name removed",
+      "impact": "notable",
+      "before": "hook_event_name",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.model",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "model"
+      ],
+      "title": "UserPromptSubmit hook payload field model removed",
+      "impact": "notable",
+      "before": "model",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 8676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server/src/codex_message_processor.rs#L8676"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs",
+            "line": 760,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L760"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.permission_mode",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "permission_mode"
+      ],
+      "title": "UserPromptSubmit hook payload field permission_mode removed",
+      "impact": "notable",
+      "before": "permission_mode",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.prompt",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "prompt"
+      ],
+      "title": "UserPromptSubmit hook payload field prompt removed",
+      "impact": "notable",
+      "before": "prompt",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1014,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1014"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1015,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1015"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.session_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "session_id"
+      ],
+      "title": "UserPromptSubmit hook payload field session_id removed",
+      "impact": "notable",
+      "before": "session_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 308,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/main.rs#L308"
+          },
+          {
+            "path": "codex-rs/codex-api/src/requests/headers.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/codex-api/src/requests/headers.rs#L8"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.transcript_path",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "transcript_path"
+      ],
+      "title": "UserPromptSubmit hook payload field transcript_path removed",
+      "impact": "notable",
+      "before": "transcript_path",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.keys.turn_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "keys",
+        "turn_id"
+      ],
+      "title": "UserPromptSubmit hook payload field turn_id removed",
+      "impact": "notable",
+      "before": "turn_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/background_requests.rs",
+            "line": 652,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/tui/src/app/background_requests.rs#L652"
+          },
+          {
+            "path": "codex-rs/analytics/src/reducer.rs",
+            "line": 290,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/reducer.rs#L290"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.matcher",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "matcher"
+      ],
+      "title": "UserPromptSubmit hook takes a matcher: false → none",
+      "impact": "notable",
+      "before": false,
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 675,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L675"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 982,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L982"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.stdin",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "stdin"
+      ],
+      "title": "Hook events.UserPromptSubmit.stdin removed",
+      "impact": "notable",
+      "before": "json",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 675,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/analytics/src/events.rs#L675"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 982,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L982"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.supported.PostCompact",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "PostCompact"
+      ],
+      "title": "New hook event: PostCompact",
+      "impact": "notable",
+      "before": null,
+      "after": "PostCompact",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 884,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L884"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 386,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L386"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.supported.PreCompact",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "PreCompact"
+      ],
+      "title": "New hook event: PreCompact",
+      "impact": "notable",
+      "before": null,
+      "after": "PreCompact",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L883"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 383,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L383"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--executor-id",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--executor-id"
+      ],
+      "title": "New flag `codex exec-server --executor-id`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Executor id to attach to when registering remotely",
+        "names": [
+          "--executor-id"
+        ],
+        "value": "<ID>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1209,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L1209"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--listen.default",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--listen",
+        "default"
+      ],
+      "title": "Default of `codex exec-server --listen`: ws://127.0.0.1:0 → none",
+      "impact": "notable",
+      "before": "ws://127.0.0.1:0",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1185,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/main.rs#L1185"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--listen.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--listen",
+        "description"
+      ],
+      "title": "`codex exec-server --listen`: description changed",
+      "impact": "informational",
+      "before": "Transport endpoint URL. Supported values: `ws://IP:PORT` (default)",
+      "after": "Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1209,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L1209"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--name",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--name"
+      ],
+      "title": "New flag `codex exec-server --name`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Human-readable executor name",
+        "names": [
+          "--name"
+        ],
+        "value": "<NAME>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1209,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L1209"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.options.--remote",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "options",
+        "--remote"
+      ],
+      "title": "New flag `codex exec-server --remote`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Register this exec-server as a remote executor using the given base URL",
+        "names": [
+          "--remote"
+        ],
+        "value": "<URL>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1209,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L1209"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex login.options.--with-access-token",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex login",
+        "options",
+        "--with-access-token"
+      ],
+      "title": "New flag `codex login --with-access-token`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login --with-access-token`)",
+        "names": [
+          "--with-access-token"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 986,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L986"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/shell_spec.rs",
+            "line": 72,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/tools/handlers/shell_spec.rs#L72"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex login.options.--with-agent-identity",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "codex login",
+        "options",
+        "--with-agent-identity"
+      ],
+      "title": "Flag removed: `codex login --with-agent-identity`",
+      "impact": "notable",
+      "before": {
+        "description": "Read the experimental Agent Identity token from stdin (e.g. `printenv CODEX_AGENT_IDENTITY | codex login --with-agent-identity`)",
+        "names": [
+          "--with-agent-identity"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 961,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/cli/src/main.rs#L961"
+          },
+          {
+            "path": "codex-rs/tools/src/local_tool.rs",
+            "line": 60,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/tools/src/local_tool.rs#L60"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex logout.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex logout",
+        "description"
+      ],
+      "title": "Description of `codex logout` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-WARNING: proceeding, even though we could not update PATH: operation would block Remove stored authentication credentials\n+Remove stored authentication credentials\n",
+      "stats": {
+        "added_chars": 40,
+        "removed_chars": 121
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+339 −123 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,15 +12,22 @@\n           shell_environment_policy.inherit=all`\n \n       --listen <URL>\n-          Transport endpoint URL. Supported values: `ws://IP:PORT` (default)\n-          \n-          [default: ws://127.0.0.1:0]\n+          Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n+      --remote <URL>\n+          Register this exec-server as a remote executor using the given base URL\n+\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --executor-id <ID>\n+          Executor id to attach to when registering remotely\n+\n+      --name <NAME>\n+          Human-readable executor name\n \n   -h, --help\n           Print help (see a summary with '-h')\n",
+      "stats": {
+        "added_chars": 339,
+        "removed_chars": 123
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+375 −149 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,9 +7,12 @@\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n-      --listen <URL>        Transport endpoint URL. Supported values: `ws://IP:PORT` (default)\n-                            [default: ws://127.0.0.1:0]\n+      --listen <URL>        Transport endpoint URL. Supported values: `ws://IP:PORT` (default),\n+                            `stdio`, `stdio://`\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --remote <URL>        Register this exec-server as a remote executor using the given base URL\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --executor-id <ID>    Executor id to attach to when registering remotely\n+      --name <NAME>         Human-readable executor name\n   -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 375,
+        "removed_chars": 149
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.login --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login --help"
+      ],
+      "title": "Full help text of `login --help` changed (+147 −174 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -21,9 +21,9 @@\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --with-agent-identity\n-          Read the experimental Agent Identity token from stdin (e.g. `printenv CODEX_AGENT_IDENTITY\n-          | codex login --with-agent-identity`)\n+      --with-access-token\n+          Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login\n+          --with-access-token`)\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n",
+      "stats": {
+        "added_chars": 147,
+        "removed_chars": 174
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 379,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L379"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+956 −1021 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,17 +7,16 @@\n   help    Print this message or the help of the given subcommand(s)\n \n Options:\n-  -c, --config <key=value>   Override a configuration value that would otherwise be loaded from\n-                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n-                             nested values. The `value` portion is parsed as TOML. If it fails to\n-                             parse as TOML, the raw string is used as a literal\n-      --with-api-key         Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex\n-                             login --with-api-key`)\n-      --enable <FEATURE>     Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --with-agent-identity  Read the experimental Agent Identity token from stdin (e.g. `printenv\n-                             CODEX_AGENT_IDENTITY | codex login --with-agent-identity`)\n-      --disable <FEATURE>    Disable a feature (repeatable). Equivalent to `-c\n-                             features.<name>=false`\n-      --device-auth          \n-  -h, --help                 Print help (see more with '--help')\n+  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n+                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n+                            nested values. The `value` portion is parsed as TOML. If it fails to\n+                            parse as TOML, the raw string is used as a literal\n+      --with-api-key        Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login\n+                            --with-api-key`)\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --with-access-token   Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN |\n+                            codex login --with-access-token`)\n+      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --device-auth         \n+  -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 956,
+        "removed_chars": 1021
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 379,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L379"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 373,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/cli/src/main.rs#L373"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.logout --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "logout --help"
+      ],
+      "title": "Full help text of `logout --help` changed (+0 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not update PATH: operation would block\n Remove stored authentication credentials\n \n Usage: codex logout [OPTIONS]\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/arg0/src/lib.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.allow_login_shell.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allow_login_shell",
+        "default"
+      ],
+      "title": "Default of allow_login_shell: none → true",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.commit_attribution.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "commit_attribution",
+        "description"
+      ],
+      "title": "commit_attribution description changed (+287 −134 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,3 @@\n-Optional commit attribution text for commit message co-author trailers.\n+Optional commit attribution text for commit message co-author trailers. This top-level setting only takes effect when `[features].codex_git_commit` is enabled.\n \n-Set to an empty string to disable automatic commit attribution.\n+When enabled and unset, Codex uses `Codex <noreply@openai.com>`. Set to an empty string to disable automatic commit attribution.\n",
+      "stats": {
+        "added_chars": 287,
+        "removed_chars": 134
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.debug",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "debug"
+      ],
+      "title": "New setting: debug",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Debugging and reproducibility settings.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/bin/logs_client.rs",
+            "line": 369,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/state/src/bin/logs_client.rs#L369"
+          },
+          {
+            "path": "codex-rs/tui/src/bottom_pane/command_popup.rs",
+            "line": 74,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/bottom_pane/command_popup.rs#L74"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.debug.config_lockfile",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile"
+      ],
+      "title": "New setting: debug.config_lockfile",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.allow_codex_version_mismatch",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.allow_codex_version_mismatch"
+      ],
+      "title": "New setting: debug.config_lockfile.allow_codex_version_mismatch",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Allow replaying a lock generated by a different Codex version.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.export_dir",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.export_dir"
+      ],
+      "title": "New setting: debug.config_lockfile.export_dir",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Directory where Codex writes effective session config lock files.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.load_path",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.load_path"
+      ],
+      "title": "New setting: debug.config_lockfile.load_path",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Lockfile to replay as the authoritative effective config.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.save_fields_resolved_from_model_catalog",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.save_fields_resolved_from_model_catalog"
+      ],
+      "title": "New setting: debug.config_lockfile.save_fields_resolved_from_model_catalog",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Save fields resolved from the model catalog/session configuration.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.auth_elicitation",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.auth_elicitation"
+      ],
+      "title": "New setting: features.auth_elicitation",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1062,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/features/src/lib.rs#L1062"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.browser_use_external",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.browser_use_external"
+      ],
+      "title": "New setting: features.browser_use_external",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 976,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/features/src/lib.rs#L976"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.builtin_mcp",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.builtin_mcp"
+      ],
+      "title": "New setting: features.builtin_mcp",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 802,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/features/src/lib.rs#L802"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.hooks"
+      ],
+      "title": "New setting: features.hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server/src/config/external_agent_config.rs#L1589"
+          },
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1103,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/config/src/config_requirements.rs#L1103"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.remote_compaction_v2",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.remote_compaction_v2"
+      ],
+      "title": "New setting: features.remote_compaction_v2",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1152,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/features/src/lib.rs#L1152"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.responses_websocket_response_processed",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.responses_websocket_response_processed"
+      ],
+      "title": "New setting: features.responses_websocket_response_processed",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/features/src/lib.rs#L1146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hide_agent_reasoning.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "hide_agent_reasoning",
+        "default"
+      ],
+      "title": "Default of hide_agent_reasoning: none → false",
+      "impact": "notable",
+      "before": null,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.history.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "history",
+        "default"
+      ],
+      "title": "Default of history: none → {\"max_bytes\":null,\"persistence\":\"save-all\"}",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "max_bytes": null,
+        "persistence": "save-all"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.history.persistence.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "history.persistence",
+        "default"
+      ],
+      "title": "Default of history.persistence: none → save-all",
+      "impact": "notable",
+      "before": null,
+      "after": "save-all",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact"
+      ],
+      "title": "New setting: hooks.PostCompact",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 884,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L884"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 386,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L386"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server/src/config/external_agent_config.rs#L1589"
+          },
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1103,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/config/src/config_requirements.rs#L1103"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].async"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 582,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L582"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 588,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L588"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].command"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 412,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L412"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 413,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L413"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 420,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L420"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 421,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L421"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].type"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 190,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L190"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].matcher"
+      ],
+      "title": "New setting: hooks.PostCompact[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 557,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L557"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 643,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L643"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact"
+      ],
+      "title": "New setting: hooks.PreCompact",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L883"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 383,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L383"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/config/external_agent_config.rs",
+            "line": 1589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server/src/config/external_agent_config.rs#L1589"
+          },
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1103,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/config/src/config_requirements.rs#L1103"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].async"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 582,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L582"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 588,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L588"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].command"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 412,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L412"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 413,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L413"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 420,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L420"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 421,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L421"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].type"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 190,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/analytics/src/events.rs#L190"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].matcher"
+      ],
+      "title": "New setting: hooks.PreCompact[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 557,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L557"
+          },
+          {
+            "path": "codex-rs/external-agent-migration/src/lib.rs",
+            "line": 643,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/external-agent-migration/src/lib.rs#L643"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.state.<name>.trusted_hash",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.state.<name>.trusted_hash"
+      ],
+      "title": "New setting: hooks.state.<name>.trusted_hash",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/background_requests.rs",
+            "line": 876,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/app/background_requests.rs#L876"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.profiles.<name>.tui",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.tui"
+      ],
+      "title": "New setting: profiles.<name>.tui",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "TUI settings scoped to this profile.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 90,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L90"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 98,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L98"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.project_doc_fallback_filenames.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "project_doc_fallback_filenames",
+        "default"
+      ],
+      "title": "Default of project_doc_fallback_filenames: none → []",
+      "impact": "notable",
+      "before": null,
+      "after": [],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.project_doc_max_bytes.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "project_doc_max_bytes",
+        "default"
+      ],
+      "title": "Default of project_doc_max_bytes: none → 32768",
+      "impact": "notable",
+      "before": null,
+      "after": 32768,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap",
+        "default"
+      ],
+      "title": "Default of tui.keymap: {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap… → {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap…",
+      "impact": "notable",
+      "before": {
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "move_down": null,
+          "move_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        }
+      },
+      "after": {
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "submit": null,
+          "toggle_shortcuts": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "clear_terminal": null,
+          "copy": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "move_down": null,
+          "move_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "insert_line_start": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "yank_line": null
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 151,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L151"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 169,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L169"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.keymap.editor.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.editor",
+        "default"
+      ],
+      "title": "Default of tui.keymap.editor: {\"delete_backward\":null,\"delete_backward_word\":null,\"dele… → {\"delete_backward\":null,\"delete_backward_word\":null,\"dele…",
+      "impact": "notable",
+      "before": {
+        "delete_backward": null,
+        "delete_backward_word": null,
+        "delete_forward": null,
+        "delete_forward_word": null,
+        "insert_newline": null,
+        "kill_line_end": null,
+        "kill_line_start": null,
+        "move_down": null,
+        "move_left": null,
+        "move_line_end": null,
+        "move_line_start": null,
+        "move_right": null,
+        "move_up": null,
+        "move_word_left": null,
+        "move_word_right": null,
+        "yank": null
+      },
+      "after": {
+        "delete_backward": null,
+        "delete_backward_word": null,
+        "delete_forward": null,
+        "delete_forward_word": null,
+        "insert_newline": null,
+        "kill_line_end": null,
+        "kill_line_start": null,
+        "kill_whole_line": null,
+        "move_down": null,
+        "move_left": null,
+        "move_line_end": null,
+        "move_line_start": null,
+        "move_right": null,
+        "move_up": null,
+        "move_word_left": null,
+        "move_word_right": null,
+        "yank": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 963,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L963"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 104,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L104"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.keymap.editor.kill_whole_line",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.editor.kill_whole_line"
+      ],
+      "title": "New setting: tui.keymap.editor.kill_whole_line",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Kill the current line.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 985,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L985"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 118,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L118"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.global.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.global",
+        "default"
+      ],
+      "title": "Default of tui.keymap.global: {\"clear_terminal\":null,\"copy\":null,\"open_external_editor\"… → {\"clear_terminal\":null,\"copy\":null,\"open_external_editor\"…",
+      "impact": "notable",
+      "before": {
+        "clear_terminal": null,
+        "copy": null,
+        "open_external_editor": null,
+        "open_transcript": null,
+        "queue": null,
+        "submit": null,
+        "toggle_shortcuts": null
+      },
+      "after": {
+        "clear_terminal": null,
+        "copy": null,
+        "open_external_editor": null,
+        "open_transcript": null,
+        "queue": null,
+        "submit": null,
+        "toggle_fast_mode": null,
+        "toggle_raw_output": null,
+        "toggle_shortcuts": null,
+        "toggle_vim_mode": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/secrets/src/local.rs",
+            "line": 307,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/secrets/src/local.rs#L307"
+          },
+          {
+            "path": "codex-rs/state/src/runtime/memories.rs",
+            "line": 21,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/state/src/runtime/memories.rs#L21"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.keymap.global.toggle_fast_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.global.toggle_fast_mode"
+      ],
+      "title": "New setting: tui.keymap.global.toggle_fast_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Toggle Fast mode.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 764,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L764"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 806,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L806"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.global.toggle_raw_output",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.global.toggle_raw_output"
+      ],
+      "title": "New setting: tui.keymap.global.toggle_raw_output",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Toggle raw scrollback mode for copy-friendly transcript selection.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 765,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L765"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 807,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L807"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.global.toggle_vim_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.global.toggle_vim_mode"
+      ],
+      "title": "New setting: tui.keymap.global.toggle_vim_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Toggle Vim mode for the composer input.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 763,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L763"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 805,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L805"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal"
+      ],
+      "title": "New setting: tui.keymap.vim_normal",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "insert_line_start": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "yank_line": null
+        },
+        "description": "Vim normal-mode keybindings for modal editing inside text areas.\n\nActions that use uppercase letters (like `A` for append-line-end) should be specified as `shift-a` in config; the runtime matcher handles cross-terminal shift-reporting differences automatically.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 992,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L992"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 121,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L121"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.append_after_cursor",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.append_after_cursor"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.append_after_cursor",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Enter insert mode after cursor (`a`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 996,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L996"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L122"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.append_line_end",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.append_line_end"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.append_line_end",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Enter insert mode at end of line (`A`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1000,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1000"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 123,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L123"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.cancel_operator",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.cancel_operator"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.cancel_operator",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Cancel a pending operator and return to normal mode.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1049,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1049"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 142,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L142"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.delete_char",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.delete_char"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.delete_char",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Delete character under cursor (`x`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1033,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1033"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 136,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L136"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.delete_to_line_end",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.delete_to_line_end"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.delete_to_line_end",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Delete from cursor to end of line (`D`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1035,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1035"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 137,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L137"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.enter_insert",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.enter_insert"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.enter_insert",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Enter insert mode at cursor (`i`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 994,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L994"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 121,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L121"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.insert_line_start",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.insert_line_start"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.insert_line_start",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Enter insert mode at first non-blank of line (`I`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1004,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1004"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 124,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L124"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_down",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_down"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_down",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor down (`j`), or recall newer composer history at history boundaries.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 969,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L969"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1018,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1018"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_left",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_left"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_left",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor left (`h`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 966,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L966"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1015,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1015"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_line_end",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_line_end"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_line_end",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor to end of line (`$`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 973,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L973"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1032,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1032"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_line_start",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_line_start"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_line_start",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor to start of line (`0`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 972,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L972"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1029,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1029"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_right",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_right"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_right",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor right (`l`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 967,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L967"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1016,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1016"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_up",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_up"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_up",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor up (`k`), or recall older composer history at history boundaries.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 968,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L968"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1017,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1017"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_word_backward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_word_backward"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_word_backward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor to start of previous word (`b`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1024,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1024"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 132,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L132"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_word_end",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_word_end"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_word_end",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor to end of current/next word (`e`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1027,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1027"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 133,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L133"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.move_word_forward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.move_word_forward"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.move_word_forward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Move cursor to start of next word (`w`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1020,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1020"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 131,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L131"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.open_line_above",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.open_line_above"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.open_line_above",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Open a new line above and enter insert mode (`O`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1012,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1012"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 126,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L126"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.open_line_below",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.open_line_below"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.open_line_below",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Open a new line below and enter insert mode (`o`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1008,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1008"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 125,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L125"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.paste_after",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.paste_after"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.paste_after",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Paste after cursor (`p`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1039,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1039"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 139,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L139"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.start_delete_operator",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.start_delete_operator"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.start_delete_operator",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Begin delete operator; next key selects motion (`d`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1041,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1041"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 140,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L140"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.start_yank_operator",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.start_yank_operator"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.start_yank_operator",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Begin yank operator; next key selects motion (`y`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1045,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1045"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 141,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L141"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_normal.yank_line",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_normal.yank_line"
+      ],
+      "title": "New setting: tui.keymap.vim_normal.yank_line",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Yank the entire line (`Y`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1038,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1038"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1059,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1059"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator"
+      ],
+      "title": "New setting: tui.keymap.vim_operator",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "yank_line": null
+        },
+        "description": "Vim operator-pending keybindings for modal editing inside text areas.\n\nThis context is active only while waiting for a motion after `d` or `y`. Repeating the operator key (`dd`, `yy`) targets the entire line. Pressing `Esc` cancels the pending operator and returns to normal mode without modifying text.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1056,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1056"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 143,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L143"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.cancel",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.cancel"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.cancel",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Cancel the pending operator and return to normal mode.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/bottom_pane/mcp_server_elicitation.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/bottom_pane/mcp_server_elicitation.rs#L66"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1084,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1084"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.delete_line",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.delete_line"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.delete_line",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Repeat delete operator to delete the whole line (`dd`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1058,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1058"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 143,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L143"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_down",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_down"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_down",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: down one line (`j`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1063,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1063"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 148,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L148"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_left",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_left"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_left",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: left (`h`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1060,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1060"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 145,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L145"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_line_end",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_line_end"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_line_end",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: to end of line (`$`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1081,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1081"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 153,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L153"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_line_start",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_line_start"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_line_start",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: to start of line (`0`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1077,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1077"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 152,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L152"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_right",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_right"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_right",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: right (`l`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1061,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1061"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_up",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_up"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_up",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: up one line (`k`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1062,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1062"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 147,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L147"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_word_backward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_word_backward"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_word_backward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: to start of previous word (`b`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1069,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1069"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 150,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L150"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_word_end",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_word_end"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_word_end",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: to end of current/next word (`e`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1073,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1073"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 151,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L151"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.motion_word_forward",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.motion_word_forward"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.motion_word_forward",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Motion: to start of next word (`w`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1065,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1065"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap_setup/actions.rs",
+            "line": 149,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap_setup/actions.rs#L149"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.vim_operator.yank_line",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.vim_operator.yank_line"
+      ],
+      "title": "New setting: tui.keymap.vim_operator.yank_line",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Repeat yank operator to yank the whole line (`yy`).",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1038,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1038"
+          },
+          {
+            "path": "codex-rs/tui/src/keymap.rs",
+            "line": 1059,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/keymap.rs#L1059"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.raw_output_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.raw_output_mode"
+      ],
+      "title": "New setting: tui.raw_output_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "description": "Start the TUI in raw scrollback mode for copy-friendly transcript output. Defaults to `false`.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.session_picker_view",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.session_picker_view"
+      ],
+      "title": "New setting: tui.session_picker_view",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Preferred layout for resume/fork session picker results.",
+        "enum": [
+          "comfortable",
+          "dense"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 98,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L98"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 1334,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L1334"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.status_line_use_colors",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.status_line_use_colors"
+      ],
+      "title": "New setting: tui.status_line_use_colors",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": true,
+        "description": "Color status line items with colors derived from the active syntax theme. Defaults to `true`.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 119,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/core/src/config/edit.rs#L119"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.vim_mode_default",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.vim_mode_default"
+      ],
+      "title": "New setting: tui.vim_mode_default",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "description": "Start the composer in Vim mode (`Normal`) by default. Defaults to `false`.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_ACCESS_TOKEN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_ACCESS_TOKEN"
+      ],
+      "title": "New environment variable: CODEX_ACCESS_TOKEN",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_ACCESS_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/login/src/auth/manager.rs",
+            "line": 467,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/login/src/auth/manager.rs#L467"
+          },
+          {
+            "path": "codex-rs/login/src/auth/manager.rs",
+            "line": 481,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/login/src/auth/manager.rs#L481"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_BWRAP_SHA256",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_BWRAP_SHA256"
+      ],
+      "title": "New environment variable: CODEX_BWRAP_SHA256",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_BWRAP_SHA256",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/linux-sandbox/src/bundled_bwrap.rs",
+            "line": 110,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/linux-sandbox/src/bundled_bwrap.rs#L110"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_CUSTOM_CA_PROBE_PROXY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_CUSTOM_CA_PROBE_PROXY"
+      ],
+      "title": "New environment variable: CODEX_CUSTOM_CA_PROBE_PROXY",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_CUSTOM_CA_PROBE_PROXY",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/bin/custom_ca_probe.rs",
+            "line": 23,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/bin/custom_ca_probe.rs#L23"
+          },
+          {
+            "path": "codex-rs/codex-client/src/bin/custom_ca_probe.rs",
+            "line": 48,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/bin/custom_ca_probe.rs#L48"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_CUSTOM_CA_PROBE_TLS13",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_CUSTOM_CA_PROBE_TLS13"
+      ],
+      "title": "New environment variable: CODEX_CUSTOM_CA_PROBE_TLS13",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_CUSTOM_CA_PROBE_TLS13",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/bin/custom_ca_probe.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/bin/custom_ca_probe.rs#L22"
+          },
+          {
+            "path": "codex-rs/codex-client/src/bin/custom_ca_probe.rs",
+            "line": 54,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/bin/custom_ca_probe.rs#L54"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_CUSTOM_CA_PROBE_URL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_CUSTOM_CA_PROBE_URL"
+      ],
+      "title": "New environment variable: CODEX_CUSTOM_CA_PROBE_URL",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_CUSTOM_CA_PROBE_URL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/bin/custom_ca_probe.rs",
+            "line": 24,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/bin/custom_ca_probe.rs#L24"
+          },
+          {
+            "path": "codex-rs/codex-client/src/bin/custom_ca_probe.rs",
+            "line": 49,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/codex-client/src/bin/custom_ca_probe.rs#L49"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.RUNFILES_DIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "RUNFILES_DIR"
+      ],
+      "title": "New environment variable: RUNFILES_DIR",
+      "impact": "informational",
+      "before": null,
+      "after": "RUNFILES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/fs_sandbox.rs",
+            "line": 35,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/exec-server/src/fs_sandbox.rs#L35"
+          },
+          {
+            "path": "codex-rs/linux-sandbox/src/bazel_bwrap.rs",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/linux-sandbox/src/bazel_bwrap.rs#L30"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.RUNFILES_MANIFEST_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "RUNFILES_MANIFEST_FILE"
+      ],
+      "title": "New environment variable: RUNFILES_MANIFEST_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "RUNFILES_MANIFEST_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/fs_sandbox.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/exec-server/src/fs_sandbox.rs#L36"
+          },
+          {
+            "path": "codex-rs/linux-sandbox/src/bazel_bwrap.rs",
+            "line": 32,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/linux-sandbox/src/bazel_bwrap.rs#L32"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TEST_SRCDIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TEST_SRCDIR"
+      ],
+      "title": "New environment variable: TEST_SRCDIR",
+      "impact": "informational",
+      "before": null,
+      "after": "TEST_SRCDIR",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/fs_sandbox.rs",
+            "line": 38,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/exec-server/src/fs_sandbox.rs#L38"
+          },
+          {
+            "path": "codex-rs/linux-sandbox/src/bazel_bwrap.rs",
+            "line": 31,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/linux-sandbox/src/bazel_bwrap.rs#L31"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TEST_WORKSPACE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TEST_WORKSPACE"
+      ],
+      "title": "New environment variable: TEST_WORKSPACE",
+      "impact": "informational",
+      "before": null,
+      "after": "TEST_WORKSPACE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/fs_sandbox.rs",
+            "line": 39,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/exec-server/src/fs_sandbox.rs#L39"
+          },
+          {
+            "path": "codex-rs/linux-sandbox/src/bazel_bwrap.rs",
+            "line": 38,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/linux-sandbox/src/bazel_bwrap.rs#L38"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TMUX_PANE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TMUX_PANE"
+      ],
+      "title": "New environment variable: TMUX_PANE",
+      "impact": "informational",
+      "before": null,
+      "after": "TMUX_PANE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/terminal-detection/src/lib.rs",
+            "line": 378,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/terminal-detection/src/lib.rs#L378"
+          },
+          {
+            "path": "codex-rs/tui/src/clipboard_copy.rs",
+            "line": 206,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/tui/src/clipboard_copy.rs#L206"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_AGENT_IDENTITY",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_AGENT_IDENTITY"
+      ],
+      "title": "Environment variable no longer read: CODEX_AGENT_IDENTITY",
+      "impact": "informational",
+      "before": "CODEX_AGENT_IDENTITY",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/login/src/auth/manager.rs",
+            "line": 467,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/login/src/auth/manager.rs#L467"
+          },
+          {
+            "path": "codex-rs/login/src/auth/manager.rs",
+            "line": 484,
+            "url": "https://github.com/openai/codex/blob/rust-v0.128.0/codex-rs/login/src/auth/manager.rs#L484"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

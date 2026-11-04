@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.111.0",
+  "to": "0.112.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.111.0...rust-v0.112.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.112.0",
+    "text": "## New Features\n- Added `@plugin` mentions so users can reference plugins directly in chat and auto-include their associated MCP/app/skill context. (#13510)\n- Added a new model-selection surface update so the latest model catalog changes are surfaced in the TUI picker flow. (#13617)\n- Merged executable permission profiles into per-turn sandbox policy for zsh-fork skill execution, allowing safer, additive privilege handling for tool runs. (#13496)\n\n## Bug Fixes\n- Fixed JS REPL state handling so previously-initialized bindings persist after a failed cell, reducing brittle restarts during iterative sessions. (#13482)\n- Treated `SIGTERM` like Ctrl-C for graceful app-server websocket shutdown instead of abrupt termination behavior. (#13594)\n- Hardened js_repl image emission to accept only `data:` URLs, preventing external URL forwarding through `emitImage`. (#13507)\n- Ensured Linux bubblewrap sandbox runs always unshare the user namespace to keep isolation consistent even for root-owned invocations. (#13624)\n- Improved macOS sandbox network and unix-socket handling in Seatbelt, improving reliability for constrained subprocess environments. (#12702)\n- Surfaced feedback/diagnostics earlier in the workflow so connectivity and diagnostics are visible before later steps. (#13604)\n\n## Documentation\n- Clarified js_repl image guidance (emission and encoding semantics), including clearer usage around repeated `emitImage` calls. (#13639)\n\n## Chores\n- Fixed a small codespell warning in the TUI theme picker path. (#13605)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.111.0...rust-v0.112.0\n\n- #13594 treat SIGTERM like ctrl-c for graceful shutdown @maxj-oai\n- #13605 Fix codespell warning about pre-selects @fjord-oai\n- #13482 Persist initialized js_repl bindings after failed cells @fjord-oai\n- #13604 [diagnostics] show diagnostics earlier in workflow @rhan-oai\n- #13496 feat: merge skill permission profiles into the turn sandbox for zsh-fork execs @celia-oai\n- #13507 Harden js_repl emitImage to accept only data: URLs @fjord-oai\n- #13602 feat(core): persist trace_id for turns in RolloutItem::TurnContext @owenlin0\n- #13624 fix(linux-sandbox): always unshare bwrap userns @viyatb-oai\n- #12702 Improve macOS Seatbelt network and unix socket handling @viyatb-oai\n- #13639 Clarify js_repl image emission and encoding guidance @fjord-oai\n- #13510 add @plugin mentions @sayan-oai\n- #13499 core/protocol: add structured macOS additional permissions and merge them into sandbox execution @celia-oai\n- #13617 Update models.json @aibrahim-oai"
+  },
+  "summary": {
+    "changes": 6,
+    "categories": {
+      "behavior": 2,
+      "caching": 1,
+      "cli": 1,
+      "model": 1,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 5
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "model.params.reasoning.summary",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "params",
+        "reasoning",
+        "summary"
+      ],
+      "title": "Model parameter reasoning.summary: auto → none",
+      "impact": "notable",
+      "before": "auto",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/traces/otel_manager.rs",
+            "line": 767,
+            "url": "https://github.com/openai/codex/blob/rust-v0.111.0/codex-rs/otel/src/traces/otel_manager.rs#L767"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+184 −144 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -97,8 +97,8 @@\n - Use monospace commands/paths/env vars/code ids, inline examples, and literal keyword bullets by wrapping them in backticks.\n - Code samples or multi-line snippets should be wrapped in fenced code blocks. Include an info string as often as possible.\n - File References: When referencing files in your response follow the below rules:\n-  * Use markdown links (not inline code) for clickable file paths.\n-  * Each reference should have a stand alone path. Even if it's the same file.\n+  * Use markdown links (not inline code) for clickable files.\n+  * Each file reference should have a stand-alone path; use inline code for non-clickable paths (for example, directories).\n   * For clickable/openable file references, the path target must be an absolute filesystem path. Labels may be short (for example, `[app.ts](/abs/path/app.ts)`).\n   * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n   * Do not use URIs like file://, vscode://, or https://.\n",
+      "stats": {
+        "added_chars": 184,
+        "removed_chars": 144
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "caching.across_turns",
+      "category": "caching",
+      "op": "added",
+      "path": [
+        "caching",
+        "across_turns"
+      ],
+      "title": "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "breakpoints": [
+          [],
+          [],
+          []
+        ],
+        "stable_cache_key": true,
+        "stable_prefix_chars": 4702,
+        "turns": 3
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "approval": "never",
+        "model": "gpt-5.3-codex",
+        "models": [
+          "gpt-5.3-codex"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR, <codex-home>/memories]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40163,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "TE…102500 tokens truncated…9",
+        "truncation": "middle"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+80 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not update PATH: operation would block\n Run commands within a Codex-provided sandbox\n \n Usage: codex sandbox [OPTIONS] <COMMAND>\n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 118,
+            "url": "https://github.com/openai/codex/blob/rust-v0.112.0/codex-rs/arg0/src/lib.rs#L118"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

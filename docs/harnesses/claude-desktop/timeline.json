@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "harness": "claude-desktop",
+  "steps": [
+    {
+      "version": "2.1.318",
+      "previous": "2.1.317",
+      "changes": []
+    },
+    {
+      "version": "2.1.317",
+      "previous": "2.1.316",
+      "changes": []
+    },
+    {
+      "version": "2.1.316",
+      "previous": "2.1.314",
+      "changes": []
+    },
+    {
+      "version": "2.1.314",
+      "previous": "2.1.312",
+      "changes": []
+    },
+    {
+      "version": "2.1.312",
+      "previous": "2.1.311",
+      "changes": []
+    },
+    {
+      "version": "2.1.311",
+      "previous": "2.1.310",
+      "changes": []
+    },
+    {
+      "version": "2.1.310",
+      "previous": "2.1.309",
+      "changes": []
+    },
+    {
+      "version": "2.1.309",
+      "previous": "2.1.308",
+      "changes": []
+    },
+    {
+      "version": "2.1.308",
+      "previous": "2.1.306",
+      "changes": []
+    },
+    {
+      "version": "2.1.306",
+      "previous": "2.1.304",
+      "changes": []
+    },
+    {
+      "version": "2.1.304",
+      "previous": "2.1.303",
+      "changes": []
+    },
+    {
+      "version": "2.1.303",
+      "previous": "2.1.302",
+      "changes": []
+    },
+    {
+      "version": "2.1.302",
+      "previous": "2.1.301",
+      "changes": []
+    },
+    {
+      "version": "2.1.301",
+      "previous": "2.1.300",
+      "changes": []
+    },
+    {
+      "version": "2.1.300",
+      "previous": "2.1.299",
+      "changes": []
+    },
+    {
+      "version": "2.1.299",
+      "previous": "2.1.296",
+      "changes": []
+    },
+    {
+      "version": "2.1.296",
+      "previous": "2.1.202",
+      "changes": []
+    }
+  ]
+}

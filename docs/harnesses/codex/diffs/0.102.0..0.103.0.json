@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.102.0",
+  "to": "0.103.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.102.0...rust-v0.103.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.103.0",
+    "text": "## New Features\n- App listing responses now include richer app details (`app_metadata`, branding, and labels), so clients can render more complete app cards without extra requests. (#11706)\n- Commit co-author attribution now uses a Codex-managed `prepare-commit-msg` hook, with `command_attribution` override support (default label, custom label, or disable). (#11617)\n\n## Bug Fixes\n- Removed the `remote_models` feature flag to prevent fallback model metadata when it was disabled, improving model selection reliability and performance. (#11699)\n\n## Chores\n- Updated Rust dependencies (`clap`, `env_logger`, `arc-swap`) and refreshed Bazel lock state as routine maintenance. (#11888, #11889, #11890, #12032)\n- Reverted the Rust toolchain bump to `1.93.1` after CI breakage. (#11886, #12035)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.102.0...rust-v0.103.0\n\n- #11699 chore: rm remote models fflag @sayan-oai\n- #11706 [apps] Expose more fields from apps listing endpoints. @mzeng-openai\n- #11890 chore(deps): bump arc-swap from 1.8.0 to 1.8.2 in /codex-rs @dependabot\n- #11886 chore(deps): bump rust-toolchain from 1.93.0 to 1.93.1 in /codex-rs @dependabot\n- #12032 chore: just bazel-lock-update @bolinfest\n- #11888 chore(deps): bump clap from 4.5.56 to 4.5.58 in /codex-rs @dependabot\n- #11889 chore(deps): bump env_logger from 0.11.8 to 0.11.9 in /codex-rs @dependabot\n- #11617 Use prompt-based co-author attribution with config override @gabec-openai\n- #12035 Revert \"chore(deps): bump rust-toolchain from 1.93.0 to 1.93.1 in /co…dex-rs (#11886)\" @etraut-openai"
+  },
+  "summary": {
+    "changes": 3,
+    "categories": {
+      "cli": 1,
+      "config": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 3,
+      "notable": 0
+    },
+    "undocumented": 3
+  },
+  "changes": [
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+97 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not update PATH: No such file or directory (os error 2)\n [experimental] Run the app server or related tooling\n \n Usage: codex app-server [OPTIONS] [COMMAND]\n",
+      "stats": {
+        "added_chars": 97,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 78,
+            "url": "https://github.com/openai/codex/blob/rust-v0.103.0/codex-rs/arg0/src/lib.rs#L78"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.commit_attribution",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "commit_attribution"
+      ],
+      "title": "New setting: commit_attribution",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Optional commit attribution text for commit message co-author trailers.\n\nSet to an empty string to disable automatic commit attribution.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.codex_git_commit",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.codex_git_commit"
+      ],
+      "title": "New setting: features.codex_git_commit",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 473,
+            "url": "https://github.com/openai/codex/blob/rust-v0.103.0/codex-rs/core/src/features.rs#L473"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

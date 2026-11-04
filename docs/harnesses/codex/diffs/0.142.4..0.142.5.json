@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.142.4",
+  "to": "0.142.5",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.142.4...rust-v0.142.5"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.142.5",
+    "text": "## Bug Fixes\n\n- Prevented full Responses WebSocket request payloads from being written to trace logs. (#30771)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.142.4...rust-v0.142.5\n\n- #30771 [codex] Backport websocket trace fix to release/0.142 @dylan-hurd-oai"
+  },
+  "summary": {
+    "changes": 2,
+    "categories": {
+      "behavior": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 2
+    },
+    "undocumented": 2
+  },
+  "changes": [
+    {
+      "id": "behavior.compaction",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "compaction"
+      ],
+      "title": "Behaviour: compaction removed",
+      "impact": "notable",
+      "before": {
+        "model": "gpt-5.5",
+        "prompt": "You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.\n\nInclude:\n- Current progress and key decisions made\n- Important context, constraints, or user preferences\n- What remains to be done (clear next steps)\n- Any critical data, examples, or references needed to continue\n\nBe concise, structured, and focused on helping the next LLM seamlessly continue the work.\n",
+        "reported_input_tokens": 995000,
+        "tools": 0,
+        "trigger": "auto"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output removed",
+      "impact": "notable",
+      "before": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40220,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "Warning: truncated output (original token count: 112500)",
+        "truncation": "middle"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

@@ -1,0 +1,985 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.120.0",
+  "to": "0.121.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.120.0...rust-v0.121.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.121.0",
+    "text": "## New Features\n- Added `codex marketplace add` and app-server support for installing plugin marketplaces from GitHub, git URLs, local directories, and direct `marketplace.json` URLs (#17087, #17717, #17756).\n- Added TUI prompt history improvements, including `Ctrl+R` reverse search and local recall for accepted slash commands (#17550, #17336).\n- Added TUI and app-server controls for memory mode, memory reset/deletion, and memory-extension cleanup (#17632, #17626, #17913, #17937, #17844).\n- Expanded MCP/plugin support with MCP Apps tool calls, namespaced MCP registration, parallel-call opt-in, and sandbox-state metadata for MCP servers (#17364, #17404, #17667, #17763).\n- Added realtime and app-server APIs for output modality, transcript completion events, raw turn item injection, and symlink-aware filesystem metadata (#17701, #17703, #17719).\n- Added a secure devcontainer profile with bubblewrap support, plus macOS sandbox allowlists for Unix sockets (#10431, #17547, #17654).\n\n## Bug Fixes\n- Fixed macOS sandbox/proxy handling for private DNS and removed the `danger-full-access` denylist-only network mode (#17370, #17732).\n- Fixed Windows cwd/session matching so `resume --last` and `thread/list` work when paths use verbatim prefixes (#17414).\n- Fixed rate-limit/account handling for `prolite` plans and made unknown WHAM plan values decodable (#17419).\n- Made Guardian timeouts distinct from policy denials, with timeout-specific guidance and visible TUI history entries (#17381, #17486, #17521, #17557).\n- Stabilized app-server behavior by avoiding premature thread unloads, tolerating failed trust persistence on startup, and skipping broken symlinks in `fs/readDirectory` (#17398, #17595, #17907).\n- Fixed MCP/tool-call edge cases including flattened deferred tool names, elicitation timeout accounting, and empty namespace descriptions (#17556, #17566, #17946).\n\n## Documentation\n- Documented the secure devcontainer profile and its bubblewrap requirements (#10431, #17547).\n- Added TUI composer documentation for history search behavior (#17550).\n- Updated app-server docs for new MCP, marketplace, turn injection, memory reset, filesystem metadata, external-agent migration, and websocket token-hash APIs (#17364, #17717, #17703, #17913, #17719, #17855, #17871).\n- Documented WSL1 bubblewrap limitations and WSL2 behavior (#17559).\n- Added memory pipeline documentation for extension cleanup (#17844).\n\n## Chores\n- Hardened supply-chain and CI inputs by pinning GitHub Actions, cargo installs, git dependencies, V8 checksums, and cargo-deny source allowlists (#17471).\n- Added Bazel release-build verification so release-only Rust code is compiled in PR CI (#17704, #17705).\n- Introduced the `codex-thread-store` crate/interface and moved local thread listing behind it (#17659, #17824).\n- Required reviewed pnpm dependency build scripts for workspace installs (#17558).\n- Reduced Rust maintenance surface with broader absolute-path types and removal of unused helper APIs (#17407, #17792, #17146).\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.120.0...rust-v0.121.0\n\n- #17087 Add marketplace command @xli-oai\n- #17409 Fix Windows exec-server output test flake @etraut-openai\n- #17381 representing guardian review timeouts in protocol types @won-openai\n- #17399 TUI: enforce core boundary @etraut-openai\n- #17370 fix: unblock private DNS in macOS sandbox @viyatb-oai\n- #17396 update cloud requirements parse failure msg @alexsong-oai\n- #17364 [mcp] Support MCP Apps part 3 - Add mcp tool call support. @mzeng-openai\n- #17424 Stabilize marketplace add local source test @ningyi-oai\n- #17414 Fix thread/list cwd filtering for Windows verbatim paths @etraut-openai\n- #10431 feat(devcontainer): add separate secure customer profile @viyatb-oai\n- #17314 Pass turn id with feedback uploads @ningyi-oai\n- #17336 fix(tui): recall accepted slash commands locally @fcoury-oai\n- #17430 Handle closed TUI input stream as shutdown @etraut-openai\n- #17385 Add use_agent_identity feature flag @adrian-openai\n- #17483 Update issue labeler agent labels @etraut-openai\n- #17493 fix @aibrahim-oai\n- #17419 Support prolite plan type @etraut-openai\n- #17416 Clear /ps after /stop @etraut-openai\n- #17415 Restore codex-tui resume hint on exit @etraut-openai\n- #17402 chore: refactor name and namespace to single type @sayan-oai\n- #17486 changing decision semantics after guardian timeout @won-openai\n- #17521 Clarify guardian timeout guidance @won-openai\n- #17547 [codex] Support bubblewrap in secure Docker devcontainer @viyatb-oai\n- #17519 Budget realtime current thread context @aibrahim-oai\n- #17556 [codex] Support flattened deferred MCP tool calls @fc-oai\n- #17558 build(pnpm): require reviewed dependency build scripts @mcgrew-oai\n- #17559 fix(sandboxing): reject WSL1 bubblewrap sandboxing @viyatb-oai\n- #17520 Mirror user text into realtime @aibrahim-oai\n- #17550 feat(tui): add reverse history search to composer @fcoury-oai\n- #17420 Remove context status-line meter @etraut-openai\n- #17506 Expose instruction sources (AGENTS.md) via app server @etraut-openai\n- #17566 fix(mcp) pause timer for elicitations @dylan-hurd-oai\n- #17406 Add MCP tool wall time to model output @pakrym-oai\n- #17294 Run exec-server fs operations through sandbox helper @starr-openai\n- #17605 Stabilize exec-server process tests @etraut-openai\n- #17221 feat: ignore keyring on 0.0.0 @jif-oai\n- #17216 Build remote exec env from exec-server policy @jif-oai\n- #17633 nit: change consolidation model @jif-oai\n- #17640 fix: stability exec server @jif-oai\n- #17643 fix: dedup compact @jif-oai\n- #17247 Make forked agent spawns keep parent model config @friel-openai\n- #17470 Fix custom tool output cleanup on stream failure @etraut-openai\n- #17417 Emit plan-mode prompt notifications for questionnaires @etraut-openai\n- #17481 Wrap status reset timestamps in narrow layouts @etraut-openai\n- #17601 Suppress duplicate compaction and terminal wait events @etraut-openai\n- #17657 Fix TUI compaction item replay @etraut-openai\n- #17595 Do not fail thread start when trust persistence fails @etraut-openai\n- #17407 Use AbsolutePathBuf in skill loading and codex_home @pakrym-oai\n- #17626 feat: disable memory endpoint @jif-oai\n- #17365 Include legacy deny paths in elevated Windows sandbox setup @iceweasel-oai\n- #17638 feat: Avoid reloading curated marketplaces for tool-suggest discovera… @jif-oai\n- #17398 app-server: Only unload threads which were unused for some time @euroelessar\n- #17669 only specify remote ports when the rule needs them @iceweasel-oai\n- #17691 Fix tui compilation @davidhao3300\n- #17384 Update phase 2 memory model to gpt-5.4 @kliu128\n- #17395 Remove unnecessary tests @kliu128\n- #17685 Cap realtime mirrored user turns @aibrahim-oai\n- #17699 change realtime tool description @aibrahim-oai\n- #17667 Add `supports_parallel_tool_calls` flag to included mcps @josiah-openai\n- #17703 Add turn item injection API @pakrym-oai\n- #17671 Stabilize exec-server filesystem tests in CI @starr-openai\n- #17557 guardian timeout fix pr 3 - ux touch for timeouts @won-openai\n- #17719 [codex] Add symlink flag to fs metadata @pakrym-oai\n- #17146 [codex] Remove unused Rust helpers @pakrym-oai\n- #17471 fix: pin inputs @viyatb-oai\n- #17717 [codex] Refactor marketplace add into shared core flow @xli-oai\n- #17747 Refactor plugin loading to async @pakrym-oai\n- #17709 [codex] Initialize ICU data for code mode V8 @pakrym-oai\n- #17749 [codex] drain mailbox only at request boundaries @tibo-openai\n- #16640 [codex-analytics] feature plumbing and emittance @rhan-oai\n- #17761 Tighten realtime handoff finalization @aibrahim-oai\n- #17701 Add realtime output modality and transcript events @aibrahim-oai\n- #17777 nit: feature flag @jif-oai\n- #17637 feat: add context percent to status line @jif-oai\n- #17665 Always enable original image detail on supported models @fjord-oai\n- #17374 [codex-analytics] add session source to client metadata @marksteinbrick-oai\n- #17489 Moving updated-at timestamps to unique millisecond times @ddr-oai\n- #17784 feat: codex sampler @jif-oai\n- #17732 fix: Revert danger-full-access denylist-only mode @viyatb-oai\n- #17234 Redirect debug client output to a file @rasmusrygaard\n- #17803 Keep image_detail_original as a removed feature flag @fjord-oai\n- #17372 app-server: prepare to run initialized rpcs concurrently @euroelessar\n- #17704 Refactor Bazel CI job setup @bolinfest\n- #17674 Route apply_patch through the environment filesystem @starr-openai\n- #17702 Fix remote skill popup loading @starr-openai\n- #17830 [codex] Fix app-server initialized request analytics build @etraut-openai\n- #17389 [codex-analytics] enable general analytics by default @rhan-oai\n- #17659 thread store interface @wiltzius-openai\n- #17792 Spread AbsolutePathBuf @pakrym-oai\n- #17808 fix: apply patch bin refresh @jif-oai\n- #17838 Add realtime wire trace logs @aibrahim-oai\n- #17684 Adjust default tool search result caps @malone-oai\n- #17705 Add Bazel verify-release-build job @bolinfest\n- #17720 Make skill loading filesystem-aware @pakrym-oai\n- #17756 [codex] Support local marketplace sources @xli-oai\n- #17846 Fix for Guardian CI Tests stack overflow, applying Box to reduce stack pressure @won-openai\n- #17855 support plugins in external agent config migration @alexsong-oai\n- #17872 Disable hooks in guardian review sessions @abhinav-oai\n- #17868 Wrap delegated input text @guinness-oai\n- #17884 Fix clippy warnings in external agent config migration @canvrno-oai\n- #17837 Reuse remote exec-server in core tests @starr-openai\n- #17859 sandbox: remove dead seatbelt helper and update tests @bolinfest\n- #17870 fix: cleanup the contract of the general-purpose exec() function @bolinfest\n- #17871 fix: add websocket capability token hash support @viyatb-oai\n- #17763 Send sandbox state through MCP tool metadata @aaronl-openai\n- #17654 Support Unix socket allowlists in macOS sandbox @aaronl-openai\n- #17915 fix: cargo deny @jif-oai\n- #17913 feat: add endpoint to delete memories @jif-oai\n- #17844 feat: cleaning of memories extension @jif-oai\n- #17921 chore: exp flag @jif-oai\n- #17917 [codex] Fix current main CI blockers @sayan-oai\n- #17919 chore: do not disable memories for past rollouts on reset @jif-oai\n- #17924 nit: stable test @jif-oai\n- #17632 feat: memories menu @jif-oai\n- #17404 register all mcp tools with namespace @sayan-oai\n- #17941 nit: doc @jif-oai\n- #17938 feat: sanitize rollouts before phase 1 @jif-oai\n- #17937 feat: reset memories button @jif-oai\n- #17883 Remove exec-server fs sandbox request preflight @pakrym-oai\n- #17386 Register agent identities behind use_agent_identity @adrian-openai\n- #17907 Fix fs/readDirectory to skip broken symlinks @willwang-openai\n- #17960 chore(features) codex dependencies feat @dylan-hurd-oai\n- #17965 fix: rename is_azure_responses_wire_base_url to is_azure_responses_provider @bolinfest\n- #17946 Fix empty tool descriptions @shijie-oai\n- #17824 [codex] Add local thread store listing @wiltzius-openai\n- #17942 Add CLI update announcement @shijie-oai\n- #17866 Refactor auth providers to mutate request headers @pakrym-oai\n- #17902 app-server: track remote-control seq IDs per stream @euroelessar\n- #17957 mcp: remove codex/sandbox-state custom request support @bolinfest\n- #17953 fix: propagate log db @jif-oai\n- #17920 chore(tui) cleanup @dylan-hurd-oai\n- #17981 chore: tmp disable @jif-oai"
+  },
+  "summary": {
+    "changes": 32,
+    "categories": {
+      "binary": 1,
+      "cli": 14,
+      "config": 16,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 31,
+      "notable": 1
+    },
+    "undocumented": 15
+  },
+  "changes": [
+    {
+      "id": "tools.view_image.input_schema.properties.detail",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "view_image",
+        "input_schema",
+        "properties",
+        "detail"
+      ],
+      "title": "view_image tool parameter detail added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Optional detail override. The only supported value is `original`; omit this field for default resized behavior. Use `original` to preserve the file's original resolution instead of resizing to fit. This is important when high-fidelity image perception or precise localization is needed, especially for CUA agents.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/codex_message_processor.rs",
+            "line": 9123,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/app-server/src/codex_message_processor.rs#L9123"
+          },
+          {
+            "path": "codex-rs/code-mode/src/runtime/value.rs",
+            "line": 47,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/code-mode/src/runtime/value.rs#L47"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex app-server.options.--ws-token-sha256",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex app-server",
+        "options",
+        "--ws-token-sha256"
+      ],
+      "title": "New flag `codex app-server --ws-token-sha256`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Hex-encoded SHA-256 digest of the capability token",
+        "names": [
+          "--ws-token-sha256"
+        ],
+        "value": "<HEX>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 487,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/app-server-test-client/src/lib.rs#L487"
+          },
+          {
+            "path": "codex-rs/app-server-test-client/src/lib.rs",
+            "line": 1450,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/app-server-test-client/src/lib.rs#L1450"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec-server.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec-server",
+        "description"
+      ],
+      "title": "Description of `codex exec-server` changed",
+      "impact": "informational",
+      "before": "[EXPERIMENTAL] Run the standalone exec-server binary",
+      "after": "[EXPERIMENTAL] Run the standalone exec-server service",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1047,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/cli/src/main.rs#L1047"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex marketplace",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex marketplace"
+      ],
+      "title": "New command: `codex marketplace`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Manage plugin marketplaces for Codex",
+        "helped": true,
+        "options": {
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex marketplace [OPTIONS] <COMMAND>"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 723,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/cli/src/main.rs#L723"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/manager.rs",
+            "line": 711,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/core/src/plugins/manager.rs#L711"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex marketplace add",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex marketplace add"
+      ],
+      "title": "New command: `codex marketplace add`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Add a remote marketplace repository",
+        "helped": false
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/apply-patch/src/parser.rs",
+            "line": 877,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/apply-patch/src/parser.rs#L877"
+          },
+          {
+            "path": "codex-rs/git-utils/src/apply.rs",
+            "line": 333,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/git-utils/src/apply.rs#L333"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex sandbox.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex sandbox",
+        "description"
+      ],
+      "title": "Description of `codex sandbox` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Run commands within a Codex-provided sandbox\n+WARNING: proceeding, even though we could not update PATH: operation would block Run commands within a Codex-provided sandbox\n",
+      "stats": {
+        "added_chars": 125,
+        "removed_chars": 44
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+119 −67 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,6 +11,7 @@\n   login        Manage login\n   logout       Remove stored authentication credentials\n   mcp          Manage external MCP servers for Codex\n+  marketplace  Manage plugin marketplaces for Codex\n   mcp-server   Start Codex as an MCP server (stdio)\n   app-server   [experimental] Run the app server or related tooling\n   app          Launch the Codex desktop app (downloads the macOS installer if missing)\n@@ -24,7 +25,7 @@\n   fork         Fork a previous interactive session (picker by default; use --last to fork the most\n                recent)\n   cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  exec-server  [EXPERIMENTAL] Run the standalone exec-server binary\n+  exec-server  [EXPERIMENTAL] Run the standalone exec-server service\n   features     Inspect feature flags\n   help         Print this message or the help of the given subcommand(s)\n \n",
+      "stats": {
+        "added_chars": 119,
+        "removed_chars": 67
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+119 −67 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,6 +9,7 @@\n   login        Manage login\n   logout       Remove stored authentication credentials\n   mcp          Manage external MCP servers for Codex\n+  marketplace  Manage plugin marketplaces for Codex\n   mcp-server   Start Codex as an MCP server (stdio)\n   app-server   [experimental] Run the app server or related tooling\n   app          Launch the Codex desktop app (downloads the macOS installer if missing)\n@@ -22,7 +23,7 @@\n   fork         Fork a previous interactive session (picker by default; use --last to fork the most\n                recent)\n   cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  exec-server  [EXPERIMENTAL] Run the standalone exec-server binary\n+  exec-server  [EXPERIMENTAL] Run the standalone exec-server service\n   features     Inspect feature flags\n   help         Print this message or the help of the given subcommand(s)\n \n",
+      "stats": {
+        "added_chars": 119,
+        "removed_chars": 67
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server --help"
+      ],
+      "title": "Full help text of `app-server --help` changed (+89 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -49,6 +49,9 @@\n       --ws-token-file <PATH>\n           Absolute path to the capability-token file\n \n+      --ws-token-sha256 <HEX>\n+          Hex-encoded SHA-256 digest of the capability token\n+\n       --ws-shared-secret-file <PATH>\n           Absolute path to the shared secret file for signed JWT bearer tokens\n \n",
+      "stats": {
+        "added_chars": 89,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+89 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -26,6 +26,8 @@\n           signed-bearer-token]\n       --ws-token-file <PATH>\n           Absolute path to the capability-token file\n+      --ws-token-sha256 <HEX>\n+          Hex-encoded SHA-256 digest of the capability token\n       --ws-shared-secret-file <PATH>\n           Absolute path to the shared secret file for signed JWT bearer tokens\n       --ws-issuer <ISSUER>\n",
+      "stats": {
+        "added_chars": 89,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+53 −52 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-[EXPERIMENTAL] Run the standalone exec-server binary\n+[EXPERIMENTAL] Run the standalone exec-server service\n \n Usage: codex exec-server [OPTIONS]\n \n",
+      "stats": {
+        "added_chars": 53,
+        "removed_chars": 52
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+53 −52 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-[EXPERIMENTAL] Run the standalone exec-server binary\n+[EXPERIMENTAL] Run the standalone exec-server service\n \n Usage: codex exec-server [OPTIONS]\n \n",
+      "stats": {
+        "added_chars": 53,
+        "removed_chars": 52
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.marketplace --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "marketplace --help"
+      ],
+      "title": "Full help text of `marketplace --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Manage plugin marketplaces for Codex\n\nUsage: codex marketplace [OPTIONS] <COMMAND>\n\nCommands:\n  add   Add a remote marketplace repository\n  help  Print this message or the help of the given subcommand(s)\n\nOptions:\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.marketplace -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "marketplace -h"
+      ],
+      "title": "Full help text of `marketplace -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Manage plugin marketplaces for Codex\n\nUsage: codex marketplace [OPTIONS] <COMMAND>\n\nCommands:\n  add   Add a remote marketplace repository\n  help  Print this message or the help of the given subcommand(s)\n\nOptions:\n  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                            nested values. The `value` portion is parsed as TOML. If it fails to\n                            parse as TOML, the raw string is used as a literal\n      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n  -h, --help                Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+80 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not update PATH: operation would block\n Run commands within a Codex-provided sandbox\n \n Usage: codex sandbox [OPTIONS] <COMMAND>\n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/arg0/src/lib.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.telepathy",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.telepathy"
+      ],
+      "title": "New setting: features.telepathy",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 682,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/features/src/lib.rs#L682"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.use_agent_identity",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.use_agent_identity"
+      ],
+      "title": "New setting: features.use_agent_identity",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 926,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/features/src/lib.rs#L926"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.workspace_dependencies",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.workspace_dependencies"
+      ],
+      "title": "New setting: features.workspace_dependencies",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 932,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/features/src/lib.rs#L932"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.marketplaces",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces"
+      ],
+      "title": "New setting: marketplaces",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "description": "User-level marketplace entries keyed by marketplace name.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 49,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L49"
+          },
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 50,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L50"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.marketplaces.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces.<name>"
+      ],
+      "title": "New setting: marketplaces.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 49,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L49"
+          },
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 50,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L50"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.marketplaces.<name>.last_updated",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces.<name>.last_updated"
+      ],
+      "title": "New setting: marketplaces.<name>.last_updated",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Last time Codex successfully added or refreshed this marketplace.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 65,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L65"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.marketplaces.<name>.ref",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces.<name>.ref"
+      ],
+      "title": "New setting: marketplaces.<name>.ref",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Git ref to check out when `source_type` is `git`.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/marketplace_cmd.rs",
+            "line": 31,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/cli/src/marketplace_cmd.rs#L31"
+          },
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 69,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L69"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.marketplaces.<name>.source",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces.<name>.source"
+      ],
+      "title": "New setting: marketplaces.<name>.source",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Source location used when the marketplace was added.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 67,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L67"
+          },
+          {
+            "path": "codex-rs/core/src/external_agent_config.rs",
+            "line": 596,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/core/src/external_agent_config.rs#L596"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.marketplaces.<name>.source_type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces.<name>.source_type"
+      ],
+      "title": "New setting: marketplaces.<name>.source_type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Source kind used to install this marketplace.",
+        "enum": [
+          "git",
+          "local"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L66"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/installed_marketplaces.rs",
+            "line": 68,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/core/src/plugins/installed_marketplaces.rs#L68"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.marketplaces.<name>.sparse_paths",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "marketplaces.<name>.sparse_paths"
+      ],
+      "title": "New setting: marketplaces.<name>.sparse_paths",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Sparse checkout paths used when `source_type` is `git`.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/marketplace_edit.rs",
+            "line": 72,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/marketplace_edit.rs#L72"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/marketplace_add/metadata.rs",
+            "line": 194,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/core/src/plugins/marketplace_add/metadata.rs#L194"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.supports_parallel_tool_calls",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.supports_parallel_tool_calls"
+      ],
+      "title": "New setting: mcp_servers.<name>.supports_parallel_tool_calls",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/mcp_edit.rs",
+            "line": 181,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/config/src/mcp_edit.rs#L181"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 229,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/core/src/config/edit.rs#L229"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CODEX_APP_SERVER_DISABLE_MANAGED_CONFIG",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_APP_SERVER_DISABLE_MANAGED_CONFIG"
+      ],
+      "title": "New environment variable: CODEX_APP_SERVER_DISABLE_MANAGED_CONFIG",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_APP_SERVER_DISABLE_MANAGED_CONFIG",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/main.rs",
+            "line": 15,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/app-server/src/main.rs#L15"
+          },
+          {
+            "path": "codex-rs/app-server/src/main.rs",
+            "line": 72,
+            "url": "https://github.com/openai/codex/blob/rust-v0.121.0/codex-rs/app-server/src/main.rs#L72"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CI",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CI"
+      ],
+      "title": "Environment variable no longer read: CI",
+      "impact": "informational",
+      "before": "CI",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/utils/path-utils/src/env.rs",
+            "line": 30,
+            "url": "https://github.com/openai/codex/blob/rust-v0.120.0/codex-rs/utils/path-utils/src/env.rs#L30"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.DISPLAY",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "DISPLAY"
+      ],
+      "title": "Environment variable no longer read: DISPLAY",
+      "impact": "informational",
+      "before": "DISPLAY",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/utils/path-utils/src/env.rs",
+            "line": 40,
+            "url": "https://github.com/openai/codex/blob/rust-v0.120.0/codex-rs/utils/path-utils/src/env.rs#L40"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.SSH_CLIENT",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "SSH_CLIENT"
+      ],
+      "title": "Environment variable no longer read: SSH_CLIENT",
+      "impact": "informational",
+      "before": "SSH_CLIENT",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/utils/path-utils/src/env.rs",
+            "line": 32,
+            "url": "https://github.com/openai/codex/blob/rust-v0.120.0/codex-rs/utils/path-utils/src/env.rs#L32"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.WAYLAND_DISPLAY",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "WAYLAND_DISPLAY"
+      ],
+      "title": "Environment variable no longer read: WAYLAND_DISPLAY",
+      "impact": "informational",
+      "before": "WAYLAND_DISPLAY",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/utils/path-utils/src/env.rs",
+            "line": 40,
+            "url": "https://github.com/openai/codex/blob/rust-v0.120.0/codex-rs/utils/path-utils/src/env.rs#L40"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 151910560 → 166923520",
+      "impact": "informational",
+      "before": 151910560,
+      "after": 166923520,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

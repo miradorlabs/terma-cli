@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.129.0",
+  "to": "0.130.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.129.0...rust-v0.130.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.130.0",
+    "text": "## New Features\n- Plugin details now show bundled hooks, and plugin sharing exposes link metadata plus discoverability controls. (#21447, #21495, #21637)\n- Added `codex remote-control` as a simpler entrypoint for starting a headless, remotely controllable app-server. (#21424)\n- App-server clients can page large threads with unloaded, summary, or full turn item views. (#21566)\n- Bedrock auth can now use AWS console-login credentials from `aws login` profiles. (#21623)\n- `view_image` can resolve files through the selected environment for multi-environment sessions. (#21143)\n\n## Bug Fixes\n- Live app-server threads now pick up config changes without requiring a restart. (#21187)\n- Turn diffs stay accurate across apply-patch operations, including partial failures that still mutated files. (#21180, #21518)\n- Thread summaries, renames, resume, and fork paths work better through `ThreadStore`, including threads without local rollout paths. (#21264, #21265, #21266)\n- Remote compaction now emits `response.processed` for v2 streams and avoids sending `service_tier` on API-key compact requests. (#21642, #21676)\n- Windows sandbox setup now grants sandbox users access to the desktop runtime binary cache. (#21564)\n- Removed stale “research preview” wording from the `codex exec` startup banner. (#21683)\n\n## Documentation\n- Fixed issue templates so CLI reports keep the intended guidance, labels apply correctly, and feature requests link to the right contributing docs. (#21685, #21686, #21688)\n- Updated install and tooling docs to consistently use `cargo install --locked`. (#21592)\n\n## Chores\n- Added a faster Cargo profiling build profile and disabled empty doctest targets to speed up Rust development loops. (#21574, #21584)\n- Hardened dependency and CI hygiene with fully qualified GitHub Action pins, a Dependabot cooldown, and a `cargo-shear` upgrade. (#21436, #21547, #21599)\n- Simplified internal surfaces by removing unused device-key APIs, extra skills roots, the remote thread-store implementation, and string-keyed MCP tool maps. (#21487, #21485, #21596, #21454)\n- Added configurable OpenTelemetry trace metadata and richer review/feedback analytics for better debugging and triage. (#21556, #18747, #21434, #21498)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.129.0...rust-v0.130.0\n\n- #21494 [codex] fix PluginListParams test initializer @xli-oai\n- #21447 Show plugin hooks in plugin details @abhinav-oai\n- #21356 feat: make built-in MCPs first-class runtime servers @jif-oai\n- #21180 Make turn diff tracking operation backed @jif-oai\n- #21498 [codex] add account id to feedback uploads @pakrym-oai\n- #21487 device-key: clean up unused crate @euroelessar\n- #21518 fix: preserve exact turn diffs after partial apply_patch failures @jif-oai\n- #18747 [codex-analytics] add tool review event schema @rhan-oai\n- #21495 feat: Expose plugin share metadata in shareContext @xl-openai\n- #21454 [codex] Remove string-keyed MCP tool maps @pakrym-oai\n- #21424 add top-level remote-control command @owenlin0\n- #21187 app-server: refresh live threads from latest config snapshot @jif-oai\n- #21461 [codex] Move tool specs onto handlers @pakrym-oai\n- #21547 Upgrade `cargo-shear` to 1.11.2 @charliemarsh-oai\n- #21264 Move thread name edits to ThreadStore @wiltzius-openai\n- #21266 [codex] Fix pathless thread summaries @wiltzius-openai\n- #21265 Route ThreadManager rollout path reads through thread store @wiltzius-openai\n- #21564 Grant sandbox users access to desktop runtime bin @iceweasel-oai\n- #21582 Use descriptive names for Cargo profile options @zanie-oai\n- #21574 Add a Cargo build profile for benchmarking @zanie-oai\n- #21436 [codex] Fully qualify hash-pins in GitHub Actions @ww-oai\n- #21592 Ensure all mentions of cargo-install are --locked @gankra-oai\n- #21584 Disable empty Cargo test targets @charliemarsh-oai\n- #21566 feat(app-server, threadstore): Thread pagination APIs and ThreadStore contract @owenlin0\n- #21556 codex-otel: add configurable trace metadata @bbrown-oai\n- #21599 [codex] Apply a Dependabot cooldown of 7 days @ww-oai\n- #21602 Use `--locked` in cargo build and lint invocations @zanie-oai\n- #20664 Add stdio exec-server client transport @starr-openai\n- #21596 [codex] Remove remote thread store implementation @wiltzius-openai\n- #20665 Make environment providers own default selection @starr-openai\n- #21143 Route view_image through selected environments @starr-openai\n- #20666 Add CODEX_HOME environments TOML provider @starr-openai\n- #21642 Send response.processed after remote compaction v2 @pakrym-oai\n- #21646 Revert \"Use `--locked` in cargo build and lint invocations\" @pakrym-oai\n- #21434 [codex-analytics] plumb protocol-native review timing @rhan-oai\n- #21485 Remove skills list extra roots @xli-oai\n- #21623 feat: enable AWS login credentials for Bedrock auth @celia-oai\n- #21637 feat: Update plugin share settings with discoverability @xl-openai\n- #21685 Fix duplicate CLI issue template description @etraut-openai\n- #21686 Fix issue template labels @etraut-openai\n- #21688 Fix feature request Contributing link @etraut-openai\n- #21683 Remove exec research preview banner wording @etraut-openai\n- #21676 Omit service_tier from remote /responses/compact requests under API auth @aibrahim-oai"
+  },
+  "summary": {
+    "changes": 13,
+    "categories": {
+      "cli": 5,
+      "config": 8
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 11,
+      "notable": 2
+    },
+    "undocumented": 12
+  },
+  "changes": [
+    {
+      "id": "cli.commands.codex remote-control",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex remote-control"
+      ],
+      "title": "New command: `codex remote-control`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "[experimental] Start a headless app-server with remote control enabled",
+        "helped": true,
+        "options": {
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex remote-control [OPTIONS]"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 914,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/cli/src/main.rs#L914"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1453 −1296 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,29 +6,30 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  exec         Run Codex non-interactively [aliases: e]\n-  review       Run a code review non-interactively\n-  login        Manage login\n-  logout       Remove stored authentication credentials\n-  mcp          Manage external MCP servers for Codex\n-  plugin       Manage Codex plugins\n-  mcp-server   Start Codex as an MCP server (stdio)\n-  app-server   [experimental] Run the app server or related tooling\n-  app          Launch the Codex desktop app (opens the app installer if missing)\n-  completion   Generate shell completion scripts\n-  update       Update Codex to the latest version\n-  sandbox      Run commands within a Codex-provided sandbox\n-  debug        Debugging tools\n-  apply        Apply the latest diff produced by Codex agent as a `git apply` to your local working\n-               tree [aliases: a]\n-  resume       Resume a previous interactive session (picker by default; use --last to continue the\n-               most recent)\n-  fork         Fork a previous interactive session (picker by default; use --last to fork the most\n-               recent)\n-  cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  exec-server  [EXPERIMENTAL] Run the standalone exec-server service\n-  features     Inspect feature flags\n-  help         Print this message or the help of the given subcommand(s)\n+  exec            Run Codex non-interactively [aliases: e]\n+  review          Run a code review non-interactively\n+  login           Manage login\n+  logout          Remove stored authentication credentials\n+  mcp             Manage external MCP servers for Codex\n+  plugin          Manage Codex plugins\n+  mcp-server      Start Codex as an MCP server (stdio)\n+  app-server      [experimental] Run the app server or related tooling\n+  remote-control  [experimental] Start a headless app-server with remote control enabled\n+  app             Launch the Codex desktop app (opens the app installer if missing)\n+  completion      Generate shell completion scripts\n+  update          Update Codex to the latest version\n+  sandbox         Run commands within a Codex-provided sandbox\n+  debug           Debugging tools\n+  apply           Apply the latest diff produced by Codex agent as a `git apply` to your local\n+                  working tree [aliases: a]\n+  resume          Resume a previous interactive session (picker by default; use --last to continue\n+                  the most recent)\n+  fork            Fork a previous interactive session (picker by default; use --last to fork the\n+                  most recent)\n+  cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+  exec-server     [EXPERIMENTAL] Run the standalone exec-server service\n+  features        Inspect feature flags\n+  help            Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [PROMPT]\n",
+      "stats": {
+        "added_chars": 1453,
+        "removed_chars": 1296
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+1453 −1296 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,29 +4,30 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  exec         Run Codex non-interactively [aliases: e]\n-  review       Run a code review non-interactively\n-  login        Manage login\n-  logout       Remove stored authentication credentials\n-  mcp          Manage external MCP servers for Codex\n-  plugin       Manage Codex plugins\n-  mcp-server   Start Codex as an MCP server (stdio)\n-  app-server   [experimental] Run the app server or related tooling\n-  app          Launch the Codex desktop app (opens the app installer if missing)\n-  completion   Generate shell completion scripts\n-  update       Update Codex to the latest version\n-  sandbox      Run commands within a Codex-provided sandbox\n-  debug        Debugging tools\n-  apply        Apply the latest diff produced by Codex agent as a `git apply` to your local working\n-               tree [aliases: a]\n-  resume       Resume a previous interactive session (picker by default; use --last to continue the\n-               most recent)\n-  fork         Fork a previous interactive session (picker by default; use --last to fork the most\n-               recent)\n-  cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  exec-server  [EXPERIMENTAL] Run the standalone exec-server service\n-  features     Inspect feature flags\n-  help         Print this message or the help of the given subcommand(s)\n+  exec            Run Codex non-interactively [aliases: e]\n+  review          Run a code review non-interactively\n+  login           Manage login\n+  logout          Remove stored authentication credentials\n+  mcp             Manage external MCP servers for Codex\n+  plugin          Manage Codex plugins\n+  mcp-server      Start Codex as an MCP server (stdio)\n+  app-server      [experimental] Run the app server or related tooling\n+  remote-control  [experimental] Start a headless app-server with remote control enabled\n+  app             Launch the Codex desktop app (opens the app installer if missing)\n+  completion      Generate shell completion scripts\n+  update          Update Codex to the latest version\n+  sandbox         Run commands within a Codex-provided sandbox\n+  debug           Debugging tools\n+  apply           Apply the latest diff produced by Codex agent as a `git apply` to your local\n+                  working tree [aliases: a]\n+  resume          Resume a previous interactive session (picker by default; use --last to continue\n+                  the most recent)\n+  fork            Fork a previous interactive session (picker by default; use --last to fork the\n+                  most recent)\n+  cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+  exec-server     [EXPERIMENTAL] Run the standalone exec-server service\n+  features        Inspect feature flags\n+  help            Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [PROMPT]  Optional user prompt to start the session\n",
+      "stats": {
+        "added_chars": 1453,
+        "removed_chars": 1296
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.remote-control --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "remote-control --help"
+      ],
+      "title": "Full help text of `remote-control --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "[experimental] Start a headless app-server with remote control enabled\n\nUsage: codex remote-control [OPTIONS]\n\nOptions:\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.remote-control -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "remote-control -h"
+      ],
+      "title": "Full help text of `remote-control -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "[experimental] Start a headless app-server with remote control enabled\n\nUsage: codex remote-control [OPTIONS]\n\nOptions:\n  -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                            `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                            nested values. The `value` portion is parsed as TOML. If it fails to\n                            parse as TOML, the raw string is used as a literal\n      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n      --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n  -h, --help                Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_thread_store.endpoint",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "experimental_thread_store.endpoint"
+      ],
+      "title": "Setting no longer read: experimental_thread_store.endpoint",
+      "impact": "notable",
+      "before": {
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/feedback/src/lib.rs",
+            "line": 105,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/feedback/src/lib.rs#L105"
+          },
+          {
+            "path": "codex-rs/feedback/src/lib.rs",
+            "line": 129,
+            "url": "https://github.com/openai/codex/blob/rust-v0.129.0/codex-rs/feedback/src/lib.rs#L129"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_thread_store_endpoint",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "experimental_thread_store_endpoint"
+      ],
+      "title": "Setting no longer read: experimental_thread_store_endpoint",
+      "impact": "notable",
+      "before": {
+        "description": "Experimental / do not use. When set, app-server uses a remote thread store at this endpoint instead of the local filesystem/SQLite store.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.span_attributes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.span_attributes"
+      ],
+      "title": "New setting: otel.span_attributes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Attributes to add to every exported trace span.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.span_attributes.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.span_attributes.<name>"
+      ],
+      "title": "New setting: otel.span_attributes.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.tracestate",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.tracestate"
+      ],
+      "title": "New setting: otel.tracestate",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Semicolon-separated `key:value` fields to upsert into W3C tracestate members.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/trace_context.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/otel/src/trace_context.rs#L41"
+          },
+          {
+            "path": "codex-rs/otel/src/trace_context.rs",
+            "line": 105,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/otel/src/trace_context.rs#L105"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.tracestate.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.tracestate.<name>"
+      ],
+      "title": "New setting: otel.tracestate.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/trace_context.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/otel/src/trace_context.rs#L41"
+          },
+          {
+            "path": "codex-rs/otel/src/trace_context.rs",
+            "line": 105,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/otel/src/trace_context.rs#L105"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.otel.tracestate.<name>.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.tracestate.<name>.<name>"
+      ],
+      "title": "New setting: otel.tracestate.<name>.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/trace_context.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/otel/src/trace_context.rs#L41"
+          },
+          {
+            "path": "codex-rs/otel/src/trace_context.rs",
+            "line": 105,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/otel/src/trace_context.rs#L105"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LOCALAPPDATA",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "LOCALAPPDATA"
+      ],
+      "title": "New environment variable: LOCALAPPDATA",
+      "impact": "informational",
+      "before": null,
+      "after": "LOCALAPPDATA",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 140,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/protocol/src/shell_environment.rs#L140"
+          },
+          {
+            "path": "codex-rs/windows-sandbox-rs/src/setup_runtime_bin.rs",
+            "line": 18,
+            "url": "https://github.com/openai/codex/blob/rust-v0.130.0/codex-rs/windows-sandbox-rs/src/setup_runtime_bin.rs#L18"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

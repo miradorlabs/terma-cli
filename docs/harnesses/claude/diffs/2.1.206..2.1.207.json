@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.206",
+  "to": "2.1.207",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Auto mode is now available without `CLAUDE_CODE_ENABLE_AUTO_MODE` opt-in on Bedrock, Vertex AI, and Foundry; disable via `disableAutoMode` in settings\n- Fixed the terminal freezing and keystrokes lagging while streaming responses containing very long lists, tables, paragraphs, or code blocks\n- Fixed remote managed settings from a non-interactive run (`claude -p`, the SDK) being permanently recorded as consented without ever showing the security consent dialog\n- Fixed spurious prompt-injection warnings triggered by benign system-generated conversation updates\n- Fixed the auto-updater overwriting a custom launcher script or symlink at `~/.local/bin/claude` on every release; `/doctor` now reports an externally managed launcher\n- Fixed compound commands with `cd` prompting for permission when the only output redirect was to `/dev/null`\n- Fixed the transcript jumping above the start of the answer when a response finishes streaming\n- Fixed `extensions.worktreeConfig` being left in the repo's `.git/config` (breaking go-git tools like `tea`) after the last `worktree.sparsePaths` worktree was removed\n- Fixed malformed bracket patterns in rules globs, skill paths, `.ignore`, and `.worktreeinclude` breaking file reads, file suggestions, and worktree creation\n- Fixed a crash loop in agent teams where a malformed teammate mailbox message caused repeated errors every second until the mailbox file was manually deleted\n- Fixed background sessions auto-named by accepting a plan not showing that name on their agent-view row\n- Fixed background sessions that entered a git worktree resuming blank after a cold reopen from the agent list\n- Fixed Remote Control task status updates being lost when the connection recovered from a network interruption or credential refresh\n- Fixed Remote Control sessions hosted by the desktop app not showing background agent and workflow progress on mobile and web\n- Fixed Deep research runs labeling every Fetch-phase agent \"unknown\" — chips now show the source hostname\n- Fixed Bedrock repeatedly requesting fresh AWS SSO credentials from IAM Identity Center on every API request\n- Improved agent view: pasting the same text again now expands the collapsed `[Pasted text #N]` placeholder instead of adding a second one\n- Improved agent view: blocked session peeks now lead with the question and show a worded staleness clock (`waiting 3m`) instead of the same timestamp twice\n- Changed Bedrock, Vertex, and Claude Platform on AWS to default to Claude Opus 4.8\n- Changed auto mode to no longer read `autoMode` from `.claude/settings.local.json` (repo-resident); use `~/.claude/settings.json` instead\n- Fixed an indefinite hang on Windows when AWS credential resolution stalls (e.g. a stuck `credential_process`): the 60-second stall guard now fires instead of waiting forever.\n- Plugin hooks/monitors/MCP headersHelper: `${user_config.*}` in shell-form commands is now rejected (shell-injection fix). Hooks: use exec form (`args` array) or `$CLAUDE_PLUGIN_OPTION_<KEY>`; monitors and headersHelper: read the value inside the script (config file or the server's `env` block).\n- Plugin option values (`pluginConfigs`) are no longer read from project-level `.claude/settings.json`; only user, `--settings`, and managed settings are honored\n- Fixed `/usage-credits` amount inputs silently stripping malformed values (e.g. a pasted timestamp) to digits; malformed amounts are now rejected with an error, and amounts over $1,000 require a typed confirmation"
+  },
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "config": 10,
+      "hooks": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 10,
+      "notable": 2
+    },
+    "undocumented": 11
+  },
+  "changes": [
+    {
+      "id": "tools.ScheduleWakeup.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ScheduleWakeup",
+        "description"
+      ],
+      "title": "ScheduleWakeup tool description changed (+230 −200 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,7 +10,7 @@\n \n ## Picking delaySeconds\n \n-The Anthropic prompt cache has a 5-minute TTL. Sleeping past 300 seconds means the next wake-up reads your full conversation context uncached — slower and more expensive. So the natural breakpoints:\n+This session's requests use the default 5-minute Anthropic prompt-cache TTL. Sleeping past 300 seconds means the next wake-up reads your full conversation context uncached — slower and more expensive. So the natural breakpoints:\n \n - **Under 5 minutes (60s–270s)**: cache stays warm. Right for actively polling external state the harness can't notify you about — a CI run, a deploy, a remote queue.\n - **5 minutes to 1 hour (300s–3600s)**: pay the cache miss. Right when there's no point checking sooner — waiting on something that takes minutes to change, genuinely idle, or as the long fallback heartbeat when something else is the primary wake signal.\n",
+      "stats": {
+        "added_chars": 230,
+        "removed_chars": 200
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_3P_PROBE_WROTE_SONNET_DEFAULT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_3P_PROBE_WROTE_SONNET_DEFAULT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_SONNET_DEFAULT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_3P_PROBE_WROTE_SONNET_DEFAULT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AWS_CHAIN_RESOLVE_TIMEOUT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AWS_CHAIN_RESOLVE_TIMEOUT_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AWS_CHAIN_RESOLVE_TIMEOUT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AWS_CHAIN_RESOLVE_TIMEOUT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_MORNING_BRIEF",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_MORNING_BRIEF"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ENABLE_MORNING_BRIEF",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ENABLE_MORNING_BRIEF",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_LANTERN_PRISM",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_LANTERN_PRISM"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_LANTERN_PRISM",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_LANTERN_PRISM",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MORNING_BRIEF_PROMPT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MORNING_BRIEF_PROMPT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MORNING_BRIEF_PROMPT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MORNING_BRIEF_PROMPT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SKIP_AWS_CRED_CACHE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SKIP_AWS_CRED_CACHE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SKIP_AWS_CRED_CACHE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SKIP_AWS_CRED_CACHE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TRIGGER_ID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TRIGGER_ID"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TRIGGER_ID",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TRIGGER_ID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WALNUT_SPIRE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WALNUT_SPIRE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WALNUT_SPIRE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WALNUT_SPIRE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_AUTO_MODE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_AUTO_MODE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ENABLE_AUTO_MODE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ENABLE_AUTO_MODE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

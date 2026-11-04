@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.210",
+  "to": "2.1.211",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `--forward-subagent-text` flag and `CLAUDE_CODE_FORWARD_SUBAGENT_TEXT` environment variable to include subagent text and thinking in stream-json output\n- Fixed permission previews relayed to chat channels not neutralizing bidirectional-override, zero-width, and look-alike quote characters, so tool inputs cannot visually alter the approval message\n- Fixed auto mode overriding a PreToolUse hook's `ask` decision for unsandboxed Bash — a hook `ask` now floors the decision at a prompt\n- Fixed parallel Claude Code sessions all logging out simultaneously after wake-from-sleep when many sessions share one credential store\n- Fixed plugin MCP servers not reconnecting after an idle web session woke, leaving MCP calls failing until the next message\n- Fixed Claude Code on Vertex and Bedrock attempting the default Opus model at startup and printing a spurious fallback notice when a model is explicitly configured\n- Fixed subagents spawned with an explicit model override reverting to the parent's model when resumed or sent a follow-up message\n- Fixed nested `.claude/rules/*.md` files loading even when setting sources exclude project settings\n- Fixed file upload validation: filenames ending in a DOS device suffix (`.prn`) or trailing dot are now accepted, and files with multiple hard links are refused\n- Fixed file uploads to Claude in Chrome from remote and CLI sessions\n- Fixed edits that leave the input as \"?\" being silently swallowed and toggling the shortcuts panel\n- Fixed a startup hang when the Claude in Chrome extension is enabled but Chrome is not running\n- Fixed a 300ms delay revealing async content (Settings tabs, Stats, diff views, and other loading states)\n- Fixed reopening a just-stopped background session from the agents view starting a blank conversation under the same session id\n- Fixed `/loop` hiding the session from `/resume` after a single use\n- Fixed screen reader users losing the audible terminal bell after `/terminal-setup` or onboarding terminal setup\n- Fixed background jobs on LLM gateway auth (`ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL`) coming back \"Not logged in\" after the daemon respawns them\n- Fixed `claude agents` jobs becoming permanently undeletable when git no longer recognizes their worktree — the row now shows why the delete was refused instead of silently reappearing\n- Fixed `/clear` not resetting the session cost counter — the statusline's cost now starts at $0 after `/clear`\n- Fixed Claude in Chrome setup pages failing to open in the browser on Windows\n- Fixed headless print-mode sessions on Windows crashing or silently exiting when stdin is unreadable\n- Fixed background session titles in the agents view showing the naming model's refusal text when the prompt contains a link\n- Fixed background agents killed by the user auto-respawning, and revived agents re-running stale prompts from old sessions\n- Fixed routines with no schedule reporting a next run time in the year 1\n- Hardened synced skill/plugin directory naming on Windows and kept CCR web fetch/search proxies working after `/clear`\n- Improved terminal layout and rendering performance\n- Improved background agent result reporting — Claude now reports the status of still-running agents and waits for the real completion instead of fabricating results\n- Improved the memory index over-limit warning to measure only loaded content, excluding frontmatter and HTML comments\n- Updated integer environment variables (timeouts, token budgets, retry counts) to accept scientific notation and digit-separator spellings like `1e6` and `64_000`\n- Updated documentation links to the current docs sites\n- Changed \"always allow\" permission rules to save at the repository root, so approvals granted in a git worktree persist across sessions and worktrees\n- Changed `/usage-credits` to ask for confirmation before sending a request to organization admins\n- Changed Vim mode `s` and `S` (substitute char/line) to work in NORMAL mode, matching vim behavior\n- [VSCode] Updated the Remote Control banner to describe what it does\n- Claude in Chrome: hardened file-upload path validation\n- Claude in Chrome: `save_to_disk` on screenshot actions now writes the image to disk and returns the path; previously it did nothing\n- Fixed a prompt-caching regression on Bedrock, Vertex, Mantle, and Foundry that billed the trailing system context block as fresh input tokens on every request."
+  },
+  "summary": {
+    "changes": 7,
+    "categories": {
+      "cli": 2,
+      "config": 4,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 6,
+      "notable": 1
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "tools.Agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "description"
+      ],
+      "title": "Agent tool description changed (+428 −300 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,8 +10,10 @@\n For a single-fact lookup where you already know the file, symbol, or value, search directly.\n Once you've delegated a search, don't also run it yourself — wait for the result.\n \n-- The agent's final message is returned to you as the tool result; it is not shown to the user — relay what matters.\n+- The agent's final report is not shown to the user — relay what matters.\n - Use SendMessage with the agent's ID or name to continue a previously spawned agent with its context intact; a new Agent call starts fresh.\n - Each agent type's model, reasoning effort, and tools come from its definition (`.claude/agents/*.md` frontmatter or SDK `agents`).\n - `isolation: \"worktree\"` gives the agent its own git worktree (auto-cleaned if unchanged).\n-- Subagents run in the background by default; you'll be notified when one completes. Pass `run_in_background: false` for a synchronous run when you need the result before continuing.\n+- Subagents run in the background by default; you'll be notified when one completes.\n+Pass `run_in_background: false` for a synchronous run when you need the result before continuing.\n+Never fabricate or predict a pending agent's results — the notification is never something you write yourself; if the user asks before it arrives, say it's still running.\n",
+      "stats": {
+        "added_chars": 428,
+        "removed_chars": 300
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude.options.--forward-subagent-text",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--forward-subagent-text"
+      ],
+      "title": "New flag `claude --forward-subagent-text`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Forward subagent text and thinking blocks as assistant/user messages with parent_tool_use_id set (only works with --print and --output-format=stream-json)",
+        "names": [
+          "--forward-subagent-text"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+311 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -85,6 +85,10 @@\n   --fork-session                        When resuming, create a new session ID\n                                         instead of reusing the original (use\n                                         with --resume or --continue)\n+  --forward-subagent-text               Forward subagent text and thinking\n+                                        blocks as assistant/user messages with\n+                                        parent_tool_use_id set (only works with\n+                                        --print and --output-format=stream-json)\n   --from-pr [value]                     Resume a session linked to a PR by PR\n                                         number/URL, or open interactive picker\n                                         with optional search term\n",
+      "stats": {
+        "added_chars": 311,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_REFRESH_MCP_TOOLS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_REFRESH_MCP_TOOLS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ENABLE_REFRESH_MCP_TOOLS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ENABLE_REFRESH_MCP_TOOLS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FORWARD_SUBAGENT_TEXT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FORWARD_SUBAGENT_TEXT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FORWARD_SUBAGENT_TEXT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FORWARD_SUBAGENT_TEXT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_GB_DISK_CACHE_WHEN_TELEMETRY_OFF",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_GB_DISK_CACHE_WHEN_TELEMETRY_OFF"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_GB_DISK_CACHE_WHEN_TELEMETRY_OFF",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_GB_DISK_CACHE_WHEN_TELEMETRY_OFF",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

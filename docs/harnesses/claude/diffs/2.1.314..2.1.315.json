@@ -1,0 +1,463 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.314",
+  "to": "2.1.315",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 23,
+    "categories": {
+      "binary": 1,
+      "config": 19,
+      "hooks": 1,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 20,
+      "notable": 3
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+0 −94 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,8 +12,6 @@\n  - Prefer the dedicated file/search tools over shell commands when one fits. Independent tool calls can run in parallel in one response.\n  - Reference code as `file_path:line_number` — it's clickable.\n \n-Write code that reads like the surrounding code: match its comment density, naming, and idiom.\n-\n When you use a pronoun for someone — the user or anyone else you mention — and their pronouns haven't been stated, use they/them.\n A name doesn't tell you someone's pronouns; a wrong guess misgenders a real person in a way the neutral default never does, so never infer pronouns from a name.\n This applies to all user-visible text, including visible thinking.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 94
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+0 −94 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,8 +12,6 @@\n  - Prefer the dedicated file/search tools over shell commands when one fits. Independent tool calls can run in parallel in one response.\n  - Reference code as `file_path:line_number` — it's clickable.\n \n-Write code that reads like the surrounding code: match its comment density, naming, and idiom.\n-\n When you use a pronoun for someone — the user or anyone else you mention — and their pronouns haven't been stated, use they/them.\n A name doesn't tell you someone's pronouns; a wrong guess misgenders a real person in a way the neutral default never does, so never infer pronouns from a name.\n This applies to all user-visible text, including visible thinking.\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 94
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.bashEditDiffEnabled.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "bashEditDiffEnabled",
+        "description"
+      ],
+      "title": "bashEditDiffEnabled description changed (+201 −141 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n Whether the Bash tool shows a diff of the files a Bash command changed (PostToolUse Bash hooks get the changed-file list in tool_response).\n Set to false to turn that off.\n-Default: on when the Bash tool handles file edits.\n-Only user, flag or policy settings can turn it on outside auto and bypassPermissions modes.\n+Default: off, except in auto and bypassPermissions modes when the Bash tool handles file edits or the model's configuration turns it on.\n+Only user, flag or policy settings can turn it on in other modes.\n",
+      "stats": {
+        "added_chars": 201,
+        "removed_chars": 141
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.blockWritesOutsideWorkingDirectories.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "permissions.blockWritesOutsideWorkingDirectories",
+        "description"
+      ],
+      "title": "permissions.blockWritesOutsideWorkingDirectories description changed (+207 −270 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Refuse file-tool writes (Write, Edit, NotebookEdit) outside the working directories in every permission mode; true in any settings source wins.\n No allow rule lifts it.\n-Files that Claude Code keeps for the session are not refused: its plan files, scratchpad and background job folder, and the auto-memory of this project, unless the CLAUDE_COWORK_MEMORY_PATH_OVERRIDE environment variable or a repository settings file points it elsewhere.\n+Files that Claude Code keeps for the session are not refused: its plan files, scratchpad and background job folder, and the auto-memory of this project, unless a repository settings file points it elsewhere.\n Nothing runs them unless the model asks.\n Also refuses file-tool writes to Claude Code settings files, inside the working directories too, and takes EnterWorktree and ExitWorktree, which move the working directory, out of the tools on offer.\n Does not limit shell commands, MCP tools, the programs that hooks run, or the memory tools.\n",
+      "stats": {
+        "added_chars": 207,
+        "removed_chars": 270
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_BG_SILENT_PEER_TIMEOUT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_BG_SILENT_PEER_TIMEOUT_MS"
+      ],
+      "title": "New environment variable: CLAUDE_BG_SILENT_PEER_TIMEOUT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_BG_SILENT_PEER_TIMEOUT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_BG_SOCK_ADMIT_SILENT_PEERS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_BG_SOCK_ADMIT_SILENT_PEERS"
+      ],
+      "title": "New environment variable: CLAUDE_BG_SOCK_ADMIT_SILENT_PEERS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_BG_SOCK_ADMIT_SILENT_PEERS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_FULL_CONTEXT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_FULL_CONTEXT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_FULL_CONTEXT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_FULL_CONTEXT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_ONE_PLUGIN_LOAD_PER_RELOAD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_ONE_PLUGIN_LOAD_PER_RELOAD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CCR_ONE_PLUGIN_LOAD_PER_RELOAD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CCR_ONE_PLUGIN_LOAD_PER_RELOAD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_HELD_MESSAGE_RECOGNITION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_HELD_MESSAGE_RECOGNITION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_HELD_MESSAGE_RECOGNITION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_HELD_MESSAGE_RECOGNITION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_HTTPS_AGENT_KEEPING",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_HTTPS_AGENT_KEEPING"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_HTTPS_AGENT_KEEPING",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_HTTPS_AGENT_KEEPING",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_LOOPED_CROSS_CERT_DROP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_LOOPED_CROSS_CERT_DROP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_LOOPED_CROSS_CERT_DROP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_LOOPED_CROSS_CERT_DROP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_ULTRATHINK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_ULTRATHINK"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_ULTRATHINK",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_ULTRATHINK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_NO_REDIAL_AFTER_POLICY_REFUSAL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_NO_REDIAL_AFTER_POLICY_REFUSAL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_NO_REDIAL_AFTER_POLICY_REFUSAL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_NO_REDIAL_AFTER_POLICY_REFUSAL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SESSION_BEGAN_AS_COPY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SESSION_BEGAN_AS_COPY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SESSION_BEGAN_AS_COPY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_BEGAN_AS_COPY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SORTED_OTTER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SORTED_OTTER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SORTED_OTTER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SORTED_OTTER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SUBAGENT_EFFORT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SUBAGENT_EFFORT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SUBAGENT_EFFORT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SUBAGENT_EFFORT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.NODE_ENVfunctionSourceallowCodeFromDisklocaleslogoutputsBundle",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVfunctionSourceallowCodeFromDisklocaleslogoutputsBundle"
+      ],
+      "title": "New environment variable: NODE_ENVfunctionSourceallowCodeFromDisklocaleslogoutputsBundle",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVfunctionSourceallowCodeFromDisklocaleslogoutputsBundle",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.UnsupportedTarget",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "UnsupportedTarget"
+      ],
+      "title": "New environment variable: UnsupportedTarget",
+      "impact": "informational",
+      "before": null,
+      "after": "UnsupportedTarget",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.NODE_ENVtaken",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVtaken"
+      ],
+      "title": "Environment variable no longer read: NODE_ENVtaken",
+      "impact": "informational",
+      "before": "NODE_ENVtaken",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 278848096 → 310114176",
+      "impact": "informational",
+      "before": 278848096,
+      "after": 310114176,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

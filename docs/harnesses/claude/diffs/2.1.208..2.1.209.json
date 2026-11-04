@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.208",
+  "to": "2.1.209",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Fixed /model and other dialogs being blocked in `claude agents` background sessions (reverts an overly broad guard)"
+  },
+  "summary": {
+    "changes": 3,
+    "categories": {
+      "config": 1,
+      "hooks": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 3,
+      "notable": 0
+    },
+    "undocumented": 3
+  },
+  "changes": [
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.message",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.message"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.message added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_calls[].tool_input.message",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.status",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "keys",
+        "tool_calls[].tool_input.status"
+      ],
+      "title": "PostToolBatch hook payload field tool_calls[].tool_input.status added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_calls[].tool_input.status",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_MCP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_MCP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_MCP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_MCP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

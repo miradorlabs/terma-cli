@@ -1,0 +1,345 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.216",
+  "to": "2.1.217",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added emoji shortcode autocomplete in the prompt input: type `:heart:` to insert ❤️, or `:hea` for suggestions — disable with the `emojiCompletionEnabled` setting\n- Added warnings when transcript writes are failing (e.g. disk full) or when session saving is off due to an inherited environment variable, instead of losing transcripts silently\n- Fixed a memory leak where truncated MCP tool outputs kept the full untruncated result in memory for the rest of the session\n- Fixed Windows auto-update failures that could leave `claude.exe` missing; failed updates now restore the preserved executable automatically\n- Fixed background session isolation not canonicalizing symlinked working directories, which could let sessions escape their workspace folder\n- Fixed auto-compact never triggering for Claude Opus 4.8 on Bedrock and `/compact` failing once over the limit\n- Fixed corporate mTLS, TLS-verify, OAuth scope, and proxy settings being ignored in Claude Desktop sessions\n- Fixed screen reader mode's startup announcement being cut off by the first prompt render, and the thinking status row re-rendering every few seconds to update elapsed time and token counts\n- Fixed managed settings that set `OTEL_EXPORTER_OTLP_ENDPOINT` not governing all signals — lower-scope signal-specific overrides no longer redirect telemetry away from the managed endpoint\n- Fixed `--resume`/`--continue` and `/resume` failing with a TypeError when a transcript has a malformed attachment entry\n- Fixed Remote Control sessions not showing a pending permission prompt or dialog to viewers that connected after it appeared\n- Fixed background shells sometimes becoming impossible to stop after a session is sent to the background (`/background` or `←`) or when the session exits on a heavily loaded machine, most visible on Windows\n- Fixed a `CLAUDE.md` or `SKILL.md` paths frontmatter value with many brace groups OOM-killing or stalling the CLI at startup — brace expansion is now budget-bounded\n- Fixed the transcript preview sitting flush against the input area when attaching to a starting background session; it now leaves the same one-line gap as the live layout, so the transcript no longer shifts when the session takes over\n- Improved footer PR badge links to be clickable hyperlinks even when terminal support can't be detected (e.g. over ssh/tmux); set `FORCE_HYPERLINK=0` to opt out\n- Changed the login-expiry warning to appear 3 days before expiry instead of 5\n- Capped the frontend-design plugin suggestion tip at 3 lifetime impressions instead of repeating indefinitely\n- Added a cap on concurrently-running subagents (default 20, override with `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`) so one message can't fan out unbounded background agents\n- Changed subagents to no longer spawn nested subagents by default; set `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to allow deeper nesting\n- Fixed `--max-budget-usd` not stopping background subagents: once the cap is reached, new spawns are denied and running background agents are halted"
+  },
+  "summary": {
+    "changes": 17,
+    "categories": {
+      "behavior": 2,
+      "config": 13,
+      "hooks": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 14,
+      "notable": 3
+    },
+    "undocumented": 14
+  },
+  "changes": [
+    {
+      "id": "tools.Workflow.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Workflow",
+        "description"
+      ],
+      "title": "Workflow tool description changed (+188 −173 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,7 +11,7 @@\n - The user asked you to run a specific named or saved workflow.\n \n For any other task — even one that would clearly benefit from parallelism — do NOT call this tool.\n-Use the Agent tool for individual subagents, or briefly describe what a multi-agent workflow could do and how much it would roughly cost, and ask the user whether to run it.\n+Use the Agent tool (if available) for individual subagents, or briefly describe what a multi-agent workflow could do and how much it would roughly cost, and ask the user whether to run it.\n Mention they can ask for one with \"use a workflow\" in a future message to skip the ask.\n \n When you do call it, the right move is often **hybrid**: scout inline first (list the files, find the channels, scope the diff) to discover the work-list, then call Workflow to pipeline over it. You don't need to know the shape before the *task* — only before the *orchestration step*.\n",
+      "stats": {
+        "added_chars": 188,
+        "removed_chars": 173
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction.outcome",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "compaction",
+        "outcome"
+      ],
+      "title": "Behaviour: compaction outcome changed: \"compacted\" → \"refused\"",
+      "impact": "notable",
+      "before": "compacted",
+      "after": "refused",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction.reason",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "compaction",
+        "reason"
+      ],
+      "title": "Behaviour: compaction reason added",
+      "impact": "notable",
+      "before": null,
+      "after": "Prompt is too long",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.emojiCompletionEnabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "emojiCompletionEnabled"
+      ],
+      "title": "New setting: emojiCompletionEnabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "When false, the :emoji: shortcode typeahead (the suggestion popup and the :name: inline replacement) is disabled. When absent or true, it is enabled.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_AX_STARTUP_QUIET_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_AX_STARTUP_QUIET_MS"
+      ],
+      "title": "New environment variable: CLAUDE_AX_STARTUP_QUIET_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_AX_STARTUP_QUIET_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ALDER_WICKET",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ALDER_WICKET"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ALDER_WICKET",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ALDER_WICKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AMBER_ASTROLABE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AMBER_ASTROLABE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AMBER_ASTROLABE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AMBER_ASTROLABE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_BISON_CAIRN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_BISON_CAIRN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_BISON_CAIRN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_BISON_CAIRN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_EXPLORE_INHERIT_CAP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_EXPLORE_INHERIT_CAP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_EXPLORE_INHERIT_CAP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_EXPLORE_INHERIT_CAP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HERON_TALLOW",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HERON_TALLOW"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HERON_TALLOW",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HERON_TALLOW",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_LARCH_CISTERN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_LARCH_CISTERN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_LARCH_CISTERN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_LARCH_CISTERN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REMOTE_SESSION_ORIGIN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REMOTE_SESSION_ORIGIN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REMOTE_SESSION_ORIGIN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REMOTE_SESSION_ORIGIN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TRANSCRIPT_LOCAL_GC",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TRANSCRIPT_LOCAL_GC"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TRANSCRIPT_LOCAL_GC",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TRANSCRIPT_LOCAL_GC",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TEST_ENABLE_SESSION_PERSISTENCE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "TEST_ENABLE_SESSION_PERSISTENCE"
+      ],
+      "title": "Environment variable no longer read: TEST_ENABLE_SESSION_PERSISTENCE",
+      "impact": "informational",
+      "before": "TEST_ENABLE_SESSION_PERSISTENCE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

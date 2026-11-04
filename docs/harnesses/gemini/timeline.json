@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "harness": "gemini",
+  "steps": [
+    {
+      "version": "0.66.0",
+      "previous": "0.65.0",
+      "changes": []
+    },
+    {
+      "version": "0.65.0",
+      "previous": "0.64.0",
+      "changes": []
+    },
+    {
+      "version": "0.64.0",
+      "previous": "0.63.0",
+      "changes": []
+    },
+    {
+      "version": "0.63.0",
+      "previous": "0.62.0",
+      "changes": []
+    },
+    {
+      "version": "0.62.0",
+      "previous": "0.61.0",
+      "changes": []
+    }
+  ]
+}

@@ -1,0 +1,816 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.212",
+  "to": "2.1.213",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 41,
+    "categories": {
+      "cli": 3,
+      "config": 17,
+      "hooks": 21
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 40,
+      "notable": 1
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.InstructionsLoaded.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "InstructionsLoaded",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "InstructionsLoaded hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.MessageDisplay.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "MessageDisplay",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "MessageDisplay hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionDenied.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionDenied",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PermissionDenied hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostCompact.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostCompact",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PostCompact hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolBatch.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PostToolBatch hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PreCompact.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreCompact",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PreCompact hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PreToolUse hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id removed",
+      "impact": "notable",
+      "before": "prompt_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SessionStart.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "SessionStart hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Setup.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Setup",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "Setup hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Stop.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "Stop hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SubagentStop.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStop",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "SubagentStop hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.UserPromptExpansion.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptExpansion",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "UserPromptExpansion hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "UserPromptSubmit hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude agents.options.--all.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--all",
+        "description"
+      ],
+      "title": "`claude agents --all`: description changed",
+      "impact": "informational",
+      "before": "With --json: include completed sessions (the full agent view list)",
+      "after": "With --json: also include completed background sessions",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude agents.options.--json.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--json",
+        "description"
+      ],
+      "title": "`claude agents --json`: description changed",
+      "impact": "informational",
+      "before": "Print active sessions as a JSON array and exit (for scripting; does not require a TTY)",
+      "after": "Print active sessions (interactive and background) as a JSON array and exit (for scripting; does not require a TTY)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.agents --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents --help"
+      ],
+      "title": "Full help text of `agents --help` changed (+367 −349 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,8 +9,8 @@\n   --agent <agent>                       Default agent for sessions dispatched\n                                         from agent view. Overrides the 'agent'\n                                         setting.\n-  --all                                 With --json: include completed sessions\n-                                        (the full agent view list)\n+  --all                                 With --json: also include completed\n+                                        background sessions\n   --allow-dangerously-skip-permissions  Make bypass-permissions mode available\n                                         to dispatched sessions without\n                                         defaulting to it\n@@ -21,9 +21,9 @@\n   --effort <level>                      Default effort level for sessions\n                                         dispatched from agent view\n   -h, --help                            Display help for command\n-  --json                                Print active sessions as a JSON array\n-                                        and exit (for scripting; does not\n-                                        require a TTY)\n+  --json                                Print active sessions (interactive and\n+                                        background) as a JSON array and exit\n+                                        (for scripting; does not require a TTY)\n   --mcp-config <config>                 MCP server configuration to apply to\n                                         dispatched sessions (repeatable)\n   --model <model>                       Default model for sessions dispatched\n",
+      "stats": {
+        "added_chars": 367,
+        "removed_chars": 349
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_GOOGLE_CLOUD_BASE_URL"
+      ],
+      "title": "New environment variable: ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_GOOGLE_CLOUD_LOCATION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_GOOGLE_CLOUD_LOCATION"
+      ],
+      "title": "New environment variable: ANTHROPIC_GOOGLE_CLOUD_LOCATION",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_GOOGLE_CLOUD_LOCATION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_GOOGLE_CLOUD_PROJECT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_GOOGLE_CLOUD_PROJECT"
+      ],
+      "title": "New environment variable: ANTHROPIC_GOOGLE_CLOUD_PROJECT",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_GOOGLE_CLOUD_PROJECT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID"
+      ],
+      "title": "New environment variable: ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID",
+      "impact": "informational",
+      "before": null,
+      "after": "ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.BUN_ENVprocess",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENVprocess"
+      ],
+      "title": "New environment variable: BUN_ENVprocess",
+      "impact": "informational",
+      "before": null,
+      "after": "BUN_ENVprocess",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_NO_MODEL_FALLBACK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_NO_MODEL_FALLBACK"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_NO_MODEL_FALLBACK",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_NO_MODEL_FALLBACK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.NODE_CHANNEL_FD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_CHANNEL_FD"
+      ],
+      "title": "New environment variable: NODE_CHANNEL_FD",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_CHANNEL_FD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT"
+      ],
+      "title": "New environment variable: OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "impact": "informational",
+      "before": null,
+      "after": "OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT"
+      ],
+      "title": "New environment variable: OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "impact": "informational",
+      "before": null,
+      "after": "OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT"
+      ],
+      "title": "New environment variable: OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "impact": "informational",
+      "before": null,
+      "after": "OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.failed",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "failed"
+      ],
+      "title": "New environment variable: failed",
+      "impact": "informational",
+      "before": null,
+      "after": "failed",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.BUN_ENV",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "BUN_ENV"
+      ],
+      "title": "Environment variable no longer read: BUN_ENV",
+      "impact": "informational",
+      "before": "BUN_ENV",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_MORNING_BRIEF",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_MORNING_BRIEF"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ENABLE_MORNING_BRIEF",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ENABLE_MORNING_BRIEF",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MORNING_BRIEF_PROMPT",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MORNING_BRIEF_PROMPT"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_MORNING_BRIEF_PROMPT",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_MORNING_BRIEF_PROMPT",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

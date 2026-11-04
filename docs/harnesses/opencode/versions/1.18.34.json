@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "version": "1.18.34",
+  "platform": "",
+  "captured_at": "2026-11-04T16:16:16.239171Z",
+  "capture": {
+    "partial": false,
+    "sections": {
+      "support": "2026-11-04T16:16:16.239171Z"
+    }
+  },
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.content_allowed",
+        "label": "Prompts and tool content delivered when allowed",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.content_withheld",
+        "label": "Prompts and tool content withheld when the project says so",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.equivalent",
+        "label": "The same telemetry through the relay as exported directly",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.only_opted_in",
+        "label": "Nothing leaves for sessions no repository opted in to",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
+}

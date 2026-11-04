@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.238",
+  "to": "2.1.239",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Cost estimates (`/cost`, status line, `--max-budget-usd`) now include the 1.1× US-only-inference premium for data-residency workspaces\n- Added the one-time fullscreen renderer offer on Bedrock, Vertex, Foundry and other previously excluded setups; new installs there now start in fullscreen\n- Added `/claude-api upgrade` to migrate Python projects from `anthropic` 0.x to 1.x, and updated the skill's Python reference for 1.x (timeouts use `anthropic.Timeout`, not `httpx.Timeout`)\n- Cloud sessions: plugins synced from claude.ai now show as `name@synced`, work with `claude plugin enable/disable <name>@synced`, and never override a same-named plugin you installed\n- Alpine/musl builds: native image paste, clipboard, and audio-capture add-ons now load (musl-built binaries instead of glibc ones refused by the runtime)\n- The usage-limit message shown when your monthly spend limit is already used up now also says when your session or weekly limit resets\n- Fixed Bedrock streaming behind proxies that strip the response Content-Type header, which silently doubled billed API calls by re-running every turn non-streaming\n- Fixed Claude Code hanging at startup behind an HTTPS proxy when using Bedrock with an SSO profile and `awsAuthRefresh` — the credential pre-check now honors `HTTPS_PROXY`\n- Fixed a raw crash dump when starting Claude Code from a directory that no longer exists; it now prints a clear message\n- Fixed Edit and Write calls pausing for about 5 seconds in JetBrains IDE terminals when the Claude Code plugin is connected\n- Fixed a race where pressing Esc with a prompt queued could let the next turn finish early, leaving the session idle while Claude was still working and letting a later resubmit repeat actions\n- Fixed WebFetch retaining expired page content in memory for the whole session instead of the intended 15 minutes\n- Fixed cloud sessions (Claude Code on the web, desktop and mobile apps) resuming out of plan mode after an idle worker restart\n- Fixed MCP elicitation forms taller than the terminal being clipped in fullscreen mode: the form now fits the window, with hidden fields reachable by scrolling and Accept/Decline always visible\n- Fixed remote MCP servers staying failed after a transient 5xx on a mid-session reconnect in cloud sessions or via SDK `setMcpServers()`\n- Fixed custom session titles disappearing from `/resume` after more than ~64 KB of conversation was written following the rename\n- Fixed `claude -c`/resume picking up sessions from a different directory whose path differed only by characters like `_`, `-`, or `.`\n- Fixed `/resume` and the agents view showing a session as recently changed (and reordering it) when only its file was touched or it was merely reopened\n- Fixed `/resume` in all-projects mode telling you to `cd` into a deleted directory (e.g. a removed worktree); such sessions now resume in the current directory\n- Fixed the `dark-ansi` theme rendering expanded tool results in fullscreen mode with text the same color as the background\n- Fixed the fullscreen renderer prompt reappearing on every launch when it could never be answered; it now stops after being shown on three launches\n- Fixed `.worktreeinclude` patterns starting with `**/` silently matching nothing when the target lived in a gitignored directory\n- Fixed agents, skills, and commands whose `.md` file starts with a UTF-8 BOM being silently ignored\n- Fixed `/insights` echoing literal `<message>` tags in its response on some models\n- Fixed marketplace `metadata.pluginRoot` having no effect: bare plugin source names now resolve under it as the docs describe\n- Fixed mouse movement in browser-based terminals inserting text like `\"35;150;7M\"` into the prompt when a mouse report arrived split across writes\n- Fixed custom theme overrides for the effort/ultracode status badge colors being ignored\n- Fixed OpenTelemetry trace fragmentation: tool executions deferred by a `PreToolUse` hook now resume in the original turn's trace instead of starting a new trace\n- Fixed vim mode in the agent view: Escape now switches to NORMAL mode and keeps your text instead of clearing the prompt\n- Fixed the `selection:copy` keybinding silently dropping a text selection that had been extended with Shift+Arrow keys\n- Fixed the `/voice` startup tip still appearing after voice dictation was enabled via the `voice.enabled` setting\n- Fixed shell-mode (`!`) Tab completion dropping the `./` from a `./script` path, which left a command the shell couldn't run\n- Fixed fullscreen mode answering a permission prompt or pressing a button when you clicked the terminal window only to bring it back into focus\n- Fixed slash-command panels (e.g. `/config`, `/model`) in fullscreen mode covering the latest messages; the conversation now stays pinned above the panel\n- Fixed the `/workflows` detail dialog overflowing the terminal and losing its header off-screen when opened while Claude is still responding\n- Fixed the Linux sandbox making a nonexistent `.git/config.worktree` unreadable, which broke every sandboxed git command in repos with `extensions.worktreeConfig` set\n- Fixed hooks failing with \"posix_spawn ENOENT\" after the session's working directory was deleted; they now run from the project root or home directory instead\n- Fixed `claudeMdExcludes` not excluding a symlinked `.claude/rules` file when the pattern names the rules directory or the symlink rather than its target\n- Fixed runaway session-title syncing to Remote Control when two Claude Code processes shared one background job's state (2.1.232 regression); title updates are now deduplicated and rate-limited\n- Fixed sessions whose title starts with `/` being unaddressable by `SendMessage` and shown as \"(untitled)\" in `ListAgents`\n- Fixed Ctrl+W, Ctrl+U, Ctrl+K, Option+Backspace, Option+D and vim `df`/`dt` leaving a broken `[Pasted text #N]` placeholder when the cursor was inside it\n- Fixed masked (password-style) inputs such as the login code field letting their text be pasted back with Ctrl+Y elsewhere or saved to prompt history when cleared with double Esc\n- Fixed Ctrl+Backspace deleting one character instead of a word in search boxes\n- Fixed a request rejected by an organization policy check being re-sent before the rejection was shown\n- Improved the reminder shown after compaction so a skill's original arguments are not re-run as a new request\n- Long file paths on tool-use rows now truncate in the middle to stay on one line\n- Remote sessions keep sending keep-alives while a long `SessionStart` or `Setup` hook runs, so the container is not idle-reaped mid-hook\n- `/goal`: repeat check-ins on long-running background work now back off (30 min, then 1 h, then every 2 h) instead of repeating every 30 minutes\n- `/goal`: resuming a session from the `claude --resume` picker now restores its active goal\n- `ListAgents` now tells a session its own name (the one peers use to message it), and `SendMessage` to your own name says so instead of \"no agent named …\"\n- `ListAgents` and `/list-agents` now list your live teammates (previously only subagents and other sessions appeared, so a reachable teammate looked absent)\n- `keybindingFlavor: \"readline\"` now also matches Bash for word keys: Alt+F and Ctrl/Option+→ stop at the end of the word, Alt+D deletes to it (Ctrl+Y pastes it back), and punctuation separates words\n- Persistent retry mode (`CLAUDE_CODE_RETRY_WATCHDOG`) now fails immediately on organization spend-limit and out-of-credits errors instead of waiting indefinitely for a reset\n- Claude in Chrome: `/clear` now closes the session's Chrome tab group, and empty groups are closed on `/resume` and when Claude Code exits\n- Remote sessions: images uploaded from mobile now include their saved file path, so Claude can copy them into files it creates\n- Claude Code on the web: requests from Bash and other tools to non-API anthropic.com hosts (e.g. www, docs) now go through the session's network proxy, so your environment's allowed domains apply\n- Remote Control: clearer message and `claude doctor` wording when Remote Control isn't enabled for your account\n- Windows: cross-session messaging is now available, so Claude Code sessions across your machines can message each other with `SendMessage` and find each other with `ListAgents`, as on macOS and Linux\n- [VSCode] \"View usage\" in the usage-limit banner now sits inline with the warning text instead of floating mid-banner"
+  },
+  "summary": {
+    "changes": 10,
+    "categories": {
+      "config": 4,
+      "hooks": 1,
+      "model": 5
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 5,
+      "notable": 5
+    },
+    "undocumented": 9
+  },
+  "changes": [
+    {
+      "id": "model.prices.claude-sonnet-5.cache_read",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5",
+        "cache_read"
+      ],
+      "title": "Built-in price for claude-sonnet-5 changed",
+      "impact": "notable",
+      "before": 0.3,
+      "after": 0.2,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "model.prices.claude-sonnet-5.cache_write_1h",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5",
+        "cache_write_1h"
+      ],
+      "title": "Built-in price for claude-sonnet-5 changed",
+      "impact": "notable",
+      "before": 6,
+      "after": 4,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "model.prices.claude-sonnet-5.cache_write_5m",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5",
+        "cache_write_5m"
+      ],
+      "title": "Built-in price for claude-sonnet-5 changed",
+      "impact": "notable",
+      "before": 3.75,
+      "after": 2.5,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "model.prices.claude-sonnet-5.input",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5",
+        "input"
+      ],
+      "title": "Built-in price for claude-sonnet-5 changed",
+      "impact": "notable",
+      "before": 3,
+      "after": 2,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.prices.claude-sonnet-5.output",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5",
+        "output"
+      ],
+      "title": "Built-in price for claude-sonnet-5 changed",
+      "impact": "notable",
+      "before": 15,
+      "after": 10,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.keys.prompt_id",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "keys",
+        "prompt_id"
+      ],
+      "title": "SessionEnd hook payload field prompt_id added",
+      "impact": "informational",
+      "before": null,
+      "after": "prompt_id",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.keybindingFlavor.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "keybindingFlavor",
+        "description"
+      ],
+      "title": "keybindingFlavor description changed (+573 −251 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Which conventions the prompt's editing keys follow: \"readline\" matches Bash and other readline programs (Ctrl+W deletes back to the previous whitespace); \"classic\" (default) keeps Claude Code's long-standing behavior (Ctrl+W deletes the previous word)\n+Which conventions the prompt's word-editing keys follow: \"readline\" matches Bash and other readline programs (Ctrl+W deletes back to the previous whitespace; Alt+F and Alt+D stop at the end of the current word and Ctrl+Y can paste back what Alt+D deleted; for Alt+B, Alt+F, Alt+D, Ctrl/Option+Arrow and Option/Ctrl+Backspace a word is a run of letters and digits, so punctuation separates words); \"classic\" (default) keeps Claude Code's long-standing behavior (Ctrl+W deletes the previous word; the word keys use Unicode word segmentation, so foo_bar and 3.14 are one word)\n",
+      "stats": {
+        "added_chars": 573,
+        "removed_chars": 251
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.modelSettings",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelSettings"
+      ],
+      "title": "New setting: modelSettings",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Per-model settings keyed by canonical model name.",
+        "enum": [
+          "/"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.worktree.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "worktree",
+        "description"
+      ],
+      "title": "worktree description changed (+173 −47 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Git worktree configuration for --worktree flag.\n+Git worktree configuration: the CLI --worktree flag, EnterWorktree and agent isolation, plus the location Claude Code Desktop uses for SSH-session worktrees on this machine.\n",
+      "stats": {
+        "added_chars": 173,
+        "removed_chars": 47
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "env_vars"
+      ],
+      "title": "Environment variables: +14 −8",
+      "impact": "informational",
+      "before": [
+        "AWS_CONFIG_FILE",
+        "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+        "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+        "AWS_ROLE_ARN",
+        "AWS_SHARED_CREDENTIALS_FILE",
+        "AWS_WEB_IDENTITY_TOKEN_FILE",
+        "CLAUDE_CODE_ARTIFACT_DIRECT_UPLOAD",
+        "CLOUDSDK_AUTH_ACCESS_TOKEN"
+      ],
+      "after": [
+        "CLAUDE_CODE_ARTIFACT_DELETE",
+        "CLAUDE_CODE_BRIDGE_MCP_CARRIER",
+        "CLAUDE_CODE_BRIDGE_PROMPT_SHA256",
+        "CLAUDE_CODE_DIR_SYNC_DISABLE_ANCHORING",
+        "CLAUDE_CODE_DIR_SYNC_GIT",
+        "CLAUDE_CODE_DISABLE_BEDROCK_CONTENT_TYPE_DEFAULT",
+        "CLAUDE_CODE_DISABLE_HOOK_FORWARDING",
+        "CLAUDE_CODE_DISABLE_PLUGIN_FORWARDING",
+        "CLAUDE_CODE_DISABLE_VITALS_EMITTER",
+        "CLAUDE_CODE_HOLD_REPORT_PARK_AT_INIT",
+        "CLAUDE_CODE_INTRO_FRAME",
+        "CLAUDE_CODE_MCP_MEMORY_CGROUP",
+        "CLAUDE_CODE_PARKED_STOP_RETIRES",
+        "CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

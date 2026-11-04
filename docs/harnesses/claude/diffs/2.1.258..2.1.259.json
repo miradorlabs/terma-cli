@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.258",
+  "to": "2.1.259",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added `managedMcpServers` managed setting: organizations can provide HTTP/SSE MCP servers to every user (same entry shape as `.mcp.json`); entries that name a command to run are skipped\n- Added `--permission-prompts none` for unattended headless hosts: anything that would prompt is denied automatically while the active permission mode (including auto mode) keeps deciding\n- Added recognition of `glab mr create/merge/close/reopen/note/update` so GitLab merge requests show as `MR !N` in the collapsed tool summary and refresh the footer MR badge\n- Added `--json` to `claude plugin validate` for a machine-readable validation report\n- Fixed concurrent sessions silently reverting each other's `~/.claude.json` changes — workspace trust no longer resets and MCP/project state is no longer lost when running many sessions at once\n- Fixed a conversation whose thinking was rejected once being rejected again on every later turn\n- Fixed Bash `Read()` deny rules not covering files given as option values (`--ignore-revs-file=.env`, `-f.env`, `@file`), `git diff`/`git grep` file operands, or `cd DIR && cat FILE` compounds; `grep -r`/`cp -r` over a directory holding a denied file now asks\n- Fixed the prompt cache being invalidated when the OAuth token refreshed in sessions with telemetry disabled\n- Fixed fullscreen mode showing a blank conversation after a long turn with hundreds of tool calls\n- Fixed auto mode running a turn on a model it doesn't support when a command or skill's frontmatter `model:` named one; the turn now keeps the session model\n- Fixed `CLAUDE_CODE_MAX_CONTEXT_TOKENS` being ignored for Vertex-style model IDs (`@YYYYMMDD` suffix) of model versions Claude Code doesn't recognize\n- Fixed the live output preview of a running shell command hiding its newest lines when an earlier line wrapped\n- Fixed a background GitHub connection check that ran on every launch for claude.ai users; the result is now remembered across launches\n- Fixed `--resume` failing (and `--continue` opening an empty conversation) when a saved session contains an attachment entry with no payload\n- Fixed frontmatter `model:` on custom commands and skills being ignored in interactive sessions\n- Fixed Artifact publishing failing once with an \"unexpected parameter `note`\" error in conversations continued from an older version\n- Fixed managed `forceRemoteSettingsRefresh` being ignored at startup when a policy helper configured by MDM or the managed settings file had already run\n- Fixed worktree isolation refusing hook-created worktrees on machines where `git rev-parse` fails with a message other than \"not a git repository\"\n- Fixed OpenTelemetry metrics and events from cloud sessions missing the `user.email`, `organization.id`, and `user.account_uuid` attributes\n- Fixed MCP servers that disconnect while their tools are being listed at startup showing as connected with no tools instead of reporting the error\n- Fixed the file edit permission dialog sometimes showing a changed line cut short with no indication\n- Fixed repository detection dropping a known repo identity after a transient git probe failure\n- Fixed managed settings silently going unenforced when the managed-settings file, a drop-in, the MDM plist, or the HKLM value cannot be parsed: Claude Code now refuses to start and names the source\n- Fixed Stop not actually stopping background agents and workflows in remote-control sessions: killed tasks now stay visible and re-stoppable until their processes exit\n- Fixed resuming a workflow run while its previous stopped run was still exiting, which could run duplicate copies of its agents\n- Fixed marketplace repo URLs on github.com with a trailing slash or dangling `?`/`#` producing an unusable `.git` clone URL\n- Fixed blocking Stop hooks causing the turn after a block to lose the model's reasoning from that turn and, on some models, miss the prompt cache\n- Fixed remote (claude.ai) sessions taking 60 seconds to start a turn after a browser-hosted MCP server's page had gone away\n- Fixed worktree-isolated sessions refusing common Bash loops, xargs pipelines and launcher-wrapped commands that cannot reach the main checkout\n- Improved terminal resize and first-render performance for long responses by reusing text measurements\n- Improved `/workflows` agent detail: JSON outcomes are pretty-printed with syntax colors and real line breaks, and long outcomes fold behind an expand toggle\n- Improved headless/SDK session start: the first turn begins up to 50 ms sooner when MCP servers finish connecting\n- Improved `/install-github-app` to explain it is GitHub-only and point to the GitLab CI/CD docs when run inside a GitLab repository\n- Improved nested background subagent results to be saved in the parent subagent's transcript, so resumed subagents keep them and shared transcripts show the delivery\n- Changed `allowedMcpServers` to govern only servers users add: a literal `managed-mcp.json` server your allowlist used to filter out now loads on upgrade; use `deniedMcpServers` to keep it off\n- [VSCode] Added an Active quick filter and a status filter menu (Needs input, Working, Completed) to the session list sidebar\n- Fixed remote and scheduled sessions doing nothing after a connector-tool permission prompt was approved while the session was paused"
+  },
+  "summary": {
+    "changes": 13,
+    "categories": {
+      "cli": 4,
+      "config": 9
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 12,
+      "notable": 1
+    },
+    "undocumented": 8
+  },
+  "changes": [
+    {
+      "id": "cli.commands.claude.options.--permission-prompts",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--permission-prompts"
+      ],
+      "title": "New flag `claude --permission-prompts`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "choices": [
+          "host",
+          "none"
+        ],
+        "default": "host",
+        "description": "Who answers permission prompts with --print: \"host\" (the SDK host or --permission-prompt-tool) or \"none\" (nobody: anything that would prompt is denied automatically; the permission mode still decides everything else)",
+        "names": [
+          "--permission-prompts"
+        ],
+        "value": "<target>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.claude ultrareview.options.--timeout.default",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude ultrareview",
+        "options",
+        "--timeout",
+        "default"
+      ],
+      "title": "Default of `claude ultrareview --timeout`: 30 → 45",
+      "impact": "notable",
+      "before": "30",
+      "after": "45",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+572 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -146,6 +146,14 @@\n                                         (choices: \"acceptEdits\", \"auto\",\n                                         \"bypassPermissions\", \"manual\",\n                                         \"dontAsk\", \"plan\")\n+  --permission-prompts <target>         Who answers permission prompts with\n+                                        --print: \"host\" (the SDK host or\n+                                        --permission-prompt-tool) or \"none\"\n+                                        (nobody: anything that would prompt is\n+                                        denied automatically; the permission\n+                                        mode still decides everything else)\n+                                        (choices: \"host\", \"none\", default:\n+                                        \"host\")\n   --plugin-dir <path>                   Load a plugin from a directory or .zip\n                                         for this session only (repeatable:\n                                         --plugin-dir A --plugin-dir B.zip)\n",
+      "stats": {
+        "added_chars": 572,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.ultrareview --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "ultrareview --help"
+      ],
+      "title": "Full help text of `ultrareview --help` changed (+36 −36 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -13,5 +13,5 @@\n   --post               Post the finished review's findings to the PR as you (PR\n                        targets only; one plain comment, not a review)\n   --timeout <minutes>  Maximum minutes to wait for the review to finish\n-                       (default: 30)\n+                       (default: 45)\n \n",
+      "stats": {
+        "added_chars": 36,
+        "removed_chars": 36
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.allowedMcpServers.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedMcpServers",
+        "description"
+      ],
+      "title": "allowedMcpServers description changed (+582 −278 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Enterprise allowlist of MCP servers that can be used. Applies to all scopes including enterprise servers from managed-mcp.json. If undefined, all servers are allowed. If empty array, no servers are allowed. Denylist takes precedence - if a server is on both lists, it is denied.\n+Enterprise allowlist of the MCP servers users may use.\n+Governs servers users add (user, project and local config, --mcp-config, agent frontmatter, plugins, claude.ai connectors); servers the organization itself delivers (managedMcpServers, and managed-mcp.json entries that use no ${VAR} expansion) are allowed without being listed; a managed-mcp.json entry that uses ${VAR} expansion is still checked against this list.\n+If undefined, all servers are allowed.\n+If empty array, users can use no servers of their own.\n+Denylist takes precedence - if a server is on both lists, it is denied.\n",
+      "stats": {
+        "added_chars": 582,
+        "removed_chars": 278
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.managedMcpServers",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "managedMcpServers"
+      ],
+      "title": "New setting: managedMcpServers",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "MCP servers the organization provides to every user, keyed by server name, each with the .mcp.json entry shape; only \"http\" and \"sse\" servers are accepted (nothing that names a program to run, no ${VAR} references). Honored from managed settings only; users cannot remove them, deniedMcpServers still applies, and they need no allowedMcpServers entry. Not read in Claude Desktop's Code tab on a third-party deployment or in Cowork sessions, where Claude Desktop supplies and locks the session's MCP servers itself.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.remoteTools",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "remoteTools"
+      ],
+      "title": "New setting: remoteTools",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal How this computer serves tool calls to cloud sessions",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_PIN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_PIN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_PIN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_PIN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_EARLY_HYDRATE_PREFETCH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_EARLY_HYDRATE_PREFETCH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CCR_EARLY_HYDRATE_PREFETCH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CCR_EARLY_HYDRATE_PREFETCH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_FUNCTION_HOOKS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PLUGIN_DIR_WATCH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PLUGIN_DIR_WATCH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PLUGIN_DIR_WATCH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PLUGIN_DIR_WATCH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SESSION_ORIGIN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SESSION_ORIGIN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SESSION_ORIGIN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SESSION_ORIGIN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SKILL_ATTRIBUTION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SKILL_ATTRIBUTION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SKILL_ATTRIBUTION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SKILL_ATTRIBUTION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "gemini",
+    "name": "Gemini CLI",
+    "vendor": "Google",
+    "homepage": "https://github.com/google-gemini/gemini-cli",
+    "source": {
+      "repo": "google-gemini/gemini-cli",
+      "url": "https://github.com/google-gemini/gemini-cli",
+      "language": "typescript"
+    },
+    "changelog": "https://github.com/google-gemini/gemini-cli/releases",
+    "latest": "0.66.0",
+    "support": "supported",
+    "versions_tracked": 6,
+    "first_tracked": "2026-09-24",
+    "last_change": {
+      "from": "0.65.0",
+      "to": "0.66.0",
+      "at": "2026-11-04T16:16:16.239171Z",
+      "released_at": "2026-10-27T20:30:04.263Z",
+      "changes": 0,
+      "categories": {}
+    }
+  },
+  "versions": [
+    {
+      "version": "0.66.0",
+      "released_at": "2026-10-27T20:30:04.263Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.65.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.65.0",
+      "released_at": "2026-10-20T21:26:34.492Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.64.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.64.0",
+      "released_at": "2026-10-13T20:48:24.183Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.63.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.63.0",
+      "released_at": "2026-10-06T20:58:43.642Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.62.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.62.0",
+      "released_at": "2026-09-29T21:25:44.188Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.61.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "0.61.0",
+      "released_at": "2026-09-24T00:04:53.021Z",
+      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    }
+  ]
+}

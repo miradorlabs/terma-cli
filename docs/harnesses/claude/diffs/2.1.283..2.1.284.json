@@ -1,0 +1,552 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.283",
+  "to": "2.1.284",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added Claude Sonnet 5.5 (`claude-sonnet-5-5`), now the default Sonnet model on the Anthropic API — 1M context, $2/$10 per Mtok with $0.20/Mtok cache reads\n- Added a \"Yes, but ask again next time\" answer to auto mode's prompt before a read outside the working directories, so you can allow that one read and still be asked about later ones\n- Added dollar amounts to the Claude apps gateway spend limit in `/usage` and the status line (for example \"$271.40 / $500.00 spent this month\") when the gateway runs this version or later; the status line's `rate_limits.spend_limit` also gains `used_usd`, `limit_usd` and `period`\n- Added `effortSlider:decreaseEffort`, `increaseEffort` and `toggleUltracode` keybinding actions, so the `/effort` slider's arrow and Tab keys can be rebound in `keybindings.json`\n- Added `/rate-limit-options` to `/help` and the command menu for claude.ai subscribers, so the usage-limit notices that mention it point to a command you can find\n- Added `/mcp reconnect all` in the interactive terminal to retry every MCP server that failed to connect or needs authentication at once\n- Added Claude apps gateway startup warnings when a managed policy's `availableModels` is empty, or leaves out the model Claude Code starts on without setting `model` or `enforceAvailableModels`\n- Added `auth: { google: {} }` for Claude apps gateway `telemetry.forward_to` destinations, so telemetry can be exported straight to Google Cloud's OTLP endpoint using the gateway's Google Cloud credentials\n- Added certificate client authentication (`private_key_jwt`) between the Claude apps gateway and its identity provider, for identity providers that issue certificate credentials instead of client secrets\n- Fixed a damaged response stream showing raw errors such as \"JSON Parse error\" or \"undefined is not an object\", or writing the word \"undefined\" into an answer, instead of being retried or reported as an interrupted response\n- Fixed an overloaded or server error arriving right after a thinking block ending the turn with an error instead of being retried\n- Fixed \"Prompt is too long\" errors that persisted after compacting: when the compacted request is still too long, Claude Code now compacts once more, keeping less of the recent conversation\n- Fixed a session whose model is unavailable, with no fallback model left, showing a bare \"is currently unavailable\" message (or \"Something went wrong\" in cloud sessions) instead of the model-unavailable notice and its Learn more link\n- Fixed Agent SDK sessions crashing when a user message contains an image with a malformed `source`, and failing on every later turn after a malformed document block; a malformed image is now replaced with an explanatory note\n- Fixed MCP tool calls in a resumed session failing with \"No such tool available\" while their server was still connecting; the call now waits up to 10 seconds for the server\n- Fixed repeated calls to the plan-usage endpoint after it rate-limits or rejects your login: `/usage`, `/extra-usage` and IDE usage views now back off instead of re-asking\n- Fixed `claude mcp add` reporting success when managed settings restrict MCP servers to plugins; it now refuses and says what to do, instead of saving a server that never loads\n- Fixed the `/plugin` configure screen: boolean options are now a true/false choice instead of free text, number options refuse invalid input, and ←/→ change an options field instead of switching tabs\n- Fixed `ANTHROPIC_FOUNDRY_RESOURCE` being interpolated into the Foundry endpoint host unvalidated; a value that is not a plain resource name is now refused\n- Fixed Claude Desktop behind a Claude apps gateway offering no 1M context option: the gateway now marks each 1M-capable model for Desktop automatically\n- Fixed ↓ in shell mode selecting a hidden background-tasks pill, which stopped Backspace and Ctrl+U from editing the prompt\n- Fixed Bash tool failing on Windows with many plugins enabled: plugin `bin/` directories that don't exist are no longer added to PATH, and inherited entries aren't added twice\n- Fixed `sparsePaths` plugin marketplaces cloning empty and replacing a working local copy on older git (before 2.39), which failed every refresh with \"marketplace.json file is no longer present\"\n- Fixed fullscreen rendering erasing the terminal output above the session when `[` in transcript mode writes the conversation to scrollback (macOS and Linux)\n- Fixed fullscreen scroll position jumping to the previous message or to the bottom when a reply finished streaming while scrolled up\n- Fixed tab bars in dialogs such as `/config` and `/plugin` breaking the title and tab labels mid-word in a narrow terminal; a tab that doesn't fit now moves to the next line whole\n- Fixed the `/model` picker showing \"+1 model\" below the list after scrolling to the last model; the count now covers only the models below the visible rows\n- Fixed `/keybindings` writing Backspace and Delete bindings for a footer action that does nothing into the generated `keybindings.json`\n- Fixed a rebound agent panel close key (`footer:close`) typing \"x\" instead of itself on the row of the agent you're viewing\n- Fixed vim mode `.` not repeating text typed very fast (for example over ssh or in tmux) or pasted without bracketed paste, and leaving the prompt in INSERT mode after repeating a change with nothing typed (such as `cw` then Esc)\n- Fixed vim mode leaving the cursor on an image placeholder's opening bracket after `dd` on the last line or `yy` at the end of the prompt, where `r` or `x` would break or delete the image\n- Fixed a key pressed the instant the terminal regained focus answering the Remote Control enable prompt before its short safety delay restarted\n- Fixed the workspace trust dialog appearing a second time after switching renderers or updating when Claude Code was started in the home directory\n- Fixed rules symlinked into `.claude/rules` from outside the project being skipped without ever showing the external-imports approval prompt; a `.claude` directory symlinked from outside the project now asks for the same approval\n- Fixed plugins from marketplaces, claude.ai and npm pre-approving their own tools via `allowed-tools` under managed `allowManagedPermissionRulesOnly`; only plugins from an official Anthropic source or a source that managed settings vouch for keep that pre-approval\n- Fixed a failed first `claude plugin install` leaving the plugin enabled and recorded when a dependency's version range could not be met\n- Fixed the debug log dropping a failed hook's stderr when the hook also wrote to stdout, and logging nothing for a failed hook with no output; failed hooks now also log their status code\n- Fixed `{\"decision\":\"block\"}` returned by Elicitation and ElicitationResult hooks being ignored; it now declines the MCP elicitation, as exit code 2 does\n- Fixed sessions launched without the `SendMessage` tool (such as by Claude Desktop) still being told to message other sessions with it\n- Fixed a photo sent from the Claude app over Remote Control being lost when its queued message was pulled back into the terminal prompt to edit, and the cursor moving one character for a photo with no caption\n- Fixed typing a message during an automatic usage-limit wait taking the wait out of the \"Continue automatically at usage limit\" setting's control when that turn hit the limit again\n- Fixed usage-limit warnings suggesting `/upgrade` to users already on the highest Max plan; the warnings and `/upgrade` itself now point at `/usage-credits` when it is available\n- Fixed the Explore subagent switching to Opus on the Claude API when the session runs a model ID Claude Code doesn't recognize, such as a custom model behind a proxy; Explore now inherits that model\n- Fixed `/loop` status updates in self-paced mode often not being shown because Claude wrote them only in its reasoning; Claude now writes each update, and the outcome when the loop stops, as visible text\n- Fixed `/ultrareview` failing to upload the working tree when started from a git worktree that the Claude desktop app created on macOS or Linux\n- Fixed sandboxed Bash commands failing to start on Linux when the working directory is write-denied and contains a read-denied directory\n- Fixed artifact database write results telling Claude that every viewer sees a write to a viewer's private `data/users/` subtree, and added a \"view\" level to `as_level`\n- Fixed the Claude apps gateway answering `431 Request Header Fields Too Large` to every request from a sign-in whose identity provider lists many groups; it now accepts request headers up to 256 KiB\n- Improved the usage-limit wait: the limit's state and the countdown with the usage-credits option now show as one block under the prompt, and limit messages no longer repeat the countdown\n- Improved the \"No such tool available\" error for Claude in Chrome tools called without their prefix: it now names the tool to call\n- Improved Monitor event rows to show what each event printed instead of repeating the description, and stopped repeating an unchanged \"Waiting for N … to finish\" line after every event\n- Improved Workflow tool sandbox hardening for errors thrown by async script hooks\n- Improved startup time and memory use by building only the parts of the settings schema that your settings files actually use\n- Improved `/claude-api`: `hillclimb` no longer spends rounds on prompt rewordings too small for the eval to measure, and an extra page you ask for beside `report.html` is built as one local file that loads nothing from the network\n- Improved lists such as `/tasks`, `/copy` and `/hooks`: the details after each name now line up in one column when they fit, and otherwise sit at the right edge\n- Improved `claude plugin marketplace add` to say when it replaces a marketplace already added under the same name from a different source, and how to undo it\n- Improved the startup refusal when managed settings require a sign-in (`forceLoginMethod` or `forceLoginOrgUUID`) and an API key, token or `apiKeyHelper` is configured: it now names the credential in use, where it is set, and how to remove it\n- Improved auto-memory loading: invisible characters and tags that imitate Claude Code's own markup are neutralized in `MEMORY.md` and recalled memory notes before they reach Claude\n- Improved `claude remote-control`: in a folder you haven't trusted yet, it now asks for workspace trust on the terminal instead of exiting\n- Improved artifact pages: Claude writes its design plan into the page instead of the reply, and uses the name you already gave something as the page title\n- Improved the Artifact tool so that when Claude is given a claude.ai chat or project link, an artifact from a chat, or an artifact id on its own, it asks for the right link or the content instead of stopping\n- Changed interactive terminal and VS Code sessions to start in auto mode when no permission mode is configured, on every plan and provider; `permissions.defaultMode` still overrides it\n- Changed Ultracode into its own toggle in `/effort` (Tab, or `/effort ultracode [on|off]`): it no longer forces xhigh effort and stays on at any effort level\n- Changed retries after a dropped connection mid-response to share one budget with the rest of the request's retries, so a failing request gives up sooner\n- Changed the notice shown when a Sonnet model's safeguards flag a message to explain why it happened and to offer editing and retrying\n- Changed safety-related model switches in sessions that pin an Opus model with `ANTHROPIC_DEFAULT_OPUS_MODEL` or `modelOverrides`: on the Anthropic API, the API now picks the model to switch to for each kind of flag, not the pinned model\n- Changed the non-interactive first turn to still wait up to 2s for connecting MCP servers named by `--allowedTools` or an `mcp_tool` hook, even when `CLAUDE_CODE_MCP_STARTUP_WAIT_MS` is `0`\n- Changed `/recap` to decline with a short notice when it arrives relayed from a chat thread (your own included) or from a routine or webhook; typed in the terminal, the Claude apps, Remote Control, `-p` or an SDK host, it runs as before\n- Changed `/artifacts` to show its filter tabs beside the title with one-word labels (All, Mine, Shared), using the same tab bar as `/config` and `/plugin`\n- Changed artifact publishing to refuse a file on a network share (a `\\\\host\\share` path or a `/net` automount) unless it is on a mapped network drive added with `--add-dir`\n- [VSCode] Added an optional time above each prompt and response, with a date line where the day changes (Claude Code: Show Message Timestamps setting, off by default)\n- [VSCode] Added plugin load errors and notes to the Manage plugins rows, with a popup to disable, uninstall or copy the error\n- [VSCode] Added an Ultracode on/off switch under the Effort slider, replacing the slider's Ultracode stop; the model pill shows \"· Ultracode\" at any effort level\n- [VSCode] Fixed Reload Claude from the Memory dialog restarting before an edited file was saved\n- [VSCode] Fixed a restored tab opening a conversation another Claude process still has open; it now asks first\n- [VSCode] Fixed Focus view sections you expanded closing on their own while a sub-agent is working or when the section's first step is trimmed from view\n- [VSCode] Fixed typing `/model` and Enter printing usage text into the chat instead of opening the model selector\n- [VSCode] Fixed `/feedback` on Vertex, Bedrock and Foundry being refused after you pressed Send; the report is now saved on this computer, as the terminal does\n- [VSCode] Fixed sign-in waiting up to a minute for the Python extension after a window reload\n- [VSCode] Fixed Claude Code tabs that stopped responding after Restart Extensions: they now reopen on their conversation\n- [VSCode] Fixed a message from another agent with no recorded sender showing as raw XML in the chat\n- [VSCode] Fixed messages from other agents, sessions or channels disappearing after a reload\n- [VSCode] Fixed a user's own `/mcp`, `/config` or `/settings` command being shadowed by the extension's dialog\n- [VSCode] Fixed Escape stopping every background agent when no turn was running\n- [VSCode] Fixed plugin install links replacing a marketplace you already have that uses the same name\n- [VSCode] Fixed \"Prompt is too long\" errors after compaction when a large text file is attached to a message\n- [VSCode] Fixed chat links to files with non-ASCII characters, spaces or brackets in their path not opening\n- [VSCode] Changed `CLAUDE_CONFIG_DIR` in the `claudeCode.environmentVariables` setting to apply only when it is an absolute path, and passed it to terminals that continue the chat\n- [Cloud sessions] Fixed a routine's Edit and Duplicate controls saying the routine was still loading while you were offline; they now tell you you're offline\n- [Claude Tag] Added model family choices such as \"Opus (latest)\" for a thread, a channel default or your DM, so the choice follows the newest model in that family\n- [Claude Tag] Added the spend that counts toward your organization-wide limit to the analytics spend projection chart, with how much of the limit is used\n- [Claude Tag] Fixed the earlier Claude in Slack app's progress card and link previews omitting the repository and Create PR button when a GitHub Enterprise host name contains an underscore\n- [Claude Tag] Fixed Claude staying silent in a channel whose environment declines to start it; it now posts one notice asking you to contact an admin, and retries when @-mentioned\n- [Claude Tag] Changed Claude to post its private sign-in notice at every @mention from someone who hasn't connected their Claude account, instead of going quiet after the first\n- [Claude Tag] Improved \"Notify members now\" in admin settings: one press reaches every workspace your organization claimed in an Enterprise Grid, and more members in large workspaces\n- [Claude Tag] Improved Claude's wait notice on self-hosted environments with on-demand runners: it now says whether a runner is starting, a start will be retried, or no runner will start\n- [Claude Tag] Improved the error shown when adding a channel manager fails because the channel's Slack workspace can't be confirmed as connected to your organization\n- [Claude Tag] Improved a channel's access lists in admin settings to show the connectors, repositories and plugins an auto-join pattern attaches, and where each comes from\n- [Claude Tag] Improved adding repositories as a channel manager: when your GitHub sign-in can't confirm you're a repository admin, the page asks you to sign in with GitHub\n- [Code Review] Fixed Code Review giving up without posting a finished review when an unsubmitted review under its GitHub App was open on the pull request; it now retries the post first"
+  },
+  "summary": {
+    "changes": 25,
+    "categories": {
+      "binary": 1,
+      "cli": 2,
+      "config": 14,
+      "model": 5,
+      "prompt": 2,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 17,
+      "notable": 8
+    },
+    "undocumented": 12
+  },
+  "changes": [
+    {
+      "id": "model.aliases.opusplan",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "aliases",
+        "opusplan"
+      ],
+      "title": "Model alias \"opusplan\": claude-sonnet-5 → claude-sonnet-5-5",
+      "impact": "notable",
+      "before": "claude-sonnet-5",
+      "after": "claude-sonnet-5-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.aliases.sonnet",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "aliases",
+        "sonnet"
+      ],
+      "title": "Model alias \"sonnet\": claude-sonnet-5 → claude-sonnet-5-5",
+      "impact": "notable",
+      "before": "claude-sonnet-5",
+      "after": "claude-sonnet-5-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.aliases.sonnet[1m]",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "aliases",
+        "sonnet[1m]"
+      ],
+      "title": "Model alias \"sonnet[1m]\": claude-sonnet-5 → claude-sonnet-5-5",
+      "impact": "notable",
+      "before": "claude-sonnet-5",
+      "after": "claude-sonnet-5-5",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.prices.claude-sonnet-5",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5"
+      ],
+      "title": "Built-in price for claude-sonnet-5 removed",
+      "impact": "notable",
+      "before": {
+        "cache_read": 0.2,
+        "cache_write_1h": 4,
+        "cache_write_5m": 2.5,
+        "input": 2,
+        "output": 10,
+        "unit": "USD per million tokens"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "model.prices.claude-sonnet-5-5",
+      "category": "model",
+      "op": "added",
+      "path": [
+        "model",
+        "prices",
+        "claude-sonnet-5-5"
+      ],
+      "title": "Built-in price for claude-sonnet-5-5 added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "cache_read": 0.2,
+        "cache_write_1h": 4,
+        "cache_write_5m": 2.5,
+        "input": 2,
+        "output": 10,
+        "unit": "USD per million tokens"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "prompt.interactive.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "Interactive system prompt changed (+301 −299 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -58,7 +58,9 @@\n If one names a file, function, or flag, verify it still exists before recommending it.\n \n # Environment\n- - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n+ - The most recent Claude models are the Claude 5 family and Haiku 4.5.\n+Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5.5: 'claude-sonnet-5-5', Haiku 4.5: 'claude-haiku-4-5-20251001'.\n+When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n  - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast.\n \n",
+      "stats": {
+        "added_chars": 301,
+        "removed_chars": 299
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+301 −299 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -57,7 +57,9 @@\n If one names a file, function, or flag, verify it still exists before recommending it.\n \n # Environment\n- - The most recent Claude models are the Claude 5 family and Haiku 4.5. Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5: 'claude-sonnet-5', Haiku 4.5: 'claude-haiku-4-5-20251001'. When building AI applications, default to the latest and most capable Claude models.\n+ - The most recent Claude models are the Claude 5 family and Haiku 4.5.\n+Model IDs — Fable 5.1: 'claude-fable-5-1', Opus 5.5: 'claude-opus-5-5', Sonnet 5.5: 'claude-sonnet-5-5', Haiku 4.5: 'claude-haiku-4-5-20251001'.\n+When building AI applications, default to the latest and most capable Claude models.\n  - Claude Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).\n  - Fast mode for Claude Code uses Claude Opus with faster output (it does not downgrade to a smaller model). It can be toggled with /fast.\n \n",
+      "stats": {
+        "added_chars": 301,
+        "removed_chars": 299
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.WebSearch.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "WebSearch",
+        "description"
+      ],
+      "title": "WebSearch tool description changed (+111 −88 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n Search the web. Returns result blocks with titles and URLs. US-only.\n \n-- The current month is November 2026 — use this when searching for recent information.\n+- The current month is (provided in the conversation below) — use this when searching for recent information.\n - `allowed_domains` / `blocked_domains` filter results.\n - After answering from results, end with a \"Sources:\" list of the URLs you used as markdown links.\n",
+      "stats": {
+        "added_chars": 111,
+        "removed_chars": 88
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.claude.options.--model.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--model",
+        "description"
+      ],
+      "title": "`claude --model`: description changed (+128 −152 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Model for the current session. Provide an alias for the latest model (e.g. 'fable', 'opus', or 'sonnet') or a model's full name (e.g. 'claude-fable-5').\n+Model for the current session. Provide an alias for the latest model (e.g. 'fable', 'opus', or 'sonnet') or a model's full name.\n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 152
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+58 −121 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -137,8 +137,7 @@\n   --model <model>                       Model for the current session. Provide\n                                         an alias for the latest model (e.g.\n                                         'fable', 'opus', or 'sonnet') or a\n-                                        model's full name (e.g.\n-                                        'claude-fable-5').\n+                                        model's full name.\n   -n, --name <name>                     Set a display name for this session\n                                         (shown in the prompt box, /resume\n                                         picker, and terminal title)\n",
+      "stats": {
+        "added_chars": 58,
+        "removed_chars": 121
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.source.registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.source.registry",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.source.registry description changed (+413 −261 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g. \"https://npm.example.com/api/npm/internal/\").\n+Registry URL.\n+When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n+In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n+\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 413,
+        "removed_chars": 261
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.allowManagedPermissionRulesOnly.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowManagedPermissionRulesOnly",
+        "description"
+      ],
+      "title": "allowManagedPermissionRulesOnly description changed (+0 −617 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-When true (and set in managed settings), permission rules from user, project, local, and --settings files and allow rules from --allowedTools are ignored; only managed settings can add allow rules through settings.\n-The allowed-tools frontmatter of skills and custom commands from user, project, and --add-dir sources, and of plugins Claude Code adopts from a .claude-plugin manifest inside those skills directories, is ignored too; other plugins and managed and bundled skills keep theirs.\n---disallowedTools, skill disallowed-tools, and other deny and ask rules from the command line or the current session still apply.\n+\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 617
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.allowedMarketplaces[].registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedMarketplaces[].registry",
+        "description"
+      ],
+      "title": "allowedMarketplaces[].registry description changed (+413 −261 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g. \"https://npm.example.com/api/npm/internal/\").\n+Registry URL.\n+When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n+In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n+\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 413,
+        "removed_chars": 261
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.blockedMarketplaces[].registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "blockedMarketplaces[].registry",
+        "description"
+      ],
+      "title": "blockedMarketplaces[].registry description changed (+413 −261 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g. \"https://npm.example.com/api/npm/internal/\").\n+Registry URL.\n+When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n+In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n+\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 413,
+        "removed_chars": 261
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.source.registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.source.registry",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.source.registry description changed (+413 −261 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g. \"https://npm.example.com/api/npm/internal/\").\n+Registry URL.\n+When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n+In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n+\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 413,
+        "removed_chars": 261
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.strictKnownMarketplaces[].registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "strictKnownMarketplaces[].registry",
+        "description"
+      ],
+      "title": "strictKnownMarketplaces[].registry description changed (+413 −261 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g. \"https://npm.example.com/api/npm/internal/\").\n+Registry URL.\n+When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n+In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n+\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 413,
+        "removed_chars": 261
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_APPEND_PROMPT_HEAD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_APPEND_PROMPT_HEAD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_APPEND_PROMPT_HEAD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_APPEND_PROMPT_HEAD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_AUTO_MODE_CANDIDATE_WORDING",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_AUTO_MODE_CANDIDATE_WORDING"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_AUTO_MODE_CANDIDATE_WORDING",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_AUTO_MODE_CANDIDATE_WORDING",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_HOME_TRUST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RELAUNCH_HOME_TRUST"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RELAUNCH_HOME_TRUST",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RELAUNCH_HOME_TRUST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SDK_READS_SESSION_STATE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SDK_READS_SESSION_STATE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SDK_READS_SESSION_STATE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SDK_READS_SESSION_STATE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WHIMSICAL_ELEPHANT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WHIMSICAL_ELEPHANT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WHIMSICAL_ELEPHANT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WHIMSICAL_ELEPHANT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_COMMIT_BETWEEN_KEYS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_COMMIT_BETWEEN_KEYS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_COMMIT_BETWEEN_KEYS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_COMMIT_BETWEEN_KEYS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DIR_SYNC_DISABLE_ANCHORING",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DIR_SYNC_DISABLE_ANCHORING"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_DIR_SYNC_DISABLE_ANCHORING",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_DIR_SYNC_DISABLE_ANCHORING",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ENABLE_NARRATION",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ENABLE_NARRATION"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ENABLE_NARRATION",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ENABLE_NARRATION",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.heuristic.settings_keys",
+      "category": "binary",
+      "op": "added",
+      "path": [
+        "binary",
+        "heuristic",
+        "settings_keys"
+      ],
+      "title": "Binary heuristic.settings_keys: none → settings_keys",
+      "impact": "informational",
+      "before": null,
+      "after": "settings_keys",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

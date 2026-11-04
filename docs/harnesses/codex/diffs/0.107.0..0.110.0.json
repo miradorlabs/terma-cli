@@ -1,0 +1,652 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.107.0",
+  "to": "0.110.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.107.0...rust-v0.110.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.110.0",
+    "text": "## New Features\n- Added a plugin system that can load skills, MCP entries, and app connectors from config or a local marketplace, with an install endpoint for enabling plugins from the app server. (#12864, #13333, #13401, #13422)\n- Expanded the TUI multi-agent flow with approval prompts, `/agent`-based enablement, clearer prompts, ordinal nicknames, and role-labeled handoff context. (#12995, #13246, #13404, #13412, #13505)\n- Added a persisted `/fast` toggle in the TUI and app-server support for `fast` and `flex` service tiers. (#13212, #13334, #13391)\n- Improved memories with workspace-scoped writes, renamed memory settings, and guardrails against saving stale or polluted facts. (#13008, #13088, #13237, #13467)\n- Added a direct Windows installer script to published release artifacts. (#12741)\n\n## Bug Fixes\n- Fixed `@` file mentions so parent-directory `.gitignore` rules no longer hide valid repository files. (#13250)\n- Made sub-agents faster and more reliable by reusing shell state correctly and fixing `/status`, `Esc`, pending-message handling, and startup/profile race conditions. (#12935, #13052, #13130, #13131, #13235, #13240, #13248)\n- Fixed project trust parsing so CLI overrides apply correctly to trusted project-local MCP transports. (#13090)\n- Fixed read-only sandbox policies so network access is preserved when it is explicitly enabled. (#13409)\n- Fixed multiline environment export capture and Windows state DB path handling in session state. (#12642, #13336)\n- Fixed ANSI/base16 syntax highlighting so terminal-themed colors render correctly in the TUI. (#13382)\n\n## Documentation\n- Expanded app-server docs around service tiers, plugin installation, renaming unloaded threads, and the new `skills/changed` notification. (#13282, #13391, #13414, #13422)\n\n## Chores\n- Removed the remaining legacy app-server v1 websocket/RPC surfaces in favor of the current protocol. (#13364, #13375, #13397)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.107.0...rust-v0.110.0\n\n- #13086 Fix CLI feedback link @etraut-openai\n- #13063 Make cloud_requirements fail close @alexsong-oai\n- #13083 Enable analytics in codex exec and codex mcp-server @etraut-openai\n- #12995 feat: approval for sub-agent in the TUI @jif-oai\n- #13027 feat: skill disable respect config layer @jif-oai\n- #13125 chore: change mem default @jif-oai\n- #13088 Tune memory read-path for stale facts @andi-oai\n- #13128 nit: ignore `resume_startup_does_not_consume_model_availability_nux_c… @jif-oai\n- #12935 Speed up subagent startup @daveaitel-openai\n- #13127 nit: disable on windows @jif-oai\n- #13129 fix: package `models.json` for Bazel tests @jif-oai\n- #13065 core: resolve host_executable() rules during preflight @bolinfest\n- #12864 feat: load from plugins @xl-openai\n- #12989 fix: MacOSAutomationPermission::BundleIDs should allow communicating … @leoshimo-oai\n- #13181 [codex] include plan type in account updates @tibo-openai\n- #13058 Record realtime close marker on replacement @aibrahim-oai\n- #13215 Fix issue deduplication workflow for Codex issues @etraut-openai\n- #13197 Improve subagent contrast in TUI @gabec-openai\n- #13130 fix: `/status` when sub-agent @jif-oai\n- #13008 feat: polluted memories @jif-oai\n- #13237 feat: update memories config names @jif-oai\n- #13131 fix: esc in `/agent` @jif-oai\n- #13052 core: reuse parent shell snapshot for thread-spawn subagents @daveaitel-openai\n- #13249 chore: `/multiagent` alias for `/agent` @jif-oai\n- #13057 fix: use https://git.savannah.gnu.org/git/bash instead of https://github.com/bolinfest/bash @bolinfest\n- #13090 Fix project trust config parsing so CLI overrides work @etraut-openai\n- #13202 tui: restore draft footer hints @charley-oai\n- #13246 feat: enable ma through `/agent` @jif-oai\n- #12642 fix(core) shell_snapshot multiline exports @dylan-hurd-oai\n- #11814 test(app-server): increase flow test timeout to reduce flake @joshka-oai\n- #13282 app-server: Update `thread/name/set` to support not-loaded threads @euroelessar\n- #13285 feat(app-server): add tracing to all app-server APIs @owenlin0\n- #13265 Update realtime websocket API @aibrahim-oai\n- #13261 fix(app-server): emit turn/started only when turn actually starts @owenlin0\n- #13079 app-server: Silence thread status changes caused by thread being created @euroelessar\n- #13284 Adjusting plan prompt for clarity and verbosity @bfioca-openai\n- #13286 feat(app-server-test-client): support tracing @owenlin0\n- #13061 chore:  remove SkillMetadata.permissions and derive skill sandboxing from permission_profile @celia-oai\n- #12006 tui: preserve kill buffer across submit and slash-command clears @rakan-oai\n- #13212 add fast mode toggle @pash-openai\n- #13250 fix(core): scope file search gitignore to repository context @fcoury\n- #13313 Renaming Team to Business plan during TUI onboarding @bwanner-oai\n- #13248 fix: agent race @jif-oai\n- #13235 fix: agent when profile @jif-oai\n- #13336 fix: db windows path @jif-oai\n- #13334 app-server service tier plumbing (plus some cleanup) @pash-openai\n- #13341 feat: presentation artifact p1 @jif-oai\n- #13344 feat: pres artifact 2 @jif-oai\n- #13346 feat: pres artifact 3 @jif-oai\n- #13345 feat: spreadsheet artifact @jif-oai\n- #13347 feat: spreadsheet v2 @jif-oai\n- #13348 feat: presentation part 4 @jif-oai\n- #13350 feat: spreadsheet part 3 @jif-oai\n- #13355 feat: pres artifact part 5 @jif-oai\n- #13357 feat: add multi-actions to presentation tool @jif-oai\n- #13360 feat: artifact presentation part 7 @jif-oai\n- #13362 feat: wire spreadsheet artifact @jif-oai\n- #12741 Add Windows direct install script @efrazer-oai\n- #13376 realtime prompt changes @aibrahim-oai\n- #13324 app-server-protocol: export flat v2 schema bundle @apanasenko-oai\n- #13364 Remove Responses V1 websocket implementation @pakrym-oai\n- #12969 app-server: source /feedback logs from sqlite at trace level @charley-oai\n- #13381 chore: rm --all-features flag from rust-analyzer @sayan-oai\n- #13043 Collapse parsed command summaries when any stage is unknown @nornagon-openai\n- #13385 Revert \"realtime prompt changes\" @aibrahim-oai\n- #13389 fix @aibrahim-oai\n- #13375 chore(app-server): delete v1 RPC methods and notifications @owenlin0\n- #13397 chore(app-server): restore EventMsg TS types @owenlin0\n- #13395 Build delegated realtime handoff text from all messages @aibrahim-oai\n- #13399 Require deduplicator success before commenting @etraut-openai\n- #13398 Revert \"Revert \"realtime prompt changes\"\" @aibrahim-oai\n- #13333 Refactor plugin config and cache path @xl-openai\n- #13275 fix(network-proxy): reject mismatched host headers @viyatb-oai\n- #12868 tui: align pending steers with core acceptance @charley-oai\n- #13280 Add thread metadata update endpoint to app server @joeytrasatti-openai\n- #13050 Add under-development original-resolution view_image support @fjord-oai\n- #13402 Ensure the env values of imported shell_environment_policy.set is string @alexsong-oai\n- #13331 Make js_repl image output controllable @fjord-oai\n- #13401 feat: load plugin apps @sayan-oai\n- #13292 [feedback] diagnostics @rhan-oai\n- #13414 feat(app-server): add a skills/changed v2 notification @owenlin0\n- #13368 feat(app-server): propagate app-server trace context into core @owenlin0\n- #13413 copy command-runner to CODEX_HOME so sandbox users can always execute it @iceweasel-oai\n- #13366 [bazel] Bump rules_rs and llvm @zbarsky-openai\n- #13409 Feat: Preserve network access on read-only sandbox policies @celia-oai\n- #13388 config: enforce enterprise feature requirements @bolinfest\n- #13218 Add role-specific subagent nickname overrides @gabec-openai\n- #13427 chore: Nest skill and protocol network permissions under `network.enabled` @celia-oai\n- #13429 core: box wrapper futures to reduce stack pressure @bolinfest\n- #13391 support 'flex' tier in app-server in addition to 'fast' @kharvd\n- #13290 image-gen-core @won-openai\n- #13404 feat: better multi-agent prompt @jif-oai\n- #13412 feat: ordinal nick name @jif-oai\n- #13454 add metric for per-turn token usage @jif-oai\n- #13240 fix: pending messages in `/agent` @jif-oai\n- #13461 fix: bad merge @jif-oai\n- #13460 feat: disable request input on sub agent @jif-oai\n- #13456 feat: add metric for per-turn tool count and add tmp_mem flag @jif-oai\n- #13468 nit: citation prompt @jif-oai\n- #13467 feat: memories in workspace write @jif-oai\n- #12383 add new scopes to login @adaley-openai\n- #13484 allow apps to specify cwd for sandbox setup. @iceweasel-oai\n- #13424 feat(core, tracing): add a span representing a turn @owenlin0\n- #13489 remove serviceTier from app-server examples @kharvd\n- #13458 [tui] Update Fast slash command description @pash-openai\n- #13382 fix(tui): decode ANSI alpha-channel encoding in syntax themes @fcoury\n- #13485 feat: external artifacts builder @jif-oai\n- #13493 feat(app-server-test-client): OTEL setup for tracing @owenlin0\n- #13501 add metrics for external config import @alexsong-oai\n- #13495 Notify TUI about plan mode prompts and user input requests @etraut-openai\n- #13506 [release] temporarily use thin LTO for releases @bolinfest\n- #13505 Prefix handoff messages with role @aibrahim-oai\n- #13422 plugin: support local-based marketplace.json + install endpoint. @xl-openai"
+  },
+  "summary": {
+    "changes": 24,
+    "categories": {
+      "behavior": 1,
+      "binary": 1,
+      "config": 21,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 19,
+      "notable": 5
+    },
+    "undocumented": 16
+  },
+  "changes": [
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+73 −48 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n <permissions instructions>\n Filesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\n Approval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n- The writable roots are `<repo>`, `/tmp`, `<tmp>\n+ The writable roots are `<codex-home>/memories`, `<repo>`, `/tmp`, `<tmp>\n </permissions instructions>\n",
+      "stats": {
+        "added_chars": 73,
+        "removed_chars": 48
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox changed",
+      "impact": "notable",
+      "before": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "after": "workspace-write [workdir, /tmp, $TMPDIR, <codex-home>/memories]",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.agents.<name>.nickname_candidates",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "agents.<name>.nickname_candidates"
+      ],
+      "title": "New setting: agents.<name>.nickname_candidates",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Candidate nicknames for agents spawned with this role.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_realtime_ws_backend_prompt.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "experimental_realtime_ws_backend_prompt",
+        "description"
+      ],
+      "title": "experimental_realtime_ws_backend_prompt description changed (+200 −204 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Experimental / do not use. Overrides only the realtime conversation websocket transport backend prompt (the `Op::RealtimeConversation` `/ws` session.create backend_prompt) without changing normal prompts.\n+Experimental / do not use. Overrides only the realtime conversation websocket transport instructions (the `Op::RealtimeConversation` `/ws` session.update instructions) without changing normal prompts.\n",
+      "stats": {
+        "added_chars": 200,
+        "removed_chars": 204
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_realtime_ws_base_url.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "experimental_realtime_ws_base_url",
+        "description"
+      ],
+      "title": "experimental_realtime_ws_base_url description changed (+203 −194 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Experimental / do not use. Overrides only the realtime conversation websocket transport base URL (the `Op::RealtimeConversation` `/ws` connection) without changing normal provider HTTP requests.\n+Experimental / do not use. Overrides only the realtime conversation websocket transport base URL (the `Op::RealtimeConversation` `/v1/realtime` connection) without changing normal provider HTTP requests.\n",
+      "stats": {
+        "added_chars": 203,
+        "removed_chars": 194
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.experimental_realtime_ws_model",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "experimental_realtime_ws_model"
+      ],
+      "title": "New setting: experimental_realtime_ws_model",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Experimental / do not use. Selects the realtime websocket model/snapshot used for the `Op::RealtimeConversation` connection.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.artifact",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.artifact"
+      ],
+      "title": "New setting: features.artifact",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 704,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/features.rs#L704"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.fast_mode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.fast_mode"
+      ],
+      "title": "New setting: features.fast_mode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 710,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/features.rs#L710"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.image_detail_original",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.image_detail_original"
+      ],
+      "title": "New setting: features.image_detail_original",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 557,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/features.rs#L557"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.image_generation",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.image_generation"
+      ],
+      "title": "New setting: features.image_generation",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/client_common.rs",
+            "line": 169,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/client_common.rs#L169"
+          },
+          {
+            "path": "codex-rs/core/src/client_common.rs",
+            "line": 189,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/client_common.rs#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.plugins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.plugins"
+      ],
+      "title": "New setting: features.plugins",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 650,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/features.rs#L650"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/manager.rs",
+            "line": 337,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/plugins/manager.rs#L337"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.memories.consolidation_model",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.consolidation_model"
+      ],
+      "title": "New setting: memories.consolidation_model",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model used for memory consolidation.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.extract_model",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.extract_model"
+      ],
+      "title": "New setting: memories.extract_model",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model used for thread summarisation.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.max_raw_memories_for_consolidation",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.max_raw_memories_for_consolidation"
+      ],
+      "title": "New setting: memories.max_raw_memories_for_consolidation",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum number of recent raw memories retained for global consolidation.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.max_raw_memories_for_global",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "memories.max_raw_memories_for_global"
+      ],
+      "title": "Setting no longer read: memories.max_raw_memories_for_global",
+      "impact": "notable",
+      "before": {
+        "description": "Maximum number of recent raw memories retained for global consolidation.",
+        "type": "integer"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.no_memories_if_mcp_or_web_search",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "memories.no_memories_if_mcp_or_web_search"
+      ],
+      "title": "New setting: memories.no_memories_if_mcp_or_web_search",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "When `true`, web searches and MCP tool calls mark the thread `memory_mode` as `\"polluted\"`.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.phase_1_model",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "memories.phase_1_model"
+      ],
+      "title": "Setting no longer read: memories.phase_1_model",
+      "impact": "notable",
+      "before": {
+        "description": "Model used for thread summarisation.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.memories.phase_2_model",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "memories.phase_2_model"
+      ],
+      "title": "Setting no longer read: memories.phase_2_model",
+      "impact": "notable",
+      "before": {
+        "description": "Model used for memory consolidation.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.plugins",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "plugins"
+      ],
+      "title": "New setting: plugins",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "description": "User-level plugin config entries keyed by plugin name.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 650,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/features.rs#L650"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/manager.rs",
+            "line": 337,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/plugins/manager.rs#L337"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.plugins.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "plugins.<name>"
+      ],
+      "title": "New setting: plugins.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/features.rs",
+            "line": 650,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/features.rs#L650"
+          },
+          {
+            "path": "codex-rs/core/src/plugins/manager.rs",
+            "line": 337,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/plugins/manager.rs#L337"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.plugins.<name>.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "plugins.<name>.enabled"
+      ],
+      "title": "New setting: plugins.<name>.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": true,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 461,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/cli/src/mcp_cmd.rs#L461"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 699,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/cli/src/mcp_cmd.rs#L699"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.profiles.<name>.service_tier",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.service_tier"
+      ],
+      "title": "New setting: profiles.<name>.service_tier",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "fast",
+          "flex"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 334,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/config/edit.rs#L334"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.service_tier",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "service_tier"
+      ],
+      "title": "New setting: service_tier",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Optional explicit service tier preference for new turns (`fast` or `flex`).",
+        "enum": [
+          "fast",
+          "flex"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 334,
+            "url": "https://github.com/openai/codex/blob/rust-v0.110.0/codex-rs/core/src/config/edit.rs#L334"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size_bytes: 77061920 → 83827360",
+      "impact": "informational",
+      "before": 77061920,
+      "after": 83827360,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

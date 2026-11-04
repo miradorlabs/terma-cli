@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "dsh",
+  "from": "0.2.1-rc.2",
+  "to": "0.2.1-rc.5",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.2...dsh-v0.2.1-rc.5"
+  },
+  "changelog": {
+    "url": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.5",
+    "text": "[中文](#cn-v0.2.1-rc.5-community) | [English](#en-v0.2.1-rc.5-community)\n\n<h3 id=\"cn-v0.2.1-rc.5-community\">体验优化</h3>\n\n- 优化对话中思考内容的展示效果。 @LegGasai\n\n<h3 id=\"en-v0.2.1-rc.5-community\">Improvements</h3>\n\n- Improve how thinking content is displayed in conversations. by @LegGasai\n\nFull Changelog: [dsh-v0.2.1-rc.4...dsh-v0.2.1-rc.5](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.4...dsh-v0.2.1-rc.5)"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

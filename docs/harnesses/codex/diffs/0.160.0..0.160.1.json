@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.160.0",
+  "to": "0.160.1",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.160.0...rust-v0.160.1"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.160.1",
+    "text": "## Bug Fixes\n\n- Preserve `SYSTEMROOT`, `TEMP`, and `TMP` when launching remote stdio MCP servers with explicitly configured remote environment variables, allowing Unix hosts to retain the Windows executor's startup environment.\n\n## Changelog\n\n- [#51121](https://github.com/openai/codex/pull/51121): Backport Windows remote MCP environment preservation to 0.160."
+  },
+  "summary": {
+    "changes": 3,
+    "categories": {
+      "cli": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 3,
+      "notable": 0
+    },
+    "undocumented": 3
+  },
+  "changes": [
+    {
+      "id": "cli.commands.codex cloud.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex cloud",
+        "description"
+      ],
+      "title": "Description of `codex cloud` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-WARNING: proceeding, even though we could not create PATH aliases: operation would block [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+[EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n",
+      "stats": {
+        "added_chars": 70,
+        "removed_chars": 159
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.cloud --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "cloud --help"
+      ],
+      "title": "Full help text of `cloud --help` changed (+0 −88 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not create PATH aliases: operation would block\n [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n \n Usage: codex cloud [OPTIONS] [COMMAND]\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 88
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 194,
+            "url": "https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/arg0/src/lib.rs#L194"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+0 −105 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,3 @@\n-WARNING: proceeding, even though we could not create PATH aliases: No such file or directory (os error 2)\n Manage login\n \n Usage: codex login [OPTIONS] [COMMAND]\n",
+      "stats": {
+        "added_chars": 0,
+        "removed_chars": 105
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 194,
+            "url": "https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/arg0/src/lib.rs#L194"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

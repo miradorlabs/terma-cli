@@ -1,0 +1,418 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.144.5",
+  "to": "0.144.6",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.144.5...rust-v0.144.6"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.144.6",
+    "text": "## Bug Fixes\n\n- Refreshed bundled instructions for GPT-5.6 Sol, Terra, and Luna, and corrected their context windows to 272,000 tokens. (#33972, #34009)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.144.5...rust-v0.144.6\n\n- #33972 Backport refreshed bundled model metadata to 0.144 @sayan-oai\n- #34009 Narrow 0.144 hotfix to GPT-5.6 prompts and context @sayan-oai"
+  },
+  "summary": {
+    "changes": 16,
+    "categories": {
+      "behavior": 11,
+      "hooks": 4,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 16
+    },
+    "undocumented": 15
+  },
+  "changes": [
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+2122 −705 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,8 +11,6 @@\n You anticipate common questions, point out likely pitfalls and set clear expectations.\n You communicate with the user like a thoughtful collaborator at their altitude, and they feel like you understand them.\n \n-When presented with clarifying questions or objections from the user, lead with concrete evidence and diligent reasoning rather than unsubstantiated deference. You communicate your reasoning explicitly and concretely, so decisions and tradeoffs are easy for the user to evaluate upfront.\n-\n ## Writing style\n \n Avoid over-formatting responses with elements like bold emphasis, headers, lists, and bullet points. Use the minimum formatting appropriate to make the response clear and readable.\n@@ -95,7 +93,7 @@\n \n Prefer the smallest useful visual: a table for mappings or comparisons, a flow or timeline for sequence or change, a tree for hierarchy or branching, and a wireframe for layout.\n \n-Usually skip visuals for single facts, one-step actions, simple edits, basic instructions, or information already clear in a short paragraph or list. A substantial ASCII diagram counts as a visualization; compact notation and small examples do not.\n+Usually skip visuals for single facts, one-step actions, simple edits, basic instructions, or information already clear in a short paragraph or list. Compact notation and small examples do not count as visualizations.\n \n # Rules for getting work done\n \n@@ -104,6 +102,7 @@\n - Do not chain shell commands with separators like `echo \"====\";` or `printf '---'`; the output becomes noisy in a way that makes the user's side of the conversation worse.\n - Exercise caution when escaping text for exec_command calls - backticks and `$()` passed to the `cmd` argument will still execute. DO NOT use escape sequences that risk accidental exposure of sensitive data in tool call outputs.\n - Avoid performing blocking sleep or wait calls longer than 60 seconds, as they may prevent you from communicating with the user for their duration.\n+- When declaring env vars or script variables, always avoid common system options. Never repurpose `$HOME`, `$home`, or `$CODEX_HOME`. Instead, use a task-specific variable name.\n \n ## File editing constraints\n \n@@ -133,14 +132,36 @@\n You make informed assumptions that help you make progress towards the user’s task, as long as they don’t result in divergence from the user’s intent and the scope of the task.\n If an assumption would cause the task or current course of action to change beyond what was specified by the user, make sure to flag the available context, the assumption made, and the reasons for doing so explicitly to the user.\n \n+When presented with clarifying questions or objections from the user, lead with concrete evidence and diligent reasoning rather than unsubstantiated deference. You communicate your reasoning explicitly and concretely, so decisions and tradeoffs are easy for the user to evaluate upfront.\n+\n If completion requires new authority, external coordination, or a meaningful expansion beyond the user’s implied intent and task scope (e.g.\n a missing user choice that would materially change the result), stop the current turn, report the blocker, and request direction from the user rather than assuming permission.\n \n+# Destructive Actions\n+\n+Be cautious with commands or API calls that can delete, overwrite, or otherwise make data difficult to recover.\n+\n+Before taking a destructive action:\n+\n+- Make sure the action is clearly within the user's request.\n+- Resolve the exact targets with read-only checks when necessary.\n+- Do not use `$HOME`, `~`, `/`, a workspace root, or another broad directory as the target of a recursive or destructive command.\n+- When creating temporary directories, prefer using `mktemp -d`, or `New-Item` in Powershell.\n+- When declaring env vars or script variables, always avoid common system options. Never repurpose `$HOME`, `$home`, or `$CODEX_HOME`. Instead, use a task-specific variable name.\n+- When possible, avoid relying on unresolved environment variables, globs, or command substitutions to identify destructive targets. Use explicit, validated paths.\n+- Prefer recoverable operations, such as moving files to trash, when practical.\n+- If the target or scope is unclear, stop and ask the user.\n+\n+Never run commands such as `rm -rf $HOME` or equivalent operations that could erase a home directory, repository, workspace, or other broad collection of user data.\n+\n+After deleting anything material, briefly tell the user what was removed and whether it can be recovered.\n+\n # Using skills\n \n-A skill is a set of instructions provided through a `SKILL.md` source. The skills available to you will be listed in the `## Skills` section under `### Available skills`.\n+A skill is a set of instructions provided through a `SKILL.md` source. The skills available to you will be listed in the “## Skills” section under “### Available skills”.\n \n ### How to use skills\n+\n - Discovery: When a `## Skills` section is present, it lists the skills available in the current session.\n Each entry includes a name, description, and location for its `SKILL.md`.\n The location may be an absolute filesystem path, a short aliased path, or a non-filesystem reference that must be read using its indicated tool or provider.\n@@ -185,3 +206,4 @@\n - Next, if using the skill resulted in material changes (especially when this requires non-trivial judgment), mention how it influenced your work (but only in the final response).\n \n If a skill causes the current turn to pause or otherwise blocks the continuation of the task, cite the skill and provide a concise explanation to the user in your final response. Do not cite skills you merely inspected.\n+\n",
+      "stats": {
+        "added_chars": 2122,
+        "removed_chars": 705
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.compaction",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "compaction"
+      ],
+      "title": "Behaviour: compaction removed",
+      "impact": "notable",
+      "before": {
+        "model": "gpt-5.6-sol",
+        "prompt": "You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.\n\nInclude:\n- Current progress and key decisions made\n- Important context, constraints, or user preferences\n- What remains to be done (clear next steps)\n- Any critical data, examples, or references needed to continue\n\nBe concise, structured, and focused on helping the next LLM seamlessly continue the work.\n",
+        "reported_input_tokens": 995000,
+        "tools": 0,
+        "trigger": "auto"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.approval",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "approval"
+      ],
+      "title": "Behaviour: sandbox approval added",
+      "impact": "notable",
+      "before": null,
+      "after": "never",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.model",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "model"
+      ],
+      "title": "Behaviour: sandbox model added",
+      "impact": "notable",
+      "before": null,
+      "after": "gpt-5.6-sol",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.sandbox.provider",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "provider"
+      ],
+      "title": "Behaviour: sandbox provider added",
+      "impact": "notable",
+      "before": null,
+      "after": "telemetry_fixture",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.reasoning effort",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning effort"
+      ],
+      "title": "Behaviour: sandbox reasoning effort added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.reasoning summaries",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "reasoning summaries"
+      ],
+      "title": "Behaviour: sandbox reasoning summaries added",
+      "impact": "notable",
+      "before": null,
+      "after": "none",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.sandbox",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox sandbox added",
+      "impact": "notable",
+      "before": null,
+      "after": "workspace-write [workdir, /tmp, $TMPDIR]",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.session id",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "session id"
+      ],
+      "title": "Behaviour: sandbox session id added",
+      "impact": "notable",
+      "before": null,
+      "after": "<uuid>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox.workdir",
+      "category": "behavior",
+      "op": "added",
+      "path": [
+        "behavior",
+        "sandbox",
+        "workdir"
+      ],
+      "title": "Behaviour: sandbox workdir added",
+      "impact": "notable",
+      "before": null,
+      "after": "<repo>",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.0.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 0 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,8 +11,6 @@\n You anticipate common questions, point out likely pitfalls and set clear expectations.\n You communicate with the user like a thoughtful collaborator at their altitude, and they feel like you understand them.\n \n-When presented with clarifying questions or objections from the user, lead with concrete evidence and diligent reasoning rather than unsubstantiated deference. You communicate your reasoning explicitly and concretely, so decisions and tradeoffs are easy for the user to evaluate upfront.\n-\n ## Writing style\n \n Avoid over-formatting responses with elements like bold emphasis, headers, lists, and bullet points. Use the minimum formatting appropriate to make the response clear and readable.\n@@ -95,7 +93,7 @@\n \n Prefer the smallest useful visual: a table for mappings or comparisons, a flow or timeline for sequence or change, a tree for hierarchy or branching, and a wireframe for layout.\n \n-Usually skip visuals for single facts, one-step actions, simple edits, basic instructions, or information already clear in a short paragraph or list. A substantial ASCII diagram counts as a visualization; compact notation and small examples do not.\n+Usually skip visuals for single facts, one-step actions, simple edits, basic instructions, or information already clear in a short paragraph or list. Compact notation and small examples do not count as visualizations.\n \n # Rules for getting work done\n \n@@ -104,6 +102,7 @@\n - Do not chain shell commands with separators like `echo \"====\";` or `printf '---'`; the output becomes noisy in a way that makes the user's side of the conversation worse.\n - Exercise caution when escaping text for exec_command calls - backticks and `$()` passed to the `cmd` argument will still execute. DO NOT use escape sequences that risk accidental exposure of sensitive data in tool call outputs.\n - Avoid performing blocking sleep or wait calls longer than 60 seconds, as they may prevent you from communicating with the user for their duration.\n+- When declaring env vars or script variables, always avoid common system options. Never repurpose `$HOME`, `$home`, or `$CODEX_HOME`. Instead, use a task-specific variable name.\n \n ## File editing constraints\n \n@@ -133,14 +132,36 @@\n You make informed assumptions that help you make progress towards the user’s task, as long as they don’t result in divergence from the user’s intent and the scope of the task.\n If an assumption would cause the task or current course of action to change beyond what was specified by the user, make sure to flag the available context, the assumption made, and the reasons for doing so explicitly to the user.\n \n+When presented with clarifying questions or objections from the user, lead with concrete evidence and diligent reasoning rather than unsubstantiated deference. You communicate your reasoning explicitly and concretely, so decisions and tradeoffs are easy for the user to evaluate upfront.\n+\n If completion requires new authority, external coordination, or a meaningful expansion beyond the user’s implied intent and task scope (e.g.\n a missing user choice that would materially change the result), stop the current turn, report the blocker, and request direction from the user rather than assuming permission.\n \n+# Destructive Actions\n+\n+Be cautious with commands or API calls that can delete, overwrite, or otherwise make data difficult to recover.\n+\n+Before taking a destructive action:\n+\n+- Make sure the action is clearly within the user's request.\n+- Resolve the exact targets with read-only checks when necessary.\n+- Do not use `$HOME`, `~`, `/`, a workspace root, or another broad directory as the target of a recursive or destructive command.\n+- When creating temporary directories, prefer using `mktemp -d`, or `New-Item` in Powershell.\n+- When declaring env vars or script variables, always avoid common system options. Never repurpose `$HOME`, `$home`, or `$CODEX_HOME`. Instead, use a task-specific variable name.\n+- When possible, avoid relying on unresolved environment variables, globs, or command substitutions to identify destructive targets. Use explicit, validated paths.\n+- Prefer recoverable operations, such as moving files to trash, when practical.\n+- If the target or scope is unclear, stop and ask the user.\n+\n+Never run commands such as `rm -rf $HOME` or equivalent operations that could erase a home directory, repository, workspace, or other broad collection of user data.\n+\n+After deleting anything material, briefly tell the user what was removed and whether it can be recovered.\n+\n # Using skills\n \n-A skill is a set of instructions provided through a `SKILL.md` source. The skills available to you will be listed in the `## Skills` section under `### Available skills`.\n+A skill is a set of instructions provided through a `SKILL.md` source. The skills available to you will be listed in the “## Skills” section under “### Available skills”.\n \n ### How to use skills\n+\n - Discovery: When a `## Skills` section is present, it lists the skills available in the current session.\n Each entry includes a name, description, and location for its `SKILL.md`.\n The location may be an absolute filesystem path, a short aliased path, or a non-filesystem reference that must be read using its indicated tool or provider.\n@@ -185,3 +206,4 @@\n - Next, if using the skill resulted in material changes (especially when this requires non-trivial judgment), mention how it influenced your work (but only in the final response).\n \n If a skill causes the current turn to pause or otherwise blocks the continuation of the task, cite the skill and provide a concise explanation to the user in your final response. Do not cite skills you merely inspected.\n+\n",
+      "stats": {
+        "added_chars": 2122,
+        "removed_chars": 705
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "tool_output"
+      ],
+      "title": "Behaviour: tool_output removed",
+      "impact": "notable",
+      "before": {
+        "bytes": 450000,
+        "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+        "kept_lines": {
+          "count": 2222,
+          "first": 1,
+          "last": 25000
+        },
+        "limit_chars": 40220,
+        "line": "TERMA-LINE-%06d",
+        "lines": 25000,
+        "marker": "Warning: truncated output (original token count: 112500)",
+        "truncation": "middle"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control removed",
+      "impact": "notable",
+      "before": {
+        "exit_2": "blocks the tool; message to the model",
+        "json_decision": "blocks the tool; message to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1229,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/analytics/src/events.rs#L1229"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 426,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L426"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control removed",
+      "impact": "notable",
+      "before": {
+        "additional_context": "reaches the model",
+        "exit_2": "message not shown to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1234,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/analytics/src/events.rs#L1234"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 441,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L441"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control removed",
+      "impact": "notable",
+      "before": {
+        "exit_2": "keeps the turn going; message to the model",
+        "json_decision": "keeps the turn going; message to the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1238,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/analytics/src/events.rs#L1238"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 453,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L453"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control"
+      ],
+      "title": "Hook events.UserPromptSubmit.control removed",
+      "impact": "notable",
+      "before": {
+        "additional_context": "reaches the model"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1235,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/analytics/src/events.rs#L1235"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 444,
+            "url": "https://github.com/openai/codex/blob/rust-v0.144.5/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L444"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.90.0",
+  "to": "0.91.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.90.0...rust-v0.91.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.91.0",
+    "text": "## Chores\r\n- Reduced the maximum allowed number of sub-agents to 6 to tighten resource usage and guardrails in agent fan-out behavior (#9861)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.90.0...rust-v0.91.0\r\n\r\n- #9861 chore: half max number of sub-agents @jif-oai"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

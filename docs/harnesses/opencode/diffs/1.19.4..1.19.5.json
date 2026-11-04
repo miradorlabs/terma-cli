@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "from": "1.19.4",
+  "to": "1.19.5",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/anomalyco/opencode/compare/v1.19.4...v1.19.5"
+  },
+  "changelog": {
+    "url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.5",
+    "text": "## Core\r\n\r\n### Bugfixes\r\n- Failed TUI worker requests now return an error instead of leaving the caller hanging. (@Nowaker)\r\n\r\n**Thank you to 1 community contributor:**\r\n- @Nowaker:\r\n  - fix(opencode): answer a failed TUI worker request instead of hanging (#54936)"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

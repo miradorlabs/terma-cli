@@ -1,0 +1,2202 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.123.0",
+  "to": "0.124.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.123.0...rust-v0.124.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.124.0",
+    "text": "## New Features\n- The TUI now has quick reasoning controls: `Alt+,` lowers reasoning, `Alt+.` raises it, and accepted model upgrades now reset reasoning to the new model’s default instead of carrying over stale settings. (#18866, #19085)\n- App-server sessions can now manage multiple environments and choose an environment and working directory per turn, which makes multi-workspace and remote setups easier to target precisely. (#18401, #18416)\n- Added first-class Amazon Bedrock support for OpenAI-compatible providers, including AWS SigV4 signing and AWS credential-based auth. (#17820)\n- Remote plugin marketplaces can now be listed and read directly, with more reliable detail lookups and larger result pages. (#18452, #19079)\n- Hooks are now stable, can be configured inline in `config.toml` and managed `requirements.toml`, and can observe MCP tools as well as `apply_patch` and long-running Bash sessions. (#18893, #18385, #18391, #18888, #19012)\n- Eligible ChatGPT plans now default to the Fast service tier unless you explicitly opt out. (#19053)\n\n## Bug Fixes\n- Preserved Cloudflare cookies across approved ChatGPT hosts, reducing auth breakage in HTTP-backed ChatGPT flows. (#17783)\n- Fixed remote app-server reliability issues so websocket events keep draining under load and shutdown no longer fails when the remote worker exits during cleanup. (#18932, #18936)\n- Fixed permission-mode drift so `/permissions` changes survive side conversations and updated Full Access state is correctly reflected in MCP approval handling. (#18924, #19033)\n- Fixed `wait_agent` so it returns promptly when mailbox work is already queued instead of waiting for a fresh notification or timing out. (#18968)\n- Fixed local stdio MCP launches for relative commands without an explicit `cwd`, bringing fallback path resolution in line with CLI behavior. (#19031)\n- Startup now fails less often on managed config edge cases: unknown feature requirements warn instead of aborting, and cloud-requirements errors are clearer about what failed. (#19038, #19078)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.123.0...rust-v0.124.0\n\n- #18870 Load app-server config through ConfigManager @pakrym-oai\n- #18866 feat(tui): shortcuts to change reasoning level temporarily @fcoury-oai\n- #18430 app-server: implement device key v2 methods @euroelessar\n- #18757 fix: fully revert agent identity runtime wiring @efrazer-oai\n- #17783 Preserve Cloudfare HTTP cookies in codex @shijie-oai\n- #18876 [rollout_trace] Add rollout trace crate @cassirer-openai\n- #18401 Support multiple managed environments @starr-openai\n- #18797 Allow guardian bare allow output @maja-openai\n- #18886 Normalize /statusline & /title items @canvrno-oai\n- #18768 [codex] Tighten external migration prompt tests @alexsong-oai\n- #18909 Update /statusline and /title snapshots @canvrno-oai\n- #18867 sandboxing: materialize cwd-relative permission globs @bolinfest\n- #18915 fix: windows snapshot for external_agent_config_migration::tests::prompt_snapshot did not match windows output @bolinfest\n- #18416 Add turn-scoped environment selections @starr-openai\n- #18391 fix(core): emit hooks for apply_patch edits @fcoury-oai\n- #18916 test(core): move prompt debug coverage to integration suite @bolinfest\n- #17820 feat: add AWS SigV4 auth for OpenAI-compatible model providers @celia-oai\n- #18913 bazel: run wrapped Rust unit test shards @bolinfest\n- #18452 feat: Support remote plugin list/read. @xl-openai\n- #18936 Fix remote app-server shutdown race @bolinfest\n- #18871 refactor: add agent identity crate @efrazer-oai\n- #18276 exec-server: carry filesystem sandbox profiles @bolinfest\n- #18926 ci: keep argument comment lint checks materialized @bolinfest\n- #18935 Keep TUI status surfaces in sync @etraut-openai\n- #18923 chore(tui) debug-config guardian_policy_config @dylan-hurd-oai\n- #18943 tests: serialize process-heavy Windows CI suites @bolinfest\n- #18934 [codex] Clean guardian instructions @dylan-hurd-oai\n- #18948 chore: remove unused Bedrock auth lazy loading @celia-oai\n- #18277 core: derive active permission profiles @bolinfest\n- #18785 feat: add explicit AgentIdentity auth mode @efrazer-oai\n- #18953 use long-lived sessions for codex sandbox windows @iceweasel-oai\n- #18278 app-server: expose thread permission profiles @bolinfest\n- #17693 [codex-analytics] guardian review analytics events emission @rhan-oai\n- #17695 [codex-analytics] guardian review truncation @rhan-oai\n- #17696 [codex-analytics] guardian review TTFT plumbing and emission @rhan-oai\n- #18962 nit: expose lib @jif-oai\n- #18502 Support multiple cwd filters for thread list @acrognale-oai\n- #18968 fix: wait_agent timeout for queued mailbox mail @jif-oai\n- #18971 fix: cargo deny @jif-oai\n- #18973 chore: prep memories for AB @jif-oai\n- #18852 [codex] Update imagegen system skill @vb-openai\n- #18865 Stage publishable Python runtime wheels @sdcoffey\n- #18932 TUI: Keep remote app-server events draining @etraut-openai\n- #18877 [rollout_trace] Record core session rollout traces @cassirer-openai\n- #18959 feat(auto-review) policy config @dylan-hurd-oai\n- #18955 Add plumbing to approve stored Auto-Review denials @won-openai\n- #18999 arg0: keep dispatch aliases alive during async main @bolinfest\n- #18925 feat: Fairly trim skill descriptions within context budget @xl-openai\n- #18890 feat(auto-review) short-circuit @dylan-hurd-oai\n- #18279 app-server: accept permission profile overrides @bolinfest\n- #18582 [2/4] Implement executor HTTP request runner @aibrahim-oai\n- #18197 feat: add guardian network approval trigger context @viyatb-oai\n- #19033 Fix MCP permission policy sync @leoshimo-oai\n- #19016 exec-server: expose arg0 alias root to fs sandbox @bolinfest\n- #19036 Overlay state DB git metadata for filtered thread lists @joeytrasatti-openai\n- #18956 [Codex] Register browser requirements feature keys @khoi-oai\n- #19043 Update bundled OpenAI Docs skill freshness check @kkahadze-oai\n- #18504 Rebrand approvals reviewer config to auto-review @won-openai\n- #19046 exec-server: require explicit filesystem sandbox cwd @bolinfest\n- #18280 clients: send permission profiles to app-server @bolinfest\n- #18281 rollout: persist turn permission profiles @bolinfest\n- #18888 hooks: emit Bash PostToolUse when exec_command completes via write_stdin @eternal-openai\n- #19056 Rename approvals reviewer variant to auto-review @won-openai\n- #18583 [3/4] Add executor-backed RMCP HTTP client @aibrahim-oai\n- #19059 core: box multi-agent wrapper futures @bolinfest\n- #19031 Fix relative stdio MCP cwd fallback @mzeng-openai\n- #19063 chore(auto-review) feature => stable @dylan-hurd-oai\n- #19050 feat(request-permissions) approve with strict review @dylan-hurd-oai\n- #19067 test: set Rust test thread stack size @bolinfest\n- #19072 tui: fix approvals popup disabled shortcut test @bolinfest\n- #18893 codex: support hooks in config.toml and requirements.toml @eternal-openai\n- #18282 protocol: report session permission profiles @bolinfest\n- #19053 Default Fast service tier for eligible ChatGPT plans @shijie-oai\n- #19055 Add safety check notification and error handling @etraut-openai\n- #18283 app-server: accept command permission profiles @bolinfest\n- #19012 Mark codex_hooks stable @abhinav-oai\n- #18924 TUI: preserve permission state after side conversations @etraut-openai\n- #19071 Add computer_use feature requirement key @leoshimo-oai\n- #19079 Use remote plugin IDs for detail reads and enlarge list pages @xl-openai\n- #19038 feat: Warn and continue on unknown feature requirements @xl-openai\n- #19078 Clarify cloud requirements error messages @gverma-openai\n- #19085 Persist target default reasoning on model upgrade @shijie-oai\n- #19086 app-server: include filesystem entries in permission requests @bolinfest\n- #18385 Support MCP tools in hooks @abhinav-oai\n- #19113 Fix auto-review config compatibility across protocol and SDK @won-openai"
+  },
+  "summary": {
+    "changes": 70,
+    "categories": {
+      "behavior": 1,
+      "cli": 1,
+      "config": 63,
+      "hooks": 4,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 65,
+      "notable": 5
+    },
+    "undocumented": 50
+  },
+  "changes": [
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+376 −387 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,7 +6,7 @@\n Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.\n (file: <codex-home>/skills/.system/imagegen/SKILL.md)\n-- openai-docs: Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or explicit GPT-5.4 upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains.\n+- openai-docs: Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains.\n (file: <codex-home>/skills/.system/openai-docs/SKILL.md)\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, and baseline placeholders you can edit before publishing or testing.\n Use when Codex needs to create a new local plugin, add optional plugin structure, or generate or update repo-root `.agents/plugins/marketplace.json` entries for plugin ordering and availability metadata.\n",
+      "stats": {
+        "added_chars": 376,
+        "removed_chars": 387
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.sandbox",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "sandbox"
+      ],
+      "title": "Behaviour: sandbox removed",
+      "impact": "notable",
+      "before": {
+        "approval": "never",
+        "model": "gpt-5.4",
+        "models": [
+          "gpt-5.4"
+        ],
+        "provider": "telemetry_fixture",
+        "reasoning effort": "none",
+        "reasoning summaries": "none",
+        "requests": 1,
+        "sandbox": "workspace-write [workdir, /tmp, $TMPDIR, <codex-home>/memories]",
+        "session id": "<uuid>",
+        "workdir": "<repo>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control"
+      ],
+      "title": "Hook events.PreToolUse.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "blocks the tool; message to the model",
+        "json_decision": "blocks the tool; message to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 671,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L671"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 966,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L966"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control"
+      ],
+      "title": "Hook events.SessionStart.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "additional_context": "reaches the model",
+        "exit_2": "message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 674,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L674"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 975,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L975"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control"
+      ],
+      "title": "Hook events.Stop.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "exit_2": "keeps the turn going; message to the model",
+        "json_decision": "keeps the turn going; message to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L676"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 981,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L981"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control"
+      ],
+      "title": "Hook events.UserPromptSubmit.control added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "additional_context": "reaches the model",
+        "exit_2": "blocks the prompt; message not shown to the model",
+        "json_decision": "blocks the prompt; message not shown to the model"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 675,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L675"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 978,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L978"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.app -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app -h"
+      ],
+      "title": "Full help text of `app -h` changed (+80 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n+WARNING: proceeding, even though we could not update PATH: operation would block\n Launch the Codex desktop app (opens the app installer if missing)\n \n Usage: codex app [OPTIONS] [PATH]\n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/arg0/src/lib.rs",
+            "line": 146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/arg0/src/lib.rs#L146"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.approvals_reviewer.enum.auto_review",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "approvals_reviewer",
+        "enum",
+        "auto_review"
+      ],
+      "title": "Setting approvals_reviewer gained value auto_review",
+      "impact": "informational",
+      "before": null,
+      "after": "auto_review",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 955,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L955"
+          },
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 2206,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/core/src/config/mod.rs#L2206"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.auto_review",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "auto_review"
+      ],
+      "title": "New setting: auto_review",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Optional policy instructions for the guardian auto-reviewer.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 328,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L328"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 339,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L339"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.auto_review.policy",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "auto_review.policy"
+      ],
+      "title": "New setting: auto_review.policy",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Additional policy instructions inserted into the guardian prompt.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.features.browser_use",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.browser_use"
+      ],
+      "title": "New setting: features.browser_use",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 871,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/features/src/lib.rs#L871"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.computer_use",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.computer_use"
+      ],
+      "title": "New setting: features.computer_use",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 877,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/features/src/lib.rs#L877"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.in_app_browser",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.in_app_browser"
+      ],
+      "title": "New setting: features.in_app_browser",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 865,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/features/src/lib.rs#L865"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.remote_plugin",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.remote_plugin"
+      ],
+      "title": "New setting: features.remote_plugin",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 883,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/features/src/lib.rs#L883"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.use_agent_identity",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.use_agent_identity"
+      ],
+      "title": "Setting no longer read: features.use_agent_identity",
+      "impact": "notable",
+      "before": {
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 993,
+            "url": "https://github.com/openai/codex/blob/rust-v0.123.0/codex-rs/features/src/lib.rs#L993"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks"
+      ],
+      "title": "New setting: hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Lifecycle hooks configured inline in TOML.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest"
+      ],
+      "title": "New setting: hooks.PermissionRequest",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 672,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L672"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 969,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L969"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].async"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].command"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 998,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L998"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 999,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L999"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1006,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1006"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].type"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L179"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].matcher"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse"
+      ],
+      "title": "New setting: hooks.PostToolUse",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 673,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L673"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 972,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L972"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].async"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].command"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 998,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L998"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 999,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L999"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1006,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1006"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].type"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L179"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].matcher"
+      ],
+      "title": "New setting: hooks.PostToolUse[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse"
+      ],
+      "title": "New setting: hooks.PreToolUse",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 671,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L671"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 966,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L966"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].async"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].command"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 998,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L998"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 999,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L999"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1006,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1006"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].type"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L179"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].matcher"
+      ],
+      "title": "New setting: hooks.PreToolUse[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart"
+      ],
+      "title": "New setting: hooks.SessionStart",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 674,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L674"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 975,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L975"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].async"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].command"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 998,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L998"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 999,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L999"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1006,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1006"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].type"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L179"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].matcher"
+      ],
+      "title": "New setting: hooks.SessionStart[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop"
+      ],
+      "title": "New setting: hooks.Stop",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 676,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L676"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 981,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L981"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks"
+      ],
+      "title": "New setting: hooks.Stop[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].async"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].command"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 998,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L998"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 999,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L999"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1006,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1006"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].type"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L179"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].matcher"
+      ],
+      "title": "New setting: hooks.Stop[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 675,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L675"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 978,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L978"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": [],
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/config_requirements.rs",
+            "line": 1096,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/config/src/config_requirements.rs#L1096"
+          },
+          {
+            "path": "codex-rs/hooks/src/engine/discovery.rs",
+            "line": 226,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/hooks/src/engine/discovery.rs#L226"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].async",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].async"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].async",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": false,
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].command",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].command"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].command",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 998,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L998"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 999,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L999"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].statusMessage",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].statusMessage"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].statusMessage",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1006,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1006"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].timeout",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].timeout"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].timeout",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L16"
+          },
+          {
+            "path": "codex-rs/codex-client/src/error.rs",
+            "line": 28,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/codex-client/src/error.rs#L28"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].type",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].type"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].type",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "enum": [
+          "command"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L179"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 464,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/export.rs#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].matcher",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].matcher"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].matcher",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.model_providers.<name>.aws.region",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.aws.region"
+      ],
+      "title": "New setting: model_providers.<name>.aws.region",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "AWS region to use for provider-specific endpoints.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/aws-auth/src/lib.rs",
+            "line": 73,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/aws-auth/src/lib.rs#L73"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.notice.fast_default_opt_out",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "notice.fast_default_opt_out"
+      ],
+      "title": "New setting: notice.fast_default_opt_out",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Tracks whether the user opted out of Codex-managed fast defaults.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 443,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/core/src/config/edit.rs#L443"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.profiles.<name>.approvals_reviewer.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.approvals_reviewer",
+        "description"
+      ],
+      "title": "profiles.<name>.approvals_reviewer description changed (+225 −164 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,5 @@\n Configures who approval requests are routed to for review.\n Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations.\n Defaults to `user`.\n-`guardian_subagent` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request.\n+`auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request.\n+The legacy value `guardian_subagent` is accepted for compatibility.\n",
+      "stats": {
+        "added_chars": 225,
+        "removed_chars": 164
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.profiles.<name>.service_tier.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "profiles.<name>.service_tier",
+        "description"
+      ],
+      "title": "profiles.<name>.service_tier description changed (+75 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-\n+Optional explicit service tier preference for new turns (`fast` or `flex`).\n",
+      "stats": {
+        "added_chars": 75,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.AWS_BEARER_TOKEN_BEDROCK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "AWS_BEARER_TOKEN_BEDROCK"
+      ],
+      "title": "New environment variable: AWS_BEARER_TOKEN_BEDROCK",
+      "impact": "informational",
+      "before": null,
+      "after": "AWS_BEARER_TOKEN_BEDROCK",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/model-provider/src/amazon_bedrock/auth.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/model-provider/src/amazon_bedrock/auth.rs#L22"
+          },
+          {
+            "path": "codex-rs/model-provider/src/amazon_bedrock/auth.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/model-provider/src/amazon_bedrock/auth.rs#L66"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_ROLLOUT_TRACE_ROOT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_ROLLOUT_TRACE_ROOT"
+      ],
+      "title": "New environment variable: CODEX_ROLLOUT_TRACE_ROOT",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_ROLLOUT_TRACE_ROOT",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/rollout-trace/src/recorder.rs",
+            "line": 29,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/rollout-trace/src/recorder.rs#L29"
+          },
+          {
+            "path": "codex-rs/rollout-trace/src/recorder.rs",
+            "line": 89,
+            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/rollout-trace/src/recorder.rs#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}

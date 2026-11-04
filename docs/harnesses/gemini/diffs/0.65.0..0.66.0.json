@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "gemini",
+  "from": "0.65.0",
+  "to": "0.66.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.65.0...v0.66.0"
+  },
+  "changelog": {
+    "url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.66.0",
+    "text": "## What's Changed\n* Update ROADMAP.md to no longer reference outdated 2025 roadmap by @DavidAPierce in https://github.com/google-gemini/gemini-cli/pull/29723\n* Changelog for v0.65.0-preview.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/29739\n* chore(release): bump version to 0.66.0-nightly.20261013.g204db94ae by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/29740\n* Changelog for v0.64.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/29741\n* fix(ui): implement synchronized output and isolate spinner rendering by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/29725\n* fix(ui): fix debug console height calculation and terminalBuffer flickering by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/29695\n* fix(cli): prevent right-hand border bleed in scrollable tool containers by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/29742\n* refactor(core,cli): emit tool call groups from the scheduler and drop the UI lookahead by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/29736\n* fix(core): format and quote Windows diff command arguments in openDiff by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/29753\n* fix(cli): round before selecting units in formatDuration by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/29766\n* fix(core): disable interactive credential and SSH prompts in getSafeGitEnv by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/29760\n* fix(cli): resolve settings placeholders after loading .env files by @elberthc-byte in https://github.com/google-gemini/gemini-cli/pull/29750\n* fix(core): harden SKILL.md frontmatter parsing for single-line descriptions by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/29769\n* Add Banner about Gemini CLI not being optimized for Gemini 4 by @srithreepo in https://github.com/google-gemini/gemini-cli/pull/29774\n* Update README to remove obsolete content by @srithreepo in https://github.com/google-gemini/gemini-cli/pull/29775\n* fix(ci): remove unsupported members permission in unassign-inactive-assignees workflow by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/29770\n* fix(cli): reset slash-command conflict dedupe when conflicts reappear by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/29768\n* fix(cli): verify active binary update to prevent PATH shadowing false success by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/29757\n* fix(cli): support 'keys' array in keybindings.json by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/29773\n* fix(cli): forward termination signals from bootstrap parent to child process by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/29790\n* fix(ui): preserve terminal scrollback during viewport refreshes by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/29792\n* fix(cli): decode streamed Node HTTP activity chunks with StringDecoder by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/29827\n* chore: migrate gsutil usage to gcloud storage by @gurusai-voleti in https://github.com/google-gemini/gemini-cli/pull/29839\n* fix(core): preserve user-level ~/.gitconfig in shell and git environments by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/29832\n* fix(core): prevent false positive matches in isAuthenticationError by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/29835\n* fix(core): support opt-in private network endpoints for MCP OAuth flows by @luisfelipe-alt in https://github.com/google-gemini/gemini-cli/pull/29844\n\n## New Contributors\n* @gurusai-voleti made their first contribution in https://github.com/google-gemini/gemini-cli/pull/29839\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.65.0...v0.66.0"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

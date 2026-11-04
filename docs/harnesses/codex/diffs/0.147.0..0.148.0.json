@@ -1,0 +1,3593 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.147.0",
+  "to": "0.148.0",
+  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.147.0...rust-v0.148.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.148.0",
+    "text": "## New Features\n\n- Export complete TUI conversations to Markdown with `/export`, either to the clipboard or a new file. (#37358)\n- Fork sessions with `codex exec fork`, and archive or restore sessions from the TUI resume picker. (#37367, #37369, #37371)\n- Draft prompts while the TUI initializes, with resume and fork progress shown during startup. (#38642, #38788)\n- View estimated thread credits or cost in `/status`, status lines, and terminal titles for eligible workspaces. (#38281, #38282)\n- Use Amazon Bedrock Runtime as a built-in provider with AWS profile, region, and GPT-5.6 routing support. (#38470)\n- Hooks can now run commands asynchronously and invoke MCP tools. (#37533, #38705)\n\n## Bug Fixes\n\n- Model switches and settings updates no longer leave stale instructions behind or change an active turn midstream. (#37260, #38785)\n- Resumed sessions now restore their persisted working directory and approval policy, with more accurate transcript previews. (#37198, #37368, #38605)\n- Turns reconnect through temporary provider outages, and MCP servers recover after OAuth reauthentication without restarting Codex. (#37337, #37485, #38418)\n- TUI startup no longer lets buffered terminal input activate prompts accidentally, and onboarding appears when authentication is missing. (#38641, #38643, #38644)\n- Composer and transcript rendering now handle CRLF pastes, wrapped whitespace, and long URLs correctly. (#37709, #38380, #38704)\n- Sandbox restrictions now fail closed for denied or unreadable paths across Linux and Windows. (#37875, #38026, #38416, #38660)\n\n## Documentation\n\n- The bundled skill-creator guide is more focused, and validation now rejects unfinished TODO placeholders. (#38384)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.147.0...rust-v0.148.0\n\n- #37190 Interrupt cyber model turns after one Guardian denial @copyberry\n- #37191 Preserve legacy semantics during rollout migration @copyberry\n- #37198 Prefer persisted cwd when reading local threads @copyberry\n- #37199 Track thread archive analytics @copyberry\n- #37204 Add durable user-message queue dispatch @copyberry\n- #37206 Add a unified image budget @copyberry\n- #37210 Fetch remote installed plugins across all scopes @copyberry\n- #37211 Harden network proxy MITM authorization @copyberry\n- #37248 Cover remote MCP discovery timeout cleanup @copyberry\n- #37252 Allow agent roles on full-history forks @copyberry\n- #37260 Fix first-turn model switching and rollback @copyberry\n- #37261 Start cached MCP servers lazily for subagents @copyberry\n- #37267 Support plugin roots in the host skill loader @copyberry\n- #37273 Reuse MCP handlers across sampling steps @copyberry\n- #37279 Avoid cloning immutable metadata on tool search cache hits @copyberry\n- #37335 Fully repaint inline viewports after history overlap @copyberry\n- #37336 Use step environments for extension turn input @copyberry\n- #37337 Recover MCP servers after OAuth reauthentication @copyberry\n- #37338 Honor the configured ChatGPT origin in connector install URLs @copyberry\n- #37339 Reload app-server telemetry after account changes @copyberry\n- #37340 Consolidate deferred environment provisioning APIs @copyberry\n- #37341 Support content references for inline visualizations @copyberry\n- #37342 Preserve foreign cwd URIs for turn-input contributors @copyberry\n- #37343 Stage Bazel app-server test binaries in `TEST_TMPDIR` @copyberry\n- #37344 Fix subagent MCP startup status settling @copyberry\n- #37345 Send model routing hints to the Codex backend @copyberry\n- #37347 Track context windows per agent @copyberry\n- #37348 Add rollout migration tooling and background migration @copyberry\n- #37349 Mount a minimal `/dev` in full-filesystem Bubblewrap sandboxes @copyberry\n- #37350 Allow `ThreadManager` to customize thread ID generation @copyberry\n- #37352 Configure the default code-mode exec yield timeout @copyberry\n- #37354 Retry busy app-server test executable spawns @copyberry\n- #37356 Support agent identity endpoint overrides @copyberry\n- #37357 Clamp short wait_agent timeouts to the configured minimum @copyberry\n- #37358 Add Markdown conversation export to the TUI @copyberry\n- #37360 Use consistent TUI input placeholders @copyberry\n- #37363 Recognize MCP tool hook configurations @copyberry\n- #37366 Harden local MCP server process tree cleanup @copyberry\n- #37367 Add session forking to `codex exec` @copyberry\n- #37368 Restore approval policy when resuming threads @copyberry\n- #37369 Add session archiving to the resume picker @copyberry\n- #37371 Restore archived sessions from the resume picker @copyberry\n- #37389 Add tool namespace metadata configuration @copyberry\n- #37400 Rename the tool registry metadata setting @copyberry\n- #37406 Add a loader for executor-local config layers @copyberry\n- #37408 Add executor-local config reads to the exec server @copyberry\n- #37424 Cap project instructions across environments @copyberry\n- #37433 Expose multi-agent versions in model/list @copyberry\n- #37434 Add process diagnostics snapshots @copyberry\n- #37439 Add shared skill root loading interfaces @copyberry\n- #37440 Load plugin skill roots through the host skills service @copyberry\n- #37444 Unify plugin skill loading with the host skill service @copyberry\n- #37446 Preserve base instruction provenance across sessions @copyberry\n- #37447 Respect plugin skill availability in tool suggestions @copyberry\n- #37452 Unify plugin skill loading through the shared loader @copyberry\n- #37457 Remove the legacy core skill loader @copyberry\n- #37461 Remove the unused remote skills client @copyberry\n- #37466 Move skill config rule resolution into `codex-config` @copyberry\n- #37470 Expose app-server diagnostics through the experimental API @copyberry\n- #37477 Include call IDs in MCP requests and clarify metadata config @copyberry\n- #37478 Shard state unit tests under Bazel @copyberry\n- #37479 Report temporary directories in exec-server environment info @copyberry\n- #37480 Delegate remote process sandboxing to the executor @copyberry\n- #37483 Interrupt active code-mode cells with their turn @copyberry\n- #37485 Keep response streams alive through connection failures @copyberry\n- #37486 Expose runtime activity in server diagnostics @copyberry\n- #37488 Generalize skill locator aliases across providers @copyberry\n- #37489 Alias resource-backed skill locators under context pressure @copyberry\n- #37492 Include tool namespace inventory in turn metadata @copyberry\n- #37494 Add MCP event discovery and subscriptions @copyberry\n- #37497 Limit payload traces in diagnostic logs @copyberry\n- #37498 Preserve child waiters during process termination @copyberry\n- #37500 Remove the legacy code-mode tool metadata inventory @copyberry\n- #37503 Move host skill prompt injection into the skills extension @copyberry\n- #37504 Disable Nagle's algorithm for code-mode WebSockets @copyberry\n- #37505 Remove the codex-core-skills crate @copyberry\n- #37507 Include sandbox mode in response metadata @copyberry\n- #37510 Define the code-mode host gRPC protocol @copyberry\n- #37511 Enforce automatic review for managed models @copyberry\n- #37513 Reuse parent compactions in Guardian review sessions @copyberry\n- #37516 Ignore reusable command approvals for cyber models @copyberry\n- #37519 Expose auto-review ignore rules in config requirements @copyberry\n- #37527 Terminate timed-out hook process trees @copyberry\n- #37528 Keep external agent detection from blocking config requests @copyberry\n- #37530 Implement the gRPC code-mode host service @copyberry\n- #37533 Support asynchronous command hooks @copyberry\n- #37538 Expose execution mode in hook listings @copyberry\n- #37607 Prevent launch context from reaching child processes @copyberry\n- #37610 Add workload identity token exchange support @copyberry\n- #37618 Use step environments for Guardian approval reviews @copyberry\n- #37622 Include buffered turns when editing prompts @copyberry\n- #37641 Use the step context for command approval prefix rules @copyberry\n- #37644 Generalize hook handler execution @copyberry\n- #37645 Improve plugin install failure analytics @copyberry\n- #37654 Advertise environment config read support @copyberry\n- #37709 Keep wrapped composer whitespace with following text @copyberry\n- #37723 Report I/O subtypes for session config import failures @copyberry\n- #37745 Add gRPC TCP transport to the code-mode host @copyberry\n- #37747 Bound Cursor project path resolution @copyberry\n- #37757 Add a line-ending preservation mode to `apply_patch` @copyberry\n- #37758 Add a feature flag to preserve apply_patch line endings @copyberry\n- #37773 Forward install attempt IDs for remote plugins @copyberry\n- #37788 Use native transparency in the imagegen skill @copyberry\n- #37806 Initialize the install attempt ID in the plugin analytics test @copyberry\n- #37807 Share model-visible tool specs across prompts @copyberry\n- #37808 Simplify package-based skill reads @copyberry\n- #37810 Support packaged defaults in config layering @copyberry\n- #37812 Keep multi-workspace skill listings consistent @copyberry\n- #37828 Track running unified exec processes at turn completion @copyberry\n- #37832 Remove obsolete plugin skill discovery helpers @copyberry\n- #37833 Encapsulate watchable skill root selection @copyberry\n- #37836 Run plugin and skill tests on Windows @copyberry\n- #37838 Tighten the skills extension API surface @copyberry\n- #37842 Speed up MCP OAuth credential reads @copyberry\n- #37843 Use the shared environment scrubber in git-utils @copyberry\n- #37847 Preserve environments when reloading V2 agents @copyberry\n- #37848 Expose the session ID to shell commands @copyberry\n- #37850 Expose plugin ownership in MCP server status @copyberry\n- #37851 Route intercepted exec approvals through shared review @copyberry\n- #37860 Speed up MCP OAuth credential reads @copyberry\n- #37862 Rename environment config for turn scope @copyberry\n- #37864 Support MCP form input in full-access user threads @copyberry\n- #37866 Add MCP OAuth credential contention regression tests @copyberry\n- #37867 Reject duplicate resolved paths in apply_patch @copyberry\n- #37871 Extract persisted history types into a dedicated crate @copyberry\n- #37874 Keep runtime summary metrics out of Statsig exports @copyberry\n- #37875 Honor the configured Windows sandbox level for managed networking @copyberry\n- #37878 Add configurable goal token budget limits @copyberry\n- #37882 Read safety buffering from response metadata @copyberry\n- #37886 Extend bundled package discovery and expose its version @copyberry\n- #37889 Ignore Unix socket proxy settings on Windows @copyberry\n- #37891 Use thread configuration for `app/read` @copyberry\n- #37892 Validate images before returning `view_image` output @copyberry\n- #37895 Add configurable Responses API request metadata @copyberry\n- #37896 Add hermetic Windows SDK and MSVC runtime repositories @copyberry\n- #37898 Add appearance metadata to thread sections @copyberry\n- #37901 Make submission operations move-only @copyberry\n- #37902 Defer `view_image` processing to history insertion @copyberry\n- #37906 Make gRPC code-mode notifications fire-and-forget @copyberry\n- #37908 Apply refreshed cloud config bundles to later sessions @copyberry\n- #37922 Extract reusable code-mode host test support @copyberry\n- #37926 Distinguish turn-start thread persistence @copyberry\n- #37929 Add shared runtime build information @copyberry\n- #37939 Validate images before returning `view_image` output @copyberry\n- #37970 Cache tool catalogs for streamable HTTP MCP servers @copyberry\n- #37979 Honor per-directory bundled skill settings in `skills/list` @copyberry\n- #37984 Stop re-exporting skill APIs from `codex-core` @copyberry\n- #38011 Remove config lockfile support @copyberry\n- #38020 Retry transient exec-server startup failures @copyberry\n- #38024 Expose image generation usage-limit failures @copyberry\n- #38026 Fail closed on unsafe Linux unreadable globs @copyberry\n- #38032 Hide approved Guardian assessments from TUI history @copyberry\n- #38033 Use session metadata to validate thread history paths @copyberry\n- #38034 Filter live rollout items in place @copyberry\n- #38035 Propagate MCP elicitation event delivery failures @copyberry\n- #38036 Limit TUI streaming traces in SQLite logs @copyberry\n- #38040 Propagate custom CA settings to local MCP servers @copyberry\n- #38041 Add gRPC-backed code-mode sessions @copyberry\n- #38043 Sandbox remote apply_patch operations @copyberry\n- #38044 Compact code mode tool calls in TUI history @copyberry\n- #38045 Store model history in response item envelopes @copyberry\n- #38046 Include auto-review state in turn metadata @copyberry\n- #38047 Add turn-aware response item injection @copyberry\n- #38049 Harden network proxy credential brokerage @copyberry\n- #38051 Run required CI against pull request merge commits @copyberry\n- #38052 Add per-login MCP OAuth client registration selection @copyberry\n- #38054 Add configuration-backed external authentication @copyberry\n- #38056 Configure PSP routing through the feature system @copyberry\n- #38057 Track artifact operations from trusted plugin markers @copyberry\n- #38058 Preserve harness metadata across conversation history @copyberry\n- #38060 Disable storage for Azure Responses requests @copyberry\n- #38061 Preserve proxy settings for Windows sandbox debug sessions @copyberry\n- #38064 Grant Windows sandbox access to the Codex app root @copyberry\n- #38066 Track resource-backed skill invocations @copyberry\n- #38067 Scope environment readiness config to thread attachments @copyberry\n- #38072 Forward gRPC code-mode callbacks to session delegates @copyberry\n- #38074 Track implicit executor skill invocations @copyberry\n- #38075 Respect rendered width when adding TUI history @copyberry\n- #38078 Reduce cloning in world-state patch handling @copyberry\n- #38080 Allow nested Git repositories in the Windows sandbox @copyberry\n- #38081 Use `ReviewDecision` for MCP tool approvals @copyberry\n- #38083 Remove standard form input from app-server docs @copyberry\n- #38084 Allow empty input to start a turn @copyberry\n- #38086 Support execution-host context when resolving cloud config @copyberry\n- #38087 Route gRPC code-mode sessions through the shared HTTP client @copyberry\n- #38089 Add CIMD support to MCP OAuth registration @copyberry\n- #38092 Simplify queued user message admission @copyberry\n- #38094 Test Guardian context for code mode commands @copyberry\n- #38101 Attach hosted app context to file uploads @copyberry\n- #38103 Avoid cloning MCP invocations in TUI history @copyberry\n- #38108 Route MCP tool calls through shared approval handling @copyberry\n- #38127 Distinguish rollout IDs from thread IDs @copyberry\n- #38165 Resolve subagent analytics connections lazily @copyberry\n- #38167 Read executor skill packages directly @copyberry\n- #38170 Notify running turn watchers only on count changes @copyberry\n- #38172 Update `lru` and `webbrowser` dependencies @copyberry\n- #38179 Embed defaults in the packaged config layer @copyberry\n- #38183 Add conservative restriction helpers for tool policies @copyberry\n- #38184 Run search tool integration tests on Windows @copyberry\n- #38186 Stop overriding environments in the skills user-turn test @copyberry\n- #38188 Integrate workload identity with Codex authentication @copyberry\n- #38189 Run plugin app-server tests in automatic environments @copyberry\n- #38197 Add an LRU baseline to skill shadow selection @copyberry\n- #38204 Fuse recent and lexical skills in shadow selection @copyberry\n- #38205 Enforce non-interactive approval policy for Codex delegates @copyberry\n- #38214 Avoid allocations when sanitizing TUI user text @copyberry\n- #38217 Start required cached MCP servers lazily for subagents @copyberry\n- #38227 Add a flag to retain client developer messages @copyberry\n- #38228 Detect implicit skill invocations from PowerShell reads @copyberry\n- #38232 Track root turns across delegated Codex requests @copyberry\n- #38238 Add manifest-defined metrics for trusted plugin scripts @copyberry\n- #38239 Add bounded plugin measurement analytics @copyberry\n- #38241 Include Node REPL policy in turn metadata @copyberry\n- #38242 Cache stable active-cell layout measurements @copyberry\n- #38243 Track client-authored developer messages in rollout history @copyberry\n- #38244 Resolve paginated thread history by rollout ID @copyberry\n- #38245 Add dynamic HTTP header helpers for MCP servers @copyberry\n- #38251 Read model ETags from WebSocket metadata events @copyberry\n- #38252 Collect metrics from plugin shell commands @copyberry\n- #38253 Collect plugin metrics from unified exec commands @copyberry\n- #38256 Report the latest rejection from multiple network reviews @copyberry\n- #38257 Reconnect gRPC code-mode sessions after host restarts @copyberry\n- #38258 Unify external authentication provider handling @copyberry\n- #38261 Resolve skill package aliases in `skills.read` @copyberry\n- #38265 Use bounded fallback ports for Windows managed proxies @copyberry\n- #38268 Expose executor skill roots from `skills.read` @copyberry\n- #38270 Add per-thread usage queries to the backend client @copyberry\n- #38272 Stamp conversation history items with creation times @copyberry\n- #38274 Represent persisted world state as JSON objects @copyberry\n- #38275 Unify turn input submission and routing @copyberry\n- #38276 Track plugin metrics for background unified exec commands @copyberry\n- #38278 Add app-server coverage for plugin measurement analytics @copyberry\n- #38280 Use protobuf's built-in Bazel proto rule @copyberry\n- #38281 Show estimated thread usage in `/status` @copyberry\n- #38282 Add thread usage to TUI status surfaces @copyberry\n- #38283 Collect plugin metrics from remote executors @copyberry\n- #38285 Move `codex-execpolicy` to protocol dev dependencies @copyberry\n- #38288 Support gRPC code-mode hosts in app server @copyberry\n- #38291 Remove unused apply_patch prompt fallback @copyberry\n- #38292 Add durable reverts for paginated threads @copyberry\n- #38299 Route network access through the shared approval pipeline @copyberry\n- #38303 Add interrupted turn recovery @copyberry\n- #38306 Protect inline visualization viewers from sandbox writes @copyberry\n- #38321 Make gRPC code-mode yield tests deterministic @copyberry\n- #38336 Add Guardian V2 extension scaffold @copyberry\n- #38356 Support sandboxed file streaming in exec-server @copyberry\n- #38358 Optimize orphan output normalization @copyberry\n- #38361 Test hook rejection for explicitly started queue items @copyberry\n- #38362 Stabilize exec-server byte-budget tests @copyberry\n- #38363 Persist security risk scores in rollout history @copyberry\n- #38368 Add the Guardian V2 Luna sampler @copyberry\n- #38377 Constrain Guardian reviews to parent filesystem permissions @copyberry\n- #38380 Preserve user message styling when wrapping long URLs @copyberry\n- #38381 Prevent unread events from blocking in-process requests @copyberry\n- #38383 Return Luna samples when streamed JSON completes @copyberry\n- #38384 Refine skill creation guidance and validation @copyberry\n- #38390 Use effective permissions when trusting app-server projects @copyberry\n- #38394 Reject sessions with unloadable required managed hooks @copyberry\n- #38396 Reap orphaned processes in Linux sandboxes @copyberry\n- #38397 Include Node REPL results in Guardian reviews @copyberry\n- #38399 Preserve floating-point values when decoding rollout lines @copyberry\n- #38400 Refresh tracing interest in the token estimate test @copyberry\n- #38403 Expose conversation history to tool lifecycle extensions @copyberry\n- #38406 Pool Guardian sampling WebSocket connections @copyberry\n- #38409 Classify tool calls in the Guardian V2 extension @copyberry\n- #38413 Allow metadata updates without materializing threads @copyberry\n- #38414 Add bounded transcript rendering for Guardian v2 @copyberry\n- #38415 Recognize PowerShell `Get-Content` file reads @copyberry\n- #38416 Honor filesystem permissions for app file uploads @copyberry\n- #38418 Clarify MCP OAuth reauthentication errors @copyberry\n- #38419 Apply Codex attribution to app-created commits @copyberry\n- #38420 Recover capability discovery after executor disconnects @copyberry\n- #38423 Centralize thread environment selection state @copyberry\n- #38424 Fail closed when workload identity initialization fails @copyberry\n- #38426 Protect workload identity auth in app-server account RPCs @copyberry\n- #38427 Add Guardian guidance for Node REPL tool calls @copyberry\n- #38429 Route curated plugin catalogs by authentication mode @copyberry\n- #38432 Gate Node REPL Guardian guidance on model metadata @copyberry\n- #38436 Add rustls fallback for local MCP HTTP requests @copyberry\n- #38439 Preserve approval policies for auto-reviewed models @copyberry\n- #38440 Add app-server support for reverting paginated threads @copyberry\n- #38441 Give Guardian V2 full tool action context @copyberry\n- #38443 Tag current time reminders in model context @copyberry\n- #38445 Retain client developer messages across context compaction @copyberry\n- #38446 Refresh current-time reminders for full-history subagents @copyberry\n- #38447 Add running-task exit choices to local daemon sessions @copyberry\n- #38448 Support per-server MCP OAuth callback ports @copyberry\n- #38449 Expose model upgrade retirement times @copyberry\n- #38450 Embed the Windows sandbox setup manifest in Bazel builds @copyberry\n- #38452 Add structured telemetry for response retries @copyberry\n- #38454 Include node_repl images in Guardian review evidence @copyberry\n- #38456 Add experimental thread queue APIs to app server @copyberry\n- #38460 Add an `AbsolutePathBuf` conversion for `FileSystemPath` @copyberry\n- #38461 Centralize turn environment selection state @copyberry\n- #38463 Preserve thread subscriptions across revert reloads @copyberry\n- #38467 Parse model annotations from skill frontmatter @copyberry\n- #38470 Add an Amazon Bedrock Runtime provider @copyberry\n- #38473 Stop generating accepted-line fingerprints @copyberry\n- #38475 Add bounded skill model delegation instructions @copyberry\n- #38483 Include agent names in turn metadata @copyberry\n- #38484 Search selected plugin apps before falling back @copyberry\n- #38492 Enforce strict auto-review for MCP tool calls @copyberry\n- #38493 Reuse pending MCP startups during reconciliation @copyberry\n- #38494 Verify bundled bwrap in Bazel builds @copyberry\n- #38499 Enable parallel tool calls for all model prompts @copyberry\n- #38521 Carry environment config in turn selections @copyberry\n- #38527 Configure Guardian sampling for responses lite @copyberry\n- #38540 Record Guardian V2 risk scores on threads @copyberry\n- #38553 Initialize Guardian V2 samplers per thread @copyberry\n- #38555 Preserve Guardian transcript boundaries in sampling input @copyberry\n- #38558 Improve Guardian transcript context selection @copyberry\n- #38561 Restrict filesystem helper sandbox access @copyberry\n- #38564 Reuse compatible parent compactions in Guardian V2 @copyberry\n- #38567 Store security risk scores as a snapshot @copyberry\n- #38568 Run tool start callbacks after pre-tool hooks @copyberry\n- #38569 Require automatic review for high-risk Guardian v2 actions @copyberry\n- #38579 Report thread storage changes after rollout migration @copyberry\n- #38580 Keep the latest Guardian risk score during concurrent sampling @copyberry\n- #38581 Honor cloud-managed requirements in feature listings @copyberry\n- #38586 Bound Guardian V2 tool actions before risk classification @copyberry\n- #38592 Let extensions resolve approval reviews before Guardian @copyberry\n- #38596 Prioritize new Guardian classifications under load @copyberry\n- #38597 Install Guardian V2 in the app server @copyberry\n- #38601 Make unbounded connection retries configurable @copyberry\n- #38602 Isolate Guardian reviewer sessions from parent extensions @copyberry\n- #38604 Avoid paginated resume requests for verified legacy rollouts @copyberry\n- #38605 Fix resume transcript preview line selection @copyberry\n- #38606 Allow larger gRPC code mode tool descriptions @copyberry\n- #38608 Fix the missing resume picker history mode import @copyberry\n- #38610 Support workload identity in remote exec-server auth @copyberry\n- #38612 Skip stale Guardian risk score persistence @copyberry\n- #38615 Remove the gRPC code-mode enabled tool limit @copyberry\n- #38616 Route escalated approval retries through Guardian @copyberry\n- #38617 Prioritize global models in the Bedrock Runtime catalog @copyberry\n- #38618 Apply Guardian policies to v2 risk classification @copyberry\n- #38619 Source multi-agent instructions from the model catalog @copyberry\n- #38621 Preserve large gRPC code-mode tool errors @copyberry\n- #38623 Preserve MCP namespace descriptions in the tool catalog cache @copyberry\n- #38624 Open notes when accepting the request input Other option @copyberry\n- #38625 Enable unified exec by default on Windows @copyberry\n- #38628 Make Guardian v2 risk classification configurable @copyberry\n- #38630 Remove the gRPC code-mode open session limit @copyberry\n- #38634 Add MCP protocol discovery metrics @copyberry\n- #38635 Remove repository-local Codex skills @copyberry\n- #38639 Render the initial TUI session header before input @copyberry\n- #38641 Harden TUI startup input handling @copyberry\n- #38642 Keep the composer editable during TUI startup @copyberry\n- #38643 Delay the startup composer until first-login onboarding @copyberry\n- #38644 Show onboarding when Codex home lacks authentication state @copyberry\n- #38645 Deliver gRPC code-mode notifications without truncation @copyberry\n- #38646 Read Apple notarization issuer ID from Key Vault @copyberry\n- #38647 Add an override to skip project configuration @copyberry\n- #38649 Reuse the TUI startup account response during bootstrap @copyberry\n- #38650 Canonicalize default namespaces in gRPC subscription filters @copyberry\n- #38651 Move permission profile snapshots into the protocol @copyberry\n- #38657 Skip terminal hyperlink layout when no links are present @copyberry\n- #38660 Enforce managed deny-read rules in the Windows sandbox @copyberry\n- #38662 Delete Thai combining marks one at a time in the composer @copyberry\n- #38664 Resolve local JSON Schema refs in Code Mode types @copyberry\n- #38670 Forward executor network policy decisions for auditing @copyberry\n- #38673 Honor per-environment permission profiles @copyberry\n- #38675 Exclude shortcut-modified input from TUI paste bursts @copyberry\n- #38678 Preserve environment configuration ownership @copyberry\n- #38681 Preserve HTTP fallback for delegated sessions @copyberry\n- #38682 Surface misalignment policy violations as typed errors @copyberry\n- #38684 Support pending environment attachment configuration @copyberry\n- #38690 Propagate request trace context through exec-server relays @copyberry\n- #38701 Route permission requests through shared Guardian approvals @copyberry\n- #38703 Refresh hook runtimes after plugin changes @copyberry\n- #38704 Normalize CRLF line endings in pasted text @copyberry\n- #38705 Add MCP tool handler support to the hooks engine @copyberry\n- #38743 Scope TUI app directory state to the active context @copyberry\n- #38746 Remove the TUI test dependency on `codex-cli` @copyberry\n- #38767 Forward workload identity context during token exchange @copyberry\n- #38774 Use paginated history for persistent exec threads @copyberry\n- #38785 Keep active-turn model settings stable across updates @copyberry\n- #38788 Show resume and fork status during TUI startup @copyberry\n- #38795 Add storage diagnostics to `codex doctor` @copyberry\n- #38800 Route executor policy audits through log-only telemetry @copyberry\n- #38806 Add a health endpoint to the code-mode gRPC listener @copyberry"
+  },
+  "summary": {
+    "changes": 122,
+    "categories": {
+      "behavior": 3,
+      "caching": 1,
+      "cli": 37,
+      "config": 71,
+      "hooks": 8,
+      "prompt": 1,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 104,
+      "notable": 18
+    },
+    "undocumented": 63
+  },
+  "changes": [
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+429 −553 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,7 +3,7 @@\n A skill is a set of instructions provided through a `SKILL.md` source.\n Below is the list of skills that can be used.\n Each entry includes a name, description, and source locator.\n-`file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n+`file` locators are on the host filesystem, `executor package` locators are owned by their execution environment, `orchestrator package` locators are opaque package identifiers, and `custom resource` locators use their provider's access mechanism.\n ### Available skills\n - imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n@@ -16,9 +16,7 @@\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n (file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n-- skill-creator: Guide for creating effective skills.\n-This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n-(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n+- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n - skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n (file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n",
+      "stats": {
+        "added_chars": 429,
+        "removed_chars": 553
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.exec.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "exec",
+        "description"
+      ],
+      "title": "exec tool description changed (+98 −98 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,7 +6,7 @@\n - Runs raw JavaScript -- no Node, no file system, no network access, no console.\n - Accepts raw JavaScript source text, not JSON, quoted strings, or markdown code fences.\n - You may optionally start the tool input with a first-line pragma like `// @exec: {\"yield_time_ms\": 10000, \"max_output_tokens\": 1000}`.\n-- `yield_time_ms` asks `exec` to yield early if the script is still running. Defaults to 10000 ms.\n+- `yield_time_ms` asks `exec` to yield early if the script is still running. Defaults to 30000 ms.\n - `max_output_tokens` sets the token budget for direct `exec` results. Defaults to 10000 tokens.\n - When the JS code is fully evaluated, the isolate's lifetime ends and unawaited promises are silently discarded.\n \n",
+      "stats": {
+        "added_chars": 98,
+        "removed_chars": 98
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "caching.across_turns.stable_prefix_chars",
+      "category": "caching",
+      "op": "changed",
+      "path": [
+        "caching",
+        "across_turns",
+        "stable_prefix_chars"
+      ],
+      "title": "Caching across_turns.stable_prefix_chars: 1191 → 909",
+      "impact": "notable",
+      "before": 1191,
+      "after": 909,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.subagents.system.1.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 1 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,7 +3,7 @@\n A skill is a set of instructions provided through a `SKILL.md` source.\n Below is the list of skills that can be used.\n Each entry includes a name, description, and source locator.\n-`file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n+`file` locators are on the host filesystem, `executor package` locators are owned by their execution environment, `orchestrator package` locators are opaque package identifiers, and `custom resource` locators use their provider's access mechanism.\n ### Available skills\n - imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts.\n Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector.\n@@ -16,9 +16,7 @@\n - plugin-creator: Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default.\n Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.\n (file: <codex-home>/skills/.system/plugin-creator/SKILL.md)\n-- skill-creator: Guide for creating effective skills.\n-This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.\n-(file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n+- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: <codex-home>/skills/.system/skill-creator/SKILL.md)\n - skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path.\n Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).\n (file: <codex-home>/skills/.system/skill-installer/SKILL.md)\n",
+      "stats": {
+        "added_chars": 429,
+        "removed_chars": 553
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.5.text",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "5",
+        "text"
+      ],
+      "title": "Behaviour: subagents system 5 text changed",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,34 +1,1 @@\n-You are an agent in a team of agents collaborating to complete a task.\n-\n-You can spawn sub-agents to handle subtasks, and those sub-agents can spawn their own sub-agents. All agents in the team, including the agents that you can assign tasks to, are equally intelligent and capable, and have access to the same set of tools.\n-\n-You can use `spawn_agent` to create a new agent, `followup_task` to give an existing agent a new task and trigger a turn, and `send_message` to pass a message to a running agent.\n-Child agents can also spawn their own sub-agents.\n-\n-When you provide a response in the final channel, that content is immediately delivered back to your parent agent.\n-\n-You will receive messages in the analysis channel in the form:\n-```\n-Message Type: NEW_TASK | MESSAGE | FINAL_ANSWER\n-Task name: <recipient>\n-Sender: <author>\n-Payload:\n-<payload text>\n-```\n-You may also see them addressed as to=/root/..., which indicates your identity is /root/...\n-\n-Note that collaboration tools cannot be called from inside `functions.exec`.\n-Call `spawn_agent`, `send_message`, `followup_task`, `wait_agent`, `interrupt_agent`, and `list_agents` only as direct tool calls using the recipient shown in their tool definitions, such as `to=functions.collaboration.spawn_agent`, since they are intentionally absent from the `functions.exec` `tools.*` namespace.\n-Available tools in `functions.exec` are explicitly described with a `tools` namespace in the developer message.\n-\n-All agents share the same directory. In detail:\n-- All agents have access to the same container and filesystem as you.\n-- All agents use the same current working directory.\n-- As a result, edits made by one agent are immediately visible to all other agents.\n-\n-When calling `wait_agent`, prefer longer waits (minutes) to avoid busy polling.\n-\n-There are 4 available concurrency slots, meaning that up to 4 agents can be active at once, including you.\n-\n-Full-history forks (`fork_turns` omitted or `\"all\"`) inherit the parent model and reasoning effort and do not accept overrides.\n-Only set `model` or `reasoning_effort` when explicitly requested by the user, applicable `AGENTS.md` instructions, or skill instructions; when doing so, set `fork_turns` to `\"none\"` or a positive integer string.\n+<multi_agent_mode>Any earlier instruction enabling proactive multi-agent delegation no longer applies. Do not spawn sub-agents unless the user or applicable AGENTS.md/skill instructions explicitly ask for sub-agents, delegation, or parallel agent work.</multi_agent_mode>\n",
+      "stats": {
+        "added_chars": 271,
+        "removed_chars": 2204
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "behavior.subagents.system.6",
+      "category": "behavior",
+      "op": "removed",
+      "path": [
+        "behavior",
+        "subagents",
+        "system",
+        "6"
+      ],
+      "title": "Behaviour: subagents system 6 removed",
+      "impact": "notable",
+      "before": {
+        "chars": 271,
+        "sha256": "6ded806e3cdbb35599ecaf8742574bc5274908472b1729090010c404c2151e8e",
+        "text": "<multi_agent_mode>Any earlier instruction enabling proactive multi-agent delegation no longer applies. Do not spawn sub-agents unless the user or applicable AGENTS.md/skill instructions explicitly ask for sub-agents, delegation, or parallel agent work.</multi_agent_mode>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.agent_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "agent_id"
+      ],
+      "title": "PostToolUse hook payload field agent_id removed",
+      "impact": "notable",
+      "before": "agent_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 395,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L395"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 404,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L404"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.agent_type",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "agent_type"
+      ],
+      "title": "PostToolUse hook payload field agent_type removed",
+      "impact": "notable",
+      "before": "agent_type",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 77,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L77"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 111,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L111"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.control.json_decision",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "control",
+        "json_decision"
+      ],
+      "title": "PreToolUse hook control (json_decision) added",
+      "impact": "informational",
+      "before": null,
+      "after": "blocks the tool; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1368,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/analytics/src/events.rs#L1368"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 471,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L471"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.agent_id",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "agent_id"
+      ],
+      "title": "PreToolUse hook payload field agent_id removed",
+      "impact": "notable",
+      "before": "agent_id",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 395,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L395"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 404,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L404"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.PreToolUse.keys.agent_type",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "keys",
+        "agent_type"
+      ],
+      "title": "PreToolUse hook payload field agent_type removed",
+      "impact": "notable",
+      "before": "agent_type",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 77,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L77"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs",
+            "line": 111,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/tools/handlers/multi_agents_spec.rs#L111"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionStart.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "control",
+        "additional_context"
+      ],
+      "title": "SessionStart hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "reaches the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1373,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/analytics/src/events.rs#L1373"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 486,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L486"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Stop.control.json_decision",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "control",
+        "json_decision"
+      ],
+      "title": "Stop hook control (json_decision) added",
+      "impact": "informational",
+      "before": null,
+      "after": "keeps the turn going; message to the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1378,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/analytics/src/events.rs#L1378"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 501,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L501"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.control.additional_context",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "control",
+        "additional_context"
+      ],
+      "title": "UserPromptSubmit hook control (additional_context) added",
+      "impact": "informational",
+      "before": null,
+      "after": "reaches the model",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/analytics/src/events.rs",
+            "line": 1375,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/analytics/src/events.rs#L1375"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.codex app-server.options.--code-mode-host.value",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex app-server",
+        "options",
+        "--code-mode-host",
+        "value"
+      ],
+      "title": "`codex app-server --code-mode-host` now takes <URL> (was <WS_URL>)",
+      "impact": "informational",
+      "before": "<WS_URL>",
+      "after": "<URL>",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-daemon/src/backend/pid.rs",
+            "line": 417,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server-daemon/src/backend/pid.rs#L417"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/backend/pid.rs",
+            "line": 420,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server-daemon/src/backend/pid.rs#L420"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex exec fork",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex exec fork"
+      ],
+      "title": "New command: `codex exec fork`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Fork a previous session by id into a new session",
+        "helped": false
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/startup.rs",
+            "line": 340,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/tui/src/app/startup.rs#L340"
+          },
+          {
+            "path": "codex-rs/tui/src/cwd_prompt.rs",
+            "line": 39,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/tui/src/cwd_prompt.rs#L39"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.codex migrate-rollouts",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex migrate-rollouts"
+      ],
+      "title": "New command: `codex migrate-rollouts`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Inspect or migrate legacy local sessions to paginated thread history",
+        "helped": true,
+        "options": {
+          "--apply": {
+            "description": "Publish the migration. Without this flag the command only reports eligible sessions",
+            "names": [
+              "--apply"
+            ]
+          },
+          "--config": {
+            "description": "Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed as TOML. If it fails to parse as TOML, the raw string is used as a literal.\nExamples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c shell_environment_policy.inherit=all`",
+            "names": [
+              "-c",
+              "--config"
+            ],
+            "value": "<key=value>"
+          },
+          "--disable": {
+            "description": "Disable a feature (repeatable). Equivalent to `-c features.<name>=false`",
+            "names": [
+              "--disable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--enable": {
+            "description": "Enable a feature (repeatable). Equivalent to `-c features.<name>=true`",
+            "names": [
+              "--enable"
+            ],
+            "value": "<FEATURE>"
+          },
+          "--help": {
+            "description": "Print help (see a summary with '-h')",
+            "names": [
+              "-h",
+              "--help"
+            ]
+          },
+          "--json": {
+            "description": "Emit the complete per-thread report as JSON",
+            "names": [
+              "--json"
+            ]
+          },
+          "--max-mib-per-second": {
+            "description": "Limit aggregate rollout read and write throughput, in MiB per second",
+            "names": [
+              "--max-mib-per-second"
+            ],
+            "value": "<MIB>"
+          },
+          "--thread": {
+            "description": "Restrict inspection or migration to one or more thread IDs",
+            "names": [
+              "--thread"
+            ],
+            "value": "<THREAD_ID>"
+          },
+          "--verbose": {
+            "description": "Print one line for every inspected rollout",
+            "names": [
+              "--verbose"
+            ]
+          }
+        },
+        "usage": [
+          "Usage: codex migrate-rollouts [OPTIONS]"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 1345,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/main.rs#L1345"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 2289,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/main.rs#L2289"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+1879 −1735 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,34 +6,35 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  exec            Run Codex non-interactively [aliases: e]\n-  review          Run a code review non-interactively\n-  login           Manage login\n-  logout          Remove stored authentication credentials\n-  mcp             Manage external MCP servers for Codex\n-  plugin          Manage Codex plugins\n-  mcp-server      Start Codex as an MCP server (stdio)\n-  app-server      [experimental] Run the app server or related tooling\n-  remote-control  [experimental] Manage the app-server daemon with remote control enabled\n-  app             Launch the Desktop app (opens the app installer if missing)\n-  completion      Generate shell completion scripts\n-  update          Update Codex to the latest version\n-  doctor          Diagnose local Codex installation, config, auth, and runtime health\n-  sandbox         Run commands within a Codex-provided sandbox\n-  debug           Debugging tools\n-  apply           Apply the latest diff produced by Codex agent as a `git apply` to your local\n-                  working tree [aliases: a]\n-  resume          Resume a previous interactive session (picker by default; use --last to continue\n-                  the most recent)\n-  archive         Archive a saved session by id or session name\n-  delete          Permanently delete a saved session by id or session name\n-  unarchive       Unarchive a saved session by id or session name\n-  fork            Fork a previous interactive session (picker by default; use --last to fork the\n-                  most recent)\n-  cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  exec-server     [EXPERIMENTAL] Run the standalone exec-server service\n-  features        Inspect feature flags\n-  help            Print this message or the help of the given subcommand(s)\n+  exec              Run Codex non-interactively [aliases: e]\n+  review            Run a code review non-interactively\n+  login             Manage login\n+  logout            Remove stored authentication credentials\n+  mcp               Manage external MCP servers for Codex\n+  plugin            Manage Codex plugins\n+  mcp-server        Start Codex as an MCP server (stdio)\n+  app-server        [experimental] Run the app server or related tooling\n+  remote-control    [experimental] Manage the app-server daemon with remote control enabled\n+  app               Launch the Desktop app (opens the app installer if missing)\n+  completion        Generate shell completion scripts\n+  update            Update Codex to the latest version\n+  doctor            Diagnose local Codex installation, config, auth, and runtime health\n+  sandbox           Run commands within a Codex-provided sandbox\n+  debug             Debugging tools\n+  apply             Apply the latest diff produced by Codex agent as a `git apply` to your local\n+                    working tree [aliases: a]\n+  resume            Resume a previous interactive session (picker by default; use --last to continue\n+                    the most recent)\n+  archive           Archive a saved session by id or session name\n+  delete            Permanently delete a saved session by id or session name\n+  migrate-rollouts  Inspect or migrate legacy local sessions to paginated thread history\n+  unarchive         Unarchive a saved session by id or session name\n+  fork              Fork a previous interactive session (picker by default; use --last to fork the\n+                    most recent)\n+  cloud             [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+  exec-server       [EXPERIMENTAL] Run the standalone exec-server service\n+  features          Inspect feature flags\n+  help              Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [PROMPT]\n",
+      "stats": {
+        "added_chars": 1879,
+        "removed_chars": 1735
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+1879 −1735 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,34 +4,35 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  exec            Run Codex non-interactively [aliases: e]\n-  review          Run a code review non-interactively\n-  login           Manage login\n-  logout          Remove stored authentication credentials\n-  mcp             Manage external MCP servers for Codex\n-  plugin          Manage Codex plugins\n-  mcp-server      Start Codex as an MCP server (stdio)\n-  app-server      [experimental] Run the app server or related tooling\n-  remote-control  [experimental] Manage the app-server daemon with remote control enabled\n-  app             Launch the Desktop app (opens the app installer if missing)\n-  completion      Generate shell completion scripts\n-  update          Update Codex to the latest version\n-  doctor          Diagnose local Codex installation, config, auth, and runtime health\n-  sandbox         Run commands within a Codex-provided sandbox\n-  debug           Debugging tools\n-  apply           Apply the latest diff produced by Codex agent as a `git apply` to your local\n-                  working tree [aliases: a]\n-  resume          Resume a previous interactive session (picker by default; use --last to continue\n-                  the most recent)\n-  archive         Archive a saved session by id or session name\n-  delete          Permanently delete a saved session by id or session name\n-  unarchive       Unarchive a saved session by id or session name\n-  fork            Fork a previous interactive session (picker by default; use --last to fork the\n-                  most recent)\n-  cloud           [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n-  exec-server     [EXPERIMENTAL] Run the standalone exec-server service\n-  features        Inspect feature flags\n-  help            Print this message or the help of the given subcommand(s)\n+  exec              Run Codex non-interactively [aliases: e]\n+  review            Run a code review non-interactively\n+  login             Manage login\n+  logout            Remove stored authentication credentials\n+  mcp               Manage external MCP servers for Codex\n+  plugin            Manage Codex plugins\n+  mcp-server        Start Codex as an MCP server (stdio)\n+  app-server        [experimental] Run the app server or related tooling\n+  remote-control    [experimental] Manage the app-server daemon with remote control enabled\n+  app               Launch the Desktop app (opens the app installer if missing)\n+  completion        Generate shell completion scripts\n+  update            Update Codex to the latest version\n+  doctor            Diagnose local Codex installation, config, auth, and runtime health\n+  sandbox           Run commands within a Codex-provided sandbox\n+  debug             Debugging tools\n+  apply             Apply the latest diff produced by Codex agent as a `git apply` to your local\n+                    working tree [aliases: a]\n+  resume            Resume a previous interactive session (picker by default; use --last to continue\n+                    the most recent)\n+  archive           Archive a saved session by id or session name\n+  delete            Permanently delete a saved session by id or session name\n+  migrate-rollouts  Inspect or migrate legacy local sessions to paginated thread history\n+  unarchive         Unarchive a saved session by id or session name\n+  fork              Fork a previous interactive session (picker by default; use --last to fork the\n+                    most recent)\n+  cloud             [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally\n+  exec-server       [EXPERIMENTAL] Run the standalone exec-server service\n+  features          Inspect feature flags\n+  help              Print this message or the help of the given subcommand(s)\n \n Arguments:\n   [PROMPT]  Optional user prompt to start the session\n",
+      "stats": {
+        "added_chars": 1879,
+        "removed_chars": 1735
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app --help"
+      ],
+      "title": "Full help text of `app --help` changed (+104 −104 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,9 +9,6 @@\n           [default: .]\n \n Options:\n-      --download-url <DOWNLOAD_URL_OVERRIDE>\n-          Override the app installer download URL (advanced)\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -19,6 +16,9 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n+\n+      --download-url <DOWNLOAD_URL_OVERRIDE>\n+          Override the app installer download URL (advanced)\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 104,
+        "removed_chars": 104
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app -h"
+      ],
+      "title": "Full help text of `app -h` changed (+104 −104 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,12 +6,12 @@\n   [PATH]  Workspace path to open in the Desktop app [default: .]\n \n Options:\n-      --download-url <DOWNLOAD_URL_OVERRIDE>\n-          Override the app installer download URL (advanced)\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n+      --download-url <DOWNLOAD_URL_OVERRIDE>\n+          Override the app installer download URL (advanced)\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>\n",
+      "stats": {
+        "added_chars": 104,
+        "removed_chars": 104
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server --help"
+      ],
+      "title": "Full help text of `app-server --help` changed (+28 −31 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -24,7 +24,7 @@\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n-      --code-mode-host <WS_URL>\n+      --code-mode-host <URL>\n           Connect to a remote code-mode host instead of starting a local host\n \n       --strict-config\n",
+      "stats": {
+        "added_chars": 28,
+        "removed_chars": 31
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.app-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "app-server -h"
+      ],
+      "title": "Full help text of `app-server -h` changed (+28 −31 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -18,7 +18,7 @@\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n-      --code-mode-host <WS_URL>\n+      --code-mode-host <URL>\n           Connect to a remote code-mode host instead of starting a local host\n       --strict-config\n           Error out when config.toml contains fields that are not recognized by this version of\n",
+      "stats": {
+        "added_chars": 28,
+        "removed_chars": 31
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.archive --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "archive --help"
+      ],
+      "title": "Full help text of `archive --help` changed (+211 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,18 +12,18 @@\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -m, --model <MODEL>\n           Model the agent should use\n",
+      "stats": {
+        "added_chars": 211,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.archive -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "archive -h"
+      ],
+      "title": "Full help text of `archive -h` changed (+186 −186 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,15 +8,15 @@\n Options:\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-  -i, --image <FILE>...\n-          Optional image(s) to attach to the initial prompt\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+  -i, --image <FILE>...\n+          Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n",
+      "stats": {
+        "added_chars": 186,
+        "removed_chars": 186
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.delete --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "delete --help"
+      ],
+      "title": "Full help text of `delete --help` changed (+211 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,18 +12,18 @@\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -m, --model <MODEL>\n           Model the agent should use\n",
+      "stats": {
+        "added_chars": 211,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.delete -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "delete -h"
+      ],
+      "title": "Full help text of `delete -h` changed (+186 −186 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,15 +8,15 @@\n Options:\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-  -i, --image <FILE>...\n-          Optional image(s) to attach to the initial prompt\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+  -i, --image <FILE>...\n+          Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n",
+      "stats": {
+        "added_chars": 186,
+        "removed_chars": 186
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.doctor --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "doctor --help"
+      ],
+      "title": "Full help text of `doctor --help` changed (+165 −165 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,9 +3,6 @@\n Usage: codex doctor [OPTIONS]\n \n Options:\n-      --json\n-          Emit a redacted machine-readable report\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -14,14 +11,17 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --json\n+          Emit a redacted machine-readable report\n+\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+\n       --summary\n           Only show grouped check rows and the final count summary\n \n       --all\n           Expand long lists in detailed human output\n-\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.doctor -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "doctor -h"
+      ],
+      "title": "Full help text of `doctor -h` changed (+165 −165 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,14 +3,14 @@\n Usage: codex doctor [OPTIONS]\n \n Options:\n-      --json                Emit a redacted machine-readable report\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n+      --json                Emit a redacted machine-readable report\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --summary             Only show grouped check rows and the final count summary\n       --all                 Expand long lists in detailed human output\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --no-color            Disable ANSI color in human output\n       --ascii               Use ASCII status labels and separators in human output\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec --help"
+      ],
+      "title": "Full help text of `exec --help` changed (+165 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -5,6 +5,7 @@\n \n Commands:\n   resume  Resume a previous session by id or pick the most recent with --last\n+  fork    Fork a previous session by id into a new session\n   review  Run a code review against the current repository\n   help    Print this message or the help of the given subcommand(s)\n \n@@ -26,12 +27,12 @@\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n       --strict-config\n           Error out when config.toml contains fields that are not recognized by this version of\n           Codex\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec -h"
+      ],
+      "title": "Full help text of `exec -h` changed (+165 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -5,6 +5,7 @@\n \n Commands:\n   resume  Resume a previous session by id or pick the most recent with --last\n+  fork    Fork a previous session by id into a new session\n   review  Run a code review against the current repository\n   help    Print this message or the help of the given subcommand(s)\n \n@@ -20,11 +21,11 @@\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n       --strict-config\n           Error out when config.toml contains fields that are not recognized by this version of\n           Codex\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n",
+      "stats": {
+        "added_chars": 165,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server --help"
+      ],
+      "title": "Full help text of `exec-server --help` changed (+248 −248 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,10 +3,6 @@\n Usage: codex exec-server [OPTIONS]\n \n Options:\n-      --strict-config\n-          Error out when config.toml contains fields that are not recognized by this version of\n-          Codex\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -15,6 +11,10 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n+\n       --concurrent-requests <COUNT>\n           Maximum number of requests to process concurrently on each connection\n           \n@@ -23,11 +23,11 @@\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --listen <URL>\n-          Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n-\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --listen <URL>\n+          Transport endpoint URL. Supported values: `ws://IP:PORT` (default), `stdio`, `stdio://`\n \n       --remote <URL>\n           Register this exec-server as a remote environment using the given base URL\n",
+      "stats": {
+        "added_chars": 248,
+        "removed_chars": 248
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.exec-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "exec-server -h"
+      ],
+      "title": "Full help text of `exec-server -h` changed (+324 −324 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,21 +3,21 @@\n Usage: codex exec-server [OPTIONS]\n \n Options:\n-      --strict-config                Error out when config.toml contains fields that are not\n-                                     recognized by this version of Codex\n   -c, --config <key=value>           Override a configuration value that would otherwise be loaded\n                                      from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`)\n                                      to override nested values. The `value` portion is parsed as\n                                      TOML. If it fails to parse as TOML, the raw string is used as a\n                                      literal\n+      --strict-config                Error out when config.toml contains fields that are not\n+                                     recognized by this version of Codex\n       --concurrent-requests <COUNT>  Maximum number of requests to process concurrently on each\n                                      connection [default: 1]\n       --enable <FEATURE>             Enable a feature (repeatable). Equivalent to `-c\n                                      features.<name>=true`\n-      --listen <URL>                 Transport endpoint URL. Supported values: `ws://IP:PORT`\n-                                     (default), `stdio`, `stdio://`\n       --disable <FEATURE>            Disable a feature (repeatable). Equivalent to `-c\n                                      features.<name>=false`\n+      --listen <URL>                 Transport endpoint URL. Supported values: `ws://IP:PORT`\n+                                     (default), `stdio`, `stdio://`\n       --remote <URL>                 Register this exec-server as a remote environment using the\n                                      given base URL\n       --environment-id <ID>          Environment id to attach to when registering remotely\n",
+      "stats": {
+        "added_chars": 324,
+        "removed_chars": 324
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork --help"
+      ],
+      "title": "Full help text of `fork --help` changed (+268 −268 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,12 +11,6 @@\n           Optional user prompt to start the session\n \n Options:\n-      --last\n-          Fork the most recent session without showing the picker\n-\n-      --all\n-          Show all sessions (disables cwd filtering and shows CWD column)\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -25,16 +19,22 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --last\n+          Fork the most recent session without showing the picker\n+\n+      --all\n+          Show all sessions (disables cwd filtering and shows CWD column)\n+\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint.\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n",
+      "stats": {
+        "added_chars": 268,
+        "removed_chars": 268
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.fork -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "fork -h"
+      ],
+      "title": "Full help text of `fork -h` changed (+239 −239 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,20 +8,20 @@\n   [PROMPT]      Optional user prompt to start the session\n \n Options:\n-      --last\n-          Fork the most recent session without showing the picker\n-      --all\n-          Show all sessions (disables cwd filtering and shows CWD column)\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n+      --last\n+          Fork the most recent session without showing the picker\n+      --all\n+          Show all sessions (disables cwd filtering and shows CWD column)\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --remote <ADDR>\n-          Connect the TUI to a remote app server endpoint\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --remote <ADDR>\n+          Connect the TUI to a remote app server endpoint\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n",
+      "stats": {
+        "added_chars": 239,
+        "removed_chars": 239
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.login --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login --help"
+      ],
+      "title": "Full help text of `login --help` changed (+295 −295 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,9 +7,6 @@\n   help    Print this message or the help of the given subcommand(s)\n \n Options:\n-      --with-api-key\n-          Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`)\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -18,18 +15,21 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --with-access-token\n-          Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login\n-          --with-access-token`)\n+      --with-api-key\n+          Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`)\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --device-auth\n-          \n+      --with-access-token\n+          Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login\n+          --with-access-token`)\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --device-auth\n+          \n \n   -h, --help\n           Print help (see a summary with '-h')\n",
+      "stats": {
+        "added_chars": 295,
+        "removed_chars": 295
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 482,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/main.rs#L482"
+          },
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 476,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/main.rs#L476"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+270 −270 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,16 +7,16 @@\n   help    Print this message or the help of the given subcommand(s)\n \n Options:\n-      --with-api-key        Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login\n-                            --with-api-key`)\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n+      --with-api-key        Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login\n+                            --with-api-key`)\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --with-access-token   Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN |\n                             codex login --with-access-token`)\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --device-auth         \n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --device-auth         \n   -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 270,
+        "removed_chars": 270
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/main.rs",
+            "line": 476,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/main.rs#L476"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server --help"
+      ],
+      "title": "Full help text of `mcp-server --help` changed (+131 −131 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,10 +3,6 @@\n Usage: codex mcp-server [OPTIONS]\n \n Options:\n-      --strict-config\n-          Error out when config.toml contains fields that are not recognized by this version of\n-          Codex\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -14,6 +10,10 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n+\n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 131,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.mcp-server -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp-server -h"
+      ],
+      "title": "Full help text of `mcp-server -h` changed (+146 −146 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,12 +3,12 @@\n Usage: codex mcp-server [OPTIONS]\n \n Options:\n-      --strict-config       Error out when config.toml contains fields that are not recognized by\n-                            this version of Codex\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n+      --strict-config       Error out when config.toml contains fields that are not recognized by\n+                            this version of Codex\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 146,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.migrate-rollouts --help",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "migrate-rollouts --help"
+      ],
+      "title": "Full help text of `migrate-rollouts --help` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Inspect or migrate legacy local sessions to paginated thread history\n\nUsage: codex migrate-rollouts [OPTIONS]\n\nOptions:\n      --apply\n          Publish the migration. Without this flag the command only reports eligible sessions\n\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --thread <THREAD_ID>\n          Restrict inspection or migration to one or more thread IDs\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n      --max-mib-per-second <MIB>\n          Limit aggregate rollout read and write throughput, in MiB per second\n\n      --json\n          Emit the complete per-thread report as JSON\n\n      --verbose\n          Print one line for every inspected rollout\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.migrate-rollouts -h",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "help",
+        "migrate-rollouts -h"
+      ],
+      "title": "Full help text of `migrate-rollouts -h` added",
+      "impact": "informational",
+      "before": null,
+      "after": "Inspect or migrate legacy local sessions to paginated thread history\n\nUsage: codex migrate-rollouts [OPTIONS]\n\nOptions:\n      --apply                     Publish the migration. Without this flag the command only reports\n                                  eligible sessions\n  -c, --config <key=value>        Override a configuration value that would otherwise be loaded from\n                                  `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to\n                                  override nested values. The `value` portion is parsed as TOML. If\n                                  it fails to parse as TOML, the raw string is used as a literal\n      --enable <FEATURE>          Enable a feature (repeatable). Equivalent to `-c\n                                  features.<name>=true`\n      --thread <THREAD_ID>        Restrict inspection or migration to one or more thread IDs\n      --disable <FEATURE>         Disable a feature (repeatable). Equivalent to `-c\n                                  features.<name>=false`\n      --max-mib-per-second <MIB>  Limit aggregate rollout read and write throughput, in MiB per\n                                  second\n      --json                      Emit the complete per-thread report as JSON\n      --verbose                   Print one line for every inspected rollout\n  -h, --help                      Print help (see more with '--help')\n",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.remote-control --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control --help"
+      ],
+      "title": "Full help text of `remote-control --help` changed (+48 −48 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,9 +9,6 @@\n   help   Print this message or the help of the given subcommand(s)\n \n Options:\n-      --json\n-          Emit machine-readable JSON\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -19,6 +16,9 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n+\n+      --json\n+          Emit machine-readable JSON\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 48,
+        "removed_chars": 48
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.remote-control -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "remote-control -h"
+      ],
+      "title": "Full help text of `remote-control -h` changed (+54 −54 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -9,11 +9,11 @@\n   help   Print this message or the help of the given subcommand(s)\n \n Options:\n-      --json                Emit machine-readable JSON\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n+      --json                Emit machine-readable JSON\n       --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n   -h, --help                Print help (see more with '--help')\n",
+      "stats": {
+        "added_chars": 54,
+        "removed_chars": 54
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume --help"
+      ],
+      "title": "Full help text of `resume --help` changed (+280 −280 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,12 +11,6 @@\n           Optional user prompt to start the session\n \n Options:\n-      --last\n-          Continue the most recent session without showing the picker\n-\n-      --all\n-          Show all sessions (disables cwd filtering and shows CWD column)\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -25,14 +19,20 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --last\n+          Continue the most recent session without showing the picker\n+\n+      --all\n+          Show all sessions (disables cwd filtering and shows CWD column)\n+\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --include-non-interactive\n-          Include non-interactive sessions in the resume picker and --last selection\n-\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --include-non-interactive\n+          Include non-interactive sessions in the resume picker and --last selection\n \n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint.\n",
+      "stats": {
+        "added_chars": 280,
+        "removed_chars": 280
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.resume -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "resume -h"
+      ],
+      "title": "Full help text of `resume -h` changed (+280 −280 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,20 +8,20 @@\n   [PROMPT]      Optional user prompt to start the session\n \n Options:\n-      --last\n-          Continue the most recent session without showing the picker\n-      --all\n-          Show all sessions (disables cwd filtering and shows CWD column)\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n+      --last\n+          Continue the most recent session without showing the picker\n+      --all\n+          Show all sessions (disables cwd filtering and shows CWD column)\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --include-non-interactive\n-          Include non-interactive sessions in the resume picker and --last selection\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --include-non-interactive\n+          Include non-interactive sessions in the resume picker and --last selection\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n       --remote-auth-token-env <ENV_VAR>\n",
+      "stats": {
+        "added_chars": 280,
+        "removed_chars": 280
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.review --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "review --help"
+      ],
+      "title": "Full help text of `review --help` changed (+342 −342 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,10 +7,6 @@\n           Custom review instructions. If `-` is used, read from stdin\n \n Options:\n-      --strict-config\n-          Error out when config.toml contains fields that are not recognized by this version of\n-          Codex\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -19,20 +15,24 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n+      --strict-config\n+          Error out when config.toml contains fields that are not recognized by this version of\n+          Codex\n+\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+\n       --uncommitted\n           Review staged, unstaged, and untracked changes\n \n       --base <BRANCH>\n           Review changes against the given base branch\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n       --commit <SHA>\n           Review the changes introduced by a commit\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n       --title <TITLE>\n           Optional commit title to display in the review summary\n",
+      "stats": {
+        "added_chars": 342,
+        "removed_chars": 342
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.review -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "review -h"
+      ],
+      "title": "Full help text of `review -h` changed (+313 −313 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,17 +6,17 @@\n   [PROMPT]  Custom review instructions. If `-` is used, read from stdin\n \n Options:\n-      --strict-config       Error out when config.toml contains fields that are not recognized by\n-                            this version of Codex\n   -c, --config <key=value>  Override a configuration value that would otherwise be loaded from\n                             `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override\n                             nested values. The `value` portion is parsed as TOML. If it fails to\n                             parse as TOML, the raw string is used as a literal\n+      --strict-config       Error out when config.toml contains fields that are not recognized by\n+                            this version of Codex\n+      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --uncommitted         Review staged, unstaged, and untracked changes\n       --base <BRANCH>       Review changes against the given base branch\n-      --enable <FEATURE>    Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --commit <SHA>        Review the changes introduced by a commit\n       --disable <FEATURE>   Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --commit <SHA>        Review the changes introduced by a commit\n       --title <TITLE>       Optional commit title to display in the review summary\n   -h, --help                Print help (see more with '--help')\n \n",
+      "stats": {
+        "added_chars": 313,
+        "removed_chars": 313
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox --help"
+      ],
+      "title": "Full help text of `sandbox --help` changed (+360 −360 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,9 +7,6 @@\n           Full command args to run under seatbelt\n \n Options:\n-      --sandbox-state-json <JSON>\n-          JSON value from `codex/sandbox-state-meta` to apply directly\n-\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n@@ -18,17 +15,20 @@\n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n \n-      --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n-          Add a readable root to the supplied sandbox state. Repeat for multiple roots\n+      --sandbox-state-json <JSON>\n+          JSON value from `codex/sandbox-state-meta` to apply directly\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n \n-      --sandbox-state-disable-network\n-          Disable direct network access in the supplied sandbox state\n+      --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n+          Add a readable root to the supplied sandbox state. Repeat for multiple roots\n \n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+\n+      --sandbox-state-disable-network\n+          Disable direct network access in the supplied sandbox state\n \n   -P, --permission-profile <NAME>\n           Named permissions profile to apply from the active configuration stack\n",
+      "stats": {
+        "added_chars": 360,
+        "removed_chars": 360
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.sandbox -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "sandbox -h"
+      ],
+      "title": "Full help text of `sandbox -h` changed (+360 −360 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,20 +6,20 @@\n   [COMMAND]...  Full command args to run under seatbelt\n \n Options:\n-      --sandbox-state-json <JSON>\n-          JSON value from `codex/sandbox-state-meta` to apply directly\n   -c, --config <key=value>\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n-      --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n-          Add a readable root to the supplied sandbox state. Repeat for multiple roots\n+      --sandbox-state-json <JSON>\n+          JSON value from `codex/sandbox-state-meta` to apply directly\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-      --sandbox-state-disable-network\n-          Disable direct network access in the supplied sandbox state\n+      --sandbox-state-readable-root <SANDBOX_STATE_READABLE_ROOT>\n+          Add a readable root to the supplied sandbox state. Repeat for multiple roots\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+      --sandbox-state-disable-network\n+          Disable direct network access in the supplied sandbox state\n   -P, --permission-profile <NAME>\n           Named permissions profile to apply from the active configuration stack\n   -p, --profile <CONFIG_PROFILE>\n",
+      "stats": {
+        "added_chars": 360,
+        "removed_chars": 360
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.unarchive --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "unarchive --help"
+      ],
+      "title": "Full help text of `unarchive --help` changed (+211 −211 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -12,18 +12,18 @@\n           \n           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.\n \n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n \n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n+      --disable <FEATURE>\n+          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -i, --image <FILE>...\n           Optional image(s) to attach to the initial prompt\n-\n-      --disable <FEATURE>\n-          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n \n   -m, --model <MODEL>\n           Model the agent should use\n",
+      "stats": {
+        "added_chars": 211,
+        "removed_chars": 211
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.unarchive -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "unarchive -h"
+      ],
+      "title": "Full help text of `unarchive -h` changed (+186 −186 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,15 +8,15 @@\n Options:\n       --remote <ADDR>\n           Connect the TUI to a remote app server endpoint\n+      --enable <FEATURE>\n+          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote-auth-token-env <ENV_VAR>\n           Name of the environment variable containing the bearer token to send to a remote app\n           server websocket\n-      --enable <FEATURE>\n-          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n-  -i, --image <FILE>...\n-          Optional image(s) to attach to the initial prompt\n       --disable <FEATURE>\n           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n+  -i, --image <FILE>...\n+          Optional image(s) to attach to the initial prompt\n   -m, --model <MODEL>\n           Model the agent should use\n       --oss\n",
+      "stats": {
+        "added_chars": 186,
+        "removed_chars": 186
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.debug",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "debug"
+      ],
+      "title": "Setting no longer read: debug",
+      "impact": "notable",
+      "before": {
+        "description": "Debugging and reproducibility settings.",
+        "type": "object"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/bin/logs_client.rs",
+            "line": 370,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/bin/logs_client.rs#L370"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 906,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/cli/src/doctor.rs#L906"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.debug.config_lockfile",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile"
+      ],
+      "title": "Setting no longer read: debug.config_lockfile",
+      "impact": "notable",
+      "before": {
+        "type": "object"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.debug.config_lockfile.allow_codex_version_mismatch",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.allow_codex_version_mismatch"
+      ],
+      "title": "Setting no longer read: debug.config_lockfile.allow_codex_version_mismatch",
+      "impact": "notable",
+      "before": {
+        "description": "Allow replaying a lock generated by a different Codex version.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.export_dir",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.export_dir"
+      ],
+      "title": "Setting no longer read: debug.config_lockfile.export_dir",
+      "impact": "notable",
+      "before": {
+        "description": "Directory where Codex writes effective session config lock files.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.load_path",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.load_path"
+      ],
+      "title": "Setting no longer read: debug.config_lockfile.load_path",
+      "impact": "notable",
+      "before": {
+        "description": "Lockfile to replay as the authoritative effective config.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.debug.config_lockfile.save_fields_resolved_from_model_catalog",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "debug.config_lockfile.save_fields_resolved_from_model_catalog"
+      ],
+      "title": "Setting no longer read: debug.config_lockfile.save_fields_resolved_from_model_catalog",
+      "impact": "notable",
+      "before": {
+        "description": "Save fields resolved from the model catalog/session configuration.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.apply_patch_preserve_line_endings",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.apply_patch_preserve_line_endings"
+      ],
+      "title": "New setting: features.apply_patch_preserve_line_endings",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1007,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1007"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.background_paginated_rollout_migration",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.background_paginated_rollout_migration"
+      ],
+      "title": "New setting: features.background_paginated_rollout_migration",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 983,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L983"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.code_mode.default_exec_yield_time_ms",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode.default_exec_yield_time_ms"
+      ],
+      "title": "New setting: features.code_mode.default_exec_yield_time_ms",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Default yield timeout for code-mode exec calls, in milliseconds.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/handlers/unified_exec.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/tools/handlers/unified_exec.rs#L36"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.code_mode_interrupt",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_interrupt"
+      ],
+      "title": "New setting: features.code_mode_interrupt",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 899,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L899"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardian_enhanced_node_repl_transcripts",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardian_enhanced_node_repl_transcripts"
+      ],
+      "title": "New setting: features.guardian_enhanced_node_repl_transcripts",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1353,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1353"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardian_node_repl_transcript_images",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardian_node_repl_transcript_images"
+      ],
+      "title": "New setting: features.guardian_node_repl_transcript_images",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1359,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1359"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardian_reuse_parent_compaction",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardian_reuse_parent_compaction"
+      ],
+      "title": "New setting: features.guardian_reuse_parent_compaction",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1347,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1347"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.type",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2",
+        "type"
+      ],
+      "title": "Type of features.guardianv2: boolean → boolean|object",
+      "impact": "notable",
+      "before": "boolean",
+      "after": "boolean|object",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 39,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L39"
+          },
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1365,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1365"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript.max_message_entry_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript.max_message_entry_tokens"
+      ],
+      "title": "New setting: features.guardianv2.transcript.max_message_entry_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 75,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L75"
+          },
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 96,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L96"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript.max_message_transcript_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript.max_message_transcript_tokens"
+      ],
+      "title": "New setting: features.guardianv2.transcript.max_message_transcript_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 85,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L85"
+          },
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 97,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L97"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript.max_recent_non_user_entries",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript.max_recent_non_user_entries"
+      ],
+      "title": "New setting: features.guardianv2.transcript.max_recent_non_user_entries",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript.max_tool_entry_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript.max_tool_entry_tokens"
+      ],
+      "title": "New setting: features.guardianv2.transcript.max_tool_entry_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 80,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L80"
+          },
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L102"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript.max_tool_transcript_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript.max_tool_transcript_tokens"
+      ],
+      "title": "New setting: features.guardianv2.transcript.max_tool_transcript_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 90,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L90"
+          },
+          {
+            "path": "codex-rs/ext/guardian-v2/src/config.rs",
+            "line": 103,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/ext/guardian-v2/src/config.rs#L103"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv2.transcript.sources",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv2.transcript.sources"
+      ],
+      "title": "New setting: features.guardianv2.transcript.sources",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.psp",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.psp"
+      ],
+      "title": "New setting: features.psp",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1125,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1125"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.retain_client_developer_messages",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.retain_client_developer_messages"
+      ],
+      "title": "New setting: features.retain_client_developer_messages",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1497,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1497"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.token_budget.mode",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "features.token_budget.mode"
+      ],
+      "title": "Setting no longer read: features.token_budget.mode",
+      "impact": "notable",
+      "before": {
+        "description": "Select whether context-window metadata identifies the thread or agent name.",
+        "enum": [
+          "thread",
+          "name"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-protocol/src/export.rs",
+            "line": 1876,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/export.rs#L1876"
+          },
+          {
+            "path": "codex-rs/app-server-protocol/src/protocol/v2/mcp.rs",
+            "line": 662,
+            "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/app-server-protocol/src/protocol/v2/mcp.rs#L662"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.tool_registry.turn_metadata_includes_tool_info",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.tool_registry.turn_metadata_includes_tool_info"
+      ],
+      "title": "New setting: features.tool_registry.turn_metadata_includes_tool_info",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Include authoritative tool information in per-turn request metadata.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.unbounded_connection_retries",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.unbounded_connection_retries"
+      ],
+      "title": "New setting: features.unbounded_connection_retries",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1073,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1073"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.unified_image_budget",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.unified_image_budget"
+      ],
+      "title": "New setting: features.unified_image_budget",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1275,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1275"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.goals",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "goals"
+      ],
+      "title": "New setting: goals",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Goal-related settings.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1371,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/features/src/lib.rs#L1371"
+          },
+          {
+            "path": "codex-rs/state/src/telemetry.rs",
+            "line": 53,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/state/src/telemetry.rs#L53"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.goals.max_goal_token_budget",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "goals.max_goal_token_budget"
+      ],
+      "title": "New setting: goals.max_goal_token_budget",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum token budget allowed for a goal and default budget for new goals.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].input"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].server"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PermissionRequest[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PermissionRequest[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.PermissionRequest[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].input"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].server"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostCompact[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostCompact[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.PostCompact[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].input"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].server"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PostToolUse[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PostToolUse[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.PostToolUse[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].input"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].server"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PreCompact[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreCompact[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.PreCompact[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].input"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].server"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.PreToolUse[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.PreToolUse[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.PreToolUse[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionEnd[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionEnd[].hooks[].input"
+      ],
+      "title": "New setting: hooks.SessionEnd[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionEnd[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionEnd[].hooks[].server"
+      ],
+      "title": "New setting: hooks.SessionEnd[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SessionEnd[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionEnd[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.SessionEnd[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].input"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].server"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SessionStart[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SessionStart[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.SessionStart[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].input"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].server"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.Stop[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.Stop[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.Stop[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].input"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].server"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStart[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStart[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.SubagentStart[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].input"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].server"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.SubagentStop[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.SubagentStop[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.SubagentStop[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].input",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].input"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].input",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "default": {},
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-protocol/src/description.rs",
+            "line": 411,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-protocol/src/description.rs#L411"
+          },
+          {
+            "path": "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].server",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].server"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].server",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/app_server_tracing.rs",
+            "line": 102,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/app-server/src/app_server_tracing.rs#L102"
+          },
+          {
+            "path": "codex-rs/core/src/context_manager/normalize.rs",
+            "line": 197,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/context_manager/normalize.rs#L197"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.hooks.UserPromptSubmit[].hooks[].tool",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "hooks.UserPromptSubmit[].hooks[].tool"
+      ],
+      "title": "New setting: hooks.UserPromptSubmit[].hooks[].tool",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs",
+            "line": 91,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/callbacks.rs#L91"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/cell_actor/mod.rs",
+            "line": 492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/code-mode-runtime/src/cell_actor/mod.rs#L492"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.http_headers_helper",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.http_headers_helper"
+      ],
+      "title": "New setting: mcp_servers.<name>.http_headers_helper",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 694,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/mcp_cmd.rs#L694"
+          },
+          {
+            "path": "codex-rs/cli/src/mcp_cmd.rs",
+            "line": 932,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/cli/src/mcp_cmd.rs#L932"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.mcp_servers.<name>.oauth.callback_port",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "mcp_servers.<name>.oauth.callback_port"
+      ],
+      "title": "New setting: mcp_servers.<name>.oauth.callback_port",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Fixed callback port that takes precedence over Codex's global OAuth callback port.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/plugin_config.rs",
+            "line": 271,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/codex-mcp/src/plugin_config.rs#L271"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit/document_helpers.rs",
+            "line": 159,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/core/src/config/edit/document_helpers.rs#L159"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.project_doc_max_bytes.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "project_doc_max_bytes",
+        "description"
+      ],
+      "title": "project_doc_max_bytes description changed (+84 −70 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum number of bytes to include from an AGENTS.md project doc file.\n+Maximum total bytes of project instruction content across all selected environments.\n",
+      "stats": {
+        "added_chars": 84,
+        "removed_chars": 70
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.responses_api_metadata",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "responses_api_metadata"
+      ],
+      "title": "New setting: responses_api_metadata",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Bounded, product-owned metadata attached to every Responses API request.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 74,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/config/src/loader/mod.rs#L74"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.responses_api_metadata.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "responses_api_metadata.<name>"
+      ],
+      "title": "New setting: responses_api_metadata.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 74,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/config/src/loader/mod.rs#L74"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CODEX_APP_SERVER_CHATGPT_BASE_URL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CODEX_APP_SERVER_CHATGPT_BASE_URL"
+      ],
+      "title": "New environment variable: CODEX_APP_SERVER_CHATGPT_BASE_URL",
+      "impact": "informational",
+      "before": null,
+      "after": "CODEX_APP_SERVER_CHATGPT_BASE_URL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/connectors/src/lib.rs",
+            "line": 483,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/connectors/src/lib.rs#L483"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.OPENAI_FEDERATION_RULE_ID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OPENAI_FEDERATION_RULE_ID"
+      ],
+      "title": "New environment variable: OPENAI_FEDERATION_RULE_ID",
+      "impact": "informational",
+      "before": null,
+      "after": "OPENAI_FEDERATION_RULE_ID",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/protocol/src/shell_environment.rs#L8"
+          },
+          {
+            "path": "codex-rs/login/src/auth/workload_identity.rs",
+            "line": 148,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/login/src/auth/workload_identity.rs#L148"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.OPENAI_IDENTITY_TOKEN_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OPENAI_IDENTITY_TOKEN_FILE"
+      ],
+      "title": "New environment variable: OPENAI_IDENTITY_TOKEN_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "OPENAI_IDENTITY_TOKEN_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 9,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/protocol/src/shell_environment.rs#L9"
+          },
+          {
+            "path": "codex-rs/login/src/auth/workload_identity.rs",
+            "line": 152,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/login/src/auth/workload_identity.rs#L152"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.OPENAI_WORKLOAD_IDENTITY_CONTEXT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OPENAI_WORKLOAD_IDENTITY_CONTEXT"
+      ],
+      "title": "New environment variable: OPENAI_WORKLOAD_IDENTITY_CONTEXT",
+      "impact": "informational",
+      "before": null,
+      "after": "OPENAI_WORKLOAD_IDENTITY_CONTEXT",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/protocol/src/shell_environment.rs",
+            "line": 10,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/protocol/src/shell_environment.rs#L10"
+          },
+          {
+            "path": "codex-rs/login/src/auth/workload_identity.rs",
+            "line": 156,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/login/src/auth/workload_identity.rs#L156"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.STABLE_GIT_COMMIT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "STABLE_GIT_COMMIT"
+      ],
+      "title": "New environment variable: STABLE_GIT_COMMIT",
+      "impact": "informational",
+      "before": null,
+      "after": "STABLE_GIT_COMMIT",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/build-info/src/lib.rs",
+            "line": 20,
+            "url": "https://github.com/openai/codex/blob/rust-v0.148.0/codex-rs/build-info/src/lib.rs#L20"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    }
+  ]
+}
