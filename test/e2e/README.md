@@ -276,11 +276,16 @@ each line has a green or red mark. For each harness's newest build it gives:
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
 
-For a harness whose source is public (Codex, `sources` in `compatgen/source.go`; one line
-adds another), `-source` links each of these to the lines of the build's source that name
-it, read from its release tag's tarball, and a new build's headline links the comparison
-of the two tags. Tests, test modules and comments (to the end of a line, or a block) are not
-the build's source. A key is
+For a harness whose source is public (Codex, Gemini CLI, OpenCode, Pi, omp, dsh, T3 Code
+and Hermes: `Sources` in `sourcelink/sourcelink.go`, one line each, with its tag, the folders
+that ship and the language its files are read in, Rust, TypeScript or Python), `-source`
+links each of these to the lines of the build's source that name it, read from its release
+tag's tarball, and a new build's headline links the comparison of the two tags. Tests, test
+modules, comments and documentation are not the build's source. `sourcelink` is a package
+of its own so the harness reference's generator can link what it finds too: any name the
+source quotes (`Find`), and a passage of a prompt or a tool's description wherever the tree
+keeps it, a Markdown file or a template literal (`FindText`); `TERMA_SOURCELINK_LIVE=1 go
+test ./sourcelink/ -v` reads a release of each harness and says what it found. A key is
 linked beside its surface's name (or the constant that holds it): a line that names a key
 belongs to the surface named nearest it in the same function, of all the harness is known to
 send, so a generic key leads to its own metric or event, not to every line that says it nor
