@@ -194,15 +194,7 @@ func TestCodexProfileEgress(t *testing.T) {
 
 // codexProfileArgs are TestCodexProfile's: the fixture provider and plugins off, nothing else.
 func codexProfileArgs(b Binary, sb *Sandbox, provider string) []string {
-	// A flag an older build does not have would end its run before its first request: each
-	// is passed where the build's own help lists it.
-	args := []string{"exec", "--json"}
-	help := codexExecHelp(b, sb.codexEnv(RouteAPIKey))
-	for _, flag := range []string{"--skip-git-repo-check", "--dangerously-bypass-hook-trust"} {
-		if strings.Contains(help, flag) {
-			args = append(args, flag)
-		}
-	}
+	args := append([]string{"exec", "--json"}, codexOptionalFlags(sb)...)
 	return append(args, "-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`,
 		"-c", "features.plugins=false", "-c", "features.remote_plugin=false",
 		"-c", `model_provider="telemetry_fixture"`, "-c", `model_providers.telemetry_fixture.name="Telemetry fixture"`,

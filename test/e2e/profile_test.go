@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http/httptest"
 	"os/exec"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -103,4 +105,29 @@ func codexExecHelp(b Binary, env []string) string {
 	cmd.Env = env
 	out, _ := cmd.CombinedOutput()
 	return string(out)
+}
+
+var (
+	codexFlagsMu sync.Mutex
+	codexFlags   = map[string][]string{}
+)
+
+// codexOptionalFlags are the flags the scenarios pass a `codex exec` that an older build may
+// not have, those sb's build lists in its help: one it does not know would end its run before
+// its first request.
+func codexOptionalFlags(sb *Sandbox) []string {
+	codexFlagsMu.Lock()
+	defer codexFlagsMu.Unlock()
+	if flags, ok := codexFlags[sb.Codex.Path]; ok {
+		return flags
+	}
+	help := codexExecHelp(sb.Codex, sb.codexEnv(RouteAPIKey))
+	flags := []string{}
+	for _, flag := range []string{"--skip-git-repo-check", "--dangerously-bypass-hook-trust"} {
+		if strings.Contains(help, flag) {
+			flags = append(flags, flag)
+		}
+	}
+	codexFlags[sb.Codex.Path] = flags
+	return flags
 }

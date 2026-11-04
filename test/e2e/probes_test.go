@@ -567,12 +567,12 @@ func serveCodex(t *testing.T, b Binary, h http.Handler) []string {
 
 // codexExecArgs is TestCodexProfile's `codex exec` with config, the prompt left out.
 func codexExecArgs(sb *Sandbox, config []string) []string {
-	return append([]string{"exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust", "-C", sb.workDir()}, config...)
+	return append(append(append([]string{"exec", "--json"}, codexOptionalFlags(sb)...), "-C", sb.workDir()), config...)
 }
 
 // codexResumeArgs resumes thread with config, the prompt left out.
-func codexResumeArgs(config []string, thread string) []string {
-	return append(append([]string{"exec", "resume", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust"}, config...), thread)
+func codexResumeArgs(sb *Sandbox, config []string, thread string) []string {
+	return append(append(append([]string{"exec", "resume", "--json"}, codexOptionalFlags(sb)...), config...), thread)
 }
 
 // codexRun runs Codex with args and prompt in sb, bounded by probeTimeout, and returns the
@@ -660,7 +660,7 @@ func TestCodexProbeAcrossTurns(t *testing.T) {
 		for turn := 2; turn <= 3; turn++ {
 			prompt := fmt.Sprintf("Say hello again (%d). TERMA_PROFILE", turn)
 			Placeholder(t, b, prompt, fmt.Sprintf("<prompt-%d>", turn))
-			resume := codexResumeArgs(config, thread)
+			resume := codexResumeArgs(sb, config, thread)
 			commands = append(commands, append([]string{"codex"}, resume...))
 			if _, _, _, err := codexRun(sb, resume, prompt); err != nil {
 				t.Fatalf("turn %d: %v", turn, err)
@@ -698,7 +698,7 @@ func TestCodexProbeCompaction(t *testing.T) {
 		full.Store(false)
 		const next = "Say hello once more. TERMA_PROFILE"
 		Placeholder(t, b, next, "<prompt-2>")
-		if _, _, _, err := codexRun(sb, codexResumeArgs(config, thread), next); err != nil {
+		if _, _, _, err := codexRun(sb, codexResumeArgs(sb, config, thread), next); err != nil {
 			t.Fatal(err)
 		}
 		RecordProbe(t, b, "compaction", map[string]any{"trigger": "auto", "reported_input_tokens": compactionTokens})
@@ -836,7 +836,7 @@ func codexReply() map[string]any {
 func TestCodexProbeSandbox(t *testing.T) {
 	codexProbe(t, []string{"sandbox"}, func(t *testing.T, b Binary, sb *Sandbox) {
 		config := serveCodex(t, b, CaptureProbe(t, b, "sandbox", codexProbeProvider(new(atomic.Int32), nil, nil)))
-		args := append([]string{"exec", "--skip-git-repo-check", "--dangerously-bypass-hook-trust", "-C", sb.workDir()}, config...)
+		args := append(append(append([]string{"exec"}, codexOptionalFlags(sb)...), "-C", sb.workDir()), config...)
 		RecordCommand(t, b, args)
 		Placeholder(t, b, profilePrompt, "<prompt>")
 		_, stdout, stderr, err := codexRun(sb, args, profilePrompt)
