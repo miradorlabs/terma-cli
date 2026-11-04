@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
@@ -74,7 +77,8 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cred.OrganizationID,
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName)}, nil
 		},
-		Keys: app.storedKeys,
+		Keys:          app.storedKeys,
+		RelayRefusals: relayRefusals,
 		Environ: func(pid int) ([]string, bool) {
 			if !procinfo.Alive(pid) {
 				return nil, false
@@ -119,6 +123,32 @@ func (app *App) relayFacts() doctor.Relay {
 		r.ServiceInstalled, r.ServiceCurrent = state.Installed, state.Current
 	}
 	return r
+}
+
+// relayRefusals reads the running relay's counters from its /stats, with its token.
+func relayRefusals(ctx context.Context, r doctor.Relay) (doctor.Refusals, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+r.Addr+"/stats", nil)
+	if err != nil {
+		return doctor.Refusals{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+r.Token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return doctor.Refusals{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return doctor.Refusals{}, errors.New("the relay answered " + resp.Status)
+	}
+	var snap relay.Snapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snap); err != nil {
+		return doctor.Refusals{}, err
+	}
+	return doctor.Refusals{Unauthorized: snap.Counters["refused_unauthorized"],
+		Unreadable: snap.Counters["refused_unreadable"] + snap.Counters["refused_undecodable"],
+		Since:      snap.Since, At: snap.RefusedAt}, nil
 }
 
 // storedKeys are the delivery keys in this machine's keystore, masked.

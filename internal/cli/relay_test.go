@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -243,6 +244,10 @@ func TestRelayRunRecordsItsEnvironment(t *testing.T) {
 	}
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "prod", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "dev environment") {
 		t.Fatalf("a relay in another environment passed doctor: %+v", c)
+	}
+	// Doctor reads the running relay's counters with its token.
+	if r, err := relayRefusals(context.Background(), testApp.relayFacts()); err != nil || r.Since.IsZero() || r.Unauthorized != 0 || !r.At.IsZero() {
+		t.Fatalf("relayRefusals = %+v, %v; want a relay that has refused nothing", r, err)
 	}
 	if err := <-done; err != nil {
 		t.Fatalf("relay run: %v", err)
