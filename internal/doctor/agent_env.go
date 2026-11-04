@@ -14,12 +14,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// exporterEndpoints are the OpenTelemetry SDK's endpoint variables, the generic one first.
-var exporterEndpoints = []string{harness.EnvOTLPEndpoint,
-	"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"}
+// exporterSignal is one signal's exporter variables and its route on the relay.
+type exporterSignal struct{ endpoint, headers, protocol, route string }
 
-// signalPaths are what an exporter appends to the generic endpoint, one per signal.
-var signalPaths = []string{"/v1/logs", "/v1/traces", "/v1/metrics"}
+// exporterSignals are the OpenTelemetry SDK's per-signal exporter variables and the route of
+// each signal on the relay. The SDK appends the route to the generic endpoint, and sends to a
+// per-signal endpoint as it is.
+var exporterSignals = []exporterSignal{
+	{"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "OTEL_EXPORTER_OTLP_LOGS_HEADERS", "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", "/v1/logs"},
+	{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "/v1/traces"},
+	{"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_HEADERS", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL", "/v1/metrics"},
+}
 
 // envFix says where an agent's environment comes from and that it is read only at startup.
 const envFix = "remove those variables where they are set: the process that started the agent " +
@@ -99,32 +104,96 @@ func exporterEnvFindings(env []string, addr, token string) string {
 		}
 	}
 	var out []string
-	for _, key := range exporterEndpoints {
-		if v, ok := vars[key]; ok && !relayEndpoint(v, addr) {
+	endpoints := []string{harness.EnvOTLPEndpoint}
+	protocols := []string{harness.EnvOTLPProtocol}
+	for _, s := range exporterSignals {
+		endpoints = append(endpoints, s.endpoint)
+		protocols = append(protocols, s.protocol)
+	}
+	for i, key := range endpoints {
+		v, set := vars[key]
+		path, relay := relayPath(v, addr)
+		route := ""
+		if i > 0 {
+			route = exporterSignals[i-1].route
+		}
+		switch {
+		case !set:
+		case !relay:
 			out = append(out, key+" sends elsewhere than the local relay")
+		case !relayRoute(path, route, token) && (i > 0 || !signalPath(v)):
+			out = append(out, key+" names a path the local relay does not serve")
 		}
 	}
-	generic := vars[harness.EnvOTLPEndpoint]
-	if u, err := url.Parse(generic); generic != "" && err == nil {
-		path := strings.TrimRight(u.Path, "/")
-		if slices.ContainsFunc(signalPaths, func(s string) bool { return strings.HasSuffix(path, s) }) {
-			out = append(out, harness.EnvOTLPEndpoint+" ends in a signal path the exporter appends again")
+	if signalPath(vars[harness.EnvOTLPEndpoint]) {
+		out = append(out, harness.EnvOTLPEndpoint+" ends in a signal path the exporter appends again")
+	}
+	for _, key := range protocols {
+		if strings.Contains(strings.ToLower(vars[key]), "grpc") {
+			out = append(out, key+" picks gRPC, which the local relay does not serve")
 		}
 	}
 	// A token leading an endpoint's path authorizes in place of the header.
-	onPath := slices.ContainsFunc(exporterEndpoints, func(key string) bool {
-		return relayEndpoint(vars[key], addr) && strings.Contains(vars[key], token)
+	onPath := slices.ContainsFunc(endpoints, func(key string) bool {
+		_, relay := relayPath(vars[key], addr)
+		return relay && strings.Contains(vars[key], token)
 	})
-	if h, ok := vars[harness.EnvOTLPHeaders]; ok && token != "" && !strings.Contains(h, token) && !onPath {
+	if token == "" || onPath {
+		return strings.Join(out, ", ")
+	}
+	if h, ok := vars[harness.EnvOTLPHeaders]; ok && !strings.Contains(h, token) {
 		out = append(out, harness.EnvOTLPHeaders+" lacks the relay's current token")
+	}
+	// A signal's headers merge over the generic ones: only an Authorization of their own replaces the token.
+	for _, s := range exporterSignals {
+		if h := vars[s.headers]; authorizes(h) && !strings.Contains(h, token) {
+			out = append(out, s.headers+" lacks the relay's current token")
+		}
 	}
 	return strings.Join(out, ", ")
 }
 
-// relayEndpoint reports whether raw is plain HTTP to the relay at addr.
-func relayEndpoint(raw, addr string) bool {
+// relayPath returns the path of raw when it is plain HTTP to the relay at addr.
+func relayPath(raw, addr string) (string, bool) {
 	u, err := url.Parse(strings.Trim(raw, `"'`))
-	return err == nil && addr != "" && u.Scheme == "http" && u.Host == addr
+	if err != nil || addr == "" || u.Scheme != "http" || u.Host != addr {
+		return "", false
+	}
+	return u.Path, true
+}
+
+// signalPath reports whether the URL raw ends in a signal's route.
+func signalPath(raw string) bool {
+	u, err := url.Parse(strings.Trim(raw, `"'`))
+	return raw != "" && err == nil && slices.ContainsFunc(exporterSignals, func(s exporterSignal) bool {
+		return strings.HasSuffix(strings.TrimRight(u.Path, "/"), s.route)
+	})
+}
+
+// relayRoute reports whether path is route on the relay, alone or after the relay's token;
+// with the token unknown, after any one segment. The generic endpoint's route is "".
+func relayRoute(path, route, token string) bool {
+	if route == "" {
+		path = strings.TrimRight(path, "/")
+	}
+	if path == route {
+		return true
+	}
+	first, rest, found := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	if found {
+		rest = "/" + rest
+	}
+	return first != "" && (token == "" || first == token) && rest == route
+}
+
+// authorizes reports whether an OTLP headers value sets an Authorization header.
+func authorizes(headers string) bool {
+	for pair := range strings.SplitSeq(headers, ",") {
+		if k, _, ok := strings.Cut(pair, "="); ok && strings.EqualFold(strings.TrimSpace(k), "authorization") {
+			return true
+		}
+	}
+	return false
 }
 
 func pidList(pids []int) string {
