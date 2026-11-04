@@ -2,7 +2,7 @@
 # Linux, a non-root user with an empty home, git, Node, and the agents from npm. terma
 # and the test binary are built for Linux on the host and mounted in, so the image is
 # rebuilt only when an agent version changes.
-FROM node:22-bookworm-slim
+FROM node:26-bookworm-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates procps \
