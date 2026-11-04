@@ -47,6 +47,9 @@ func diffConfig(a, b map[string]any, out *[]Change) {
 			if approx && strings.ContainsAny(k, ".[") && (!inA || !inB) {
 				continue
 			}
+			if (!inA || !inB) && (unobserved(a, k) || unobserved(b, k)) {
+				continue
+			}
 			if approx && inA && inB {
 				x, y = withoutType(x), withoutType(y)
 			}
@@ -67,7 +70,7 @@ func diffConfig(a, b map[string]any, out *[]Change) {
 	}
 	for _, k := range sortedKeys(union(a, b)) {
 		switch k {
-		case "source", "options", "env_source":
+		case "source", "options", "env_source", "unobserved":
 			continue
 		case "env_vars", "env_vars_uncertain":
 			if envA != envB {
@@ -359,4 +362,25 @@ func nonNilStrings(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// unobserved reports a setting a build's reading missed (config.unobserved): not observed
+// there, so neither removed nor added.
+func unobserved(cfg map[string]any, key string) bool {
+	top, _, _ := strings.Cut(key, ".")
+	top, _, _ = strings.Cut(top, "[")
+	list, _ := cfg["unobserved"].([]any)
+	for _, v := range list {
+		if v == top {
+			return true
+		}
+	}
+	if ss, ok := cfg["unobserved"].([]string); ok {
+		for _, v := range ss {
+			if v == top {
+				return true
+			}
+		}
+	}
+	return false
 }

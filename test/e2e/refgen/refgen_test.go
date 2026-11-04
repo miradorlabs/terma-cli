@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -590,5 +591,36 @@ func TestDocScope(t *testing.T) {
 	d := parseSettingsDoc(md)["remote.defaultEnvironmentId"]
 	if d == nil || d.Scope != "Any file" || d.ScopeNote != "For a self-hosted environment ID, user or managed settings only." {
 		t.Errorf("scope = %+v", d)
+	}
+}
+
+// A setting a minified reading missed on one build, though builds either side have it, is not
+// observed there: no removal and no addition between them.
+func TestUnobservedSettings(t *testing.T) {
+	src := "the settings schema its bundle declares (zod, read from minified code)"
+	snap := func(v string, keys ...string) *Snapshot {
+		o := map[string]any{}
+		for _, k := range keys {
+			o[k] = map[string]any{"description": k}
+		}
+		return &Snapshot{Harness: "claude", Version: v, Config: map[string]any{"source": src, "options": o}}
+	}
+	by := map[string]*Snapshot{"1": snap("1", "model", "autoMode"), "2": snap("2", "model"), "3": snap("3", "model", "autoMode", "quietHours"), "4": snap("4", "model", "autoMode")}
+	markUnobserved([]string{"1", "2", "3", "4"}, by)
+	if got := by["2"].Config["unobserved"]; !reflect.DeepEqual(got, []string{"autoMode"}) {
+		t.Errorf("unobserved in 2 = %v", got)
+	}
+	if by["4"].Config["unobserved"] != nil {
+		t.Errorf("the newest build's missing setting is a removal, not unobserved: %v", by["4"].Config["unobserved"])
+	}
+	if d := refdiff.New(by["1"], by["2"], nil, time.Now()); len(d.Changes) != 0 {
+		t.Errorf("a missed setting read as removed: %+v", d.Changes)
+	}
+	var ids []string
+	for _, c := range refdiff.New(by["3"], by["4"], nil, time.Now()).Changes {
+		ids = append(ids, c.ID)
+	}
+	if strings.Join(ids, " ") != "config.options.quietHours" {
+		t.Errorf("3..4 = %v", ids)
 	}
 }

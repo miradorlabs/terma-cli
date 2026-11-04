@@ -57,6 +57,11 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "hooks" && len(c.Path) == 3 && c.Path[1] == "events" && c.Op != "changed" {
 			continue
 		}
+		// A retry probe's status there in one build and not the other was cut short in one: not
+		// observed, not a change of the build.
+		if c.Path[0] == "behavior" && len(c.Path) == 4 && c.Path[1] == "retries" && c.Path[2] == "statuses" && c.Op != "changed" {
+			continue
+		}
 		// How many times an event fired, and where the session was when it did, are the run's.
 		if c.Path[0] == "hooks" && len(c.Path) == 4 && c.Path[1] == "events" && (c.Path[3] == "count" || c.Path[3] == "cwd") {
 			continue

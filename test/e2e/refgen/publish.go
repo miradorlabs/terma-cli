@@ -171,6 +171,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			dates = releaseDates(meta)
 		}
 
+		markUnobserved(versions, byVersion)
+
 		// The vendor's reference tonight goes with tonight's newest build that has its
 		// configuration captured; an older build keeps what it got when it was the newest.
 		if opt.fetch {
@@ -465,4 +467,56 @@ func firstTracked(entries []VersionEntry) string {
 		return ""
 	}
 	return first.Format("2006-01-02")
+}
+
+// markUnobserved says, of each build whose settings were read from minified code, the
+// top-level settings its reading did not find though builds before and after it have them:
+// the reader missed them there (a block of the schema it did not follow), not the build. A
+// diff takes them for not observed, rather than removed and added again.
+func markUnobserved(versions []string, byVersion map[string]*Snapshot) {
+	tops := make([]map[string]bool, len(versions))
+	approx := make([]bool, len(versions))
+	for i, v := range versions {
+		cfg := byVersion[v].Config
+		src, _ := cfg["source"].(string)
+		approx[i] = strings.Contains(src, "minified")
+		tops[i] = map[string]bool{}
+		opts, _ := cfg["options"].(map[string]any)
+		for k := range opts {
+			top, _, _ := strings.Cut(k, ".")
+			top, _, _ = strings.Cut(top, "[")
+			tops[i][top] = true
+		}
+		delete(cfg, "unobserved")
+	}
+	for i, v := range versions {
+		if !approx[i] || len(tops[i]) == 0 {
+			continue
+		}
+		before, after := map[string]bool{}, map[string]bool{}
+		for j := range i {
+			if approx[j] {
+				for k := range tops[j] {
+					before[k] = true
+				}
+			}
+		}
+		for j := i + 1; j < len(versions); j++ {
+			if approx[j] {
+				for k := range tops[j] {
+					after[k] = true
+				}
+			}
+		}
+		var gaps []string
+		for k := range before {
+			if after[k] && !tops[i][k] {
+				gaps = append(gaps, k)
+			}
+		}
+		if len(gaps) > 0 {
+			sort.Strings(gaps)
+			byVersion[v].Config["unobserved"] = gaps
+		}
+	}
 }
