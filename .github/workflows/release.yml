@@ -17,7 +17,7 @@ jobs:
     # its required reviewer approves: a release cannot be signed without that approval.
     environment: release
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # GoReleaser builds the changelog from commit history; a shallow clone
           # produces an empty one.
@@ -76,7 +76,7 @@ jobs:
       contents: read
       id-token: write # trusted publishing and npm provenance
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: 22
