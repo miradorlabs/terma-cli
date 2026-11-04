@@ -1,4 +1,4 @@
-package codex
+package shellwrites
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestShellWrites(t *testing.T) {
+func TestWrites(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	if err := os.Mkdir(filepath.Join(cwd, "src"), 0o755); err != nil {
@@ -87,8 +87,8 @@ func TestShellWrites(t *testing.T) {
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got, _ := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
-				t.Fatalf("shellWrites(%q)\n got %v\nwant %v", tc.command, got, tc.want)
+			if got, _ := Writes(tc.command, cwd); !slices.Equal(got, tc.want) {
+				t.Fatalf("Writes(%q)\n got %v\nwant %v", tc.command, got, tc.want)
 			}
 		})
 	}
@@ -115,7 +115,7 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
+			if _, got := Writes(tc.command, cwd); !slices.Equal(got, tc.want) {
 				t.Fatalf("commits = %v, want %v", got, tc.want)
 			}
 		})

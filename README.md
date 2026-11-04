@@ -425,7 +425,11 @@ has worked in runs nothing of terma's at all.
 
 Commit attribution works like this:
 
-1. Agent hooks announce sessions and record files the agent edits.
+1. Agent hooks announce sessions and record files the agent edits. For Claude Code and
+   Codex that includes the files a shell command names as written (a redirect, `sed -i`,
+   `cp`, `mv`, a formatter's `-w`), recorded before the command runs, so a commit in the
+   same command is stamped; a file a script or code generator writes without naming it is
+   not recorded.
 2. `prepare-commit-msg` intersects staged files with those manifests and adds one
    `Agent-Session-Id` / `Agent-Tool` trailer pair per matching session.
 3. `post-commit` retires the committed files and records the commit event.
