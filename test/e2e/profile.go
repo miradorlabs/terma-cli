@@ -30,6 +30,13 @@ import (
 // to report/profiles.json, as it writes the field census beside it. They are the raw evidence a
 // build's published snapshot is normalized from, and one build is compared against the build
 // before it.
+//
+// The plain turn also records what it changes nothing to read: the files the build wrote
+// (storage.go), its hooks' payloads and its executable (probes_oob.go, binaryfacts.go) and the
+// help of each subcommand (clihelp.go). What would change how the build behaves is a scenario of
+// its own, a profile row beside the plain turn's for the same build: its egress through a
+// recording proxy (egress.go, Test…ProfileEgress), and its own telemetry export, timed
+// (Test…ProfileTelemetry).
 
 // ProviderRequest is one request a harness build sent its model provider, as it sent it, but
 // for the values of headers that carry a credential.
@@ -50,6 +57,12 @@ type ProviderRequest struct {
 	// a build's backoff between retries.
 	Status int       `json:"status,omitempty"`
 	At     time.Time `json:"at"`
+	// When places an egress request against the run's model calls: "before" the first,
+	// "during" them, or "after" the last had been answered.
+	When string `json:"when,omitempty"`
+	// Error is why the recording proxy could not read a request: a CONNECT whose TLS the
+	// build refused (a pinned host) is kept with it, so the host is known to exist.
+	Error string `json:"error,omitempty"`
 }
 
 // Profile is what one profile scenario saw of one harness build.

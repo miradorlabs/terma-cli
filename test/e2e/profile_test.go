@@ -17,7 +17,8 @@ const profilePrompt = "Say hello. TERMA_PROFILE"
 // TestClaudeProfile records what each Claude Code build sends its provider on a first turn of
 // `claude -p` as a user runs it: its own system prompt, every tool it offers, its default
 // model, betas and cache breakpoints. None of the suite's settings (claudeArgs pins a system
-// prompt, a model and turns off slash commands and MCP) is passed.
+// prompt, a model and turns off slash commands and MCP) is passed. After the turn it records
+// the files the build wrote, its hooks' payloads, its executable's facts and its help.
 func TestClaudeProfile(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
@@ -30,8 +31,11 @@ func TestClaudeProfile(t *testing.T) {
 		PlaceSandbox(t, b, sb)
 		Placeholder(t, b, provider.URL, "<provider>")
 		Placeholder(t, b, profilePrompt, "<prompt>")
-		args := []string{"--output-format", "json", "--max-turns", "1", "--session-id", uuid.NewString()}
+		session := uuid.NewString()
+		args := []string{"--output-format", "json", "--max-turns", "1", "--session-id", session}
 		RecordCommand(t, b, args)
+		storage := sb.claudeStorage(session)
+		before := SnapshotFiles(storage.Roots...)
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, sb.claudeLauncher(), append([]string{"-p", profilePrompt}, args...)...)
@@ -43,13 +47,17 @@ func TestClaudeProfile(t *testing.T) {
 		if calls.Load() == 0 {
 			t.Fatal("Claude Code sent its provider no message request")
 		}
-		RecordHelp(t, b, sb.claudeEnv(RouteAPIKey), "--help")
+		RecordStorage(t, b, before, storage)
+		RecordHooks(t, b, sb)
+		RecordBinaryFacts(t, b)
+		RecordHelpTree(t, b, sb.claudeEnv(RouteAPIKey), "claude")
 	})
 }
 
 // TestCodexProfile is the same for each Codex build's `codex exec`, with its defaults: the
 // sandbox, approval policy and reasoning effort a user's first run has (CodexExec pins the
 // last). Only the fixture provider and plugins (whose catalog clone outlives Codex) are set.
+// It records the same out-of-band evidence after the turn.
 func TestCodexProfile(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
@@ -62,26 +70,24 @@ func TestCodexProfile(t *testing.T) {
 		PlaceSandbox(t, b, sb)
 		Placeholder(t, b, provider.URL, "<provider>")
 		Placeholder(t, b, profilePrompt, "<prompt>")
-		args := []string{"exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust",
-			"-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`,
-			"-c", "features.plugins=false", "-c", "features.remote_plugin=false",
-			"-c", `model_provider="telemetry_fixture"`, "-c", `model_providers.telemetry_fixture.name="Telemetry fixture"`,
-			"-c", "model_providers.telemetry_fixture.base_url=" + tomlQuote(provider.URL),
-			"-c", `model_providers.telemetry_fixture.wire_api="responses"`,
-			"-c", `model_providers.telemetry_fixture.requires_openai_auth=false`}
+		args := codexProfileArgs(sb, provider.URL)
 		RecordCommand(t, b, args)
+		before := SnapshotFiles(sb.codexStorage("").Roots...)
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, b.Path, append(args, profilePrompt)...)
 		cmd.Dir = sb.workDir()
 		cmd.Env = sb.codexEnv(RouteAPIKey)
-		if out, err := cmd.CombinedOutput(); err != nil {
+		out, err := cmd.CombinedOutput()
+		if err != nil {
 			t.Fatalf("codex exec: %v\n%s", err, out)
 		}
 		if calls.Load() == 0 {
 			t.Fatal("Codex sent its provider no responses request")
 		}
-		RecordHelp(t, b, sb.codexEnv(RouteAPIKey), "--help")
-		RecordHelp(t, b, sb.codexEnv(RouteAPIKey), "exec", "--help")
+		RecordStorage(t, b, before, sb.codexStorage(codexThread(out)))
+		RecordHooks(t, b, sb)
+		RecordBinaryFacts(t, b)
+		RecordHelpTree(t, b, sb.codexEnv(RouteAPIKey), "codex")
 	})
 }
