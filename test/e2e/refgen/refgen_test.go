@@ -531,6 +531,11 @@ func TestLatestProfiles(t *testing.T) {
 	if len(got) != 2 || got[0].Scenario != "TestClaudeProfile" || got[1].Failed {
 		t.Errorf("latest = %+v", got)
 	}
+	// A later pass that failed does not replace an earlier whole one.
+	got = latestProfiles([]e2e.Profile{b, c, a})
+	if len(got) != 2 || got[0].Failed || got[0].Scenario != "TestClaudeProbeCompaction" {
+		t.Errorf("a failed later pass replaced a whole one: %+v", got)
+	}
 }
 
 const settingsDocMD = "# All settings\n\n## Model and responses\n\n### `model`\n\nThe model to use. See [models](https://x/models.md).\n\n" +
