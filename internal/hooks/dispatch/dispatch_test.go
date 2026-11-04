@@ -12,9 +12,11 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -239,5 +241,63 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 	// The policy goes with it: what a repository gets installed depends on it.
 	if policy.TeamID != hookruntest.Team {
 		t.Fatalf("policy = %+v, want the profile's", policy)
+	}
+}
+
+// editing is fake whose edit handler records an edit of a.go in its repository, claiming the
+// session as an agent's hook does.
+type editing struct{ fake }
+
+func (editing) Events() map[string]agents.Handler {
+	edit := func(ctx context.Context, env hookrun.Env) error {
+		r, err := env.Repo(ctx)
+		if err != nil {
+			return err
+		}
+		env.Touch(r, session.Session{ID: "s1", Tool: "fake"}, "Edit", []string{"a.go"}, nil)
+		return nil
+	}
+	return map[string]agents.Handler{"fake-edit": edit}
+}
+
+// An agent's hook claims its session as the agent's; a git hook's claim alone never is, so
+// doctor never judges the processes of a commit made by hand as an agent's.
+func TestOnlyAgentHooksClaimAsTheAgent(t *testing.T) {
+	t.Parallel()
+	root := hookruntest.InitRepo(t)
+	h := newHarness(t)
+	h.deps.Agents = agents.New(editing{fake{ran: &h.ran}})
+	h.deps.Profile = func() Profile {
+		p := hookruntest.Admitting(root)
+		p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
+		return Profile{Team: hookruntest.Team, Policy: p}
+	}
+	edit := request("fake-edit")
+	edit.Cwd = root
+	Run(context.Background(), h.deps, edit)
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || !c.FromAgent() {
+		t.Fatalf("the agent hook's claim = %+v, %v; want the agent's", c, ok)
+	}
+
+	// The claim expires; the session's edit is then committed by hand.
+	if err := os.Remove(filepath.Join(claim.Dir(h.deps.StateDir), "claims", "s1.json")); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "a.go", "package a\n")
+	if _, err := gitx.Git(context.Background(), root, "add", "a.go"); err != nil {
+		t.Fatal(err)
+	}
+	msg := filepath.Join(t.TempDir(), "MSG")
+	if err := os.WriteFile(msg, []byte("Add a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commit := request("prepare-commit-msg")
+	commit.Cwd, commit.Args = root, []string{msg, "message"}
+	Run(context.Background(), h.deps, commit)
+	if stamped, _ := os.ReadFile(msg); !strings.Contains(string(stamped), "s1") {
+		t.Fatalf("the commit was not stamped with the session: %q", stamped)
+	}
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || c.FromAgent() {
+		t.Fatalf("the git hook's claim = %+v, %v; want a claim, not the agent's", c, ok)
 	}
 }

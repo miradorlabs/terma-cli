@@ -472,13 +472,13 @@ func TestListReturnsFreshClaims(t *testing.T) {
 }
 
 // End marks a fresh claim ended and keeps it for the relay; a commit made afterwards (a git
-// hook's claim, naming no directory) keeps the mark, a run of the agent in another process
-// clears it, and a stale or missing claim is neither marked nor revived.
+// hook's claim) keeps the mark, a run of the agent in another process clears it, and a stale
+// or missing claim is neither marked nor revived.
 func TestEndKeepsTheClaimUntilANewRun(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	Write(dir, "sess-1", Claim{ProjectID: "p1", Cwd: "/work/a", PIDs: []int{101, 201}}, now)
+	Write(dir, "sess-1", Claim{ProjectID: "p1", Cwd: "/work/a", Agent: true, PIDs: []int{101, 201}}, now)
 	if !End(dir, "sess-1", now.Add(time.Second)) {
 		t.Fatal("End did not write")
 	}
@@ -487,10 +487,10 @@ func TestEndKeepsTheClaimUntilANewRun(t *testing.T) {
 		t.Fatalf("after End: %+v, %v; want the claim kept, ended", got, ok)
 	}
 	Write(dir, "sess-1", Claim{ProjectID: "p1", PIDs: []int{401, 301}}, now.Add(2*time.Second))
-	if got, _ := Read(dir, "sess-1", now.Add(2*time.Second)); got.EndedAt.IsZero() || !got.Covers(301) {
-		t.Fatalf("after a commit: %+v, want the end kept", got)
+	if got, _ := Read(dir, "sess-1", now.Add(2*time.Second)); got.EndedAt.IsZero() || !got.FromAgent() || !got.Covers(301) {
+		t.Fatalf("after a commit: %+v, want the end and the agent's claim kept", got)
 	}
-	Write(dir, "sess-1", Claim{ProjectID: "p1", Cwd: "/work/a", PIDs: []int{102, 202}}, now.Add(3*time.Second))
+	Write(dir, "sess-1", Claim{ProjectID: "p1", Cwd: "/work/a", Agent: true, PIDs: []int{102, 202}}, now.Add(3*time.Second))
 	if got, _ := Read(dir, "sess-1", now.Add(3*time.Second)); !got.EndedAt.IsZero() || !got.Covers(202) {
 		t.Fatalf("after a new run: %+v, want the end cleared", got)
 	}
@@ -507,5 +507,31 @@ func TestEndKeepsTheClaimUntilANewRun(t *testing.T) {
 	}
 	if _, ok := Read(dir, "stale", now); ok {
 		t.Fatal("a stale claim reads as fresh after End")
+	}
+}
+
+// Only an agent hook's write marks a claim as the agent's; a git hook's alone never does, and
+// one written before the mark existed reads as no agent's, so its processes are not judged as
+// an agent. A fresh claim the agent's hook now rewrites gains the mark at once.
+func TestOnlyAnAgentHookMarksTheClaimAsTheAgents(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	Write(dir, "git-only", Claim{ProjectID: "p1", PIDs: []int{400, 401}}, now)
+	if got, _ := Read(dir, "git-only", now); got.FromAgent() {
+		t.Fatalf("a git hook's claim = %+v, want no agent's", got)
+	}
+	old := filepath.Join(Dir(dir), claimsDir, "old.json")
+	if err := os.WriteFile(old, []byte(`{"project_id":"p1","cwd":"/work/a","pids":[101,201],"claimed_at":"2026-11-04T00:00:00Z"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := Read(dir, "old", now); !ok || got.FromAgent() {
+		t.Fatalf("a claim from before the mark = %+v, %v; want no agent's", got, ok)
+	}
+	if !Write(dir, "old", Claim{ProjectID: "p1", Cwd: "/work/a", Agent: true, PIDs: []int{201}}, now) {
+		t.Fatal("the agent's hook did not mark a fresh claim naming its processes")
+	}
+	if got, _ := Read(dir, "old", now); !got.FromAgent() {
+		t.Fatalf("after the agent's hook: %+v, want the agent's", got)
 	}
 }
