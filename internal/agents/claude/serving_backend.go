@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
@@ -21,8 +22,14 @@ func servingBackend(repoRoot string) string {
 // apiKeyHelper or the stored login).
 func routeBackend(lookup func(string) string, storedCredential bool) string {
 	if c, ok := cloudRoute(lookup); ok {
-		if base := lookup(c.baseURLVar); base != "" {
-			return baseURLBackend(base)
+		for _, key := range c.baseURLVars {
+			if base := lookup(key); base != "" {
+				// Another provider's host is as foreign to this route as a gateway's.
+				if b := baseURLBackend(base); b == "" || b == c.backend {
+					return b
+				}
+				return semconv.TermaServingBackendPrivate
+			}
 		}
 		return c.backend
 	}
@@ -35,8 +42,8 @@ func routeBackend(lookup func(string) string, storedCredential bool) string {
 	return ""
 }
 
-// baseURLBackend recognises the hosts each backend serves its API from; any other host (a
-// gateway, a proxy, a local server) is private, and a URL with no host is "".
+// baseURLBackend recognises the hosts each backend serves its API from (servinghost); any
+// other host (a gateway, a proxy, a local server) is private, and a URL with no host is "".
 func baseURLBackend(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -48,14 +55,11 @@ func baseURLBackend(raw string) string {
 		return ""
 	case host == "api.anthropic.com":
 		return semconv.TermaServingBackendAnthropic
-	case (strings.HasPrefix(host, "bedrock-runtime.") || strings.HasPrefix(host, "bedrock-runtime-fips.")) &&
-		(strings.HasSuffix(host, ".amazonaws.com") || strings.HasSuffix(host, ".amazonaws.com.cn")):
+	case servinghost.Bedrock(host):
 		return semconv.TermaServingBackendAwsBedrock
-	case strings.HasPrefix(host, "bedrock-mantle.") && strings.HasSuffix(host, ".api.aws"):
-		return semconv.TermaServingBackendAwsBedrock
-	case host == "aiplatform.googleapis.com" || strings.HasSuffix(host, "-aiplatform.googleapis.com"):
+	case servinghost.Vertex(host):
 		return semconv.TermaServingBackendGoogleVertex
-	case strings.HasSuffix(host, ".services.ai.azure.com"):
+	case servinghost.Azure(host):
 		return semconv.TermaServingBackendAzureFoundry
 	}
 	return semconv.TermaServingBackendPrivate

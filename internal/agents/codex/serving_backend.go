@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -20,9 +21,13 @@ const codexOpenAIProvider = "openai"
 // codexLocalProviders are Codex's built-in providers that run on the developer's machine.
 var codexLocalProviders = []string{"ollama", "lmstudio", "oss"}
 
-// codexBedrockProviders are Codex's built-in Amazon Bedrock providers, which config.toml's
-// model_providers cannot redefine either.
-var codexBedrockProviders = []string{"amazon-bedrock", "amazon-bedrock-runtime"}
+// codexCloudProviders are Codex's built-in cloud providers and their backends; config.toml can
+// move one only by setting its base_url.
+var codexCloudProviders = map[string]string{
+	"amazon-bedrock":         semconv.TermaServingBackendAwsBedrock,
+	"amazon-bedrock-runtime": semconv.TermaServingBackendAwsBedrock,
+	"gcp":                    semconv.TermaServingBackendGoogleVertex,
+}
 
 // codexRoutes is what config.toml says about where each provider sends its calls. It is
 // today's file, not the session's: a base_url passed with -c, a profile file or a managed
@@ -70,9 +75,6 @@ func (c codexRoutes) backend(provider string) string {
 	if slices.Contains(codexLocalProviders, provider) {
 		return semconv.TermaServingBackendPrivate
 	}
-	if slices.Contains(codexBedrockProviders, provider) {
-		return semconv.TermaServingBackendAwsBedrock
-	}
 	if provider == "" || !c.readable {
 		return ""
 	}
@@ -83,10 +85,22 @@ func (c codexRoutes) backend(provider string) string {
 		}
 		return codexBaseURLBackend(base)
 	}
+	if cloud, ok := codexCloudProviders[provider]; ok {
+		base := c.baseURLs[provider]
+		if base == "" {
+			return cloud
+		}
+		// Another provider's host is as foreign to this one as a gateway's.
+		if b := codexBaseURLBackend(base); b == "" || b == cloud {
+			return b
+		}
+		return semconv.TermaServingBackendPrivate
+	}
 	return codexBaseURLBackend(c.baseURLs[provider])
 }
 
-// codexBaseURLBackend recognises OpenAI's and Azure OpenAI's hosts; any other host (a
+// codexBaseURLBackend recognises OpenAI's, Azure OpenAI's, Bedrock's and Vertex's hosts; any
+// other host (a
 // gateway, Azure API Management, a proxy, a local server) is private, and a URL with no host,
 // or none at all, is "".
 func codexBaseURLBackend(raw string) string {
@@ -103,6 +117,10 @@ func codexBaseURLBackend(raw string) string {
 	case strings.HasSuffix(host, ".openai.azure.com"), strings.HasSuffix(host, ".services.ai.azure.com"),
 		strings.HasSuffix(host, ".cognitiveservices.azure.com"):
 		return semconv.TermaServingBackendAzureOpenai
+	case servinghost.Bedrock(host):
+		return semconv.TermaServingBackendAwsBedrock
+	case servinghost.Vertex(host):
+		return semconv.TermaServingBackendGoogleVertex
 	}
 	return semconv.TermaServingBackendPrivate
 }

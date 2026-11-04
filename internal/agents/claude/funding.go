@@ -136,17 +136,23 @@ func (r claudeRoute) lookup(key string) string {
 	return ""
 }
 
-// claudeCloud is a cloud provider route: the switch that selects it, the variable that sends
-// it to another endpoint (an LLM gateway) and the backend that serves it.
-type claudeCloud struct{ switchVar, baseURLVar, backend string }
+// claudeCloud is a cloud provider route: the switch that selects it, the variables that send
+// it to another endpoint (an LLM gateway), the first set deciding, and the backend that serves it.
+type claudeCloud struct {
+	switchVar   string
+	baseURLVars []string
+	backend     string
+}
 
-// claudeClouds are the cloud provider switches, in the order Claude Code checks them.
+// claudeClouds are the cloud provider routes terma.serving.backend names, in the order Claude
+// Code checks their switches.
 var claudeClouds = []claudeCloud{
-	{"CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BEDROCK_BASE_URL", semconv.TermaServingBackendAwsBedrock},
-	{"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_BASE_URL", semconv.TermaServingBackendAzureFoundry},
+	{"CLAUDE_CODE_USE_BEDROCK", []string{"ANTHROPIC_BEDROCK_BASE_URL", "AWS_ENDPOINT_URL_BEDROCK_RUNTIME", "AWS_ENDPOINT_URL_BEDROCK", "AWS_ENDPOINT_URL"},
+		semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_FOUNDRY", []string{"ANTHROPIC_FOUNDRY_BASE_URL"}, semconv.TermaServingBackendAzureFoundry},
 	// Amazon Bedrock's Mantle endpoint.
-	{"CLAUDE_CODE_USE_MANTLE", "ANTHROPIC_BEDROCK_MANTLE_BASE_URL", semconv.TermaServingBackendAwsBedrock},
-	{"CLAUDE_CODE_USE_VERTEX", "ANTHROPIC_VERTEX_BASE_URL", semconv.TermaServingBackendGoogleVertex},
+	{"CLAUDE_CODE_USE_MANTLE", []string{"ANTHROPIC_BEDROCK_MANTLE_BASE_URL"}, semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_VERTEX", []string{"ANTHROPIC_VERTEX_BASE_URL"}, semconv.TermaServingBackendGoogleVertex},
 }
 
 // cloudRoute is the first cloud provider route whose switch lookup finds on.
