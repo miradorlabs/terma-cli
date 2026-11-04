@@ -271,7 +271,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: git tag v0.0.0-ci
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           # `before` is `go test`, which the test job already runs; `sign` needs the
