@@ -45,6 +45,12 @@ type Snapshot struct {
 	// the flags changed it. A rollout changes it from night to night, so it is no section and
 	// never compared.
 	Live map[string]any `json:"live,omitempty"`
+
+	// Docs is what the vendor's reference said of the build's configuration the night it was
+	// the newest: each documented setting and variable, whether the build reads it, and what it
+	// reads that no reference mentions. A page describes the current release, not the build, so
+	// it is no section and never compared.
+	Docs map[string]any `json:"docs,omitempty"`
 }
 
 // Capture says how a snapshot was taken.

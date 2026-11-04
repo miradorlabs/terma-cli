@@ -319,6 +319,36 @@ In `binary.signing`, the certificate is compared as one thing (a new certificate
 and `signed_at`, `checked_at`, `assessment`, `resigned` and `authority` are never read as
 changes: they differ by nature, or say again what `status` and the certificate say.
 
+### docs
+
+What the vendor's own reference said of the build's configuration, the night the build was the
+newest: Claude Code's settings reference and environment variable pages
+(`code.claude.com/docs/en/settings-reference.md`, `env-vars.md`). A reference describes the
+vendor's current release, not every build, so `docs` is kept with the build that was newest when
+it was read, and older builds keep theirs: it is no section, and never compared.
+
+```json
+"docs": {
+  "source": ["https://code.claude.com/docs/en/settings-reference.md", "https://code.claude.com/docs/en/env-vars.md"],
+  "fetched_at": "2026-11-04T05:02:11Z",
+  "settings": { "advisorModel": { "description": "Pick which model answers…", "type": "string, one of the aliases…",
+                                  "default": "unset, so the advisor is off", "scope": "Any file", "topic": "Model and responses", "read": true } },
+  "undocumented_settings": ["quietHours", "breakReminder"],
+  "documented_not_read": ["idleCompaction"],
+  "env_vars": { "ANTHROPIC_API_KEY": { "description": "API key sent as X-Api-Key header…", "read": true } },
+  "undocumented_env_vars": ["CLAUDE_CODE_…"],
+  "documented_env_not_read": ["…"]
+}
+```
+
+`read` says whether the build reads the setting (its `config.options`) or variable (its
+`config.env_vars`). `undocumented_settings` are the top-level settings the build reads that the
+reference does not mention; `documented_not_read` those it documents that the build was not
+found to read (a setting newer than the build, or one the build's schema builds where it cannot
+be read), the reference's `Global config` keys (kept in `~/.claude.json`, outside the settings
+schema) aside. The variable lists are as good as `config.env_vars`, a heuristic for a closed
+harness: a name the build composes at run time is not found, and one it only sets may be.
+
 ### cli
 
 `help` keeps each help text as the build printed it: every command's `--help`, and its `-h`

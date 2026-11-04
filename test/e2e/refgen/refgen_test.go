@@ -532,3 +532,50 @@ func TestLatestProfiles(t *testing.T) {
 		t.Errorf("latest = %+v", got)
 	}
 }
+
+const settingsDocMD = "# All settings\n\n## Model and responses\n\n### `model`\n\nThe model to use. See [models](https://x/models.md).\n\n" +
+	"* **Scope**: [`Any file`](#scopes)\n* **Type**: string\n* **Default**: unset\n\n```json\n{ \"model\": \"opus\" }\n```\n\n" +
+	"### `permissions.allow`\n\nRules to allow.\n\n* **Scope**: `Any file`\n* **Type**: array of strings\n* **Default**: `[]`\n\n" +
+	"### `newKey`\n\nOnly in a newer build.\n\n* **Scope**: `Any file`\n* **Type**: Boolean\n* **Default**: `false`\n\n" +
+	"## Global config settings\n\n### `autoConnectIde`\n\nConnect to an IDE.\n\n* **Scope**: [`Global config`](#scopes)\n* **Type**: Boolean\n* **Default**: `false`\n"
+
+const envDocMD = "## Variables\n\n| Variable | Purpose |\n| :- | :- |\n| `ANTHROPIC_API_KEY` | API key sent as `X-Api-Key` header |\n| `DOCUMENTED_ONLY` | Not read |\n"
+
+// The reference goes with the newest build: what it documents, whether the build reads it, and
+// what the build reads that it does not mention; a global config key is not counted unread.
+func TestVendorDocs(t *testing.T) {
+	saved := fetcher
+	t.Cleanup(func() { fetcher = saved })
+	fetcher = func(url string) ([]byte, error) {
+		switch {
+		case strings.HasSuffix(url, "settings-reference.md"):
+			return []byte(settingsDocMD), nil
+		case strings.HasSuffix(url, "env-vars.md"):
+			return []byte(envDocMD), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	docs := parseSettingsDoc(settingsDocMD)
+	if m := docs["model"]; m == nil || m.Description != "The model to use. See models." || m.Scope != "Any file" || m.Type != "string" || m.Topic != "Model and responses" {
+		t.Errorf("model = %+v", m)
+	}
+	s := &Snapshot{Harness: "claude", Version: "1.0.1", Config: map[string]any{
+		"options":  map[string]any{"model": map[string]any{}, "permissions.allow": map[string]any{}, "quietHours": map[string]any{}, "$schema": map[string]any{}},
+		"env_vars": []any{"ANTHROPIC_API_KEY", "CLAUDE_CODE_SECRET_FLAG"}}}
+	d := docsOf(s, fetchDocs("claude", time.Now()))
+	if got := strings.Join(d["undocumented_settings"].([]string), ","); got != "quietHours" {
+		t.Errorf("undocumented settings = %s", got)
+	}
+	if got := strings.Join(d["documented_not_read"].([]string), ","); got != "newKey" {
+		t.Errorf("documented, not read = %s", got)
+	}
+	if got := strings.Join(d["undocumented_env_vars"].([]string), ","); got != "CLAUDE_CODE_SECRET_FLAG" {
+		t.Errorf("undocumented env = %s", got)
+	}
+	if got := strings.Join(d["documented_env_not_read"].([]string), ","); got != "DOCUMENTED_ONLY" {
+		t.Errorf("documented env not read = %s", got)
+	}
+	if d["settings"].(map[string]any)["permissions.allow"].(map[string]any)["read"] != true {
+		t.Errorf("a nested documented key the build reads read as unread")
+	}
+}

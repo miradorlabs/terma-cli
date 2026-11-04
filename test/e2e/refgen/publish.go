@@ -171,6 +171,19 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			dates = releaseDates(meta)
 		}
 
+		// The vendor's reference tonight goes with tonight's newest build that has its
+		// configuration captured; an older build keeps what it got when it was the newest.
+		if opt.fetch {
+			if d := fetchDocs(h, n.now); d != nil {
+				for i := len(versions) - 1; i >= 0; i-- {
+					if s := byVersion[versions[i]]; s.Config != nil {
+						s.Docs = docsOf(s, d)
+						break
+					}
+				}
+			}
+		}
+
 		diffs := map[string]*Diff{}
 		for i := 1; i < len(versions); i++ {
 			from, to := versions[i-1], versions[i]
