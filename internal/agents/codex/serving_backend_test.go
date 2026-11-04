@@ -13,7 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Only OpenAI's and Azure OpenAI's hosts are named; every other base URL is unknown.
+// Only OpenAI's and Azure OpenAI's hosts are named; every other host is private, and a base
+// URL with no host says nothing.
 func TestCodexBaseURLBackend(t *testing.T) {
 	t.Parallel()
 	for raw, want := range map[string]string{
@@ -23,13 +24,13 @@ func TestCodexBaseURLBackend(t *testing.T) {
 		"https://my-resource.openai.azure.com/openai/v1":         semconv.TermaServingBackendAzureOpenai,
 		"https://my-project.services.ai.azure.com/openai/v1":     semconv.TermaServingBackendAzureOpenai,
 		"https://my-resource.cognitiveservices.azure.com/openai": semconv.TermaServingBackendAzureOpenai,
-		"https://api.openai.com.evil.example":                    "",
-		"https://openai.azure.com.evil.example":                  "",
-		"https://chatgpt.com/backend-api/codex":                  "",
-		"https://openrouter.ai/api/v1":                           "",
-		"https://my-gateway.azure-api.net/openai":                "",
-		"https://gateway.ai.cloudflare.com/v1/acct/gw/openai":    "",
-		"http://localhost:11434/v1":                              "",
+		"https://api.openai.com.evil.example":                    semconv.TermaServingBackendPrivate,
+		"https://openai.azure.com.evil.example":                  semconv.TermaServingBackendPrivate,
+		"https://chatgpt.com/backend-api/codex":                  semconv.TermaServingBackendPrivate,
+		"https://openrouter.ai/api/v1":                           semconv.TermaServingBackendPrivate,
+		"https://my-gateway.azure-api.net/openai":                semconv.TermaServingBackendPrivate,
+		"https://gateway.ai.cloudflare.com/v1/acct/gw/openai":    semconv.TermaServingBackendPrivate,
+		"http://localhost:11434/v1":                              semconv.TermaServingBackendPrivate,
 		"api.openai.com":                                         "",
 		"":                                                       "",
 	} {
@@ -40,8 +41,8 @@ func TestCodexBaseURLBackend(t *testing.T) {
 }
 
 // The session's provider id maps through where config.toml sends it: the built-in openai
-// provider is OpenAI unless openai_base_url or OPENAI_BASE_URL moves it, and a custom id is
-// only what its base_url's host says.
+// provider is OpenAI unless openai_base_url or OPENAI_BASE_URL moves it, a local built-in is
+// private, a custom id is what its base_url's host says, and an id nothing defines is unknown.
 func TestCodexRoutesBackend(t *testing.T) {
 	const providers = `
 [model_providers.azure]
@@ -57,6 +58,12 @@ base_url = "https://api.openai.com/v1"
 [model_providers.gateway]
 base_url = "https://llm.corp.example/v1"
 
+[model_providers.apim]
+base_url = "https://my-gateway.azure-api.net/openai"
+
+[model_providers.nourl]
+name = "No URL"
+
 [model_providers.openai]
 base_url = "https://llm.corp.example/v1"
 `
@@ -65,19 +72,23 @@ base_url = "https://llm.corp.example/v1"
 	}{
 		{"openai without a config file", "", "", "openai", semconv.TermaServingBackendOpenai},
 		{"openai with providers defined", providers, "", "openai", semconv.TermaServingBackendOpenai},
-		{"openai_base_url to a gateway", `openai_base_url = "https://llm.corp.example/v1"`, "", "openai", ""},
+		{"openai_base_url to a gateway", `openai_base_url = "https://llm.corp.example/v1"`, "", "openai", semconv.TermaServingBackendPrivate},
 		{"openai_base_url to OpenAI", `openai_base_url = "https://api.openai.com/v1"`, "", "openai", semconv.TermaServingBackendOpenai},
 		{"openai_base_url to Azure", `openai_base_url = "https://r.openai.azure.com/openai/v1"`, "", "openai", semconv.TermaServingBackendAzureOpenai},
-		{"OPENAI_BASE_URL to a gateway", "", "https://llm.corp.example/v1", "openai", ""},
+		{"OPENAI_BASE_URL to a gateway", "", "https://llm.corp.example/v1", "openai", semconv.TermaServingBackendPrivate},
 		{"OPENAI_BASE_URL to Azure", "", "https://r.openai.azure.com/openai/v1", "openai", semconv.TermaServingBackendAzureOpenai},
 		{"openai_base_url over OPENAI_BASE_URL", `openai_base_url = "https://api.openai.com/v1"`, "https://llm.corp.example/v1", "openai", semconv.TermaServingBackendOpenai},
 		{"azure", providers, "", "azure", semconv.TermaServingBackendAzureOpenai},
 		{"foundry", providers, "", "foundry", semconv.TermaServingBackendAzureOpenai},
 		{"custom id to OpenAI", providers, "", "direct", semconv.TermaServingBackendOpenai},
-		{"custom id to a gateway", providers, "", "gateway", ""},
+		{"custom id to a gateway", providers, "", "gateway", semconv.TermaServingBackendPrivate},
+		{"custom id to Azure API Management", providers, "", "apim", semconv.TermaServingBackendPrivate},
+		{"custom id without a base_url", providers, "", "nourl", ""},
 		{"undefined id (a -c override)", providers, "", "telemetry_fixture", ""},
-		{"ollama", "", "", "ollama", ""},
-		{"oss", "", "", "oss", ""},
+		{"ollama", "", "", "ollama", semconv.TermaServingBackendPrivate},
+		{"lmstudio", "", "", "lmstudio", semconv.TermaServingBackendPrivate},
+		{"oss", "", "", "oss", semconv.TermaServingBackendPrivate},
+		{"ollama with an unparsable config", "model_providers = [", "", "ollama", semconv.TermaServingBackendPrivate},
 		{"no provider", providers, "", "", ""},
 		{"unparsable config", "model_providers = [", "", "openai", ""},
 		{"mistyped openai_base_url", `openai_base_url = 1`, "", "openai", ""},
@@ -112,7 +123,8 @@ func providerRollout(t *testing.T, cwd string) string {
 }
 
 // Every quota observation names the session's backend; a resume onto another provider moves
-// it from there on, across reads, and a provider config.toml cannot place sends no key at all.
+// it from there on, across reads; a custom provider at an unrecognised host is private, and
+// one config.toml does not define sends no key at all.
 func TestCodexQuotaCarriesServingBackend(t *testing.T) {
 	env := fundingEnv(t)
 	hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), codexConfigFile, `
@@ -169,7 +181,13 @@ base_url = "https://llm.corp.example/v1"
 	appendRollout(resumed("gateway"))
 	quotas = stopOn()
 	raw, _ := json.Marshal(quotas)
-	if len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != nil || strings.Contains(string(raw), "corp.example") || strings.Contains(string(raw), `"gateway"`) {
-		t.Fatalf("resumed on a gateway: %s, want no backend, host or provider id", raw)
+	if len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != semconv.TermaServingBackendPrivate || strings.Contains(string(raw), "corp.example") || strings.Contains(string(raw), `"gateway"`) {
+		t.Fatalf("resumed on a gateway: %s, want private and no host or provider id", raw)
+	}
+
+	appendRollout(resumed("undefined"))
+	quotas = stopOn()
+	if len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != nil {
+		t.Fatalf("resumed on a provider config.toml does not define: %+v, want no backend", quotas)
 	}
 }

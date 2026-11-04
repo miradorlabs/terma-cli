@@ -95,11 +95,17 @@ attributes:
           value: azure-openai
           brief: Azure OpenAI.
           stability: development
+        - id: private
+          value: private
+          brief: >-
+            An endpoint that is not a recognised public provider: a custom base URL's host, or a
+            custom, self-hosted or local provider.
+          stability: development
     stability: development
     brief: Who served the session's model calls, from the route the agent was configured with.
     note: >-
-      Absent when the route is not one terma can name; never a host, URL or provider id the
-      developer chose.
+      Absent when nothing says where the calls went; `private` when they went somewhere terma
+      does not recognise. Never the host, URL or provider id itself.
 
   # Operations.
   - key: terma.operation.status

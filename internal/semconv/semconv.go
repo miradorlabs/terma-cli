@@ -447,6 +447,8 @@ const (
 	TermaServingBackendOpenai = "openai"
 	// TermaServingBackendAzureOpenai is terma.serving.backend azure-openai: Azure OpenAI.
 	TermaServingBackendAzureOpenai = "azure-openai"
+	// TermaServingBackendPrivate is terma.serving.backend private: An endpoint that is not a recognised public provider: a custom base URL's host, or a custom, self-hosted or local provider.
+	TermaServingBackendPrivate = "private"
 	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
 	TermaUpdateAutoOn = "on"
 	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).

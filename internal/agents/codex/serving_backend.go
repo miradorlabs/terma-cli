@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -15,6 +16,9 @@ import (
 // codexOpenAIProvider is the id of Codex's built-in OpenAI provider, which config.toml's
 // model_providers cannot redefine: only openai_base_url moves it.
 const codexOpenAIProvider = "openai"
+
+// codexLocalProviders are Codex's built-in providers that run on the developer's machine.
+var codexLocalProviders = []string{"ollama", "lmstudio", "oss"}
 
 // codexRoutes is what config.toml says about where each provider sends its calls. It is
 // today's file, not the session's: a base_url passed with -c, a profile file or a managed
@@ -55,10 +59,13 @@ func readCodexRoutes() codexRoutes {
 	return routes
 }
 
-// backend maps the session's model provider id to terma.serving.backend's value, "" when the
-// route is not one it can name. The id is the developer's own name for a custom provider, so
-// only where it sends calls decides.
+// backend maps the session's model provider id to terma.serving.backend's value, "" when
+// nothing says where its calls go. The id is the developer's own name for a custom provider,
+// so only where it sends calls decides.
 func (c codexRoutes) backend(provider string) string {
+	if slices.Contains(codexLocalProviders, provider) {
+		return semconv.TermaServingBackendPrivate
+	}
 	if provider == "" || !c.readable {
 		return ""
 	}
@@ -72,8 +79,9 @@ func (c codexRoutes) backend(provider string) string {
 	return codexBaseURLBackend(c.baseURLs[provider])
 }
 
-// codexBaseURLBackend recognises OpenAI's and Azure OpenAI's hosts; any other host (a gateway,
-// a proxy, a local server) is "", since what stands behind it is unknown.
+// codexBaseURLBackend recognises OpenAI's and Azure OpenAI's hosts; any other host (a
+// gateway, Azure API Management, a proxy, a local server) is private, and a URL with no host,
+// or none at all, is "".
 func codexBaseURLBackend(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -81,13 +89,15 @@ func codexBaseURLBackend(raw string) string {
 	}
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 	switch {
+	case host == "":
+		return ""
 	case host == "api.openai.com":
 		return semconv.TermaServingBackendOpenai
 	case strings.HasSuffix(host, ".openai.azure.com"), strings.HasSuffix(host, ".services.ai.azure.com"),
 		strings.HasSuffix(host, ".cognitiveservices.azure.com"):
 		return semconv.TermaServingBackendAzureOpenai
 	}
-	return ""
+	return semconv.TermaServingBackendPrivate
 }
 
 // codexSessionProvider is the model provider a rollout's session_meta line names.

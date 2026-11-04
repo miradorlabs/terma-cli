@@ -30,8 +30,10 @@ func TestRouteBackend(t *testing.T) {
 		{"switch off", map[string]string{"CLAUDE_CODE_USE_BEDROCK": "0", "ANTHROPIC_API_KEY": "k"}, false, semconv.TermaServingBackendAnthropic},
 		{"anthropic base URL", map[string]string{"ANTHROPIC_BASE_URL": "https://api.anthropic.com"}, false, semconv.TermaServingBackendAnthropic},
 		{"bedrock base URL", map[string]string{"ANTHROPIC_BASE_URL": "https://bedrock-runtime.us-east-1.amazonaws.com"}, false, semconv.TermaServingBackendAwsBedrock},
-		{"gateway base URL with a key", map[string]string{"ANTHROPIC_BASE_URL": "https://llm.corp.example", "ANTHROPIC_API_KEY": "k"}, false, ""},
-		{"gateway base URL with a stored login", map[string]string{"ANTHROPIC_BASE_URL": "http://localhost:4000"}, true, ""},
+		{"gateway base URL with a key", map[string]string{"ANTHROPIC_BASE_URL": "https://llm.corp.example", "ANTHROPIC_API_KEY": "k"}, false, semconv.TermaServingBackendPrivate},
+		{"local base URL with a stored login", map[string]string{"ANTHROPIC_BASE_URL": "http://localhost:4000"}, true, semconv.TermaServingBackendPrivate},
+		{"gateway base URL without a credential", map[string]string{"ANTHROPIC_BASE_URL": "https://llm.corp.example"}, false, semconv.TermaServingBackendPrivate},
+		{"base URL with no host", map[string]string{"ANTHROPIC_BASE_URL": "api.anthropic.com", "ANTHROPIC_API_KEY": "k"}, false, ""},
 		{"api key", map[string]string{"ANTHROPIC_API_KEY": "k"}, false, semconv.TermaServingBackendAnthropic},
 		{"auth token", map[string]string{"ANTHROPIC_AUTH_TOKEN": "t"}, false, semconv.TermaServingBackendAnthropic},
 		{"stored login or apiKeyHelper", nil, true, semconv.TermaServingBackendAnthropic},
@@ -44,7 +46,8 @@ func TestRouteBackend(t *testing.T) {
 	}
 }
 
-// Only the hosts a backend serves its API from are named; every other base URL is unknown.
+// Only the hosts a backend serves its API from are named; every other host is private, and a
+// base URL with no host says nothing.
 func TestBaseURLBackend(t *testing.T) {
 	t.Parallel()
 	for raw, want := range map[string]string{
@@ -56,12 +59,12 @@ func TestBaseURLBackend(t *testing.T) {
 		"https://us-east5-aiplatform.googleapis.com/v1":            semconv.TermaServingBackendGoogleVertex,
 		"https://aiplatform.googleapis.com":                        semconv.TermaServingBackendGoogleVertex,
 		"https://my-resource.services.ai.azure.com/anthropic":      semconv.TermaServingBackendAzureFoundry,
-		"https://bedrock.us-east-1.amazonaws.com":                  "",
-		"https://api.anthropic.com.evil.example":                   "",
-		"https://console.anthropic.com":                            "",
-		"https://openrouter.ai/api":                                "",
-		"https://gateway.ai.cloudflare.com/v1/acct/gw/anthropic":   "",
-		"http://localhost:4000":                                    "",
+		"https://bedrock.us-east-1.amazonaws.com":                  semconv.TermaServingBackendPrivate,
+		"https://api.anthropic.com.evil.example":                   semconv.TermaServingBackendPrivate,
+		"https://console.anthropic.com":                            semconv.TermaServingBackendPrivate,
+		"https://openrouter.ai/api":                                semconv.TermaServingBackendPrivate,
+		"https://gateway.ai.cloudflare.com/v1/acct/gw/anthropic":   semconv.TermaServingBackendPrivate,
+		"http://localhost:4000":                                    semconv.TermaServingBackendPrivate,
 		"api.anthropic.com":                                        "",
 		"://":                                                      "",
 		"":                                                         "",
@@ -88,7 +91,7 @@ func TestServingBackendReadsSettings(t *testing.T) {
 	}
 
 	hookruntest.WriteFile(t, userDir, "settings.json", `{"env":{"ANTHROPIC_BASE_URL":"https://llm.corp.example"}}`)
-	if got := servingBackend(env.Cwd); got != "" {
+	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendPrivate {
 		t.Fatalf("user settings gateway: got %q", got)
 	}
 	hookruntest.WriteFile(t, projectDir, "settings.json", `{"env":{"ANTHROPIC_BASE_URL":"https://other.corp.example"}}`)
@@ -115,8 +118,8 @@ func TestServingBackendReadsSettings(t *testing.T) {
 	}
 }
 
-// Each call's response names its backend; an unknown route sends the key not at all, and never
-// the host it saw.
+// Each call's response names its backend; an unrecognised base URL is private, and its host
+// never leaves.
 func TestClaudeStopSpoolsServingBackend(t *testing.T) {
 	env := titleEnv(t)
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "1")
@@ -134,7 +137,7 @@ func TestClaudeStopSpoolsServingBackend(t *testing.T) {
 	stopClaude(t, env, path)
 	got = spooledResponses(t, env.Spool)
 	raw, _ := json.Marshal(got)
-	if len(got) != 1 || got[0].Attrs[semconv.TermaServingBackendKey] != nil || strings.Contains(string(raw), "corp.example") {
-		t.Fatalf("gateway: got %s, want no backend and no host", raw)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaServingBackendKey] != semconv.TermaServingBackendPrivate || strings.Contains(string(raw), "corp.example") {
+		t.Fatalf("gateway: got %s, want private and no host", raw)
 	}
 }

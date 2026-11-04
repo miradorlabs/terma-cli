@@ -77,7 +77,7 @@ func routeBackend(lookup func(string) string, storedCredential bool) string {
 }
 
 // baseURLBackend recognises the hosts each backend serves its API from; any other host (a
-// gateway, a proxy, a local server) is "", since what stands behind it is unknown.
+// gateway, a proxy, a local server) is private, and a URL with no host is "".
 func baseURLBackend(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -85,6 +85,8 @@ func baseURLBackend(raw string) string {
 	}
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 	switch {
+	case host == "":
+		return ""
 	case host == "api.anthropic.com":
 		return semconv.TermaServingBackendAnthropic
 	case (strings.HasPrefix(host, "bedrock-runtime.") || strings.HasPrefix(host, "bedrock-runtime-fips.")) &&
@@ -95,5 +97,5 @@ func baseURLBackend(raw string) string {
 	case strings.HasSuffix(host, ".services.ai.azure.com"):
 		return semconv.TermaServingBackendAzureFoundry
 	}
-	return ""
+	return semconv.TermaServingBackendPrivate
 }
