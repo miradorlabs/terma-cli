@@ -44,7 +44,7 @@ type agentProc struct {
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	procs, unread := runningAgents(reg, stateDir, environ, now)
 	switch {
-	case len(procs) == 0 && unread:
+	case len(procs) == 0 && len(unread) > 0:
 		return Check{Status: Skip, Detail: "terma cannot read the environment of the running agent processes on this system"}
 	case len(procs) == 0:
 		return Check{Status: Skip, Detail: "no agent process of a collected session is running"}
@@ -75,14 +75,14 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 
 // runningAgents are the running processes of agents whose exporter reads its startup
 // environment, in collected sessions claimed under stateDir, readable ones by pid; unread
-// says one ran that could not be read. A claim lists the ancestors of each hook that ran
+// names each agent with one running that could not be read. A claim lists the ancestors of each hook that ran
 // for the session, nearest first, one chain after another; a hook's own processes exit with
 // it, so the nearest process of each run of running ones is an agent, or what a git hook
 // ran under (a developer's shell), or an exited process's id that another has taken since.
 // All are returned, so the agent always is; the others add a finding only when they too
 // started with what a check flags.
-func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now time.Time) (procs map[int]agentProc, unread bool) {
-	procs = map[int]agentProc{}
+func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now time.Time) (procs map[int]agentProc, unread map[string]bool) {
+	procs, unread = map[int]agentProc{}, map[string]bool{}
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
 		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
@@ -93,7 +93,7 @@ func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now t
 			env, alive := environ(pid)
 			switch {
 			case alive && !after && env == nil:
-				unread = true
+				unread[a.Name()] = true
 			case alive && !after:
 				procs[pid] = agentProc{a, env}
 			}

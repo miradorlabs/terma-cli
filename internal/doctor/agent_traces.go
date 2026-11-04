@@ -17,12 +17,13 @@ import (
 // agent is installed.
 func TracesCheck(ctx context.Context, reg *agents.Registry, mine []string, stateDir string, environ Environ, now time.Time) (Check, bool) {
 	var procs map[int]agentProc
-	unread := false
+	var unread map[string]bool
 	if environ != nil {
 		procs, unread = runningAgents(reg, stateDir, environ, now)
 	}
 	pids := slices.Sorted(maps.Keys(procs))
 	var exporting, parts, fixes []string
+	exportingUnread := false
 	fix := func(f string) {
 		if !slices.Contains(fixes, f) {
 			fixes = append(fixes, f)
@@ -58,6 +59,7 @@ func TracesCheck(ctx context.Context, reg *agents.Registry, mine []string, state
 		}
 		if len(problems) == 0 {
 			exporting = append(exporting, a.DisplayName())
+			exportingUnread = exportingUnread || unread[a.Name()]
 			continue
 		}
 		parts = append(parts, a.DisplayName()+" exports no spans ("+strings.Join(problems, "; ")+"), so Terma has no "+a.SpansCarry()+" for its calls")
@@ -65,7 +67,7 @@ func TracesCheck(ctx context.Context, reg *agents.Registry, mine []string, state
 	switch {
 	case len(parts) > 0:
 		return Check{Status: Warn, Detail: strings.Join(parts, "; "), Fix: strings.Join(fixes, "; ")}, true
-	case len(exporting) > 0 && unread:
+	case len(exporting) > 0 && exportingUnread:
 		return Check{Status: Pass, Detail: strings.Join(exporting, ", ") + " exports its spans by its settings; terma cannot read the environment a running process of it started with"}, true
 	case len(exporting) > 0:
 		return Check{Status: Pass, Detail: strings.Join(exporting, ", ") + " exports its spans"}, true

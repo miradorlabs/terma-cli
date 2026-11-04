@@ -102,6 +102,20 @@ func TestTracesCheckNamesWhatSpansCarry(t *testing.T) {
 	}
 }
 
+// Another agent's process terma cannot read says nothing about this one's.
+func TestTracesCheckNamesOnlyItsOwnUnreadProcess(t *testing.T) {
+	t.Parallel()
+	reg := agents.New(tracedAgent{envAgent: envAgent{agentstest.Agent{ID: "fake"}}}, envAgent{agentstest.Agent{ID: "other"}})
+	dir := t.TempDir()
+	for id, c := range map[string]claim.Claim{"s1": {ProjectID: "p1", Tool: "fake", PIDs: []int{201}}, "s2": {ProjectID: "p1", Tool: "other", PIDs: []int{202}}} {
+		claim.Write(dir, id, c, time.Now())
+	}
+	c, _ := TracesCheck(context.Background(), reg, nil, dir, processes(map[int][]string{201: {"HOME=/home/dev"}, 202: nil}), time.Now())
+	if c.Status != Pass || strings.Contains(c.Detail, "cannot read") {
+		t.Fatalf("check = %+v, want a pass that does not say fake's process is unread", c)
+	}
+}
+
 // Processes sharing what switches spans off are named together.
 func TestTracesCheckGroupsProcesses(t *testing.T) {
 	t.Parallel()
