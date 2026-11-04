@@ -302,6 +302,33 @@ quiet night. The digest goes to the run's summary and to Slack through the
 channel means the job did not run. Drift never fails the night; a removed key on a surface
 terma parses fails its golden.
 
+## Harness Reference
+
+The public reference of what each harness build does and what changed from one build to the
+next (`reference/SCHEMA.md`). Profile scenarios (`profile_test.go`) run each build with its own
+defaults, none of the suite's settings, against a fixture provider that records every request
+(`profile.go`): the system prompt and injected context, tools, model and parameters, cache
+breakpoints, headers and betas, side requests, and the build's help. Behaviour probes add how
+it retries, compacts, truncates tool output and delegates; out-of-band captures add its
+network egress, what it writes to disk and what its binary says of itself. The run writes
+`report/profiles.json`, credentials redacted.
+
+`refgen` normalizes each build's profile (the run's paths, ids, dates and prompt become
+placeholders), builds its snapshot with its field census and its capability history, merges
+it into the published snapshots (a section the night did not capture keeps the last night's),
+compares each harness's versions in order, checks each change against the vendor's changelog,
+and writes `docs/harnesses/`. The nightly `compat` job runs it after compatgen and publishes
+the tree on `compat-matrix` beside the matrix; `publish.sh restore` starts each night from it.
+
+```sh
+make run RUN='^(TestClaudeProfile|TestCodexProfile)$'
+go run ./refgen -profiles report/profiles.json -fields report/fields.json -census report/census.json \
+  -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch
+```
+
+`-catalog docs/compat/fields.json` takes a census from the field catalog for each build a
+whole census saw, for a backfill whose builds were censused on earlier nights.
+
 ## Relay restarts
 
 `TestRelayClaudeMidTurn` and `TestRelayCodexMidTurn` stop the relay at a session's second

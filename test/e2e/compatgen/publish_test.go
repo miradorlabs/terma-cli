@@ -60,14 +60,15 @@ func TestPublishTwoNights(t *testing.T) {
 	run(seed, "git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "main")
 	run(seed, "git", "push", "-q", "origin", "main")
 
-	generated := []string{"docs/COMPATIBILITY.md", "docs/FIELDS.md", "docs/compat/compat.json", "docs/compat/history.json", "docs/compat/fields.json"}
+	generated := []string{"docs/COMPATIBILITY.md", "docs/FIELDS.md", "docs/compat/compat.json", "docs/compat/history.json", "docs/compat/fields.json",
+		"docs/harnesses/index.json", "docs/harnesses/claude/versions/1.0.0.json"}
 	for night := 1; night <= 2; night++ {
 		wt := filepath.Join(tmp, "night"+string(rune('0'+night)))
 		run(tmp, "git", "clone", "-q", "-b", "main", origin, wt)
 		run(wt, "bash", script, "restore")
 		if night == 2 {
 			// What the first night published, back in place and ignored, as the job renders over it.
-			for _, f := range []string{"docs/FIELDS.md", "docs/compat/history.json", "docs/compat/fields.json"} {
+			for _, f := range []string{"docs/FIELDS.md", "docs/compat/history.json", "docs/compat/fields.json", "docs/harnesses/index.json", "docs/harnesses/claude/diffs/0.9.0..1.0.0.json"} {
 				if b, err := os.ReadFile(filepath.Join(wt, f)); err != nil || string(b) != "night 1\n" {
 					t.Fatalf("night 2 restored %s as %q (%v)", f, b, err)
 				}
@@ -75,6 +76,14 @@ func TestPublishTwoNights(t *testing.T) {
 		}
 		for _, f := range generated {
 			write(wt, f, "night "+string(rune('0'+night))+"\n")
+		}
+		if night == 1 {
+			// A diff only the first night writes: the second, which no longer does, takes it out.
+			write(wt, "docs/harnesses/claude/diffs/0.9.0..1.0.0.json", "night 1\n")
+		} else {
+			if err := os.Remove(filepath.Join(wt, "docs/harnesses/claude/diffs/0.9.0..1.0.0.json")); err != nil {
+				t.Fatal(err)
+			}
 		}
 		if s := run(wt, "git", "status", "--porcelain"); s != "" {
 			t.Fatalf("night %d's generated files are not ignored on main:\n%s", night, s)
@@ -91,6 +100,9 @@ func TestPublishTwoNights(t *testing.T) {
 		if b, err := os.ReadFile(filepath.Join(check, f)); err != nil || string(b) != "night 2\n" {
 			t.Errorf("compat-matrix has %s as %q (%v), want night 2's", f, b, err)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(check, "docs/harnesses/claude/diffs/0.9.0..1.0.0.json")); err == nil {
+		t.Error("a reference file the night no longer wrote stayed on compat-matrix")
 	}
 	if _, err := os.Stat(filepath.Join(check, "README.md")); err == nil {
 		t.Error("compat-matrix carries main's files")

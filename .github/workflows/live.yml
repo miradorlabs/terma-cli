@@ -192,8 +192,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-  # The matrix and the field catalog: this night's rows from both platforms, and the field
-  # census macOS takes, merged into the history and catalog, rendered as docs/COMPATIBILITY.md,
+  # The matrix, the field catalog and the Harness Reference: this night's rows from both
+  # platforms, and the field census and profiles macOS takes, merged into the history, catalog
+  # and reference (docs/harnesses), rendered as docs/COMPATIBILITY.md,
   # docs/compat/compat.json (the website's data) and docs/FIELDS.md, published as an artefact
   # and the run's summary. Both live on the compat-matrix branch, which each scheduled run
   # extends and pushes: that branch's docs/compat/compat.json is the published matrix.
@@ -220,7 +221,7 @@ jobs:
           cache-dependency-path: test/e2e/go.sum
       - uses: actions/download-artifact@v5
         with:
-          pattern: "{compat,fields}-*"
+          pattern: "{compat,fields,profiles}-*"
           path: test/e2e/runs
       - name: Say what changed, and render the matrix and catalog
         working-directory: test/e2e
@@ -235,6 +236,20 @@ jobs:
           go run ./compatgen "${args[@]}" -digest report -source -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
           if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
+      # The Harness Reference: each build the night captured, normalized into its snapshot and
+      # merged into the published ones, each harness's versions compared in order, changes
+      # checked against the vendor's changelog (refgen; test/e2e/reference/SCHEMA.md). After
+      # compatgen, so a build's support is tonight's history.
+      - name: Render the Harness Reference
+        working-directory: test/e2e
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
+          for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
+          for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
+          go run ./refgen "${args[@]}" -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch
       - name: Post the digest to Slack
         # A webhook that fails (revoked, Slack down) must not keep the night from being published.
         continue-on-error: true
@@ -254,6 +269,7 @@ jobs:
             docs/COMPATIBILITY.md
             docs/FIELDS.md
             docs/compat/
+            docs/harnesses/
             test/e2e/report/drift.*
             test/e2e/report/slack.json
           if-no-files-found: ignore

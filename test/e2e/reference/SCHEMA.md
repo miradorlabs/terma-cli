@@ -91,9 +91,15 @@ where there is no changelog to read).
 ## versions/<version>.json: a snapshot
 
 Each section is what one kind of capture saw. A section the night did not capture is absent.
-Text is normalized: the run's own paths, URLs, dates, ids and prompt are replaced by
-placeholders (`<repo>`, `<home>`, `<provider>`, `<date>`, `<uuid>`, `<prompt>`), so two
-snapshots differ only where the builds do.
+Text is normalized, so two snapshots differ only where the builds do. The run's own literals
+become `<repo>`, `<home>`, `<sandbox>`, `<workdir>`, `<claude-config>`, `<codex-home>`,
+`<terma-config>`, `<provider>` (the fixture's URL) and `<prompt>` (the scenario's own
+prompt), and a path's slug form (every character but letters and digits a dash, as Claude
+Code names a project) `<repo-slug>` and so on. What varies by itself becomes `<version>` (the
+build's own version where it stands alone, as in a user agent), `<commit>`, `<date>`,
+`<timestamp>`, `<uuid>`, `<hex>` (32 to 64 hex digits), `<tmp>`, `<local>` (a loopback
+address and port), `<timezone>` and `<os-release>`. A date inside a name (a beta's, a
+model's) is part of the name and stays.
 
 ```json
 {
@@ -105,7 +111,8 @@ snapshots differ only where the builds do.
   "capture": {
     "command": ["claude", "-p", "<prompt>", "--output-format", "json", "--max-turns", "1"],
     "partial": false,
-    "notes": ["Model requests answered by a local fixture provider, not the vendor's API."]
+    "notes": ["Model requests answered by a local fixture provider, not the vendor's API."],
+    "sections": { "prompt": "2026-11-04T04:41:09Z", "support": "2026-11-04T05:02:11Z" }
   },
 
   "model": {
@@ -121,21 +128,23 @@ snapshots differ only where the builds do.
     "context": [ { "role": "user", "text": "<system-reminder>…", "chars": 1439 } ],
     "chars": 7447,
     "sha256": "…",
-    "interactive": { "system": [ "…same shape, the interactive session's…" ], "chars": 7012, "sha256": "…" }
+    "interactive": { "system": [ "…same shape, the interactive session's…" ], "context": [ ], "chars": 7012, "sha256": "…", "model": "claude-opus-5-5", "tools": ["Agent", "Bash"] }
   },
 
   "tools": [
-    { "name": "Bash", "description": "Executes a bash command…", "input_schema": { "type": "object" }, "sha256": "…" }
+    { "name": "Bash", "description": "Executes a bash command…", "input_schema": { "type": "object" }, "sha256": "…" },
+    { "name": "spawn_agent", "namespace": "collaboration", "type": "custom", "description": "…", "sha256": "…" }
   ],
 
   "caching": {
     "breakpoints": [ { "at": "system[1]", "type": "ephemeral", "ttl": "5m" }, { "at": "messages[-1]", "type": "ephemeral", "ttl": "5m" } ],
     "prompt_cache_key": false,
-    "across_turns": { "turns": 3, "moves": "last-message", "stable_prefix_chars": 41200 }
+    "across_turns": { "turns": 3, "breakpoints": [ ["system[1]", "messages[0].content[1]"], ["system[1]", "messages[2].content[0]"] ], "stable_cache_key": true, "stable_prefix_chars": 41200 }
   },
 
   "request": {
     "endpoint": "POST /v1/messages",
+    "wire": "messages",
     "query": "beta=true",
     "headers": { "anthropic-version": "2023-06-01", "user-agent": "claude-cli/2.1.318 (external, sdk-cli)", "x-app": "cli" },
     "betas": ["claude-code-20250219", "context-management-2025-06-27", "prompt-caching-scope-2026-01-05"],
@@ -144,10 +153,13 @@ snapshots differ only where the builds do.
     "identifiers": ["metadata.user_id", "header:x-claude-code-session-id"]
   },
 
-  "side_requests": [ { "method": "HEAD", "path": "/api/hello", "when": "before the first turn" } ],
+  "side_requests": [
+    { "method": "HEAD", "path": "/api/hello", "when": "before the first model request" },
+    { "method": "POST", "path": "/v1/messages", "model": "claude-haiku-5-5", "tools": 0, "system": [ "…" ], "when": "after the first model request" }
+  ],
 
   "behavior": {
-    "retries":      { "statuses": { "529": { "attempts": 10, "backoff_ms": [520, 1040, 2100], "honors_retry_after": true } }, "fallback_model": null },
+    "retries":      { "statuses": { "529": { "attempts": 4, "failed": 3, "backoff_ms": [2010, 2004, 2012], "honors_retry_after": true, "recovered": true } }, "fallback_model": "claude-sonnet-5-5" },
     "compaction":   { "triggered_at_tokens": 160000, "prompt": "Your task is to create a detailed summary…", "model": "claude-opus-5-5" },
     "tool_output":  { "limit_chars": 30000, "truncation": "middle", "marker": "… [N characters truncated] …" },
     "subagents":    { "model": "claude-opus-5-5", "system": [ "…" ], "tools": ["Bash", "Read"] },
@@ -240,7 +252,13 @@ A change:
 | `stats` | for text: characters added and removed |
 | `terma` | `{ "capabilities": ["relay.telemetry"] }` where a capability's result changed with it |
 | `source` | where the harness's public source names the thing changed, at `to` (for one removed, `gone` and where `from` named it) |
-| `documented` | whether the vendor's changelog for `to` mentions it; null without a changelog |
+| `documented` | whether the vendor's changelog for `to` mentions it; null without a changelog. A heuristic: a named thing (a tool, field, flag, beta, model) is documented where the changelog names it; a prompt's change where it says "system prompt"; a text's change (a tool's description) where it names the thing and its wording ("description", "prompt", "instruction"). `undocumented` counts the rest, the history's verdicts aside |
+
+A diff compares only the sections both snapshots have: a build captured before a kind of
+capture existed is no evidence the next build added everything that capture sees. `sha256`
+and `chars` are derived and never read as changes. The changelog is the vendor's markdown
+changelog section for `to` (Claude Code, Copilot CLI) or the release notes of its tag
+(harnesses whose source is public).
 
 Lists are compared by key: tools by `name`, telemetry by surface then key, hooks by event,
 egress by host, method and path, capabilities by `id` and platform. Strings of more than one
