@@ -88,6 +88,8 @@ base_url = "https://llm.corp.example/v1"
 		{"ollama", "", "", "ollama", semconv.TermaServingBackendPrivate},
 		{"lmstudio", "", "", "lmstudio", semconv.TermaServingBackendPrivate},
 		{"oss", "", "", "oss", semconv.TermaServingBackendPrivate},
+		{"amazon-bedrock", "", "", "amazon-bedrock", semconv.TermaServingBackendAwsBedrock},
+		{"amazon-bedrock-runtime", providers, "", "amazon-bedrock-runtime", semconv.TermaServingBackendAwsBedrock},
 		{"ollama with an unparsable config", "model_providers = [", "", "ollama", semconv.TermaServingBackendPrivate},
 		{"no provider", providers, "", "", ""},
 		{"unparsable config", "model_providers = [", "", "openai", ""},

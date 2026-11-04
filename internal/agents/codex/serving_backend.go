@@ -20,6 +20,10 @@ const codexOpenAIProvider = "openai"
 // codexLocalProviders are Codex's built-in providers that run on the developer's machine.
 var codexLocalProviders = []string{"ollama", "lmstudio", "oss"}
 
+// codexBedrockProviders are Codex's built-in Amazon Bedrock providers, which config.toml's
+// model_providers cannot redefine either.
+var codexBedrockProviders = []string{"amazon-bedrock", "amazon-bedrock-runtime"}
+
 // codexRoutes is what config.toml says about where each provider sends its calls. It is
 // today's file, not the session's: a base_url passed with -c, a profile file or a managed
 // layer is not seen, and a provider it does not define maps to nothing.
@@ -65,6 +69,9 @@ func readCodexRoutes() codexRoutes {
 func (c codexRoutes) backend(provider string) string {
 	if slices.Contains(codexLocalProviders, provider) {
 		return semconv.TermaServingBackendPrivate
+	}
+	if slices.Contains(codexBedrockProviders, provider) {
+		return semconv.TermaServingBackendAwsBedrock
 	}
 	if provider == "" || !c.readable {
 		return ""

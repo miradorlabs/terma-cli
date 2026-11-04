@@ -75,7 +75,7 @@ func TestClaudeFundingSnapshotAndHints(t *testing.T) {
 func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 	dir, repo := t.TempDir(), t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	for _, k := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"} {
+	for _, k := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_MANTLE"} {
 		t.Setenv(k, "")
 	}
 	writeEvidenceFile(t, filepath.Join(dir, ".claude.json"), `{"oauthAccount":{"accountUuid":"account-a","emailAddress":"me@example.test"}}`)
@@ -94,6 +94,12 @@ func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 	if e.Attrs[semconv.TermaAccountIDKey] != "account-a" {
 		t.Fatalf("account_id stays as raw evidence: %+v", e)
 	}
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("CLAUDE_CODE_USE_MANTLE", "1")
+	if e = readFunding(repo); e.oauthEffective {
+		t.Fatalf("a Bedrock (Mantle) session does not use the cached login: %+v", e)
+	}
+	t.Setenv("CLAUDE_CODE_USE_MANTLE", "")
 	// Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so a settings file is where it shows.
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	writeEvidenceFile(t, filepath.Join(repo, ".claude", "settings.local.json"), `{"env":{"CLAUDE_CODE_OAUTH_TOKEN":"never-export-token"}}`)

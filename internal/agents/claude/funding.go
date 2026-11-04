@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -135,18 +136,26 @@ func (r claudeRoute) lookup(key string) string {
 	return ""
 }
 
-// cloudBackend is the backend of the first cloud provider switch lookup finds on, in the order
-// Claude Code checks them; "" when none is.
-func cloudBackend(lookup func(string) string) string {
-	switch {
-	case isOn(lookup("CLAUDE_CODE_USE_BEDROCK")):
-		return semconv.TermaServingBackendAwsBedrock
-	case isOn(lookup("CLAUDE_CODE_USE_VERTEX")):
-		return semconv.TermaServingBackendGoogleVertex
-	case isOn(lookup("CLAUDE_CODE_USE_FOUNDRY")):
-		return semconv.TermaServingBackendAzureFoundry
+// claudeCloud is a cloud provider route: the switch that selects it, the variable that sends
+// it to another endpoint (an LLM gateway) and the backend that serves it.
+type claudeCloud struct{ switchVar, baseURLVar, backend string }
+
+// claudeClouds are the cloud provider switches, in the order Claude Code checks them.
+var claudeClouds = []claudeCloud{
+	{"CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BEDROCK_BASE_URL", semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_BASE_URL", semconv.TermaServingBackendAzureFoundry},
+	// Amazon Bedrock's Mantle endpoint.
+	{"CLAUDE_CODE_USE_MANTLE", "ANTHROPIC_BEDROCK_MANTLE_BASE_URL", semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_VERTEX", "ANTHROPIC_VERTEX_BASE_URL", semconv.TermaServingBackendGoogleVertex},
+}
+
+// cloudRoute is the first cloud provider route whose switch lookup finds on.
+func cloudRoute(lookup func(string) string) (claudeCloud, bool) {
+	i := slices.IndexFunc(claudeClouds, func(c claudeCloud) bool { return isOn(lookup(c.switchVar)) })
+	if i < 0 {
+		return claudeCloud{}, false
 	}
-	return ""
+	return claudeClouds[i], true
 }
 
 // firstPartyKey reports whether lookup finds a first-party key or token, which the session
@@ -159,5 +168,6 @@ func firstPartyKey(lookup func(string) string) bool {
 // key or token, no cloud provider, and apiKeyHelper positively not configured. Claude Code strips
 // CLAUDE_CODE_OAUTH_TOKEN from hooks' environment, so only a settings file can show it.
 func oauthAccountIsEffective(r claudeRoute) bool {
-	return !r.unreadable && !r.helper && cloudBackend(r.lookup) == "" && !firstPartyKey(r.lookup)
+	_, cloud := cloudRoute(r.lookup)
+	return !r.unreadable && !r.helper && !cloud && !firstPartyKey(r.lookup)
 }
