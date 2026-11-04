@@ -53,12 +53,10 @@ func (Agent) TracesOffIn(env []string) []string {
 	if v := vars[claudeEnableTelemetry]; v != "" && !isOn(v) {
 		off = append(off, claudeEnableTelemetry)
 	}
-	if beta := []string{claudeEnhancedTelemetry, claudeEnhancedTelemetryAlias}; !slices.ContainsFunc(beta, func(k string) bool { return isOn(vars[k]) }) {
-		for _, k := range beta {
-			if vars[k] != "" {
-				off = append(off, k)
-			}
-		}
+	// Either name on is enough, and settings name the beta switch as setup writes it, so only
+	// that name off, the other not on, can switch it off here.
+	if v := vars[claudeEnhancedTelemetry]; v != "" && !isOn(v) && !isOn(vars[claudeEnhancedTelemetryAlias]) {
+		off = append(off, claudeEnhancedTelemetry)
 	}
 	if v := vars[otelTracesExporter]; v != "" && !exportsOTLP(v) {
 		off = append(off, otelTracesExporter)

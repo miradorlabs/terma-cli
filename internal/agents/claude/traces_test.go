@@ -45,7 +45,8 @@ func TestTracesOffNamesWhatKeepsSpans(t *testing.T) {
 		t.Errorf("process env: TracesOffIn = %q", off)
 	}
 	for _, on := range [][]string{{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1", "OTEL_TRACES_EXPORTER=otlp", "HOME=/"},
-		{"ENABLE_ENHANCED_TELEMETRY_BETA=1", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=0", "OTEL_TRACES_EXPORTER=console,otlp"}} {
+		{"ENABLE_ENHANCED_TELEMETRY_BETA=1", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=0", "OTEL_TRACES_EXPORTER=console,otlp"},
+		{"ENABLE_ENHANCED_TELEMETRY_BETA=0"}} {
 		if off := (Agent{}).TracesOffIn(on); len(off) != 0 {
 			t.Errorf("process env on %q: TracesOffIn = %q", on, off)
 		}
