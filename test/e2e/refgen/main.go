@@ -50,6 +50,7 @@ func main() {
 		}
 		n.profiles = append(n.profiles, ps...)
 	}
+	n.profiles = latestProfiles(n.profiles)
 	for _, f := range fields {
 		var rows []e2e.FieldRow
 		if err := readOptional(f, &rows); err != nil {
@@ -119,6 +120,24 @@ func main() {
 			fail(err)
 		}
 	}
+}
+
+// latestProfiles keeps, of the profiles one scenario took of one build on one platform, the
+// last given: a later pass (a backfill's supplement, a retried scenario) replaces what an
+// earlier one took, where combining them would count its requests twice.
+func latestProfiles(ps []e2e.Profile) []e2e.Profile {
+	type key struct{ harness, version, scenario, platform string }
+	last := map[key]int{}
+	for i, p := range ps {
+		last[key{p.Harness, p.Version, p.Scenario, p.Platform}] = i
+	}
+	out := make([]e2e.Profile, 0, len(last))
+	for i, p := range ps {
+		if last[key{p.Harness, p.Version, p.Scenario, p.Platform}] == i {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // readOptional reads a JSON file into v; a file that is not there is an empty night of it.

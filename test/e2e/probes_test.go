@@ -160,16 +160,39 @@ func TestClaudeProbeCompaction(t *testing.T) {
 		full.Store(false)
 		const next = "Say hello once more. TERMA_PROFILE"
 		Placeholder(t, b, next, "<prompt-2>")
-		if _, err := claudeRun(sb, next, "--output-format", "json", "--max-turns", "1", "--resume", sid); err != nil {
-			t.Fatal(err)
+		// An older build does not compact a context past its window on its own: it refuses the
+		// turn ("Prompt is too long"), which is what it does, not a failed probe.
+		auto := map[string]any{"trigger": "auto", "reported_input_tokens": compactionTokens}
+		if result, err := claudeRun(sb, next, "--output-format", "json", "--max-turns", "1", "--resume", sid); err != nil {
+			if !refusedTooLong(result) {
+				t.Fatal(err)
+			}
+			auto["outcome"] = "refused"
+			auto["reason"] = result["result"]
+		} else {
+			auto["outcome"] = "compacted"
 		}
 		capture.Set("compaction-command")
-		if _, err := claudeRun(sb, "/compact", "--output-format", "json", "--max-turns", "1", "--resume", sid); err != nil {
-			t.Fatal(err)
+		manual := map[string]any{"trigger": "/compact"}
+		if result, err := claudeRun(sb, "/compact", "--output-format", "json", "--max-turns", "1", "--resume", sid); err != nil {
+			if !refusedTooLong(result) {
+				t.Fatal(err)
+			}
+			manual["outcome"] = "refused"
+			manual["reason"] = result["result"]
+		} else {
+			manual["outcome"] = "compacted"
 		}
-		RecordProbe(t, b, "compaction", map[string]any{"trigger": "auto", "reported_input_tokens": compactionTokens})
-		RecordProbe(t, b, "compaction-command", map[string]any{"trigger": "/compact"})
+		RecordProbe(t, b, "compaction", auto)
+		RecordProbe(t, b, "compaction-command", manual)
 	})
+}
+
+// refusedTooLong reports a turn Claude Code refused because its context was past the window.
+func refusedTooLong(result map[string]any) bool {
+	reason, _ := result["terminal_reason"].(string)
+	text, _ := result["result"].(string)
+	return reason == "blocking_limit" || strings.Contains(text, "Prompt is too long")
 }
 
 // compactionTokens is the input a compaction probe's fixture reports: more than any build's

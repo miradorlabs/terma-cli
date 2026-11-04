@@ -69,4 +69,11 @@ one() {
 export harness out bin var name summary
 export -f one
 echo "$versions" | xargs -P "${BACKFILL_JOBS:-3}" -I{} bash -c 'one "$1"' _ {}
+# Once more for a build that failed (a binary macOS removed mid-run, a machine too busy): its
+# second result is the one kept.
+for v in $(awk -F'\t' -v h="$harness" '$1 == h && $3 ~ /fail/ {print $2}' "$summary" | sort -u); do
+	[ -n "$(grep -E "^(--- FAIL)" "$out/$harness/$v/log" 2>/dev/null | grep -v ProbeSubagent)" ] || continue
+	rm -rf "${out:?}/$harness/$v"
+	echo "$v"
+done | xargs -P "${BACKFILL_JOBS:-3}" -I{} bash -c 'one "$1"' _ {}
 echo "done: $total builds of $harness" >&2

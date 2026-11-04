@@ -517,3 +517,14 @@ func TestShortHelp(t *testing.T) {
 		t.Errorf("flag from -h = %+v", c)
 	}
 }
+
+func TestLatestProfiles(t *testing.T) {
+	a := e2e.Profile{Harness: "claude", Version: "1.0.0", Scenario: "TestClaudeProbeCompaction", Platform: "darwin/arm64", Failed: true}
+	b := a
+	b.Failed = false
+	c := e2e.Profile{Harness: "claude", Version: "1.0.0", Scenario: "TestClaudeProfile", Platform: "darwin/arm64"}
+	got := latestProfiles([]e2e.Profile{a, c, b})
+	if len(got) != 2 || got[0].Scenario != "TestClaudeProfile" || got[1].Failed {
+		t.Errorf("latest = %+v", got)
+	}
+}
