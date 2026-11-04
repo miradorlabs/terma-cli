@@ -14,13 +14,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// exporterSignal is one signal's exporter variables and its route on the relay.
-type exporterSignal struct{ endpoint, headers, protocol, route string }
+// exporterVars are one OpenTelemetry SDK exporter's variables and the route they send to on
+// the relay.
+type exporterVars struct{ endpoint, headers, protocol, route string }
 
-// exporterSignals are the OpenTelemetry SDK's per-signal exporter variables and the route of
-// each signal on the relay. The SDK appends the route to the generic endpoint, and sends to a
-// per-signal endpoint as it is.
-var exporterSignals = []exporterSignal{
+// exporterSet is the SDK's generic variables, whose endpoint each signal's route is appended
+// to, then each signal's own, whose endpoint is sent to as it is.
+var exporterSet = []exporterVars{
+	{harness.EnvOTLPEndpoint, harness.EnvOTLPHeaders, harness.EnvOTLPProtocol, ""},
 	{"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "OTEL_EXPORTER_OTLP_LOGS_HEADERS", "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", "/v1/logs"},
 	{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "/v1/traces"},
 	{"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_HEADERS", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL", "/v1/metrics"},
@@ -103,51 +104,34 @@ func exporterEnvFindings(env []string, addr, token string) string {
 			vars[k] = v
 		}
 	}
+	// A token leading a relay endpoint's path authorizes in place of the header.
+	onPath := token != "" && slices.ContainsFunc(exporterSet, func(e exporterVars) bool {
+		_, relay := relayPath(vars[e.endpoint], addr)
+		return relay && strings.Contains(vars[e.endpoint], token)
+	})
 	var out []string
-	endpoints := []string{harness.EnvOTLPEndpoint}
-	protocols := []string{harness.EnvOTLPProtocol}
-	for _, s := range exporterSignals {
-		endpoints = append(endpoints, s.endpoint)
-		protocols = append(protocols, s.protocol)
-	}
-	for i, key := range endpoints {
-		v, set := vars[key]
+	for _, e := range exporterSet {
+		v, set := vars[e.endpoint]
 		path, relay := relayPath(v, addr)
-		route := ""
-		if i > 0 {
-			route = exporterSignals[i-1].route
-		}
+		generic := e.route == ""
+		doubled := generic && signalPath(v)
 		switch {
 		case !set:
 		case !relay:
-			out = append(out, key+" sends elsewhere than the local relay")
-		case !relayRoute(path, route, token) && (i > 0 || !signalPath(v)):
-			out = append(out, key+" names a path the local relay does not serve")
+			out = append(out, e.endpoint+" sends elsewhere than the local relay")
+		case !doubled && !relayRoute(path, e.route, token):
+			out = append(out, e.endpoint+" names a path the local relay does not serve")
 		}
-	}
-	if signalPath(vars[harness.EnvOTLPEndpoint]) {
-		out = append(out, harness.EnvOTLPEndpoint+" ends in a signal path the exporter appends again")
-	}
-	for _, key := range protocols {
-		if strings.Contains(strings.ToLower(vars[key]), "grpc") {
-			out = append(out, key+" picks gRPC, which the local relay does not serve")
+		if doubled {
+			out = append(out, e.endpoint+" ends in a signal path the exporter appends again")
 		}
-	}
-	// A token leading an endpoint's path authorizes in place of the header.
-	onPath := slices.ContainsFunc(endpoints, func(key string) bool {
-		_, relay := relayPath(vars[key], addr)
-		return relay && strings.Contains(vars[key], token)
-	})
-	if token == "" || onPath {
-		return strings.Join(out, ", ")
-	}
-	if h, ok := vars[harness.EnvOTLPHeaders]; ok && !strings.Contains(h, token) {
-		out = append(out, harness.EnvOTLPHeaders+" lacks the relay's current token")
-	}
-	// A signal's headers merge over the generic ones: only an Authorization of their own replaces the token.
-	for _, s := range exporterSignals {
-		if h := vars[s.headers]; authorizes(h) && !strings.Contains(h, token) {
-			out = append(out, s.headers+" lacks the relay's current token")
+		if strings.Contains(strings.ToLower(vars[e.protocol]), "grpc") {
+			out = append(out, e.protocol+" picks gRPC, which the local relay does not serve")
+		}
+		// A signal's headers merge over the generic ones: only an Authorization of their own replaces the token.
+		h, set := vars[e.headers]
+		if set && (generic || authorizes(h)) && token != "" && !onPath && !strings.Contains(h, token) {
+			out = append(out, e.headers+" lacks the relay's current token")
 		}
 	}
 	return strings.Join(out, ", ")
@@ -165,8 +149,8 @@ func relayPath(raw, addr string) (string, bool) {
 // signalPath reports whether the URL raw ends in a signal's route.
 func signalPath(raw string) bool {
 	u, err := url.Parse(strings.Trim(raw, `"'`))
-	return raw != "" && err == nil && slices.ContainsFunc(exporterSignals, func(s exporterSignal) bool {
-		return strings.HasSuffix(strings.TrimRight(u.Path, "/"), s.route)
+	return raw != "" && err == nil && slices.ContainsFunc(exporterSet, func(e exporterVars) bool {
+		return e.route != "" && strings.HasSuffix(strings.TrimRight(u.Path, "/"), e.route)
 	})
 }
 
