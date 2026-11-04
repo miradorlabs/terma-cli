@@ -93,6 +93,10 @@ func captureClaudeCallResponses(e hookrun.Env, r *hookrun.Repo, sessionID, trans
 		e.Logf("call responses: %v", err)
 		return
 	}
+	backend := ""
+	if len(calls) > 0 {
+		backend = servingBackend(r.Root)
+	}
 	for _, c := range calls {
 		attrs := map[string]any{
 			semconv.GenAIMainAgentNameKey:         claudeTool,
@@ -109,6 +113,7 @@ func captureClaudeCallResponses(e hookrun.Env, r *hookrun.Repo, sessionID, trans
 		hookrun.BoundedAttr(attrs, semconv.GenAIResponseModelKey, c.Model)
 		hookrun.BoundedAttr(attrs, semconv.TermaResponseServiceTierKey, c.ServiceTier)
 		hookrun.BoundedAttr(attrs, semconv.TermaResponseInferenceGeoKey, c.InferenceGeo)
+		hookrun.BoundedAttr(attrs, semconv.TermaServingBackendKey, backend)
 		// Unsent calls stay past the stored offset, for the next stop; the platform folds a re-sent one away.
 		if !e.EmitFor(r, spool.Event{Time: c.Time, Name: semconv.TermaModelCallResponseEvent, SessionID: sessionID, Attrs: attrs}) {
 			return

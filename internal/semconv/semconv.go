@@ -263,6 +263,8 @@ const (
 	TermaResponseServiceTierKey = "terma.response.service_tier"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
+	// TermaServingBackendKey is terma.serving.backend: Who served the session's model calls, from the route the agent was configured with.
+	TermaServingBackendKey = "terma.serving.backend"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
 	TermaSessionParentIDKey = "terma.session.parent.id"
 	// TermaSessionTitleKey is terma.session.title: The name the agent gave the session.
@@ -433,6 +435,18 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaServingBackendAnthropic is terma.serving.backend anthropic: Anthropic's own API.
+	TermaServingBackendAnthropic = "anthropic"
+	// TermaServingBackendAwsBedrock is terma.serving.backend aws-bedrock: Amazon Bedrock.
+	TermaServingBackendAwsBedrock = "aws-bedrock"
+	// TermaServingBackendGoogleVertex is terma.serving.backend google-vertex: Google Cloud Vertex AI.
+	TermaServingBackendGoogleVertex = "google-vertex"
+	// TermaServingBackendAzureFoundry is terma.serving.backend azure-foundry: Microsoft Foundry.
+	TermaServingBackendAzureFoundry = "azure-foundry"
+	// TermaServingBackendOpenai is terma.serving.backend openai: OpenAI's own API.
+	TermaServingBackendOpenai = "openai"
+	// TermaServingBackendAzureOpenai is terma.serving.backend azure-openai: Azure OpenAI.
+	TermaServingBackendAzureOpenai = "azure-openai"
 	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
 	TermaUpdateAutoOn = "on"
 	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).
