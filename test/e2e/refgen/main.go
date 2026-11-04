@@ -37,6 +37,8 @@ func main() {
 	compat := flag.String("compat", "", "the matrix, docs/compat/compat.json, for capability labels")
 	out := flag.String("out", "docs/harnesses", "the published tree to merge into")
 	fetch := flag.Bool("fetch", false, "read release dates and changelogs from the web")
+	site := flag.String("site", "https://terma.ai", "the reference's public site, for the links announcements carry")
+	announcePath := flag.String("announce", "", "write the versions to announce (new, newer than any captured before) to this JSON file")
 	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them (a tarball a build)")
 	flag.Parse()
 
@@ -99,15 +101,23 @@ func main() {
 			n.labels[c.ID] = c.Label
 		}
 	}
-	opt := options{fetch: *fetch}
+	opt := options{fetch: *fetch, site: strings.TrimSuffix(*site, "/")}
 	links := newLinker(*source)
 	if links != nil {
 		opt.linker = links
 	}
-	err := publish(*out, n, opt)
+	news, err := publish(*out, n, opt)
 	links.close()
 	if err != nil {
 		fail(err)
+	}
+	if *announcePath != "" {
+		if news == nil {
+			news = []Announcement{}
+		}
+		if err := writeJSON(*announcePath, news); err != nil {
+			fail(err)
+		}
 	}
 }
 

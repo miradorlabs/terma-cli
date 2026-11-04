@@ -1,4 +1,4 @@
-package main
+package refdiff
 
 import (
 	"encoding/json"
@@ -22,9 +22,9 @@ var skipKeys = map[string]bool{"sha256": true, "chars": true, "checked_at": true
 
 // compare is every change from a to b.
 func compare(a, b *Snapshot) []Change {
-	at, bt := a.tree(), b.tree()
+	at, bt := a.Tree(), b.Tree()
 	var out []Change
-	for _, sec := range sections {
+	for _, sec := range Sections {
 		if at[sec] == nil || bt[sec] == nil {
 			continue
 		}
@@ -537,10 +537,10 @@ func documented(c Change, changelog string) bool {
 	return false
 }
 
-// newDiff is the diff from a to b, its changes summarized, and checked against the changelog
+// New is the diff from a to b, its changes summarized, and checked against the changelog
 // where there is one.
-func newDiff(a, b *Snapshot, changelog *ChangelogNote, now time.Time) *Diff {
-	d := &Diff{SchemaVersion: schemaVersion, Harness: b.Harness, From: a.Version, To: b.Version, GeneratedAt: now,
+func New(a, b *Snapshot, changelog *ChangelogNote, now time.Time) *Diff {
+	d := &Diff{SchemaVersion: SchemaVersion, Harness: b.Harness, From: a.Version, To: b.Version, GeneratedAt: now,
 		Changelog: changelog, Changes: compare(a, b)}
 	if d.Changes == nil {
 		d.Changes = []Change{}
@@ -570,12 +570,12 @@ func summarize(changes []Change) DiffSummary {
 	return s
 }
 
-// highlights are a diff's few changes a person reads first: the most severe, then the
+// Highlights are a diff's few changes a person reads first: the most severe, then the
 // categories people care most about, one line each.
-func highlights(d *Diff, n int) []string {
+func Highlights(d *Diff, n int) []string {
 	rank := map[string]int{"breaking": 0, "degrading": 1, "notable": 2, "informational": 3}
 	order := map[string]int{}
-	for i, s := range sections {
+	for i, s := range Sections {
 		order[s] = i
 	}
 	cs := append([]Change{}, d.Changes...)
@@ -593,4 +593,40 @@ func highlights(d *Diff, n int) []string {
 		out = append(out, c.Title)
 	}
 	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// CompareRange is the diff between any two snapshots of a harness, from to to, however many
+// versions apart: what differs between them, net. A change is documented where the vendor's
+// changelog of any version between them (after from, up to to) mentions it; notes are those
+// changelogs by version.
+func CompareRange(from, to *Snapshot, notes map[string]ChangelogNote, now time.Time) *Diff {
+	lo, hi := from.Version, to.Version
+	if VersionLess(hi, lo) {
+		lo, hi = hi, lo
+	}
+	versions := make([]string, 0, len(notes))
+	for v := range notes {
+		if VersionLess(lo, v) && !VersionLess(hi, v) {
+			versions = append(versions, v)
+		}
+	}
+	sort.Slice(versions, func(i, j int) bool { return VersionLess(versions[j], versions[i]) })
+	var note *ChangelogNote
+	if len(versions) > 0 {
+		var sb strings.Builder
+		for _, v := range versions {
+			fmt.Fprintf(&sb, "## %s\n\n%s\n\n", v, strings.TrimSpace(notes[v].Text))
+		}
+		note = &ChangelogNote{URL: notes[versions[0]].URL, Text: strings.TrimSpace(sb.String())}
+	}
+	return New(from, to, note, now)
 }

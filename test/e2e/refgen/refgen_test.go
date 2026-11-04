@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/e2e"
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 func TestNormalize(t *testing.T) {
@@ -133,7 +134,7 @@ func TestDiffClassifies(t *testing.T) {
 		fields: []e2e.FieldRow{{Harness: "claude", Version: "1.0.1", Surface: "logs/api_request", Key: "cost_usd", Kinds: []string{"number"}, Class: "safe"},
 			{Harness: "claude", Version: "1.0.1", Surface: "logs/api_request", Key: "speed", Kinds: []string{"text"}, Class: "safe"}}}
 	sa, sb := a.tonight(buildID{"claude", "1.0.0"}), b.tonight(buildID{"claude", "1.0.1"})
-	d := newDiff(sa, sb, &ChangelogNote{Text: "- Added the Monitor tool"}, time.Now())
+	d := refdiff.New(sa, sb, &ChangelogNote{Text: "- Added the Monitor tool"}, time.Now())
 
 	if c := changeByID(d, "prompt.system.1.text"); c == nil || c.TextDiff == nil || !strings.Contains(*c.TextDiff, "-Use tools.\n+Use tools well.") || c.Impact != "notable" {
 		t.Errorf("system prompt change = %+v", c)
@@ -176,34 +177,8 @@ func TestDiffClassifies(t *testing.T) {
 func TestDiffSkipsSectionsOnlyOneHas(t *testing.T) {
 	a := &Snapshot{Harness: "codex", Version: "0.1.0", Support: map[string]any{"status": "supported"}}
 	b := &Snapshot{Harness: "codex", Version: "0.1.1", Support: map[string]any{"status": "supported"}, Tools: []any{map[string]any{"name": "shell"}}}
-	if d := newDiff(a, b, nil, time.Now()); len(d.Changes) != 0 || d.Summary.Undocumented != nil {
+	if d := refdiff.New(a, b, nil, time.Now()); len(d.Changes) != 0 || d.Summary.Undocumented != nil {
 		t.Errorf("changes = %+v", d.Changes)
-	}
-}
-
-func TestUnifiedDiff(t *testing.T) {
-	a := "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"
-	b := "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight\nnine\nten\neleven\n"
-	d, stats := unifiedDiff(a, b)
-	want := "@@ -1,6 +1,6 @@\n one\n two\n-three\n+THREE\n four\n five\n six\n@@ -8,4 +8,5 @@\n eight\n nine\n ten\n+eleven\n \n"
-	if d != want {
-		t.Errorf("diff =\n%s\nwant\n%s", d, want)
-	}
-	if stats.AddedChars != 11 || stats.RemovedChars != 5 {
-		t.Errorf("stats = %+v", stats)
-	}
-	long := strings.Repeat("A sentence here. ", 30)
-	d, _ = unifiedDiff(long, strings.Replace(long, "A sentence here. A", "A sentence there. A", 1))
-	if strings.Count(d, "\n-") != 1 || strings.Count(d, "\n+") != 1 {
-		t.Errorf("a long line compared whole:\n%s", d)
-	}
-}
-
-func TestVersionLess(t *testing.T) {
-	for _, c := range [][2]string{{"2.1.9", "2.1.10"}, {"0.2.1-rc.5", "0.2.1"}, {"2026.9.21", "2026.9.24"}, {"0.159.0", "0.159.1"}} {
-		if !versionLess(c[0], c[1]) || versionLess(c[1], c[0]) {
-			t.Errorf("%s < %s not said", c[0], c[1])
-		}
 	}
 }
 
@@ -221,13 +196,13 @@ func TestPublishTwoNights(t *testing.T) {
 	dir := t.TempDir()
 	first := night{now: time.Date(2026, 11, 3, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "a-2025", "")},
 		history: []HistoryEntry{{Harness: "claude", Version: "1.0.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}}
-	if err := publish(dir, first, options{}); err != nil {
+	if _, err := publish(dir, first, options{}); err != nil {
 		t.Fatal(err)
 	}
 	second := night{now: time.Date(2026, 11, 4, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be briefer.", []string{"Bash", "Monitor"}, "a-2025", "")},
 		history: []HistoryEntry{{Harness: "claude", Version: "1.0.0", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"},
 			{Harness: "claude", Version: "1.0.1", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}}
-	if err := publish(dir, second, options{}); err != nil {
+	if _, err := publish(dir, second, options{}); err != nil {
 		t.Fatal(err)
 	}
 	var idx Index
@@ -265,7 +240,7 @@ func TestPublishTwoNights(t *testing.T) {
 	// A build arriving between two published ones replaces their diff with two.
 	third := night{now: time.Date(2026, 11, 5, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{claudeProfile("1.0.0-rc.1", "Be brief!", []string{"Bash"}, "a-2025", "")}}
 	third.profiles[0].Version = "1.0.1-rc.1"
-	if err := publish(dir, third, options{}); err != nil {
+	if _, err := publish(dir, third, options{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "claude", "diffs", "1.0.0..1.0.1.json")); err == nil {
@@ -283,7 +258,7 @@ func TestPublishTwoNights(t *testing.T) {
 func TestAttemptedBuildIsPublished(t *testing.T) {
 	dir := t.TempDir()
 	n := night{now: time.Now(), attempted: []buildID{{"codex", "0.200.0"}}}
-	if err := publish(dir, n, options{}); err != nil {
+	if _, err := publish(dir, n, options{}); err != nil {
 		t.Fatal(err)
 	}
 	var s Snapshot
@@ -295,7 +270,7 @@ func TestAttemptedBuildIsPublished(t *testing.T) {
 	}
 	later := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("0.200.0", "Be brief.", []string{"shell"}, "", "")}}
 	later.profiles[0].Harness = "codex"
-	if err := publish(dir, later, options{}); err != nil {
+	if _, err := publish(dir, later, options{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := readJSON(filepath.Join(dir, "codex", "versions", "0.200.0.json"), &s); err != nil {
@@ -322,7 +297,7 @@ func TestSigningChange(t *testing.T) {
 	if sb.Binary["signing"].(map[string]any)["status"] != "revoked" {
 		t.Fatalf("binary = %v", sb.Binary)
 	}
-	d := newDiff(sa, sb, nil, time.Now())
+	d := refdiff.New(sa, sb, nil, time.Now())
 	c := changeByID(d, "binary.signing.status")
 	if c == nil || c.Impact != "notable" || c.Title != "Signing certificate revoked" {
 		t.Errorf("signing change = %+v", c)
@@ -357,5 +332,47 @@ func TestDiffSides(t *testing.T) {
 	a, r := diffSides("@@ -1,2 +1,2 @@\n same\n-old line\n+new line\n")
 	if a != "new line\n" || r != "old line\n" {
 		t.Errorf("sides = %q, %q", a, r)
+	}
+}
+
+// A version newer than every one captured before is announced, once; an older one arriving
+// late (a backfill) and a harness's first publication are not.
+func TestAnnouncements(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	first := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}
+	if news, err := publish(dir, first, opt); err != nil || len(news) != 0 {
+		t.Fatalf("first publication announced %v (%v)", news, err)
+	}
+	second := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be briefer.", []string{"Bash", "Monitor"}, "", "")}}
+	news, err := publish(dir, second, opt)
+	if err != nil || len(news) != 1 {
+		t.Fatalf("announced %+v (%v)", news, err)
+	}
+	a := news[0]
+	if a.Version != "1.0.1" || a.Previous != "1.0.0" || a.URL != "https://terma.ai/h/claude/1.0.1" ||
+		a.CompareURL != "https://terma.ai/harnesses/claude/compare/1.0.0...1.0.1" || len(a.Highlights) == 0 {
+		t.Errorf("announcement = %+v", a)
+	}
+	if !strings.HasPrefix(a.Text, "Claude Code 1.0.1 is out.") || !strings.HasSuffix(a.Text, a.URL) || len([]rune(a.Text))-len(a.URL)+23 > 280 {
+		t.Errorf("post = %q", a.Text)
+	}
+	if a.Slack["blocks"] == nil || !strings.Contains(a.Slack["text"].(string), a.URL) {
+		t.Errorf("slack = %v", a.Slack)
+	}
+	if news, _ := publish(dir, second, opt); len(news) != 0 {
+		t.Errorf("announced again: %+v", news)
+	}
+	late := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("0.9.0", "Be.", []string{"Bash"}, "", "")}}
+	if news, _ := publish(dir, late, opt); len(news) != 0 {
+		t.Errorf("a backfilled version announced: %+v", news)
+	}
+	var tl Timeline
+	if err := readJSON(filepath.Join(dir, "claude", "timeline.json"), &tl); err != nil || len(tl.Steps) != 2 || tl.Steps[0].Version != "1.0.1" {
+		t.Errorf("timeline = %+v (%v)", tl, err)
+	}
+	var cl Changelogs
+	if err := readJSON(filepath.Join(dir, "claude", "changelog.json"), &cl); err != nil || cl.Versions == nil {
+		t.Errorf("changelog = %+v (%v)", cl, err)
 	}
 }

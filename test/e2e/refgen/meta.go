@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 // What the reference says of each harness besides what it observed: its name, vendor, where
@@ -77,32 +78,7 @@ func (m harnessMeta) compare(from, to string) string {
 }
 
 // versionLess orders versions by their numbers, a prerelease before its release.
-func versionLess(a, b string) bool {
-	ar, apre, _ := strings.Cut(a, "-")
-	br, bpre, _ := strings.Cut(b, "-")
-	as, bs := strings.Split(ar, "."), strings.Split(br, ".")
-	for i := range max(len(as), len(bs)) {
-		var x, y int
-		if i < len(as) {
-			x, _ = strconv.Atoi(as[i])
-		}
-		if i < len(bs) {
-			y, _ = strconv.Atoi(bs[i])
-		}
-		if x != y {
-			return x < y
-		}
-	}
-	switch {
-	case apre == bpre:
-		return false
-	case apre == "":
-		return false
-	case bpre == "":
-		return true
-	}
-	return apre < bpre
-}
+func versionLess(a, b string) bool { return refdiff.VersionLess(a, b) }
 
 // fetcher reads the web for release dates and changelogs; tests replace it.
 var fetcher = func(url string) ([]byte, error) {

@@ -19,6 +19,9 @@ docs/harnesses/<harness>/index.json                one harness: every version wi
 docs/harnesses/<harness>/versions/<version>.json   a build's snapshot
 docs/harnesses/<harness>/diffs/<from>..<to>.json   what changed from one build to the next
 docs/harnesses/<harness>/prompts/<version>.md      the build's system prompt, as text
+docs/harnesses/<harness>/changelog.json            what the vendor's changelog says of each version
+docs/harnesses/<harness>/timeline.json             every step's changes, without their values
+docs/harnesses/refdiff.wasm, wasm_exec.js          the comparison of any two versions, for a browser
 ```
 
 `<harness>` is a stable id: `claude`, `codex`, `gemini`, `opencode`, `pi`, `omp`, `hermes`,
@@ -285,3 +288,62 @@ changelog section for `to` (Claude Code, Copilot CLI) or the release notes of it
 Lists are compared by key: tools by `name`, telemetry by surface then key, hooks by event,
 egress by host, method and path, capabilities by `id` and platform. Strings of more than one
 line are compared as text.
+
+## <harness>/changelog.json
+
+What the vendor's changelog says of each version, where it says something that could be read
+(a version absent has none): the comparison of any two versions judges `documented` against
+every one between them.
+
+```json
+{ "schema_version": 1, "harness": "claude",
+  "versions": { "2.1.318": { "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md", "text": "- Added …" } } }
+```
+
+## <harness>/timeline.json
+
+Every step between consecutive versions, newest first: each change's `id`, `category`, `op`,
+`title`, `impact` and `documented`, without values. Over a range of versions it says which
+version made each change (a net change matches its steps by `id`).
+
+```json
+{ "schema_version": 1, "harness": "claude",
+  "steps": [ { "version": "2.1.318", "previous": "2.1.317",
+               "changes": [ { "id": "tools.Monitor", "category": "tools", "op": "added", "title": "New tool: Monitor", "impact": "notable", "documented": true } ] } ] }
+```
+
+## Comparing any two versions
+
+Diffs are published between consecutive versions only; any other two are compared where they
+are read, by the same code that made the published ones (`refdiff`), compiled to WebAssembly:
+`refdiff.wasm` with the Go runtime that built it, `wasm_exec.js`. After
+
+```js
+const go = new Go();
+const { instance } = await WebAssembly.instantiateStreaming(fetch("refdiff.wasm"), go.importObject);
+go.run(instance);
+```
+
+`harnessReferenceCompare(fromSnapshotJSON, toSnapshotJSON, changelogJSON)` returns, as a
+string, a diff in the schema above between the two snapshots (`from` and `to` the two
+versions, net of every step between them), each change `documented` where the changelog of
+any version after `from` up to `to` mentions it; or `{"error": "…"}`. It needs a page's
+CSP to allow `'wasm-unsafe-eval'`.
+
+## Links
+
+The reference's pages, which announcements and anything else link to:
+
+| page | |
+|---|---|
+| `https://terma.ai/h/<harness>/<version>` | a version's page: its changes from the version before, and the vendor's changelog of it (redirects to `/harnesses/<harness>/<version>`) |
+| `https://terma.ai/harnesses/<harness>/compare/<from>...<to>` | any two versions compared |
+
+## Announcements
+
+Not published: what `refgen -announce` writes for the workflows to post, each version newer
+than any of its harness captured before, once (a backfill, a failed capture and a harness's
+first publication announce nothing). Each has the version, the one before, its page and
+comparison links, counts, highlights, its signing verdict, `text` (a post of at most 280
+characters, a link counted as 23) and `slack` (a Slack message with buttons to the page and
+the comparison).

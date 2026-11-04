@@ -114,6 +114,8 @@ jobs:
     if: always() && needs.detect.outputs.builds != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # For the Slack webhook the announcements are posted with.
+    environment: live-harnesses
     permissions:
       contents: write
     # The nightly compat job (live.yml) publishes the same branch: never both at once.
@@ -142,8 +144,30 @@ jobs:
           args=()
           if [ -f runs/profiles.json ]; then args+=(-profiles runs/profiles.json); fi
           while read -r line; do args+=(-attempted "$line"); done <<<"$BUILDS"
-          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch -source
+          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch -source -announce "$RUNNER_TEMP/announcements.json"
+          # The comparison of any two versions, run in the reader's browser: the same code that
+          # made the diffs, built reproducibly, so an unchanged engine is no change on the branch.
+          GOOS=js GOARCH=wasm go build -trimpath -buildvcs=false -ldflags='-s -w' -o ../../docs/harnesses/refdiff.wasm ./refdiff/wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" ../../docs/harnesses/wasm_exec.js
       - name: Publish the reference
         env:
           BUILDS: ${{ needs.detect.outputs.builds }}
         run: TERMA_REFERENCE_BUILDS="$(paste -sd' ' - <<<"$BUILDS")" test/e2e/compatgen/publish.sh publish-reference
+      # Each version newer than any captured before, once, after it is published: never a
+      # backfill, never twice. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without
+      # it, the digest's.
+      - name: Announce new versions
+        if: success()
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          news="$RUNNER_TEMP/announcements.json"
+          [ -s "$news" ] || exit 0
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::notice::No Slack webhook in the live-harnesses environment: $(jq length "$news") new versions not announced."
+            exit 0
+          fi
+          jq -c '.[].slack' "$news" | while read -r message; do
+            curl -fsS -X POST -H 'Content-Type: application/json' --data "$message" "$SLACK_WEBHOOK_URL"
+          done

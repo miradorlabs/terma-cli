@@ -284,7 +284,7 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 		out.Capture.Sections = map[string]time.Time{}
 	}
 	keepWhole := tonight.Capture.Partial && !old.Capture.Partial
-	ot, tt := out.tree(), tonight.tree()
+	ot, tt := out.Tree(), tonight.Tree()
 	took := false
 	for _, sec := range present(tonight) {
 		if keepWhole && sec != "support" && sec != "telemetry" && ot[sec] != nil {
@@ -316,7 +316,7 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 
 // present are the sections s has, in the schema's order.
 func present(s *Snapshot) []string {
-	t := s.tree()
+	t := s.Tree()
 	var out []string
 	for _, sec := range sections {
 		if t[sec] != nil {

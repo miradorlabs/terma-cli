@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 	"github.com/miradorlabs/terma-cli/e2e/sourcelink"
 )
 
@@ -25,6 +26,7 @@ import (
 type options struct {
 	fetch  bool   // release dates and changelogs from the web
 	linker linker // source links; nil leaves changes unlinked
+	site   string // the reference's public site, for announcements' links
 }
 
 // linker says where a harness's public source names what a change is about.
@@ -34,13 +36,15 @@ type linker interface {
 
 // published is what a run starts from.
 type published struct {
-	snapshots map[string]map[string]*Snapshot
-	diffs     map[string]map[string]*Diff
-	versions  map[string]map[string]VersionEntry
+	snapshots  map[string]map[string]*Snapshot
+	diffs      map[string]map[string]*Diff
+	versions   map[string]map[string]VersionEntry
+	changelogs map[string]map[string]ChangelogNote
 }
 
 func load(dir string) (published, error) {
-	p := published{snapshots: map[string]map[string]*Snapshot{}, diffs: map[string]map[string]*Diff{}, versions: map[string]map[string]VersionEntry{}}
+	p := published{snapshots: map[string]map[string]*Snapshot{}, diffs: map[string]map[string]*Diff{}, versions: map[string]map[string]VersionEntry{},
+		changelogs: map[string]map[string]ChangelogNote{}}
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return p, nil
@@ -69,6 +73,10 @@ func load(dir string) (published, error) {
 				return p, err
 			}
 			p.diffs[h][d.From+".."+d.To] = &d
+		}
+		var cl Changelogs
+		if err := readJSON(filepath.Join(dir, h, "changelog.json"), &cl); err == nil {
+			p.changelogs[h] = cl.Versions
 		}
 		var hi HarnessIndex
 		if err := readJSON(filepath.Join(dir, h, "index.json"), &hi); err == nil {
@@ -102,11 +110,17 @@ func writeJSON(path string, v any) error {
 	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 
-// publish merges the night into dir.
-func publish(dir string, n night, opt options) error {
+// publish merges the night into dir, and says which versions to announce.
+func publish(dir string, n night, opt options) ([]Announcement, error) {
 	pub, err := load(dir)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	// The newest version of each harness published with something captured of it, before the
+	// night: a version newer than it, captured tonight, is news.
+	before := map[string]string{}
+	for h, byVersion := range pub.snapshots {
+		before[h] = newestCaptured(byVersion)
 	}
 	changed := map[buildID]bool{}
 	for _, id := range n.builds() {
@@ -141,6 +155,7 @@ func publish(dir string, n night, opt options) error {
 	}
 
 	var notes changelogs
+	var news []Announcement
 	index := Index{SchemaVersion: schemaVersion, GeneratedAt: n.now, Harnesses: []HarnessEntry{}}
 	for _, h := range sortedHarnesses(pub.snapshots) {
 		byVersion := pub.snapshots[h]
@@ -171,7 +186,7 @@ func publish(dir string, n night, opt options) error {
 			case opt.fetch:
 				note = notes.of(h, to)
 			}
-			d := newDiff(byVersion[from], byVersion[to], note, n.now)
+			d := refdiff.New(byVersion[from], byVersion[to], note, n.now)
 			c := sourcelink.Compare(h, from, to)
 			if c == "" {
 				c = meta.compare(from, to)
@@ -214,7 +229,7 @@ func publish(dir string, n night, opt options) error {
 				e.Previous = &prev
 				d := diffs[prev+".."+v]
 				e.Changes, e.Categories, e.Impact, e.Undocumented = d.Summary.Changes, d.Summary.Categories, d.Summary.Impact, d.Summary.Undocumented
-				e.Highlights = highlights(d, 3)
+				e.Highlights = refdiff.Highlights(d, 3)
 			}
 			entries = append(entries, e)
 		}
@@ -233,15 +248,25 @@ func publish(dir string, n night, opt options) error {
 		}
 		index.Harnesses = append(index.Harnesses, entry)
 
-		if err := writeHarness(filepath.Join(dir, h), entry, entries, byVersion, diffs); err != nil {
-			return err
+		cl := Changelogs{SchemaVersion: schemaVersion, Harness: h, Versions: map[string]ChangelogNote{}}
+		for v, note := range pub.changelogs[h] {
+			cl.Versions[v] = note
 		}
+		for _, d := range diffs {
+			if d.Changelog != nil {
+				cl.Versions[d.To] = *d.Changelog
+			}
+		}
+		if err := writeHarness(filepath.Join(dir, h), entry, entries, byVersion, diffs, cl); err != nil {
+			return nil, err
+		}
+		news = append(news, announce(opt.site, entry, entries, diffs, byVersion, before[h])...)
 	}
-	return writeJSON(filepath.Join(dir, "index.json"), index)
+	return news, writeJSON(filepath.Join(dir, "index.json"), index)
 }
 
 // writeHarness writes one harness's tree, and removes what no longer belongs in it.
-func writeHarness(dir string, entry HarnessEntry, entries []VersionEntry, snaps map[string]*Snapshot, diffs map[string]*Diff) error {
+func writeHarness(dir string, entry HarnessEntry, entries []VersionEntry, snaps map[string]*Snapshot, diffs map[string]*Diff, cl Changelogs) error {
 	for v, s := range snaps {
 		if err := writeJSON(filepath.Join(dir, "versions", v+".json"), s); err != nil {
 			return err
@@ -268,7 +293,31 @@ func writeHarness(dir string, entry HarnessEntry, entries []VersionEntry, snaps 
 			return err
 		}
 	}
+	if err := writeJSON(filepath.Join(dir, "changelog.json"), cl); err != nil {
+		return err
+	}
+	if err := writeJSON(filepath.Join(dir, "timeline.json"), timelineOf(entry.ID, entries, diffs)); err != nil {
+		return err
+	}
 	return writeJSON(filepath.Join(dir, "index.json"), HarnessIndex{SchemaVersion: schemaVersion, Harness: entry, Versions: entries})
+}
+
+// timelineOf is every step of a harness's versions, newest first: each version's changes from
+// the one before it, without their values, so a range of versions reads as what each step did.
+func timelineOf(harness string, entries []VersionEntry, diffs map[string]*Diff) Timeline {
+	t := Timeline{SchemaVersion: schemaVersion, Harness: harness, Steps: []TimelineStep{}}
+	for _, e := range entries {
+		if e.Previous == nil {
+			continue
+		}
+		d := diffs[*e.Previous+".."+e.Version]
+		step := TimelineStep{Version: e.Version, Previous: *e.Previous, Changes: make([]TimelineChange, 0, len(d.Changes))}
+		for _, c := range d.Changes {
+			step.Changes = append(step.Changes, TimelineChange{ID: c.ID, Category: c.Category, Op: c.Op, Title: c.Title, Impact: c.Impact, Documented: c.Documented})
+		}
+		t.Steps = append(t.Steps, step)
+	}
+	return t
 }
 
 // promptMarkdown is a build's prompts as one text a person reads, "" where none was captured.
@@ -301,7 +350,7 @@ func promptMarkdown(name string, s *Snapshot) string {
 }
 
 func sameSections(a, b *Snapshot) bool {
-	at, bt := a.tree(), b.tree()
+	at, bt := a.Tree(), b.Tree()
 	for _, sec := range sections {
 		if !reflect.DeepEqual(at[sec], bt[sec]) {
 			return false
