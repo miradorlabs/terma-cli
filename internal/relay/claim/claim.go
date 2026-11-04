@@ -57,6 +57,10 @@ type Claim struct {
 	Remote    string    `json:"remote,omitempty"`
 	Branch    string    `json:"branch,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
+	// Agent says an agent's hook has claimed the session, not only a git hook: only then do
+	// PIDs name an agent's process. A git hook's write keeps it as it was. A claim written
+	// before the field existed reads false, so nothing judges its processes as an agent's.
+	Agent bool `json:"agent,omitempty"`
 	// EndedAt is when the session's agent reported its end, zero while it runs. The relay
 	// ignores it, since the agent still exports as it exits; an agent hook's later write
 	// clears it, a git hook's keeps it.
@@ -92,10 +96,6 @@ type Placement struct {
 const maxPIDs = 64
 
 const maxPlacements = 8
-
-// FromAgent reports whether an agent's hook has claimed the session: a git hook's claim
-// names no directory, and keeps the one an agent's hook named.
-func (c Claim) FromAgent() bool { return c.Cwd != "" }
 
 // Covers reports whether pid may send under this claim's latest placement.
 func (c Claim) Covers(pid int) bool {
@@ -221,7 +221,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := readFresh(p, now); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) && (prev.Agent || !c.Agent) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -236,21 +236,24 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		defer unlock()
 	}
 	now = now.UTC()
-	prev, havePrev := read(p)
+	prev, havePrev := readFresh(p, now)
 	placements := []Placement{}
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) && (prev.Agent || !c.Agent) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
 		if c.Tool == "" {
 			c.Tool = prev.Tool
 		}
+		if c.Cwd == "" {
+			c.Cwd = prev.Cwd
+		}
 		// A git hook's claim is no new run of the agent.
-		if !c.FromAgent() {
-			c.Cwd, c.EndedAt = prev.Cwd, prev.EndedAt
+		if !c.Agent {
+			c.Agent, c.EndedAt = prev.Agent, prev.EndedAt
 		}
 		placements = prev.placements()
 		placements = placements[:len(placements)-1]
@@ -320,6 +323,12 @@ func Read(dir, sessionID string, now time.Time) (Claim, bool) {
 	if !ok {
 		return Claim{}, false
 	}
+	return readFresh(p, now)
+}
+
+// readFresh reads the claim at p if written less than TTL ago: an older one is gone, though
+// the relay may not have pruned it yet.
+func readFresh(p string, now time.Time) (Claim, bool) {
 	info, err := os.Stat(p)
 	if err != nil || now.Sub(info.ModTime()) >= TTL {
 		return Claim{}, false

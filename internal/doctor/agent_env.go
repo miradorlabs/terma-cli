@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"net/url"
@@ -85,9 +86,10 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 // is not: once the agent exits, the nearest running process is its launcher.
 //
 // Accepted risk: an agent that exits without its end hook completing (a crash, a kill, the
-// hook's timeout) leaves its claim fresh for claim.TTL, so its launcher is judged as the
-// agent and a launcher that sets no exporter variable of its own reads as a pass. Telling the
-// agent's own process apart (by its executable) would close it.
+// hook's timeout) leaves its claim fresh for claim.TTL after the session's last hook, a
+// commit's included, so its launcher is judged as the agent and a launcher that sets no
+// exporter variable of its own reads as a pass. Telling the agent's own process apart (by
+// its executable) would close it.
 func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now time.Time) (procs map[int]agentProc, unread map[string]bool) {
 	type seenProc struct {
 		agentProc
@@ -98,7 +100,7 @@ func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now t
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
 		// A session only git hooks claimed (a commit after its claim expired) names no agent process.
-		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" || !c.FromAgent() {
+		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" || !c.Agent {
 			continue
 		}
 		// A subagent's claim names its session's processes but never ends: the later word wins.
@@ -137,17 +139,15 @@ func exporterEnvFindings(env []string, addr, token string) string {
 			vars[k] = v
 		}
 	}
-	// A token leading a relay endpoint's path authorizes in place of the header.
-	onPath := token != "" && slices.ContainsFunc(exporterSet, func(e exporterVars) bool {
-		_, relay := relayPath(vars[e.endpoint], addr)
-		return relay && strings.Contains(vars[e.endpoint], token)
-	})
+	// The generic endpoint is used by no signal whose own endpoint is set.
+	overridden := !slices.ContainsFunc(exporterSet[1:], func(e exporterVars) bool { return vars[e.endpoint] == "" })
 	var out []string
 	for _, e := range exporterSet {
 		v, set := vars[e.endpoint]
 		path, relay := relayPath(v, addr)
 		generic := e.route == ""
-		doubled := generic && signalPath(v)
+		set = set && (!generic || !overridden)
+		doubled := set && generic && signalPath(v)
 		switch {
 		case !set:
 		case !relay:
@@ -161,10 +161,25 @@ func exporterEnvFindings(env []string, addr, token string) string {
 		if strings.Contains(strings.ToLower(vars[e.protocol]), "grpc") {
 			out = append(out, e.protocol+" picks gRPC, which the local relay does not serve")
 		}
-		// A signal's headers merge over the generic ones: only an Authorization of their own replaces the token.
-		h, set := vars[e.headers]
-		if set && (generic || authorizes(h)) && token != "" && !onPath && !strings.Contains(h, token) {
-			out = append(out, e.headers+" lacks the relay's current token")
+	}
+	if token == "" {
+		return strings.Join(out, ", ")
+	}
+	// Each signal is authorized on its own: by a token leading the path of the endpoint it
+	// sends to, else by the bearer of the headers it sends, its own Authorization replacing
+	// the generic one.
+	generic := exporterSet[0]
+	for _, e := range exporterSet[1:] {
+		endpoint := cmp.Or(vars[e.endpoint], vars[generic.endpoint])
+		if path, relay := relayPath(endpoint, addr); relay && strings.HasPrefix(strings.TrimRight(path, "/")+"/", "/"+token+"/") {
+			continue
+		}
+		headers := e.headers
+		if !authorizes(vars[headers]) {
+			headers = generic.headers
+		}
+		if h, set := vars[headers]; set && bearer(h) != token && !slices.Contains(out, headers+" lacks the relay's current token") {
+			out = append(out, headers+" lacks the relay's current token")
 		}
 	}
 	return strings.Join(out, ", ")
@@ -203,14 +218,34 @@ func relayRoute(path, route, token string) bool {
 	return first != "" && (token == "" || first == token) && rest == route
 }
 
-// authorizes reports whether an OTLP headers value sets an Authorization header.
+// authorizes reports whether an OTLP headers value sets an Authorization header, which
+// replaces the generic one whatever it holds.
 func authorizes(headers string) bool {
-	for pair := range strings.SplitSeq(headers, ",") {
-		if k, _, ok := strings.Cut(pair, "="); ok && strings.EqualFold(strings.TrimSpace(k), "authorization") {
-			return true
+	_, ok := authorization(headers)
+	return ok
+}
+
+// bearer is the credential an OTLP headers value's Authorization presents as "Bearer <x>",
+// as the relay reads it; "" when it presents none.
+func bearer(headers string) string {
+	v, _ := authorization(headers)
+	got, _ := strings.CutPrefix(v, "Bearer ")
+	return strings.TrimSpace(got)
+}
+
+// authorization is an OTLP headers value's Authorization, URL-decoded as the SDK does.
+func authorization(headers string) (string, bool) {
+	for pair := range strings.SplitSeq(strings.Trim(headers, `"'`), ",") {
+		k, v, ok := strings.Cut(pair, "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(k), "authorization") {
+			continue
 		}
+		if decoded, err := url.QueryUnescape(strings.TrimSpace(v)); err == nil {
+			v = decoded
+		}
+		return strings.TrimSpace(v), true
 	}
-	return false
+	return "", false
 }
 
 func pidList(pids []int) string {

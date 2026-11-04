@@ -107,7 +107,7 @@ func TestTracesCheckNamesOnlyItsOwnUnreadProcess(t *testing.T) {
 	t.Parallel()
 	reg := agents.New(tracedAgent{envAgent: envAgent{agentstest.Agent{ID: "fake"}}}, envAgent{agentstest.Agent{ID: "other"}})
 	dir := t.TempDir()
-	for id, c := range map[string]claim.Claim{"s1": {ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: []int{201}}, "s2": {ProjectID: "p1", Tool: "other", Cwd: "/work/a", PIDs: []int{202}}} {
+	for id, c := range map[string]claim.Claim{"s1": {ProjectID: "p1", Tool: "fake", Agent: true, PIDs: []int{201}}, "s2": {ProjectID: "p1", Tool: "other", Agent: true, PIDs: []int{202}}} {
 		claim.Write(dir, id, c, time.Now())
 	}
 	c, _ := TracesCheck(context.Background(), reg, nil, dir, processes(map[int][]string{201: {"HOME=/home/dev"}, 202: nil}), time.Now())
@@ -122,7 +122,7 @@ func TestTracesCheckGroupsProcesses(t *testing.T) {
 	reg := agents.New(tracedAgent{envAgent: envAgent{agentstest.Agent{ID: "fake"}}})
 	dir := t.TempDir()
 	for id, pid := range map[string]int{"s1": 201, "s2": 202} {
-		claim.Write(dir, id, claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: []int{pid}}, time.Now())
+		claim.Write(dir, id, claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: []int{pid}}, time.Now())
 	}
 	table := map[int][]string{201: {"SPANS=off"}, 202: {"SPANS=off"}}
 	c, _ := TracesCheck(context.Background(), reg, nil, dir, processes(table), time.Now())
