@@ -92,7 +92,7 @@ func TestBaseURLBackend(t *testing.T) {
 		"https://bedrock-runtime.eu-central-1.amazonaws.eu":              semconv.TermaServingBackendAwsBedrock,
 		"https://bedrock-runtime.us-east-1.amazonaws.com.evil.example":   semconv.TermaServingBackendPrivate,
 		"https://aiplatform.europe-west4.rep.googleapis.com":             semconv.TermaServingBackendGoogleVertex,
-		"https://my-psc.p.googleapis.com":                                semconv.TermaServingBackendGoogleVertex,
+		"https://my-psc.p.googleapis.com":                                "",
 		"https://aws-external-anthropic.us-east-1.api.aws":               semconv.TermaServingBackendAnthropicAws,
 		"https://claude.googleapis.com":                                  semconv.TermaServingBackendAnthropicGoogleCloud,
 		"https://my-resource.cognitiveservices.azure.com":                semconv.TermaServingBackendAzureFoundry,
@@ -141,6 +141,12 @@ func TestServingBackendReadsSettings(t *testing.T) {
 	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendGoogleVertex {
 		t.Fatalf("vertex switch in user settings: got %q", got)
 	}
+	// A file above it that clears the switch turns it off.
+	hookruntest.WriteFile(t, projectDir, "settings.json", `{"env":{"CLAUDE_CODE_USE_VERTEX":""}}`)
+	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendAnthropic {
+		t.Fatalf("vertex switch cleared by project settings: got %q, want anthropic", got)
+	}
+	hookruntest.WriteFile(t, projectDir, "settings.json", `{"env":{"ANTHROPIC_BASE_URL":"https://other.corp.example"}}`)
 	t.Setenv("CLAUDE_CODE_USE_VERTEX", "0")
 	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendAnthropic {
 		t.Fatalf("the environment over settings: got %q, want anthropic", got)

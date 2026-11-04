@@ -58,17 +58,17 @@ var claudeHostBackends = map[servinghost.Kind]string{
 	servinghost.Anthropic:            semconv.TermaServingBackendAnthropic,
 	servinghost.Bedrock:              semconv.TermaServingBackendAwsBedrock,
 	servinghost.Vertex:               semconv.TermaServingBackendGoogleVertex,
-	servinghost.GooglePSC:            semconv.TermaServingBackendGoogleVertex,
 	servinghost.Azure:                semconv.TermaServingBackendAzureFoundry,
 	servinghost.AnthropicAWS:         semconv.TermaServingBackendAnthropicAws,
 	servinghost.AnthropicGoogleCloud: semconv.TermaServingBackendAnthropicGoogleCloud,
 }
 
 // baseURLBackend is the backend serving raw's host; any other host (a gateway, a proxy, a
-// local server) is private, and a URL with no host is "".
+// local server) is private. A URL with no host is "", and so is a Private Service Connect
+// host, which serves Vertex AI and Claude Platform on Google Cloud alike.
 func baseURLBackend(raw string) string {
 	kind, ok := servinghost.Of(raw)
-	if !ok {
+	if !ok || kind == servinghost.GooglePSC {
 		return ""
 	}
 	return cmp.Or(claudeHostBackends[kind], semconv.TermaServingBackendPrivate)

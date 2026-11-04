@@ -124,15 +124,17 @@ func readClaudeRoute(repoRoot, configPath string) claudeRoute {
 	return r
 }
 
-// lookup is key's value as the session sees it: the environment's, else the first settings
-// env block's that sets it.
+// lookup is key's value as the session sees it: the environment's, else that of the first
+// settings env block that sets it, an empty value included: a file that clears a key
+// overrides the files below it.
 func (r claudeRoute) lookup(key string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
 	}
 	for _, env := range r.envs {
-		var v string
-		if json.Unmarshal(env[key], &v) == nil && strings.TrimSpace(v) != "" {
+		if raw, ok := env[key]; ok {
+			var v string
+			_ = json.Unmarshal(raw, &v)
 			return strings.TrimSpace(v)
 		}
 	}
