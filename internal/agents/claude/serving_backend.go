@@ -20,24 +20,31 @@ func servingBackend(repoRoot string) string {
 	return routeBackend(f.route.lookup, f.route.helper || f.Status == hookrun.StatusPresent)
 }
 
-// routeBackend maps Claude Code's route to the closed set: a cloud provider's switch, by the
-// host of that provider's base URL when one is set, else ANTHROPIC_BASE_URL's host, else
-// Anthropic when a first-party credential is visible (a key, a token, or storedCredential: an
-// apiKeyHelper or the stored login).
+// routeBackend maps Claude Code's route to the closed set: a gateway its switch selects, by
+// ANTHROPIC_BASE_URL's host; a cloud provider's switch, by its own base URL's host when one is
+// set; else ANTHROPIC_BASE_URL's host; else Anthropic when a first-party credential is visible
+// (a key, a token, or storedCredential: an apiKeyHelper or the stored login).
 func routeBackend(lookup func(string) string, storedCredential bool) string {
-	if c, ok := cloudRoute(lookup); ok {
-		for _, key := range c.baseURLVars {
-			if base := lookup(key); base != "" {
-				// Another provider's host is as foreign to this route as a gateway's.
-				if b := baseURLBackend(base); b == "" || b == c.backend {
-					return b
-				}
-				return semconv.TermaServingBackendPrivate
-			}
-		}
-		return c.backend
+	base := lookup("ANTHROPIC_BASE_URL")
+	// The gateway switch outranks every cloud switch, and needs a base URL.
+	if isOn(lookup("CLAUDE_CODE_USE_GATEWAY")) && base != "" {
+		return baseURLBackend(base)
 	}
-	if base := lookup("ANTHROPIC_BASE_URL"); base != "" {
+	if c, ok := cloudRoute(lookup); ok {
+		own := ""
+		if c.baseURLVar != "" {
+			own = lookup(c.baseURLVar)
+		}
+		if own == "" {
+			return c.backend
+		}
+		// Another provider's host is as foreign to this route as a gateway's.
+		if b := baseURLBackend(own); b == "" || b == c.backend {
+			return b
+		}
+		return semconv.TermaServingBackendPrivate
+	}
+	if base != "" {
 		return baseURLBackend(base)
 	}
 	if storedCredential || firstPartyKey(lookup) {

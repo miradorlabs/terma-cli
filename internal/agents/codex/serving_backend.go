@@ -99,7 +99,7 @@ func (c codexRoutes) backend(provider string) string {
 	return codexBaseURLBackend(c.baseURLs[provider])
 }
 
-// codexBaseURLBackend recognises OpenAI's, Azure OpenAI's, Bedrock's and Vertex's hosts; any
+// codexBaseURLBackend recognises OpenAI's host and the cloud providers' (servinghost); any
 // other host (a
 // gateway, Azure API Management, a proxy, a local server) is private, and a URL with no host,
 // or none at all, is "".
@@ -114,8 +114,7 @@ func codexBaseURLBackend(raw string) string {
 		return ""
 	case host == "api.openai.com":
 		return semconv.TermaServingBackendOpenai
-	case strings.HasSuffix(host, ".openai.azure.com"), strings.HasSuffix(host, ".services.ai.azure.com"),
-		strings.HasSuffix(host, ".cognitiveservices.azure.com"):
+	case servinghost.Azure(host):
 		return semconv.TermaServingBackendAzureOpenai
 	case servinghost.Bedrock(host):
 		return semconv.TermaServingBackendAwsBedrock
