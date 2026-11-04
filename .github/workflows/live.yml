@@ -41,7 +41,7 @@ jobs:
       # what is new to classify, and a harness sending it still sends what terma expects.
       TERMA_E2E_UNCLASSIFIED: note
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -153,7 +153,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Ubuntu 24.04 gives a process no capabilities in a user namespace it creates unless an
       # AppArmor profile allows it, so Codex's bwrap sandbox cannot bring up its loopback
       # ("bwrap: loopback: Failed RTM_NEWADDR") and every tool command fails. This runner is
@@ -201,7 +201,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Start from the published history and catalog
         run: test/e2e/compatgen/publish.sh restore
       - uses: actions/setup-go@v6
