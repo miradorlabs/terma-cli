@@ -76,29 +76,53 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 
 // runningAgents are the running processes of agents whose exporter reads its startup
 // environment, in collected sessions claimed under stateDir, readable ones by pid; unread
-// names each agent with one running that could not be read. A claim lists the ancestors of each hook that ran
-// for the session, nearest first, one chain after another; a hook's own processes exit with
-// it, so the nearest process of each run of running ones is an agent, or what a git hook
-// ran under (a developer's shell), or an exited process's id that another has taken since.
-// All are returned, so the agent always is; the others add a finding only when they too
-// started with what a check flags.
+// names each agent with one running that could not be read. A claim lists the ancestors of
+// each hook that ran for the session, nearest first, one chain after another; a hook's own
+// processes exit with it, so the nearest process of each run of running ones is an agent, or
+// what a git hook ran under (a developer's shell), or an exited process's id that another has
+// taken since. All are returned, so the agent always is; the others add a finding only when
+// they too started with what a check flags. A process whose latest claim is a session's end
+// is not: once the agent exits, the nearest running process is its launcher.
+//
+// Accepted risk: an agent that exits without its end hook completing (a crash, a kill, the
+// hook's timeout) leaves its claim fresh for claim.TTL, so its launcher is judged as the
+// agent and a launcher that sets no exporter variable of its own reads as a pass. Telling the
+// agent's own process apart (by its executable) would close it.
 func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now time.Time) (procs map[int]agentProc, unread map[string]bool) {
-	procs, unread = map[int]agentProc{}, map[string]bool{}
+	type seenProc struct {
+		agentProc
+		at    time.Time
+		ended bool
+	}
+	seen := map[int]seenProc{}
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
-		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
+		// A session only git hooks claimed (a commit after its claim expired) names no agent process.
+		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" || !c.FromAgent() {
 			continue
+		}
+		// A subagent's claim names its session's processes but never ends: the later word wins.
+		at, ended := c.ClaimedAt, !c.EndedAt.IsZero()
+		if ended {
+			at = c.EndedAt
 		}
 		after := false
 		for _, pid := range c.PIDs {
 			env, alive := environ(pid)
-			switch {
-			case alive && !after && env == nil:
-				unread[a.Name()] = true
-			case alive && !after:
-				procs[pid] = agentProc{a, env}
+			if prev, ok := seen[pid]; alive && !after && (!ok || at.After(prev.at)) {
+				seen[pid] = seenProc{agentProc{a, env}, at, ended}
 			}
 			after = alive
+		}
+	}
+	procs, unread = map[int]agentProc{}, map[string]bool{}
+	for pid, p := range seen {
+		switch {
+		case p.ended:
+		case p.env == nil:
+			unread[p.agent.Name()] = true
+		default:
+			procs[pid] = p.agentProc
 		}
 	}
 	return procs, unread

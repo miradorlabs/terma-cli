@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -53,12 +54,14 @@ func (e Env) Announce(r *Repo, sess session.Session, extra map[string]any) {
 	e.EmitStart(r, sess, extra)
 }
 
-// EndSession clears the active session and spools the end; manifests stay, the work may be uncommitted.
+// EndSession clears the active session, spools the end and marks its claim ended; manifests
+// stay, the work may be uncommitted.
 func (e Env) EndSession(r *Repo, id, tool string) {
 	_ = r.Store.ClearActive(session.Key{Tool: tool, ID: id})
 	e.EmitFor(r, spool.Event{Name: semconv.TermaSessionEndEvent, SessionID: id, Attrs: map[string]any{
 		semconv.GenAIMainAgentNameKey: tool,
 	}})
+	claim.End(e.StateDir, id, e.Time())
 }
 
 // Touch spools the reported paths, absolute or relative to Cwd, as one event per checkout,
