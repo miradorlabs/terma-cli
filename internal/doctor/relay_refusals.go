@@ -33,9 +33,13 @@ func RefusalsCheck(r Refusals, now time.Time, envNamed bool) Check {
 			return Check{Status: Pass, Detail: detail + "; none in the last hour"}
 		}
 	}
-	if r.Unauthorized > 0 {
+	// The counters are cumulative and At is shared, so with both causes counted either may be the one going on.
+	switch {
+	case r.Unauthorized > 0 && r.Unreadable > 0:
+		detail += ": an agent process started with a stale or foreign exporter header or token, or an exporter sends requests the relay cannot read, and nothing in them reaches Terma"
+	case r.Unauthorized > 0:
 		detail += ": an agent process started with a stale or foreign exporter header or token, and nothing it exports reaches Terma"
-	} else {
+	default:
 		detail += ": an exporter sends requests the relay cannot read, and nothing in them reaches Terma"
 	}
 	fix := "restart the agent sessions, and remove the exporter variable where it is set (the IDE or agent host that started them, or a shell profile)"

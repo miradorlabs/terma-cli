@@ -25,6 +25,8 @@ func TestRefusalsCheckWarnsWhileTheRelayRefuses(t *testing.T) {
 			[]string{"161 export requests for a token not its own", "stale or foreign exporter header or token", "restart the agent sessions",
 				"remove the exporter variable", "the live agent environment check above names"}},
 		{"unreadable bodies", Refusals{Unreadable: 3, Since: since, At: now}, false, Warn, []string{"3 it could not read", "cannot read"}},
+		{"both causes counted", Refusals{Unauthorized: 9, Unreadable: 2, Since: since, At: now}, false, Warn,
+			[]string{"stale or foreign exporter header or token, or an exporter sends requests the relay cannot read"}},
 		{"stopped an hour ago", Refusals{Unauthorized: 9, Since: since, At: now.Add(-2 * time.Hour)}, false, Pass, []string{"none in the last hour"}},
 		{"an earlier relay that does not say when", Refusals{Unauthorized: 9, Since: since}, false, Warn, []string{"9 export requests"}},
 	} {
