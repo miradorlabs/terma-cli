@@ -336,6 +336,16 @@ go run ./refgen -profiles report/profiles.json -fields report/fields.json -censu
 `-catalog docs/compat/fields.json` takes a census from the field catalog for each build a
 whole census saw, for a backfill whose builds were censused on earlier nights.
 
+A build's `config` itemizes every option it reads and every environment variable
+(`configschema/`). With `-source`, a public harness's are read from its source at the
+release's tag (Codex's `config.schema.json`, Gemini CLI's and Pi's settings schemas, OpenCode's
+Effect Schema, omp's `register()` calls, DeepSeek Harness's config catalog, Hermes's
+`DEFAULT_CONFIG`, and the variables the code reads), so no capture is needed. Claude Code's and
+the Copilot CLI's are read from the bundle at capture time (`settingsfacts.go`): its settings
+schema and the variables its JavaScript reads. `TestClaudeProfileBinary` and
+`TestCopilotProfileBinary` take only a build's binary facts and signing, no turn, for a backfill
+that re-reads many builds' facts quickly; refgen prefers their facts to an earlier scenario's.
+
 Harnesses release more often than nightly, so `reference.yml` checks every quarter hour:
 `reference/new-builds.sh` asks each registry for builds newer than the newest the reference
 has published (a few requests, no build; nothing else runs when nothing is new), and only

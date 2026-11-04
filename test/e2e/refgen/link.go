@@ -182,7 +182,9 @@ func needleOf(c *Change) string {
 			return ""
 		}
 		return at(2)
-	case "cli", "config":
+	case "config":
+		return configNeedle(c)
+	case "cli":
 		if at(1) != "help" {
 			// A subcommand's flag is kept with its subcommand: "exec --json".
 			fields := strings.Fields(at(2))

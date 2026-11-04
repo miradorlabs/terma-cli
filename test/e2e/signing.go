@@ -234,6 +234,9 @@ func SigningOf(b Binary) (*Signing, error) {
 	if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
+	if native := npmPlatformBinary(path); native != "" {
+		path = native // an npm loader's platform executable (the Copilot CLI's) is what is signed
+	}
 	return inspectSigning(path)
 }
 

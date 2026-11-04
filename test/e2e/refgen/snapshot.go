@@ -47,6 +47,7 @@ type night struct {
 	// published, partial, so the hourly check does not set out to capture it again.
 	attempted []buildID
 	now       time.Time
+	sources   *sourceConfigs // what public builds' source says of their configuration; nil reads none
 }
 
 type buildID struct{ harness, version string }
@@ -163,6 +164,7 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 			merged.Command = p.Command
 		}
 	}
+	preferBinaryScenario(&merged, ps)
 	// A probe that failed says nothing of the first turn: only the turn published is the
 	// capture's whole or partial.
 	merged.Failed = src >= 0 && ps[src].Failed
@@ -184,6 +186,7 @@ func (n night) tonight(id buildID) *Snapshot {
 		deriveBehavior(s, p)
 		deriveCLI(s, p)
 		deriveOutOfBand(s, p)
+		n.deriveSourceConfig(s)
 		deriveTelemetryProbe(s, p)
 	}
 	n.deriveTelemetry(s)

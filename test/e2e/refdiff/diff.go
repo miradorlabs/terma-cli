@@ -44,6 +44,10 @@ func compare(a, b *Snapshot) []Change {
 		if at[sec] == nil || bt[sec] == nil {
 			continue
 		}
+		if a, b, ok := configs(sec, at[sec], bt[sec]); ok {
+			diffConfig(a, b, &out) // option by option (config.go)
+			continue
+		}
 		diffValue([]string{sec}, at[sec], bt[sec], &out)
 	}
 	kept := out[:0]
@@ -330,6 +334,8 @@ func classify(c *Change, labels map[string]string) {
 	case c.Category == "binary" && len(c.Path) > 2 && c.Path[1] == "signing" &&
 		(c.Path[2] == "status" || c.Path[2] == "team_id" || c.Path[2] == "format" || c.Path[2] == "certificate"):
 		c.Impact = "notable" // a new signer, a new certificate, or one revoked
+	case c.Category == "config":
+		c.Impact = configImpact(c)
 	case notableCategories[c.Category]:
 		c.Impact = "notable"
 	}
@@ -486,12 +492,8 @@ func title(c *Change, labels map[string]string) string {
 			return "Help text of `" + at(2) + "` " + verb + stats
 		}
 	case "config":
-		what := map[string]string{"env_vars": "environment variable", "settings_keys": "setting"}[at(1)]
-		if what != "" && len(p) == 3 {
-			if c.Op == "added" {
-				return "New " + what + ": " + at(2)
-			}
-			return strings.ToUpper(what[:1]) + what[1:] + " no longer read: " + at(2)
+		if t := configTitle(c, arrow, stats); t != "" {
+			return t
 		}
 	case "network":
 		if len(p) == 3 {
@@ -619,7 +621,8 @@ var genericSegments = map[string]bool{"keys": true, "surfaces": true, "system": 
 	"headers": true, "betas": true, "params": true, "egress": true, "kinds": true, "class": true, "properties": true,
 	"breakpoints": true, "statuses": true, "result": true, "status": true, "capabilities": true, "default": true,
 	"body_keys": true, "identifiers": true, "aliases": true, "prices": true, "type": true, "required": true,
-	"supported": true, "control": true, "env_paths": true, "matcher": true, "fired": true, "count": true}
+	"supported": true, "control": true, "env_paths": true, "matcher": true, "fired": true, "count": true,
+	"options": true, "enum": true, "deprecated": true, "env_vars": true, "settings_keys": true, "source": true, "env_source": true}
 
 // documented reports whether changelog mentions c: the thing it names (a tool, a field, a
 // flag, a model), or for a prompt's change, the prompt.

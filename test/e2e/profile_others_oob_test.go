@@ -254,8 +254,8 @@ func TestDshProfileEgress(t *testing.T) {
 	})
 }
 
-// TestCopilotProfileBinary records each Copilot CLI build's executable and help: it has no
-// local provider to take a turn against.
+// TestCopilotProfileBinary records each Copilot CLI build's executable, its signing and its
+// help, with no turn: as TestClaudeProfileBinary, for a backfill of many builds' facts.
 func TestCopilotProfileBinary(t *testing.T) {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
@@ -266,6 +266,7 @@ func TestCopilotProfileBinary(t *testing.T) {
 			track(t)
 			home := t.TempDir()
 			RecordBinaryFacts(t, b)
+			RecordSigning(t, b)
 			RecordHelpTree(t, b, []string{"HOME=" + home, "COPILOT_HOME=" + filepath.Join(home, ".copilot"), "PATH=" + os.Getenv("PATH")}, "copilot")
 			Placeholder(t, b, home, "<home>")
 		})
