@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"net/url"
@@ -127,11 +128,6 @@ func exporterEnvFindings(env []string, addr, token string) string {
 			vars[k] = v
 		}
 	}
-	// A token leading a relay endpoint's path authorizes in place of the header.
-	onPath := token != "" && slices.ContainsFunc(exporterSet, func(e exporterVars) bool {
-		_, relay := relayPath(vars[e.endpoint], addr)
-		return relay && strings.Contains(vars[e.endpoint], token)
-	})
 	var out []string
 	for _, e := range exporterSet {
 		v, set := vars[e.endpoint]
@@ -151,10 +147,25 @@ func exporterEnvFindings(env []string, addr, token string) string {
 		if strings.Contains(strings.ToLower(vars[e.protocol]), "grpc") {
 			out = append(out, e.protocol+" picks gRPC, which the local relay does not serve")
 		}
-		// A signal's headers merge over the generic ones: only an Authorization of their own replaces the token.
-		h, set := vars[e.headers]
-		if set && (generic || authorizes(h)) && token != "" && !onPath && !strings.Contains(h, token) {
-			out = append(out, e.headers+" lacks the relay's current token")
+	}
+	if token == "" {
+		return strings.Join(out, ", ")
+	}
+	// Each signal is authorized on its own: by a token leading the path of the endpoint it
+	// sends to, else by the bearer of the headers it sends, its own Authorization replacing
+	// the generic one.
+	generic := exporterSet[0]
+	for _, e := range exporterSet[1:] {
+		endpoint := cmp.Or(vars[e.endpoint], vars[generic.endpoint])
+		if path, relay := relayPath(endpoint, addr); relay && strings.HasPrefix(path, "/"+token+"/") {
+			continue
+		}
+		headers := e.headers
+		if bearer(vars[headers]) == "" {
+			headers = generic.headers
+		}
+		if h, set := vars[headers]; set && bearer(h) != token && !slices.Contains(out, headers+" lacks the relay's current token") {
+			out = append(out, headers+" lacks the relay's current token")
 		}
 	}
 	return strings.Join(out, ", ")
@@ -193,14 +204,24 @@ func relayRoute(path, route, token string) bool {
 	return first != "" && (token == "" || first == token) && rest == route
 }
 
-// authorizes reports whether an OTLP headers value sets an Authorization header.
-func authorizes(headers string) bool {
-	for pair := range strings.SplitSeq(headers, ",") {
-		if k, _, ok := strings.Cut(pair, "="); ok && strings.EqualFold(strings.TrimSpace(k), "authorization") {
-			return true
+// bearer is the credential an OTLP headers value's Authorization presents as "Bearer <x>",
+// as the relay reads it; "" when it sets none.
+func bearer(headers string) string {
+	for pair := range strings.SplitSeq(strings.Trim(headers, `"'`), ",") {
+		k, v, ok := strings.Cut(pair, "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(k), "authorization") {
+			continue
 		}
+		// The SDK URL-decodes header values.
+		if decoded, err := url.QueryUnescape(strings.TrimSpace(v)); err == nil {
+			v = decoded
+		}
+		if got, ok := strings.CutPrefix(strings.TrimSpace(v), "Bearer "); ok {
+			return strings.TrimSpace(got)
+		}
+		return ""
 	}
-	return false
+	return ""
 }
 
 func pidList(pids []int) string {
