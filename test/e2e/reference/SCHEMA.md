@@ -210,9 +210,21 @@ model's) is part of the name and stays.
   },
 
   "cli": {
-    "help": { "--help": "Usage: claude [options] [command] [prompt]…" },
-    "flags": ["--model", "--print", "--resume"],
-    "subcommands": ["config", "mcp", "update"]
+    "help": { "--help": "Usage: claude [options] [command] [prompt]…", "exec -h": "…" },
+    "commands": {
+      "codex exec": {
+        "usage": ["Usage: codex exec [OPTIONS] [PROMPT]"],
+        "description": "Run Codex non-interactively",
+        "helped": true,
+        "options": {
+          "--sandbox": { "names": ["-s", "--sandbox"], "value": "<SANDBOX_MODE>", "description": "Select the sandbox policy…",
+                         "choices": ["read-only", "workspace-write", "danger-full-access"] },
+          "--color": { "names": ["--color"], "value": "<COLOR>", "description": "…", "default": "auto", "choices": ["always", "never", "auto"] }
+        },
+        "arguments": { "PROMPT": { "description": "Initial instructions for the agent…" } }
+      },
+      "codex exec resume": { "description": "Resume a previous session by id…", "helped": false }
+    }
   },
 
   "config": { "env_vars": ["ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK"], "settings_keys": ["model", "permissions.allow"] },
@@ -296,6 +308,19 @@ of its own, and neither is `not_fired`.
 In `binary.signing`, the certificate is compared as one thing (a new certificate is one change),
 and `signed_at`, `checked_at`, `assessment`, `resigned` and `authority` are never read as
 changes: they differ by nature, or say again what `status` and the certificate say.
+
+### cli
+
+`help` keeps each help text as the build printed it: every command's `--help`, and its `-h`
+where that prints something else. `commands` itemizes them, by command as a person types it:
+its usage lines, description, options (by their first long name: every name, the value it
+takes, its description, and the default, allowed values and environment variable its help
+notes), arguments, and the commands it lists (with their description; `helped` false where its
+own help was not read). Descriptions are read as one line a paragraph, however the terminal
+wrapped them, so a narrower terminal is no change. A diff lists each command, option and
+argument added or removed, each changed description, value, default, alias, environment
+variable and allowed value; the full help texts are compared too, for what no entry holds
+(examples, notes).
 
 ## diffs/<from>..<to>.json
 

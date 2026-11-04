@@ -28,7 +28,7 @@ import (
 // run's timing.
 var skipKeys = map[string]bool{"sha256": true, "chars": true, "checked_at": true, "signed_at": true,
 	"assessment": true, "resigned": true, "authority": true, "backoff_ms": true,
-	"files": true, "paths": true, "more_paths": true, "when": true}
+	"files": true, "paths": true, "more_paths": true, "when": true, "helped": true}
 
 // measured are numbers a capture measures, which move a little from run to run: a change of
 // less than measuredSlack of them is none.
@@ -330,6 +330,9 @@ func classify(c *Change, labels map[string]string) {
 	case c.Category == "binary" && len(c.Path) > 2 && c.Path[1] == "signing" &&
 		(c.Path[2] == "status" || c.Path[2] == "team_id" || c.Path[2] == "format" || c.Path[2] == "certificate"):
 		c.Impact = "notable" // a new signer, a new certificate, or one revoked
+	case c.Category == "cli" && len(c.Path) >= 3 && c.Path[1] == "commands" &&
+		(c.Op == "removed" && (len(c.Path) == 3 || len(c.Path) == 5) || last == "default" || len(c.Path) > 5 && c.Path[5] == "choices"):
+		c.Impact = "notable" // a command or flag gone, a default moved, an allowed value added or dropped
 	case notableCategories[c.Category]:
 		c.Impact = "notable"
 	}
@@ -469,21 +472,65 @@ func title(c *Change, labels map[string]string) string {
 	case "hooks":
 		return hookTitle(c, verb, arrow)
 	case "cli":
-		switch at(1) {
-		case "flags":
+		if at(1) == "help" {
+			return "Full help text of `" + at(2) + "` " + verb + stats
+		}
+		if at(1) != "commands" {
+			break
+		}
+		cmd := at(2)
+		if len(p) == 3 {
 			if c.Op == "added" {
-				return "New flag: " + at(2)
+				return "New command: `" + cmd + "`"
 			}
-			return "Flag removed: " + at(2)
-		case "subcommands":
-			if c.Op == "added" {
-				return "New subcommand: " + at(2)
+			return "Command removed: `" + cmd + "`"
+		}
+		switch at(3) {
+		case "options", "arguments":
+			what, name := "flag", at(4)
+			if at(3) == "arguments" {
+				what = "argument"
 			}
-			return "Subcommand removed: " + at(2)
-		case "help":
-			// "exec --help" → `codex exec --help`, as a person types it; the build's own help by its
-			// flag alone.
-			return "Help text of `" + at(2) + "` " + verb + stats
+			subject := "`" + cmd + " " + name + "`"
+			switch {
+			case len(p) == 5 && c.Op == "added":
+				return "New " + what + " " + subject
+			case len(p) == 5:
+				return strings.ToUpper(what[:1]) + what[1:] + " removed: " + subject
+			}
+			switch at(5) {
+			case "description":
+				if c.TextDiff != nil {
+					return subject + ": description " + verb + stats
+				}
+				return subject + ": description " + verb
+			case "default":
+				return "Default of " + subject + ": " + arrow()
+			case "choices":
+				if c.Op == "added" {
+					return subject + " gained value `" + at(6) + "`"
+				}
+				return subject + " lost value `" + at(6) + "`"
+			case "names":
+				if c.Op == "added" {
+					return subject + " gained alias `" + at(6) + "`"
+				}
+				return subject + " lost alias `" + at(6) + "`"
+			case "value":
+				switch c.Op {
+				case "added":
+					return subject + " now takes a value " + short(c.After)
+				case "removed":
+					return subject + " no longer takes a value"
+				}
+				return subject + " now takes " + short(c.After) + " (was " + short(c.Before) + ")"
+			case "env":
+				return subject + " environment variable: " + arrow()
+			}
+		case "description":
+			return "Description of `" + cmd + "` " + verb
+		case "usage":
+			return "Usage of `" + cmd + "` " + verb
 		}
 	case "config":
 		what := map[string]string{"env_vars": "environment variable", "settings_keys": "setting"}[at(1)]

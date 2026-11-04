@@ -1008,63 +1008,6 @@ func commonPrefix(a, b string) int {
 	return n
 }
 
-// deriveCLI is the help a build printed, and the flags and subcommands it names.
-func deriveCLI(s *Snapshot, p e2e.Profile) {
-	if len(p.Help) == 0 {
-		return
-	}
-	flags, subs := map[string]bool{}, map[string]bool{}
-	for args, text := range p.Help {
-		// "--help", "-h", "exec --help", "exec -h": the command, and its flags under it.
-		cmd := strings.TrimSuffix(strings.TrimSuffix(args, "--help"), "-h")
-		prefix := strings.TrimSpace(cmd)
-		if prefix != "" {
-			prefix += " "
-		}
-		for _, m := range flagRe.FindAllStringSubmatch(text, -1) {
-			flags[prefix+m[1]] = true
-		}
-		for _, sub := range subcommandsOf(text) {
-			subs[prefix+sub] = true
-		}
-	}
-	help := map[string]any{}
-	for k, v := range p.Help {
-		help[k] = v
-	}
-	s.CLI = map[string]any{"help": help, "flags": sortedKeys(flags), "subcommands": sortedKeys(subs)}
-}
-
-var (
-	flagRe       = regexp.MustCompile(`(?m)^\s{1,12}(?:-[A-Za-z0-9], )?(--[a-z0-9][a-z0-9-]*)`)
-	commandsHead = regexp.MustCompile(`(?im)^(?:commands|subcommands|available commands):?\s*$`)
-	commandLine  = regexp.MustCompile(`^\s{1,8}([a-z][a-z0-9-]*)(?:\s|\||$)`)
-)
-
-// subcommandsOf are the commands a help text lists under its Commands heading.
-func subcommandsOf(text string) []string {
-	loc := commandsHead.FindStringIndex(text)
-	if loc == nil {
-		return nil
-	}
-	var out []string
-	for line := range strings.SplitSeq(text[loc[1]:], "\n") {
-		if strings.TrimSpace(line) == "" {
-			if len(out) > 0 {
-				break
-			}
-			continue
-		}
-		if !strings.HasPrefix(line, " ") {
-			break
-		}
-		if m := commandLine.FindStringSubmatch(line); m != nil && m[1] != "help" {
-			out = append(out, m[1])
-		}
-	}
-	return out
-}
-
 func sortedKeys(m map[string]bool) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

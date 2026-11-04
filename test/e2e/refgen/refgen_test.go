@@ -105,8 +105,10 @@ func TestSnapshotFromProfile(t *testing.T) {
 	if r["attempts"] != 2 || r["honors_retry_after"] != true || r["recovered"] != true {
 		t.Errorf("retries = %v", r)
 	}
-	if strings.Join(s.CLI["flags"].([]string), ",") != "--model,--print" || strings.Join(s.CLI["subcommands"].([]string), ",") != "mcp,update" {
-		t.Errorf("cli = %v %v", s.CLI["flags"], s.CLI["subcommands"])
+	cmds := s.CLI["commands"].(map[string]any)
+	opts := cmds["claude"].(map[string]any)["options"].(map[string]any)
+	if opts["--print"] == nil || opts["--model"] == nil || cmds["claude mcp"] == nil || cmds["claude update"] == nil {
+		t.Errorf("cli commands = %v", cmds)
 	}
 	if s.Telemetry["surfaces"].(map[string]any)["logs/api_request"] == nil {
 		t.Errorf("telemetry = %v", s.Telemetry)
@@ -495,26 +497,28 @@ func TestSigningNormalizedAndCompared(t *testing.T) {
 	}
 }
 
-// A command's -h is help as its --help is: its flags under the command, its text compared.
+// A command's -h is read where its --help is missing, and itemized the same way; the full
+// texts are compared too.
 func TestShortHelp(t *testing.T) {
 	p := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
-	p.Help = map[string]string{"--help": "Usage: codex\n\nOptions:\n  --model <M>  Model\n", "-h": "Usage: codex\n\nOptions:\n  --model <M>\n",
-		"exec --help": "Usage: codex exec\n\nOptions:\n  --json  JSONL\n", "exec -h": "Usage: codex exec\n\nOptions:\n  --json\n"}
+	p.Help = map[string]string{"--help": "Usage: codex [OPTIONS]\n\nOptions:\n  --model <M>  Model\n", "-h": "Usage: codex [OPTIONS]\n\nOptions:\n  --model <M>\n",
+		"exec -h": "Usage: codex exec [OPTIONS]\n\nOptions:\n  --json  JSONL\n"}
 	s := night{now: time.Now(), profiles: []e2e.Profile{p}}.tonight(buildID{"claude", "1.0.0"})
-	if got := strings.Join(s.CLI["flags"].([]string), ","); got != "--model,exec --json" {
-		t.Errorf("flags = %s", got)
+	cmds := s.CLI["commands"].(map[string]any)
+	if cmds["codex"].(map[string]any)["options"].(map[string]any)["--model"] == nil ||
+		cmds["codex exec"].(map[string]any)["options"].(map[string]any)["--json"] == nil {
+		t.Errorf("commands = %v", cmds)
 	}
 	q := p
 	q.Version = "1.0.1"
-	q.Help = map[string]string{"--help": p.Help["--help"], "-h": "Usage: codex\n\nOptions:\n  --model <M>\n  --oss\n",
-		"exec --help": p.Help["exec --help"], "exec -h": p.Help["exec -h"]}
+	q.Help = map[string]string{"--help": "Usage: codex [OPTIONS]\n\nOptions:\n  --model <M>  Model\n  --oss        Local\n", "-h": p.Help["-h"], "exec -h": p.Help["exec -h"]}
 	s2 := night{now: time.Now(), profiles: []e2e.Profile{q}}.tonight(buildID{"claude", "1.0.1"})
 	d := refdiff.New(s, s2, nil, time.Now())
-	if c := changeByID(d, "cli.help.-h"); c == nil || !strings.HasPrefix(c.Title, "Help text of `-h` changed") {
-		t.Errorf("short help change = %+v", c)
+	if c := changeByID(d, "cli.commands.codex.options.--oss"); c == nil || c.Title != "New flag `codex --oss`" {
+		t.Errorf("new flag = %+v", c)
 	}
-	if c := changeByID(d, "cli.flags.--oss"); c == nil || c.Title != "New flag: --oss" {
-		t.Errorf("flag from -h = %+v", c)
+	if c := changeByID(d, "cli.help.--help"); c == nil || !strings.HasPrefix(c.Title, "Full help text of `--help` changed") {
+		t.Errorf("help text = %+v", c)
 	}
 }
 
