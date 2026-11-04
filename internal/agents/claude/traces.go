@@ -34,14 +34,22 @@ func (Agent) TracesOff() ([]string, error) {
 }
 
 // TracesOffIn names the variables of env, a running process's startup environment, that switch
-// Claude Code's spans off. Whether a settings entry beats the process's is undocumented, so
-// either off may lose them; an empty one is unset.
+// Claude Code's spans off; an empty one is unset. As in terma's conflict checks, the process
+// environment is taken to outrank the user settings file.
 func (Agent) TracesOffIn(env []string) []string {
 	var off []string
 	for _, kv := range env {
 		k, v, _ := strings.Cut(kv, "=")
-		if v != "" && (k == claudeEnableTelemetry && !isOn(v) || k == claudeEnhancedTelemetry && !isOn(v) || k == otelTracesExporter && v != exporterOTLP) {
-			off = append(off, k)
+		switch {
+		case v == "":
+		case k == claudeEnableTelemetry, k == claudeEnhancedTelemetry:
+			if !isOn(v) {
+				off = append(off, k)
+			}
+		case k == otelTracesExporter:
+			if v != exporterOTLP {
+				off = append(off, k)
+			}
 		}
 	}
 	return off
