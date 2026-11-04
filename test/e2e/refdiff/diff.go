@@ -77,6 +77,24 @@ func compare(a, b *Snapshot) []Change {
 		kept = append(kept, c)
 	}
 	out = kept
+	// A command only listed in one build (its own help not read) has no options to compare.
+	helpedIn := func(t map[string]any, cmd string) bool {
+		cli, _ := t["cli"].(map[string]any)
+		cmds, _ := cli["commands"].(map[string]any)
+		c, _ := cmds[cmd].(map[string]any)
+		h, _ := c["helped"].(bool)
+		return h
+	}
+	kept = out[:0]
+	for _, c := range out {
+		if c.Path[0] == "cli" && len(c.Path) > 3 && c.Path[1] == "commands" &&
+			(c.Path[3] == "options" || c.Path[3] == "arguments" || c.Path[3] == "usage") &&
+			(!helpedIn(at, c.Path[2]) || !helpedIn(bt, c.Path[2])) {
+			continue
+		}
+		kept = append(kept, c)
+	}
+	out = kept
 	labels := capabilityLabels(bt)
 	for i := range out {
 		classify(&out[i], labels)

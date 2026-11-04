@@ -25,6 +25,7 @@ type docSetting struct {
 	Type        string `json:"type,omitempty"`
 	Default     string `json:"default,omitempty"`
 	Scope       string `json:"scope,omitempty"`
+	ScopeNote   string `json:"scope_note,omitempty"`
 	Topic       string `json:"topic,omitempty"`
 	Read        bool   `json:"read"` // the build reads it
 }
@@ -35,6 +36,8 @@ var (
 	docBullet  = regexp.MustCompile(`^\* \*\*([^*]+)\*\*:\s*(.*)$`)
 	docEnvRow  = regexp.MustCompile("^\\| `([A-Z][A-Z0-9_]+)` \\| (.*) \\|\\s*$")
 	mdLink     = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+	// A scope is a link to the scopes table, or a name in backticks before any note.
+	docScopes = regexp.MustCompile("\\[`([^`]+)`\\]\\(#scopes\\)")
 )
 
 // plainText is markdown as text: links as their words.
@@ -72,7 +75,21 @@ func parseSettingsDoc(md string) map[string]*docSetting {
 			inDesc = false
 			switch m[1] {
 			case "Scope":
-				cur.Scope = strings.Trim(plainText(m[2]), "`")
+				// "[`Any file`](#scopes). For a self-hosted …": the scopes are the names in
+				// backticks; what follows is a note.
+				if names := docScopes.FindAllStringSubmatch(m[2], -1); len(names) > 0 {
+					var ss []string
+					for _, n := range names {
+						ss = append(ss, n[1])
+					}
+					cur.Scope = strings.Join(ss, ", ")
+					if _, note, ok := strings.Cut(plainText(m[2]), "`. "); ok {
+						cur.ScopeNote = strings.TrimSpace(note)
+					}
+				} else {
+					head, note, _ := strings.Cut(plainText(m[2]), ". ")
+					cur.Scope, cur.ScopeNote = strings.Trim(strings.TrimSpace(head), "`"), strings.TrimSpace(note)
+				}
 			case "Type":
 				cur.Type = plainText(m[2])
 			case "Default":

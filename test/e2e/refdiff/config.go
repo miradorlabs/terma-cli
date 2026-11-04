@@ -35,7 +35,7 @@ func diffConfig(a, b map[string]any, out *[]Change) {
 	optsA, okA := a["options"].(map[string]any)
 	optsB, okB := b["options"].(map[string]any)
 	first := len(*out)
-	defer func() { *out = append((*out)[:first], collapseProfiles((*out)[first:])...) }()
+	defer func() { *out = append((*out)[:first], groupEnvVars(collapseProfiles((*out)[first:]))...) }()
 	if okA && okB && srcA == srcB {
 		for _, k := range sortedKeys(union(optsA, optsB)) {
 			x, inA := optsA[k]
@@ -226,6 +226,11 @@ func configTitle(c *Change, arrow func() string, stats string) string {
 	case "env_source":
 		return "Environment variables read from: " + arrow()
 	case "env_vars", "settings_keys":
+		if len(c.Path) == 2 && at(1) == "env_vars" {
+			added, _ := c.After.([]string)
+			removed, _ := c.Before.([]string)
+			return fmt.Sprintf("Environment variables: +%d −%d", len(added), len(removed))
+		}
 		what := map[string]string{"env_vars": "environment variable", "settings_keys": "setting"}[at(1)]
 		if len(p) == 3 {
 			if c.Op == "added" {
@@ -286,4 +291,43 @@ func collapseProfiles(changes []Change) []Change {
 		out = append(out, c)
 	}
 	return out
+}
+
+// envGroup is how many variables added or removed a diff lists one by one: past it, they are
+// one change with their lists, as a wide range of builds (or a heuristic reading) has hundreds.
+const envGroup = 20
+
+// groupEnvVars makes many variables added and removed one change: "Environment variables: +309
+// −70", the names in its before (removed) and after (added).
+func groupEnvVars(changes []Change) []Change {
+	var added, removed []string
+	n := 0
+	for _, c := range changes {
+		if len(c.Path) == 3 && c.Path[1] == "env_vars" {
+			n++
+			switch c.Op {
+			case "added":
+				added = append(added, c.Path[2])
+			case "removed":
+				removed = append(removed, c.Path[2])
+			}
+		}
+	}
+	if n <= envGroup {
+		return changes
+	}
+	out := changes[:0]
+	for _, c := range changes {
+		if !(len(c.Path) == 3 && c.Path[1] == "env_vars") {
+			out = append(out, c)
+		}
+	}
+	return append(out, Change{Op: "changed", Path: []string{"config", "env_vars"}, Before: nonNilStrings(removed), After: nonNilStrings(added)})
+}
+
+func nonNilStrings(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }

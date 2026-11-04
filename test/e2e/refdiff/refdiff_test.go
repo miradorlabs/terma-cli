@@ -1,6 +1,7 @@
 package refdiff
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,5 +116,26 @@ func TestConfigProfilesCollapse(t *testing.T) {
 	}
 	if strings.Join(ids, " ") != "config.options.profiles.<name>.only_here config.options.web_search" {
 		t.Errorf("changes = %v", ids)
+	}
+}
+
+// Many variables added and removed are one change; a command only listed in one build has no
+// options to compare.
+func TestEnvGroupedAndUnhelped(t *testing.T) {
+	vars := func(prefix string, n int) []any {
+		out := []any{}
+		for i := range n {
+			out = append(out, fmt.Sprintf("%s_%02d", prefix, i))
+		}
+		return out
+	}
+	cmd := func(helped bool, opts map[string]any) map[string]any {
+		return map[string]any{"commands": map[string]any{"claude agents": map[string]any{"helped": helped, "options": opts}}}
+	}
+	a := &Snapshot{Harness: "claude", Version: "1", Config: map[string]any{"env_vars": vars("OLD", 5)}, CLI: cmd(false, nil)}
+	b := &Snapshot{Harness: "claude", Version: "2", Config: map[string]any{"env_vars": vars("NEW", 30)}, CLI: cmd(true, map[string]any{"--json": map[string]any{"names": []any{"--json"}}})}
+	d := New(a, b, nil, time.Now())
+	if len(d.Changes) != 1 || d.Changes[0].ID != "config.env_vars" || d.Changes[0].Title != "Environment variables: +30 −5" {
+		t.Errorf("changes = %+v", d.Changes)
 	}
 }

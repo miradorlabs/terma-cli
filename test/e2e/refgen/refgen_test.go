@@ -579,3 +579,11 @@ func TestVendorDocs(t *testing.T) {
 		t.Errorf("a nested documented key the build reads read as unread")
 	}
 }
+
+func TestDocScope(t *testing.T) {
+	md := "## Remote\n\n### `remote.defaultEnvironmentId`\n\nThe environment.\n\n* **Scope**: [`Any file`](#scopes). For a self-hosted environment ID, user or managed settings only.\n* **Type**: string\n* **Default**: unset\n"
+	d := parseSettingsDoc(md)["remote.defaultEnvironmentId"]
+	if d == nil || d.Scope != "Any file" || d.ScopeNote != "For a self-hosted environment ID, user or managed settings only." {
+		t.Errorf("scope = %+v", d)
+	}
+}
