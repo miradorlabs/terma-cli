@@ -329,6 +329,15 @@ go run ./refgen -profiles report/profiles.json -fields report/fields.json -censu
 `-catalog docs/compat/fields.json` takes a census from the field catalog for each build a
 whole census saw, for a backfill whose builds were censused on earlier nights.
 
+Harnesses release more often than nightly, so `reference.yml` checks every quarter hour:
+`reference/new-builds.sh` asks each registry for builds newer than the newest the reference
+has published (a few requests, no build; nothing else runs when nothing is new), and only
+then captures those builds' profiles on macOS and publishes the reference alone
+(`publish.sh publish-reference`). A build it set out to capture is published even where the
+capture failed, partial (`refgen -attempted`), so the next check does not take it for new
+again; the night tries it again. Its publish job and the nightly compat job share a
+concurrency group, so they never push `compat-matrix` at once.
+
 ## Relay restarts
 
 `TestRelayClaudeMidTurn` and `TestRelayCodexMidTurn` stop the relay at a session's second

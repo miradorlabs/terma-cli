@@ -27,11 +27,12 @@ func (l *listFlag) String() string     { return strings.Join(*l, ",") }
 func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
 
 func main() {
-	var profiles, fields, census listFlag
+	var profiles, fields, census, attempted listFlag
 	flag.Var(&profiles, "profiles", "a run's report/profiles.json (repeatable: one a platform)")
 	flag.Var(&fields, "fields", "a run's report/fields.json, its field census (repeatable)")
 	flag.Var(&census, "census", "a run's report/census.json (repeatable)")
 	catalog := flag.String("catalog", "", "the field catalog, docs/compat/fields.json: a census for each build it saw whole (a backfill's)")
+	flag.Var(&attempted, "attempted", "harness=version,… a run set out to capture (repeatable): published even where it captured nothing")
 	history := flag.String("history", "", "the capability history, docs/compat/history.json")
 	compat := flag.String("compat", "", "the matrix, docs/compat/compat.json, for capability labels")
 	out := flag.String("out", "docs/harnesses", "the published tree to merge into")
@@ -59,6 +60,17 @@ func main() {
 			fail(err)
 		}
 		n.census = append(n.census, runs...)
+	}
+	for _, a := range attempted {
+		harness, versions, ok := strings.Cut(a, "=")
+		if !ok {
+			fail(fmt.Errorf("-attempted %q: want harness=version,…", a))
+		}
+		for v := range strings.SplitSeq(versions, ",") {
+			if v = strings.TrimSpace(v); v != "" {
+				n.attempted = append(n.attempted, buildID{harness, v})
+			}
+		}
 	}
 	if *catalog != "" {
 		rows, err := catalogRows(*catalog)

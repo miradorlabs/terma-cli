@@ -1,0 +1,149 @@
+name: Harness Reference new builds
+
+# Harnesses release more often than nightly: every quarter hour, a check asks each registry
+# for builds the Harness Reference has not published (test/e2e/reference/new-builds.sh, a
+# few requests and no build), and only when there are, captures those builds' profiles on
+# macOS and publishes them (refgen, publish.sh publish-reference). The nightly E2E harness
+# contracts (live.yml) still run every contract and the field census, and publish the matrix.
+
+on:
+  schedule:
+    # Off the hour and its quarters, when GitHub delays scheduled runs most.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time: a capture can outlast the quarter hour, and the next check must see what it
+# published rather than capture the same build again.
+concurrency:
+  group: harness-reference-new-builds
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      builds: ${{ steps.new.outputs.builds }}
+      tests: ${{ steps.new.outputs.tests }}
+      claude: ${{ steps.new.outputs.claude }}
+      codex: ${{ steps.new.outputs.codex }}
+      gemini: ${{ steps.new.outputs.gemini }}
+      opencode: ${{ steps.new.outputs.opencode }}
+      copilot: ${{ steps.new.outputs.copilot }}
+      dsh: ${{ steps.new.outputs.dsh }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: test/e2e/reference/new-builds.sh
+          sparse-checkout-cone-mode: false
+      - name: Ask the registries what is new
+        id: new
+        run: |
+          builds=$(test/e2e/reference/new-builds.sh)
+          if [ -z "$builds" ]; then
+            echo 'Nothing new since the reference was last published.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Each new harness's scenarios, by the name its tests carry.
+          names=()
+          while IFS='=' read -r harness versions; do
+            echo "$harness=$versions" >> "$GITHUB_OUTPUT"
+            case "$harness" in
+              opencode) names+=(OpenCode) ;;
+              *) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}") ;;
+            esac
+          done <<<"$builds"
+          echo "tests=^Test($(IFS='|'; echo "${names[*]}"))(Profile|Probe)" >> "$GITHUB_OUTPUT"
+          { echo 'builds<<EOF'; echo "$builds"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+          { echo '| harness | new builds |'; echo '|---|---|'; sed 's/=/ | /; s/^/| /; s/$/ |/' <<<"$builds"; } >> "$GITHUB_STEP_SUMMARY"
+
+  capture:
+    needs: detect
+    if: needs.detect.outputs.builds != ''
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: |
+            go.sum
+            test/e2e/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Build native test binaries
+        run: |
+          go build -o test/e2e/bin/terma ./cmd/terma
+          cd test/e2e
+          go test -c -o bin/e2e.test .
+      # No account: every model request goes to the scenarios' fixture providers. A build's
+      # scenario that fails still leaves its profile, partial, and refgen says so.
+      - name: Capture the new builds
+        working-directory: test/e2e
+        env:
+          TERMA_E2E: "1"
+          TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
+          TERMA_E2E_UNCLASSIFIED: note
+          TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
+          TERMA_E2E_CLAUDE_VERSIONS: ${{ needs.detect.outputs.claude }}
+          TERMA_E2E_CODEX_VERSIONS: ${{ needs.detect.outputs.codex }}
+          TERMA_E2E_GEMINI_VERSIONS: ${{ needs.detect.outputs.gemini }}
+          TERMA_E2E_OPENCODE_VERSIONS: ${{ needs.detect.outputs.opencode }}
+          TERMA_E2E_COPILOT_VERSIONS: ${{ needs.detect.outputs.copilot }}
+          TERMA_E2E_DSH_VERSIONS: ${{ needs.detect.outputs.dsh }}
+          TESTS: ${{ needs.detect.outputs.tests }}
+        run: ./bin/e2e.test -test.v -test.timeout 50m -test.run "$TESTS"
+      - name: Upload the profiles
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: profiles-macos
+          path: test/e2e/report/profiles.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    needs: [detect, capture]
+    # A capture that failed outright still publishes its builds, partial, so the next check
+    # does not take them for new again; the night tries them again.
+    if: always() && needs.detect.outputs.builds != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    # The nightly compat job (live.yml) publishes the same branch: never both at once.
+    concurrency:
+      group: compat-matrix
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start from the published reference
+        run: test/e2e/compatgen/publish.sh restore
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: test/e2e/go.sum
+      - uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: profiles-macos
+          path: test/e2e/runs
+      - name: Render the reference
+        working-directory: test/e2e
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BUILDS: ${{ needs.detect.outputs.builds }}
+        run: |
+          args=()
+          if [ -f runs/profiles.json ]; then args+=(-profiles runs/profiles.json); fi
+          while read -r line; do args+=(-attempted "$line"); done <<<"$BUILDS"
+          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch
+      - name: Publish the reference
+        env:
+          BUILDS: ${{ needs.detect.outputs.builds }}
+        run: TERMA_REFERENCE_BUILDS="$(paste -sd' ' - <<<"$BUILDS")" test/e2e/compatgen/publish.sh publish-reference

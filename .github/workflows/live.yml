@@ -211,6 +211,11 @@ jobs:
     environment: live-harnesses
     permissions:
       contents: write
+    # The frequent new-build check (reference.yml) publishes the reference to the same
+    # branch: never both at once.
+    concurrency:
+      group: compat-matrix
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
       - name: Start from the published history and catalog

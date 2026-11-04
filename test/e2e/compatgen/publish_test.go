@@ -91,10 +91,21 @@ func TestPublishTwoNights(t *testing.T) {
 		run(wt, "bash", script, "publish")
 	}
 
+	// Between nights, the frequent check publishes a new build's reference alone.
+	between := filepath.Join(tmp, "between")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, between)
+	run(between, "bash", script, "restore")
+	write(between, "docs/harnesses/claude/versions/1.0.1.json", "between\n")
+	write(between, "docs/compat/history.json", "not to be published\n")
+	run(between, "bash", script, "publish-reference")
+
 	check := filepath.Join(tmp, "check")
 	run(tmp, "git", "clone", "-q", "-b", "compat-matrix", origin, check)
-	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "2" {
-		t.Errorf("compat-matrix has %s commits, want one a night", n)
+	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "3" {
+		t.Errorf("compat-matrix has %s commits, want one a night and the check's", n)
+	}
+	if b, err := os.ReadFile(filepath.Join(check, "docs/harnesses/claude/versions/1.0.1.json")); err != nil || string(b) != "between\n" {
+		t.Errorf("the check's reference was not published: %q (%v)", b, err)
 	}
 	for _, f := range generated {
 		if b, err := os.ReadFile(filepath.Join(check, f)); err != nil || string(b) != "night 2\n" {

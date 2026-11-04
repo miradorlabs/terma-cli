@@ -41,7 +41,10 @@ type night struct {
 	census   []CensusRun
 	history  []HistoryEntry
 	labels   map[string]string // capability id → label
-	now      time.Time
+	// attempted are builds a run set out to capture: one it captured nothing of is still
+	// published, partial, so the hourly check does not set out to capture it again.
+	attempted []buildID
+	now       time.Time
 }
 
 type buildID struct{ harness, version string }
@@ -59,6 +62,9 @@ func (n night) builds() []buildID {
 		if h.Result == "pass" || h.Result == "fail" {
 			seen[buildID{h.Harness, h.Version}] = true
 		}
+	}
+	for _, id := range n.attempted {
+		seen[id] = true
 	}
 	out := slices.Collect(maps.Keys(seen))
 	sort.Slice(out, func(i, j int) bool {
@@ -139,6 +145,9 @@ func (n night) tonight(id buildID) *Snapshot {
 	}
 	n.deriveTelemetry(s)
 	n.deriveSupport(s)
+	if len(present(s)) == 0 && slices.Contains(n.attempted, id) {
+		s.Capture = Capture{Partial: true, Notes: []string{"This build's capture failed; the next nightly run tries it again."}}
+	}
 	return s
 }
 

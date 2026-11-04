@@ -277,3 +277,31 @@ func TestPublishTwoNights(t *testing.T) {
 		}
 	}
 }
+
+// A build a run set out to capture and captured nothing of is published, partial, so the
+// hourly check does not take it for new again; a later capture fills it in.
+func TestAttemptedBuildIsPublished(t *testing.T) {
+	dir := t.TempDir()
+	n := night{now: time.Now(), attempted: []buildID{{"codex", "0.200.0"}}}
+	if err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	var s Snapshot
+	if err := readJSON(filepath.Join(dir, "codex", "versions", "0.200.0.json"), &s); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Capture.Partial || len(s.Capture.Notes) == 0 {
+		t.Errorf("capture = %+v", s.Capture)
+	}
+	later := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("0.200.0", "Be brief.", []string{"shell"}, "", "")}}
+	later.profiles[0].Harness = "codex"
+	if err := publish(dir, later, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(filepath.Join(dir, "codex", "versions", "0.200.0.json"), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Capture.Partial || s.Prompt == nil {
+		t.Errorf("a later capture did not fill the attempted build in: %+v", s.Capture)
+	}
+}

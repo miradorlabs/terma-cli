@@ -5,6 +5,9 @@
 #   restore  starts the night from what the compat-matrix branch last published: the history,
 #            the field catalog and its rendering, and the Harness Reference (docs/harnesses)
 #   publish  commits the night's matrix, catalog and reference to compat-matrix and pushes it
+#   publish-reference
+#            commits the reference alone (the frequent check's new builds, reference.yml),
+#            leaving the night's matrix and catalog as they are
 #
 # What they write is generated, and git-ignored on every other branch.
 set -euo pipefail
@@ -15,7 +18,7 @@ case "${1:-}" in
 restore)
 	git fetch -q origin "$branch" 2>/dev/null || exit 0
 	mkdir -p docs/compat
-	for f in docs/compat/history.json docs/compat/fields.json docs/FIELDS.md; do
+	for f in docs/compat/history.json docs/compat/fields.json docs/compat/compat.json docs/FIELDS.md; do
 		git show "origin/$branch:$f" >"$f" 2>/dev/null || rm -f "$f"
 	done
 	# The reference's snapshots are kept from night to night: a night merges into them.
@@ -57,8 +60,31 @@ publish)
 	git commit -q -m "compat: nightly matrix, field catalog and harness reference, $(date -u +%F)"
 	git push -q origin "$branch"
 	;;
+publish-reference)
+	[ -d docs/harnesses ] || exit 0
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' EXIT
+	cp -R docs/harnesses "$tmp/"
+	# What restore put back must not meet the checkout either.
+	rm -rf docs/COMPATIBILITY.md docs/FIELDS.md docs/compat docs/harnesses
+	git config user.name "terma-compat"
+	git config user.email "terma-compat@users.noreply.github.com"
+	if git rev-parse -q --verify "origin/$branch" >/dev/null; then
+		git checkout -q -B "$branch" "origin/$branch"
+	else
+		git checkout -q --orphan "$branch"
+		git rm -rq --cached . && git clean -fdxq
+	fi
+	mkdir -p docs
+	rm -rf docs/harnesses
+	cp -R "$tmp/harnesses" docs/harnesses
+	git add -A -f docs/harnesses
+	if git diff --cached --quiet; then exit 0; fi
+	git commit -q -m "reference: ${TERMA_REFERENCE_BUILDS:-new builds}, $(date -u +%FT%RZ)"
+	git push -q origin "$branch"
+	;;
 *)
-	echo "usage: $0 restore|publish" >&2
+	echo "usage: $0 restore|publish|publish-reference" >&2
 	exit 2
 	;;
 esac
