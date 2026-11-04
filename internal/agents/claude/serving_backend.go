@@ -13,6 +13,10 @@ import (
 // the route Claude Code was configured with; "" when it cannot tell.
 func servingBackend(repoRoot string) string {
 	f := readFunding(repoRoot)
+	// A settings file that cannot be read may hide a cloud switch, a gateway or a key.
+	if f.route.unreadable {
+		return ""
+	}
 	return routeBackend(f.route.lookup, f.route.helper || f.Status == hookrun.StatusPresent)
 }
 

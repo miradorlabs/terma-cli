@@ -100,6 +100,8 @@ func readClaudeRoute(repoRoot, configPath string) claudeRoute {
 	}
 	paths = append(paths, configPath)
 	var r claudeRoute
+	// A host that manages the provider has Claude Code ignore the route the settings files set.
+	managed := isOn(os.Getenv("CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"))
 	for _, path := range paths {
 		settings, status := hookrun.ReadEvidenceJSON(path)
 		if status != hookrun.StatusPresent && status != "missing" {
@@ -107,7 +109,7 @@ func readClaudeRoute(repoRoot, configPath string) claudeRoute {
 			continue
 		}
 		var env map[string]json.RawMessage
-		if json.Unmarshal(settings["env"], &env) == nil {
+		if !managed && json.Unmarshal(settings["env"], &env) == nil {
 			r.envs = append(r.envs, env)
 		}
 		// Never execute or export the command.
@@ -144,12 +146,14 @@ type claudeCloud struct {
 	backend     string
 }
 
-// claudeClouds are the cloud provider routes terma.serving.backend names, in the order Claude
-// Code checks their switches.
+// claudeClouds are the cloud provider routes, in the order Claude Code checks their switches.
+// Claude Platform on AWS and on Google Cloud have no terma.serving.backend value yet: "".
 var claudeClouds = []claudeCloud{
 	{"CLAUDE_CODE_USE_BEDROCK", []string{"ANTHROPIC_BEDROCK_BASE_URL", "AWS_ENDPOINT_URL_BEDROCK_RUNTIME", "AWS_ENDPOINT_URL_BEDROCK", "AWS_ENDPOINT_URL"},
 		semconv.TermaServingBackendAwsBedrock},
 	{"CLAUDE_CODE_USE_FOUNDRY", []string{"ANTHROPIC_FOUNDRY_BASE_URL"}, semconv.TermaServingBackendAzureFoundry},
+	{"CLAUDE_CODE_USE_ANTHROPIC_AWS", nil, ""},
+	{"CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", nil, ""},
 	// Amazon Bedrock's Mantle endpoint.
 	{"CLAUDE_CODE_USE_MANTLE", []string{"ANTHROPIC_BEDROCK_MANTLE_BASE_URL"}, semconv.TermaServingBackendAwsBedrock},
 	{"CLAUDE_CODE_USE_VERTEX", []string{"ANTHROPIC_VERTEX_BASE_URL"}, semconv.TermaServingBackendGoogleVertex},

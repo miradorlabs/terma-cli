@@ -36,6 +36,8 @@ func TestRouteBackend(t *testing.T) {
 		{"bedrock through its VPC endpoint", map[string]string{"CLAUDE_CODE_USE_BEDROCK": "1", "ANTHROPIC_BEDROCK_BASE_URL": "https://vpce-0abc.bedrock-runtime.us-east-1.vpce.amazonaws.com"}, false, semconv.TermaServingBackendAwsBedrock},
 		{"bedrock through the AWS SDK's endpoint", map[string]string{"CLAUDE_CODE_USE_BEDROCK": "1", "AWS_ENDPOINT_URL_BEDROCK_RUNTIME": "http://localhost:4566"}, false, semconv.TermaServingBackendPrivate},
 		{"bedrock pointed at Vertex's host", map[string]string{"CLAUDE_CODE_USE_BEDROCK": "1", "ANTHROPIC_BEDROCK_BASE_URL": "https://aiplatform.googleapis.com"}, false, semconv.TermaServingBackendPrivate},
+		{"Claude Platform on AWS", map[string]string{"CLAUDE_CODE_USE_ANTHROPIC_AWS": "1", "ANTHROPIC_AWS_BASE_URL": "https://llm.corp.example"}, true, ""},
+		{"Claude Platform on Google Cloud before vertex", map[string]string{"CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD": "1", "CLAUDE_CODE_USE_VERTEX": "1"}, true, ""},
 		{"switch spelled on", map[string]string{"CLAUDE_CODE_USE_BEDROCK": "on"}, true, semconv.TermaServingBackendAwsBedrock},
 		{"bedrock at its own regional endpoint", map[string]string{"CLAUDE_CODE_USE_BEDROCK": "1", "ANTHROPIC_BEDROCK_BASE_URL": "https://bedrock-runtime.eu-west-1.amazonaws.com"}, false, semconv.TermaServingBackendAwsBedrock},
 		{"another provider's base URL", map[string]string{"CLAUDE_CODE_USE_VERTEX": "1", "ANTHROPIC_BEDROCK_BASE_URL": "https://litellm.corp.example"}, false, semconv.TermaServingBackendGoogleVertex},
@@ -138,6 +140,21 @@ func TestServingBackendReadsSettings(t *testing.T) {
 	hookruntest.WriteFile(t, projectDir, "settings.json", `{}`)
 	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendAnthropic {
 		t.Fatalf("apiKeyHelper: got %q, want anthropic", got)
+	}
+
+	// A host managing the provider has Claude Code ignore the settings files' route.
+	hookruntest.WriteFile(t, projectDir, "settings.json", `{"env":{"CLAUDE_CODE_USE_BEDROCK":"1"}}`)
+	t.Setenv("CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST", "1")
+	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendAnthropic {
+		t.Fatalf("host-managed provider: got %q, want the settings' switch ignored", got)
+	}
+	t.Setenv("CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST", "")
+
+	// A settings file terma cannot read may hide the route: nothing is reported.
+	hookruntest.WriteFile(t, projectDir, "settings.json", `{`)
+	writeRealClaudeAccount(t)
+	if got := servingBackend(env.Cwd); got != "" {
+		t.Fatalf("unreadable settings: got %q, want nothing", got)
 	}
 }
 
