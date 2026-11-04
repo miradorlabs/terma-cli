@@ -331,3 +331,31 @@ func TestSigningChange(t *testing.T) {
 		t.Error("when the signature was checked read as a change")
 	}
 }
+
+func TestNeedleOf(t *testing.T) {
+	for _, c := range []struct {
+		change Change
+		want   string
+	}{
+		{Change{Category: "tools", Path: []string{"tools", "collaboration/spawn_agent", "description"}}, "spawn_agent"},
+		{Change{Category: "tools", Path: []string{"tools", "Bash", "input_schema", "properties", "timeout", "description"}}, "timeout"},
+		{Change{Category: "telemetry", Path: []string{"telemetry", "surfaces", "logs/api_request", "keys", "speed"}}, "speed"},
+		{Change{Category: "telemetry", Path: []string{"telemetry", "surfaces", "metrics/codex.turn.e2e_duration_ms"}}, "codex.turn.e2e_duration_ms"},
+		{Change{Category: "model", Path: []string{"model", "default"}, Op: "changed", Before: "gpt-6-astra", After: "gpt-6.1-sol"}, "gpt-6.1-sol"},
+		{Change{Category: "request", Path: []string{"request", "betas", "remote_compaction_v2"}}, "remote_compaction_v2"},
+		{Change{Category: "side_requests", Path: []string{"side_requests", "POST /analytics/codex/turn-costs"}}, "/analytics/codex/turn-costs"},
+		{Change{Category: "cli", Path: []string{"cli", "flags", "exec --json"}}, "--json"},
+		{Change{Category: "support", Path: []string{"support", "status"}}, ""},
+	} {
+		if got := needleOf(&c.change); got != c.want {
+			t.Errorf("needleOf(%v) = %q, want %q", c.change.Path, got, c.want)
+		}
+	}
+}
+
+func TestDiffSides(t *testing.T) {
+	a, r := diffSides("@@ -1,2 +1,2 @@\n same\n-old line\n+new line\n")
+	if a != "new line\n" || r != "old line\n" {
+		t.Errorf("sides = %q, %q", a, r)
+	}
+}

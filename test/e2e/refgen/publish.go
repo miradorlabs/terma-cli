@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/e2e/sourcelink"
 )
 
 // Publishing: the night's snapshots merged into the published ones, each harness's versions
@@ -170,7 +172,11 @@ func publish(dir string, n night, opt options) error {
 				note = notes.of(h, to)
 			}
 			d := newDiff(byVersion[from], byVersion[to], note, n.now)
-			if c := meta.compare(from, to); c != "" {
+			c := sourcelink.Compare(h, from, to)
+			if c == "" {
+				c = meta.compare(from, to)
+			}
+			if c != "" {
 				d.Source = &DiffSource{Compare: c}
 			}
 			for j := range d.Changes {

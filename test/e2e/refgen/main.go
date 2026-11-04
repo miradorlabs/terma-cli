@@ -37,6 +37,7 @@ func main() {
 	compat := flag.String("compat", "", "the matrix, docs/compat/compat.json, for capability labels")
 	out := flag.String("out", "docs/harnesses", "the published tree to merge into")
 	fetch := flag.Bool("fetch", false, "read release dates and changelogs from the web")
+	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them (a tarball a build)")
 	flag.Parse()
 
 	n := night{now: time.Now().UTC(), labels: map[string]string{}}
@@ -98,7 +99,14 @@ func main() {
 			n.labels[c.ID] = c.Label
 		}
 	}
-	if err := publish(*out, n, options{fetch: *fetch, linker: newLinker(*fetch)}); err != nil {
+	opt := options{fetch: *fetch}
+	links := newLinker(*source)
+	if links != nil {
+		opt.linker = links
+	}
+	err := publish(*out, n, opt)
+	links.close()
+	if err != nil {
 		fail(err)
 	}
 }

@@ -256,7 +256,7 @@ jobs:
           for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
           # The catalog compatgen just merged gives each build a whole census saw its telemetry,
           # tonight's or an earlier night's: a backfill that took no census still has it.
-          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch
+          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch -source
       - name: Post the digest to Slack
         # A webhook that fails (revoked, Slack down) must not keep the night from being published.
         continue-on-error: true
