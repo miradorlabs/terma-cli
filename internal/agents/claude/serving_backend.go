@@ -15,11 +15,23 @@ func servingBackend(repoRoot string) string {
 	return routeBackend(f.route.lookup, f.route.helper || f.Status == hookrun.StatusPresent)
 }
 
-// routeBackend maps Claude Code's route to the closed set: a cloud provider's switch, else
-// ANTHROPIC_BASE_URL's host, else Anthropic when a first-party credential is visible (a key, a
-// token, or storedCredential: an apiKeyHelper or the stored login).
+// cloudBaseURLs are the variables that send a cloud provider's requests to another endpoint,
+// such as an LLM gateway.
+var cloudBaseURLs = map[string]string{
+	semconv.TermaServingBackendAwsBedrock:   "ANTHROPIC_BEDROCK_BASE_URL",
+	semconv.TermaServingBackendGoogleVertex: "ANTHROPIC_VERTEX_BASE_URL",
+	semconv.TermaServingBackendAzureFoundry: "ANTHROPIC_FOUNDRY_BASE_URL",
+}
+
+// routeBackend maps Claude Code's route to the closed set: a cloud provider's switch, by the
+// host of that provider's base URL when one is set, else ANTHROPIC_BASE_URL's host, else
+// Anthropic when a first-party credential is visible (a key, a token, or storedCredential: an
+// apiKeyHelper or the stored login).
 func routeBackend(lookup func(string) string, storedCredential bool) string {
 	if b := cloudBackend(lookup); b != "" {
+		if base := lookup(cloudBaseURLs[b]); base != "" {
+			return baseURLBackend(base)
+		}
 		return b
 	}
 	if base := lookup("ANTHROPIC_BASE_URL"); base != "" {

@@ -95,7 +95,7 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 	// skip reports a record it cannot read as a gap. That record may have moved the thread to
 	// another turn or provider.
 	// Accepted risk: the backend is then unknown, and not sent, until the thread's next provider
-	// move; reading the provider out of an oversized record would keep it.
+	// move; reading the provider out of an oversized or unparseable record would keep it.
 	skip := func(offset int64) error {
 		cursor.Provider = ""
 		if err := gap(offset); err != nil {
