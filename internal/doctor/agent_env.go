@@ -33,31 +33,70 @@ const envFix = "remove those variables where they are set: the process that star
 	"(an IDE or agent host, often from a config file of its own; `ps -o ppid= -p <pid>` names it) or a shell profile; " +
 	"then restart the agent, which reads its exporter settings only when it starts"
 
+// agentProc is a running agent process and the environment it started with, nil unread.
+type agentProc struct {
+	agent agents.Agent
+	env   []string
+}
+
 // AgentEnvCheck judges the environment each running agent process of a collected session
-// started with, against the relay: an exporter variable there overrides the settings files
-// the export check reads. A claim under stateDir lists the ancestors of each hook that ran
-// for the session, nearest first, one chain after another; a hook's own processes exit with
-// it, so the nearest process of each run of running ones is an agent, or what a git hook
-// ran under (a developer's shell), or an exited process's id that another has taken since.
-// All are judged, so the agent always is; the others add a finding only when they too
-// started with exporter variables that bypass the relay. A process whose latest claim is
-// a session's end is not judged: once the agent exits, the nearest running process is its
-// launcher. Only variable names are said, never a value: an endpoint or header may hold a
-// credential.
+// started with (runningAgents), against the relay: an exporter variable there overrides the
+// settings files the export check reads. Only variable names are said, never a value: an
+// endpoint or header may hold a credential.
+func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
+	procs, unread := runningAgents(reg, stateDir, environ, now)
+	switch {
+	case len(procs) == 0 && len(unread) > 0:
+		return Check{Status: Skip, Detail: "terma cannot read the environment of the running agent processes on this system"}
+	case len(procs) == 0:
+		return Check{Status: Skip, Detail: "no agent process of a collected session is running"}
+	}
+	type finding struct{ agent, what string }
+	found := map[finding][]int{}
+	var names []string
+	for _, pid := range slices.Sorted(maps.Keys(procs)) {
+		p := procs[pid]
+		if !slices.Contains(names, p.agent.DisplayName()) {
+			names = append(names, p.agent.DisplayName())
+		}
+		if what := exporterEnvFindings(p.env, relay.Addr, relay.Token); what != "" {
+			f := finding{p.agent.DisplayName(), what}
+			found[f] = append(found[f], pid)
+		}
+	}
+	if len(found) == 0 {
+		return Check{Status: Pass, Detail: fmt.Sprintf("%s started with no exporter variable that overrides the local relay on %s",
+			strings.Join(names, ", "), relay.Addr)}
+	}
+	var parts []string
+	for _, f := range slices.SortedFunc(maps.Keys(found), func(a, b finding) int { return strings.Compare(a.agent+a.what, b.agent+b.what) }) {
+		parts = append(parts, f.agent+" ("+pidList(found[f])+") started with exporter variables that override terma's setup: "+f.what)
+	}
+	return Check{Status: Warn, Detail: strings.Join(parts, "; "), Fix: envFix}
+}
+
+// runningAgents are the running processes of agents whose exporter reads its startup
+// environment, in collected sessions claimed under stateDir, readable ones by pid; unread
+// names each agent with one running that could not be read. A claim lists the ancestors of
+// each hook that ran for the session, nearest first, one chain after another; a hook's own
+// processes exit with it, so the nearest process of each run of running ones is an agent, or
+// what a git hook ran under (a developer's shell), or an exited process's id that another has
+// taken since. All are returned, so the agent always is; the others add a finding only when
+// they too started with what a check flags. A process whose latest claim is a session's end
+// is not: once the agent exits, the nearest running process is its launcher.
 //
 // Accepted risk: an agent that exits without its end hook completing (a crash, a kill, the
 // hook's timeout) leaves its claim fresh for claim.TTL after the session's last hook, a
 // commit's included, so its launcher is judged as the agent and a launcher that sets no
 // exporter variable of its own reads as a pass. Telling the agent's own process apart (by
 // its executable) would close it.
-func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
-	type proc struct {
-		agent string
-		env   []string
+func runningAgents(reg *agents.Registry, stateDir string, environ Environ, now time.Time) (procs map[int]agentProc, unread map[string]bool) {
+	type seenProc struct {
+		agentProc
 		at    time.Time
 		ended bool
 	}
-	seen := map[int]proc{}
+	seen := map[int]seenProc{}
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
 		// A session only git hooks claimed (a commit after its claim expired) names no agent process.
@@ -73,50 +112,22 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 		for _, pid := range c.PIDs {
 			env, alive := environ(pid)
 			if prev, ok := seen[pid]; alive && !after && (!ok || at.After(prev.at)) {
-				seen[pid] = proc{a.DisplayName(), env, at, ended}
+				seen[pid] = seenProc{agentProc{a, env}, at, ended}
 			}
 			after = alive
 		}
 	}
-	procs := map[int]proc{}
-	unread := false
+	procs, unread = map[int]agentProc{}, map[string]bool{}
 	for pid, p := range seen {
 		switch {
 		case p.ended:
 		case p.env == nil:
-			unread = true
+			unread[p.agent.Name()] = true
 		default:
-			procs[pid] = p
+			procs[pid] = p.agentProc
 		}
 	}
-	switch {
-	case len(procs) == 0 && unread:
-		return Check{Status: Skip, Detail: "terma cannot read the environment of the running agent processes on this system"}
-	case len(procs) == 0:
-		return Check{Status: Skip, Detail: "no agent process of a collected session is running"}
-	}
-	type finding struct{ agent, what string }
-	found := map[finding][]int{}
-	var names []string
-	for _, pid := range slices.Sorted(maps.Keys(procs)) {
-		p := procs[pid]
-		if !slices.Contains(names, p.agent) {
-			names = append(names, p.agent)
-		}
-		if what := exporterEnvFindings(p.env, relay.Addr, relay.Token); what != "" {
-			f := finding{p.agent, what}
-			found[f] = append(found[f], pid)
-		}
-	}
-	if len(found) == 0 {
-		return Check{Status: Pass, Detail: fmt.Sprintf("%s started with no exporter variable that overrides the local relay on %s",
-			strings.Join(names, ", "), relay.Addr)}
-	}
-	var parts []string
-	for _, f := range slices.SortedFunc(maps.Keys(found), func(a, b finding) int { return strings.Compare(a.agent+a.what, b.agent+b.what) }) {
-		parts = append(parts, f.agent+" ("+pidList(found[f])+") started with exporter variables that override terma's setup: "+f.what)
-	}
-	return Check{Status: Warn, Detail: strings.Join(parts, "; "), Fix: envFix}
+	return procs, unread
 }
 
 // exporterEnvFindings names, by variable, what in env keeps an exporter from the relay at
