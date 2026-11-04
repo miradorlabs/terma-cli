@@ -57,6 +57,11 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "hooks" && len(c.Path) == 3 && c.Path[1] == "events" && c.Op != "changed" {
 			continue
 		}
+		// How a build retries is measured in waits a busy machine moves and a run its probe cuts
+		// short: kept in each snapshot, not yet compared until it reads the same run to run.
+		if c.Path[0] == "behavior" && len(c.Path) > 1 && c.Path[1] == "retries" {
+			continue
+		}
 		// A retry probe's status there in one build and not the other was cut short in one: not
 		// observed, not a change of the build.
 		if c.Path[0] == "behavior" && len(c.Path) == 4 && c.Path[1] == "retries" && c.Path[2] == "statuses" && c.Op != "changed" {
@@ -64,6 +69,11 @@ func compare(a, b *Snapshot) []Change {
 		}
 		// How many times an event fired, and where the session was when it did, are the run's.
 		if c.Path[0] == "hooks" && len(c.Path) == 4 && c.Path[1] == "events" && (c.Path[3] == "count" || c.Path[3] == "cwd") {
+			continue
+		}
+		// A tool that became deferred keeps no schema in the request: that is its deferral (one
+		// change), not its description and parameters removed.
+		if c.Path[0] == "tools" && len(c.Path) >= 3 && c.Op == "removed" && deferredIn(bt, c.Path[1]) {
 			continue
 		}
 		// A command only listed says its description where its lister does; one there and not
@@ -425,10 +435,16 @@ func title(c *Change, labels map[string]string) string {
 		return what + " " + verb + stats
 	case "tools":
 		switch {
+		case len(p) == 2 && c.Op == "added" && deferredValue(c.After):
+			return "New deferred tool: " + at(1)
 		case len(p) == 2 && c.Op == "added":
 			return "New tool: " + at(1)
 		case len(p) == 2 && c.Op == "removed":
 			return "Tool removed: " + at(1)
+		case at(2) == "deferred" && c.Op == "added":
+			return at(1) + " is now a deferred tool (named only; its schema loaded on demand)"
+		case at(2) == "deferred" && c.Op == "removed":
+			return at(1) + " is no longer deferred: offered with its schema"
 		case at(2) == "description":
 			return at(1) + " tool description " + verb + stats
 		case at(2) == "input_schema" && at(3) == "properties" && len(p) == 5:
@@ -866,4 +882,22 @@ func structured(vs ...any) bool {
 		}
 	}
 	return false
+}
+
+// deferredIn reports a tool the snapshot names as deferred.
+func deferredIn(t map[string]any, name string) bool {
+	tools, _ := t["tools"].([]any)
+	for _, x := range tools {
+		if m, _ := x.(map[string]any); keyOf(m) == name {
+			d, _ := m["deferred"].(bool)
+			return d
+		}
+	}
+	return false
+}
+
+func deferredValue(v any) bool {
+	m, _ := v.(map[string]any)
+	d, _ := m["deferred"].(bool)
+	return d
 }

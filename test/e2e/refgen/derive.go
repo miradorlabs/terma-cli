@@ -106,9 +106,21 @@ func deriveRequestSections(s *Snapshot, p e2e.Profile) {
 	s.Prompt = derivePrompt(b, w)
 	tools := toolsOf(b)
 	s.Tools = make([]any, 0, len(tools))
+	offered := map[string]bool{}
 	for _, t := range tools {
 		s.Tools = append(s.Tools, t)
+		offered[t["name"].(string)] = true
 	}
+	// Tools a build names but defers (their schemas loaded on demand, through its tool search):
+	// known to the model by name alone.
+	for _, name := range deferredTools(b) {
+		if !offered[name] {
+			s.Tools = append(s.Tools, map[string]any{"name": name, "deferred": true})
+		}
+	}
+	sort.SliceStable(s.Tools, func(i, j int) bool {
+		return s.Tools[i].(map[string]any)["name"].(string) < s.Tools[j].(map[string]any)["name"].(string)
+	})
 	s.Caching = deriveCaching(b, w)
 	s.Request = deriveRequest(main, b, w)
 	s.SideRequests = deriveSideRequests(p, main)
@@ -210,6 +222,13 @@ func derivePrompt(b map[string]any, w string) map[string]any {
 			first, _ := msgs[0].(map[string]any)
 			if first["role"] == "user" {
 				addContext("user", first["content"])
+			}
+			// A system message among the turns (Claude Code's environment, its deferred tools and
+			// agent types) is the build's too.
+			for _, msg := range msgs {
+				if m, _ := msg.(map[string]any); m["role"] == "system" {
+					addContext("system", m["content"])
+				}
 			}
 		}
 	case "responses":
@@ -1091,4 +1110,42 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 			s.Binary["signing"] = sig
 		}
 	}
+}
+
+// deferredList is where Claude Code lists the tools it defers: after it says their schemas
+// are not loaded, one name a line, to the first blank line.
+var deferredList = regexp.MustCompile(`(?s)(?:schemas are NOT loaded|deferred tools?)[^\n]*:\n((?:[A-Za-z_][\w.:-]*\n)+)`)
+
+// deferredTools are the tools a model request names without offering them.
+func deferredTools(b map[string]any) []string {
+	var raw string
+	// The list is in a message's text: read it unescaped.
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case string:
+			if strings.Contains(x, "NOT loaded") || strings.Contains(x, "deferred tool") {
+				raw += x + "\n"
+			}
+		case map[string]any:
+			for _, v := range x {
+				walk(v)
+			}
+		case []any:
+			for _, v := range x {
+				walk(v)
+			}
+		}
+	}
+	walk(b)
+	var out []string
+	for _, m := range deferredList.FindAllStringSubmatch(raw, -1) {
+		for name := range strings.SplitSeq(strings.TrimSpace(m[1]), "\n") {
+			if name = strings.TrimSpace(name); name != "" {
+				out = append(out, name)
+			}
+		}
+	}
+	sort.Strings(out)
+	return slices.Compact(out)
 }

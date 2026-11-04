@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -622,5 +623,45 @@ func TestUnobservedSettings(t *testing.T) {
 	}
 	if strings.Join(ids, " ") != "config.options.quietHours" {
 		t.Errorf("3..4 = %v", ids)
+	}
+}
+
+// A system message among the turns is prompt context; the tools it names as deferred are
+// tools, and one that becomes deferred is one change.
+func TestDeferredToolsAndSystemMessages(t *testing.T) {
+	deferredText := "# Environment\nThe following deferred tools are available. Their schemas are NOT loaded, use ToolSearch:\nWebFetch\nWebSearch\n\nAgent types:\n- claude"
+	p := claudeProfile("1.0.1", "Be brief.", []string{"Bash", "ToolSearch"}, "", "")
+	var b map[string]any
+	_ = json.Unmarshal(p.Requests[1].Body, &b)
+	b["messages"] = append(b["messages"].([]any), map[string]any{"role": "system", "content": []any{map[string]any{"type": "text", "text": deferredText}}})
+	p.Requests[1].Body, _ = json.Marshal(b)
+	s := night{now: time.Now(), profiles: []e2e.Profile{p}}.tonight(buildID{"claude", "1.0.1"})
+	var ctx []string
+	for _, c := range s.Prompt["context"].([]any) {
+		ctx = append(ctx, c.(map[string]any)["role"].(string))
+	}
+	if strings.Join(ctx, ",") != "user,system" {
+		t.Errorf("context roles = %v", ctx)
+	}
+	var names []string
+	for _, tl := range s.Tools {
+		m := tl.(map[string]any)
+		names = append(names, fmt.Sprintf("%v %v", m["name"], m["deferred"] == true))
+	}
+	if strings.Join(names, " ") != "Bash false ToolSearch false WebFetch true WebSearch true" {
+		t.Errorf("tools = %v", names)
+	}
+	a := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash", "WebFetch"}, "", "")}}.tonight(buildID{"claude", "1.0.0"})
+	d := refdiff.New(a, s, nil, time.Now())
+	if c := changeByID(d, "tools.WebFetch.deferred"); c == nil || c.Title != "WebFetch is now a deferred tool (named only; its schema loaded on demand)" {
+		t.Errorf("deferral = %+v", c)
+	}
+	for _, c := range d.Changes {
+		if c.ID == "tools.WebFetch.description" || c.ID == "tools.WebFetch.input_schema" {
+			t.Errorf("a deferral read as its schema removed: %s", c.ID)
+		}
+	}
+	if c := changeByID(d, "tools.WebSearch"); c == nil || c.Title != "New deferred tool: WebSearch" {
+		t.Errorf("new deferred = %+v", c)
 	}
 }

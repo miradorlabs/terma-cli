@@ -349,6 +349,17 @@ be read), the reference's `Global config` keys (kept in `~/.claude.json`, outsid
 schema) aside. The variable lists are as good as `config.env_vars`, a heuristic for a closed
 harness: a name the build composes at run time is not found, and one it only sets may be.
 
+### tools and prompt context
+
+A tool a build names but defers (its schema loaded on demand, through its tool search: Claude
+Code's from 2.1.304) is in `tools` as `{ "name": "WebFetch", "deferred": true }`; one that
+becomes deferred is one change ("WebFetch is now a deferred tool"), not its description and
+parameters removed. A system message among a request's turns (Claude Code's environment,
+deferred tools and agent types) is in `prompt.context` with `role: "system"`.
+
+`behavior.retries` is kept in each snapshot but not compared: its waits and outcomes move with
+the machine's load and with runs the probe cuts short, until it reads the same run to run.
+
 ### cli
 
 `help` keeps each help text as the build printed it: every command's `--help`, and its `-h`
