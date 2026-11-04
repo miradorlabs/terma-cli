@@ -13,8 +13,8 @@ import (
 // TracesCheck says whether each of the developer's agents (mine; empty means all) whose
 // spans need switches of their own exports them: by its settings and, with environ, by the
 // environment its running processes started with (runningAgents). Spans alone carry some of
-// what Terma shows, and nothing else reports their absence. False when no such agent is
-// installed.
+// what Terma shows, and nothing else reports their absence. False when no surface of such an
+// agent is installed.
 func TracesCheck(ctx context.Context, reg *agents.Registry, mine []string, stateDir string, environ Environ, now time.Time) (Check, bool) {
 	var procs map[int]agentProc
 	unread := false
@@ -29,10 +29,9 @@ func TracesCheck(ctx context.Context, reg *agents.Registry, mine []string, state
 		}
 	}
 	for _, a := range reg.With[agents.TraceGated]() {
-		if len(mine) > 0 && !slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(mine, s) }) {
-			continue
-		}
-		if !a.Installed(ctx) {
+		if !slices.ContainsFunc(agents.Surfaces(a), func(s agents.Surface) bool {
+			return (len(mine) == 0 || slices.Contains(mine, s.Name)) && s.Installed(ctx)
+		}) {
 			continue
 		}
 		var problems []string

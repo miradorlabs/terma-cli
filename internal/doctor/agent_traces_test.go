@@ -34,6 +34,18 @@ func (tracedAgent) TracesOffIn(env []string) []string {
 
 func (tracedAgent) SpansCarry() string { return "finish reason" }
 
+// desktopTraced is a tracedAgent whose own command is missing, run from a desktop app instead.
+type desktopTraced struct {
+	tracedAgent
+	desktop bool
+}
+
+func (desktopTraced) Installed(context.Context) bool { return false }
+
+func (a desktopTraced) Surfaces() []agents.Surface {
+	return []agents.Surface{{Name: a.Name(), Installed: func(context.Context) bool { return a.desktop }}}
+}
+
 // The spans check warns, naming what is lost and where it is switched off, from the settings
 // and from running processes' environments; it passes when both export spans, and never
 // passes on settings it could not read.
@@ -78,6 +90,15 @@ func TestTracesCheckNamesWhatSpansCarry(t *testing.T) {
 	}
 	if _, ok := TracesCheck(ctx, agent(nil, "BETA=1"), []string{"other"}, t.TempDir(), nil, time.Now()); ok {
 		t.Fatal("an agent the developer does not use was checked")
+	}
+	desktop := func(installed bool) *agents.Registry {
+		return agents.New(desktopTraced{tracedAgent{envAgent{agentstest.Agent{ID: "fake"}}, []string{"BETA=1"}, nil}, installed})
+	}
+	if c, ok := TracesCheck(ctx, desktop(true), []string{"fake"}, t.TempDir(), nil, time.Now()); !ok || c.Status != Warn {
+		t.Fatalf("desktop only = %+v, %v; want a warning", c, ok)
+	}
+	if _, ok := TracesCheck(ctx, desktop(false), nil, t.TempDir(), nil, time.Now()); ok {
+		t.Fatal("an agent with no surface installed was checked")
 	}
 }
 

@@ -9,6 +9,9 @@ import (
 // TracesOff names what in the user settings file keeps Claude Code's spans, claude_code.llm_request
 // among them, from being exported: the master switch, the beta switch and the traces exporter, all
 // needed. A repository's settings are left out: one switching traces off is its own policy.
+// Accepted risk: this is the file terma's own CLAUDE_CONFIG_DIR names, as for setup and every
+// other check, so a running process started with another is judged by this file; reading that
+// process's own settings through TracesOffIn is the upgrade path.
 func (Agent) TracesOff() ([]string, error) {
 	path, err := exporter{}.ConfigPath()
 	if err != nil {
