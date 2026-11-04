@@ -177,6 +177,13 @@ base_url = "https://llm.corp.example/v1"
 	if len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != semconv.TermaServingBackendAzureOpenai {
 		t.Fatalf("next read on azure: %+v", quotas)
 	}
+	// A cursor written before the provider was tracked may be past a move, so it sends none until the next.
+	forgetCursorProvider(t, env.StateDir)
+	appendRollout(`{"timestamp":"2026-10-30T05:00:04Z","type":"event_msg","payload":{"type":"token_count","rate_limits":null}}` + "\n")
+	quotas = stopOn()
+	if len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != nil {
+		t.Fatalf("a cursor from before the provider was tracked: %+v, want no backend", quotas)
+	}
 
 	appendRollout(resumed("gateway"))
 	quotas = stopOn()
@@ -189,5 +196,31 @@ base_url = "https://llm.corp.example/v1"
 	quotas = stopOn()
 	if len(quotas) != 1 || quotas[0].Attrs[semconv.TermaServingBackendKey] != nil {
 		t.Fatalf("resumed on a provider config.toml does not define: %+v, want no backend", quotas)
+	}
+}
+
+// forgetCursorProvider rewrites every funding cursor as a terma that did not track the provider wrote it.
+func forgetCursorProvider(t *testing.T, stateDir string) {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(stateDir, codexFundingCursorDir, "*.json"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no funding cursor: %v", err)
+	}
+	for _, path := range paths {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cursor map[string]any
+		if err := json.Unmarshal(b, &cursor); err != nil {
+			t.Fatal(err)
+		}
+		delete(cursor, "provider")
+		if b, err = json.Marshal(cursor); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

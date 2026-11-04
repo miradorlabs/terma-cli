@@ -70,8 +70,9 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 	if cursor.Identity == "" || reset {
 		cursor = quotaCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
 	}
-	// A cursor written before the provider was tracked is past session_meta, which the head holds.
-	if cursor.Provider == "" {
+	// Only a read from the start knows the provider: a cursor written before it was tracked may be past a move to
+	// another, so it sends none until the next move.
+	if cursor.Provider == "" && cursor.Offset == 0 {
 		cursor.Provider = codexSessionProvider(first)
 	}
 	routes := sync.OnceValue(readCodexRoutes)
