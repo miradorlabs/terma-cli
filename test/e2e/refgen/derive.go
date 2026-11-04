@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/e2e"
@@ -871,18 +872,36 @@ func toolOutputOf(reqs []e2e.ProviderRequest) map[string]any {
 	out := map[string]any{"limit_chars": len(longest)}
 	if m := truncationMarker.FindString(longest); m != "" {
 		out["marker"] = strings.TrimSpace(m)
-		idx := strings.Index(longest, m)
-		switch {
-		case idx < len(longest)/4:
-			out["truncation"] = "start"
-		case idx > len(longest)*3/4:
-			out["truncation"] = "end"
-		default:
+	}
+	// The probe's tool numbers its lines (TERMA-LINE-000001…): the numbers that reached the
+	// model say which part the build kept.
+	var first, last, kept int
+	for _, m := range numberedLine.FindAllStringSubmatch(longest, -1) {
+		n, _ := strconv.Atoi(m[1])
+		if kept == 0 || n < first {
+			first = n
+		}
+		last = max(last, n)
+		kept++
+	}
+	if kept > 0 {
+		out["kept_lines"] = map[string]int{"count": kept, "first": first, "last": last}
+		switch head, tail := first == 1, last >= probeLines; {
+		case head && tail:
 			out["truncation"] = "middle"
+		case head:
+			out["truncation"] = "end"
+		case tail:
+			out["truncation"] = "start"
 		}
 	}
 	return out
 }
+
+// numberedLine is a line of the tool output probe's command; probeLines how many it prints.
+var numberedLine = regexp.MustCompile(`TERMA-LINE-0*(\d+)`)
+
+const probeLines = 25000
 
 // toolResults are the texts of the tool results a model request sends back.
 func toolResults(b map[string]any) []string {

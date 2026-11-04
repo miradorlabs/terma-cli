@@ -2,7 +2,7 @@
 # Backfill the Harness Reference with a harness's older builds: run by hand, once, not in
 # CI. Each build runs on its own, so one that can no longer be fetched or driven is a line
 # in the summary, not the end of the run; a build already captured in the output is skipped,
-# so a run stopped half way picks up where it stopped. Each build is downloaded into the
+# so a run stopped half way picks up where it stopped; BACKFILL_JOBS builds run at once. Each build is downloaded into the
 # run's own folder and removed once captured: a hundred builds never sit on disk at once.
 # (Its own folder, too, because macOS holds at launch whatever is put at a path it once
 # rejected, and an older run may have had a revoked build rejected at the shared cache's.)
@@ -43,23 +43,30 @@ go test -c -o "$bin/e2e.test" .
 
 summary="$out/summary.tsv"
 total=$(wc -l <<<"$versions" | tr -d ' ')
-i=0
-for v in $versions; do
-	i=$((i + 1))
-	dir="$out/$harness/$v"
+
+# One build: its profile, its proxied first turn and its behaviour probes, not the telemetry
+# export's cadence (which holds a model call for a minute, and is better measured on the builds
+# the nights test).
+one() {
+	local v=$1 dir="$out/$harness/$1" start status=pass
 	if [ -s "$dir/profiles.json" ]; then
-		continue
+		return
 	fi
 	mkdir -p "$dir"
 	start=$(date +%s)
-	status=pass
 	if ! env TERMA_ENV=dev TERMA_E2E=1 TERMA_E2E_BINARY="$bin/terma" TERMA_E2E_REPORT="$dir" "$var=$v" \
 		TERMA_E2E_VERSIONS_DIR="$out/.versions" \
-		"$bin/e2e.test" -test.v -test.timeout 15m -test.run "^Test${name}(Profile|Probe)" >"$dir/log" 2>&1; then
+		"$bin/e2e.test" -test.v -test.timeout 30m -test.run "^Test${name}(Profile|Probe)" -test.skip 'ProfileTelemetry|Offline$' \
+		>"$dir/log" 2>&1; then
 		status=fail
 	fi
 	[ -s "$dir/profiles.json" ] || status="$status, no profile"
 	rm -rf "$out/.versions/$harness/$v"
 	printf '%s\t%s\t%s\t%ss\n' "$harness" "$v" "$status" "$(($(date +%s) - start))" | tee -a "$summary"
-	echo "  [$i/$total]" >&2
-done
+}
+
+# BACKFILL_JOBS builds at once (default 3): each in its own sandboxes and download folder.
+export harness out bin var name summary
+export -f one
+echo "$versions" | xargs -P "${BACKFILL_JOBS:-3}" -I{} bash -c 'one "$1"' _ {}
+echo "done: $total builds of $harness" >&2
