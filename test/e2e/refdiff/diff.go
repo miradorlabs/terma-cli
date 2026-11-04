@@ -57,6 +57,15 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "hooks" && len(c.Path) == 3 && c.Path[1] == "events" && c.Op != "changed" {
 			continue
 		}
+		// How many times an event fired, and where the session was when it did, are the run's.
+		if c.Path[0] == "hooks" && len(c.Path) == 4 && c.Path[1] == "events" && (c.Path[3] == "count" || c.Path[3] == "cwd") {
+			continue
+		}
+		// A command only listed says its description where its lister does; one there and not
+		// in the other build is not observed, not added or removed.
+		if c.Path[0] == "cli" && len(c.Path) == 4 && c.Path[1] == "commands" && c.Path[3] == "description" && c.Op != "changed" {
+			continue
+		}
 		if measured[c.Path[len(c.Path)-1]] && c.Op == "changed" && nearly(c.Before, c.After) {
 			continue
 		}

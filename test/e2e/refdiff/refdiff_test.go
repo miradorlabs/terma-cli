@@ -139,3 +139,22 @@ func TestEnvGroupedAndUnhelped(t *testing.T) {
 		t.Errorf("changes = %+v", d.Changes)
 	}
 }
+
+// Options read from minified code: a top-level setting new is a change; a nested one appearing,
+// or a type read another way, is not.
+func TestApproximateConfig(t *testing.T) {
+	src := "the settings schema its bundle declares (zod, read from minified code)"
+	a := &Snapshot{Harness: "claude", Version: "1", Config: map[string]any{"source": src, "options": map[string]any{
+		"model": map[string]any{"type": "string", "description": "The model"}}}}
+	b := &Snapshot{Harness: "claude", Version: "2", Config: map[string]any{"source": src, "options": map[string]any{
+		"model":            map[string]any{"type": "string|object", "description": "The model"},
+		"quietHours":       map[string]any{"type": "object"},
+		"quietHours.start": map[string]any{"type": "string"}}}}
+	var ids []string
+	for _, c := range New(a, b, nil, time.Now()).Changes {
+		ids = append(ids, c.ID)
+	}
+	if strings.Join(ids, " ") != "config.options.quietHours" {
+		t.Errorf("changes = %v", ids)
+	}
+}

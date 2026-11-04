@@ -36,10 +36,20 @@ func diffConfig(a, b map[string]any, out *[]Change) {
 	optsB, okB := b["options"].(map[string]any)
 	first := len(*out)
 	defer func() { *out = append((*out)[:first], groupEnvVars(collapseProfiles((*out)[first:]))...) }()
+	// A schema read from minified code resolves a nested schema on one build and not the next:
+	// its top-level settings are compared item by item, and of a nested one only what changed in
+	// both. Its types, which a minified name resolved to its nearest definition says, are not.
+	approx := approximate(srcA)
 	if okA && okB && srcA == srcB {
 		for _, k := range sortedKeys(union(optsA, optsB)) {
 			x, inA := optsA[k]
 			y, inB := optsB[k]
+			if approx && strings.ContainsAny(k, ".[") && (!inA || !inB) {
+				continue
+			}
+			if approx && inA && inB {
+				x, y = withoutType(x), withoutType(y)
+			}
 			switch {
 			case !inA && !unread(optsA, k):
 				*out = append(*out, Change{Op: "added", Path: path("options", k), After: y})
@@ -135,6 +145,25 @@ func diffOption(path []string, a, b any, out *[]Change) {
 var sourceTag = regexp.MustCompile(` at \S+$`)
 
 // sourceKind is where options were read from, the build's own tag left out.
+// approximate reports options read from minified code, where a nested schema or a type is not
+// read the same way from build to build.
+func approximate(kind string) bool { return strings.Contains(kind, "minified") }
+
+// withoutType is an option without its type.
+func withoutType(v any) any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return v
+	}
+	out := make(map[string]any, len(m))
+	for k, x := range m {
+		if k != "type" {
+			out[k] = x
+		}
+	}
+	return out
+}
+
 func sourceKind(v any) string {
 	s, _ := v.(string)
 	return sourceTag.ReplaceAllString(s, "")
