@@ -127,6 +127,9 @@ const egressSettle = 3 * time.Second
 
 // TestClaudeProfileEgress records everything each Claude Code build contacts besides its
 // provider on the profile's turn, through the recording proxy: its defaults, nothing turned off.
+// Its first turn, behind the proxy that answers every request but the model's empty, runs on
+// the feature flags the build ships with: the reference publishes it as the build's first
+// turn, and the plain turn's, with live flags, beside it (refgen).
 func TestClaudeProfileEgress(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
@@ -135,7 +138,7 @@ func TestClaudeProfileEgress(t *testing.T) {
 		sb.unproxyHooks()
 		proxy := StartEgressProxy(t)
 		var calls atomic.Int32
-		provider := httptest.NewServer(proxy.Provider(isClaudeModelCall, claudeWorkloadProvider(&calls, nil, false)))
+		provider := httptest.NewServer(proxy.Provider(isClaudeModelCall, CaptureProvider(t, b, claudeWorkloadProvider(&calls, nil, false))))
 		defer provider.Close()
 		sb.ClaudeBaseURL = provider.URL
 		PlaceSandbox(t, b, sb)
@@ -170,7 +173,7 @@ func TestCodexProfileEgress(t *testing.T) {
 		sb.unproxyHooks()
 		proxy := StartEgressProxy(t)
 		var calls atomic.Int32
-		provider := httptest.NewServer(proxy.Provider(isCodexModelCall, codexWorkloadProvider(&calls, nil)))
+		provider := httptest.NewServer(proxy.Provider(isCodexModelCall, CaptureProvider(t, b, codexWorkloadProvider(&calls, nil))))
 		defer provider.Close()
 		PlaceSandbox(t, b, sb)
 		Placeholder(t, b, provider.URL, "<provider>")

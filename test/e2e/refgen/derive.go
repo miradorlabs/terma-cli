@@ -552,6 +552,13 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 				s.Prompt["interactive"] = map[string]any{"system": pr["system"], "context": pr["context"], "chars": pr["chars"], "sha256": pr["sha256"],
 					"model": b["model"], "tools": names(toolsOf(b))}
 			}
+		case probe == "live-flags":
+			if main := largest(reqs); main != nil {
+				b := body(*main)
+				pr := derivePrompt(b, wire(b))
+				s.Live = map[string]any{"prompt": pr, "model": b["model"], "tools": names(toolsOf(b)),
+					"differs": s.Prompt != nil && pr["sha256"] != s.Prompt["sha256"]}
+			}
 		case probe == "compaction":
 			if c := compactionOf(reqs); c != nil {
 				beh["compaction"] = c

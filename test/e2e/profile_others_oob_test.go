@@ -47,7 +47,7 @@ func profileOtherOutOfBand(t *testing.T, b Binary, h otherProfile) {
 	sb := New(t, Isolated)
 	proxy := StartEgressProxy(t)
 	var calls atomic.Int32
-	provider := httptest.NewServer(proxy.Provider(h.isModelCall, h.provider(&calls)))
+	provider := httptest.NewServer(proxy.Provider(h.isModelCall, CaptureProvider(t, b, h.provider(&calls))))
 	defer provider.Close()
 	h.setup(sb, provider.URL)
 	sb.unproxyHooks()

@@ -423,3 +423,36 @@ func TestSupportPlatformsAndModelWords(t *testing.T) {
 		t.Errorf("capability change = %+v", c)
 	}
 }
+
+// The proxied turn is the published first turn; the plain one, with live flags, is kept apart
+// and never compared.
+func TestProxiedFirstTurn(t *testing.T) {
+	plain := claudeProfile("1.0.0", "Live flags on.", []string{"Bash"}, "", "")
+	proxied := claudeProfile("1.0.0", "Shipped defaults.", []string{"Bash"}, "", "")
+	proxied.Scenario = "TestClaudeProfileEgress"
+	proxied.Help = nil
+	n := night{now: time.Now(), profiles: []e2e.Profile{plain, proxied}}
+	s := n.tonight(buildID{"claude", "1.0.0"})
+	sys := s.Prompt["system"].([]any)
+	if got := sys[1].(map[string]any)["text"]; got != "Shipped defaults." {
+		t.Errorf("published prompt = %q", got)
+	}
+	if s.Live == nil || s.Live["differs"] != true {
+		t.Errorf("live = %v", s.Live)
+	}
+	if s.CLI == nil {
+		t.Error("the plain turn's help was lost")
+	}
+	other := *s
+	other.Version = "1.0.1"
+	other.Live = map[string]any{"differs": false}
+	if d := refdiff.New(s, &other, nil, time.Now()); len(d.Changes) != 0 {
+		t.Errorf("live flags read as changes: %+v", d.Changes)
+	}
+	failed := proxied
+	failed.Failed = true
+	s = night{now: time.Now(), profiles: []e2e.Profile{plain, failed}}.tonight(buildID{"claude", "1.0.0"})
+	if got := s.Prompt["system"].([]any)[1].(map[string]any)["text"]; got != "Live flags on." || s.Live != nil {
+		t.Errorf("a failed proxied turn was published: %q, live %v", got, s.Live)
+	}
+}

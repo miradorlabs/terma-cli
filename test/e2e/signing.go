@@ -134,6 +134,11 @@ func inspectSigning(path string) (*Signing, error) {
 	// Gatekeeper asks whether the certificate still stands (it reaches Apple's OCSP service):
 	// revocation is a fact of when it is asked, not of the build.
 	out, _ = exec.CommandContext(ctx, "spctl", "-a", "-vv", "-t", "exec", path).CombinedOutput()
+	// A command line tool is no app to run from the Finder: Gatekeeper rejects it as such, the
+	// code valid. Asked as an installer would, it says what it says of the signature.
+	if strings.Contains(string(out), "does not seem to be an app") {
+		out, _ = exec.CommandContext(ctx, "spctl", "-a", "-vv", "-t", "install", path).CombinedOutput()
+	}
 	s.Assessment = strings.TrimSpace(strings.ReplaceAll(string(out), path+": ", ""))
 	switch a := s.Assessment; {
 	case strings.Contains(a, "REVOKED"):

@@ -39,6 +39,12 @@ type Snapshot struct {
 	Storage      map[string]any `json:"storage,omitempty"`
 	Binary       map[string]any `json:"binary,omitempty"`
 	Support      map[string]any `json:"support,omitempty"`
+
+	// Live is the first turn as it ran with the vendor's live feature flags, beside the
+	// published one, which ran with the flags the build ships with: its prompt, and whether
+	// the flags changed it. A rollout changes it from night to night, so it is no section and
+	// never compared.
+	Live map[string]any `json:"live,omitempty"`
 }
 
 // Capture says how a snapshot was taken.

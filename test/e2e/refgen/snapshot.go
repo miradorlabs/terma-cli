@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/e2e"
@@ -79,7 +80,9 @@ func (n night) builds() []buildID {
 
 // profileOf is the night's profile of a build: its profile scenarios' merged, the macOS one
 // first, so a snapshot reads one platform's evidence where it can.
-func (n night) profileOf(id buildID) (e2e.Profile, bool) {
+// profileOf is the night's profile of a build, whether its first turn was taken behind the
+// recording proxy, and whether there is one.
+func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 	var ps []e2e.Profile
 	for _, p := range n.profiles {
 		if p.Harness == id.harness && p.Version == id.version {
@@ -87,7 +90,7 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool) {
 		}
 	}
 	if len(ps) == 0 {
-		return e2e.Profile{}, false
+		return e2e.Profile{}, false, false
 	}
 	sort.SliceStable(ps, func(i, j int) bool {
 		if (ps[i].Platform == "darwin/arm64") != (ps[j].Platform == "darwin/arm64") {
@@ -95,18 +98,44 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool) {
 		}
 		return ps[i].Scenario < ps[j].Scenario
 	})
+	// The first turn published is the one taken behind the recording proxy (the egress
+	// scenario's), where every request but the model's is answered empty and the build runs on
+	// the feature flags it ships with: the plain turn reaches the vendor's live flags, which a
+	// server-side rollout changes from one night to the next. The plain turn's is kept as the
+	// live-flags capture. Without a whole proxied turn, the plain turn's is the first turn.
+	first := -1
+	for i, p := range ps {
+		if p.Platform == ps[0].Platform && strings.HasSuffix(p.Scenario, "ProfileEgress") && !p.Failed && hasFirstTurn(p) {
+			first = i
+			break
+		}
+	}
+	src := first
+	for i, p := range ps {
+		if src < 0 && p.Platform == ps[0].Platform && hasFirstTurn(p) {
+			src = i
+		}
+	}
 	merged := ps[0]
-	for _, p := range ps[1:] {
+	merged.Requests = nil
+	for i, p := range ps {
 		if p.Platform != merged.Platform {
 			continue
 		}
-		// A scenario beside the plain turn (its egress, its telemetry) takes a first turn of
-		// its own: the plain turn's is the first turn, the others' behaviour probes are kept.
 		for _, r := range p.Requests {
-			if r.Probe == "first-turn" && hasFirstTurn(merged) {
-				continue
+			if r.Probe == "first-turn" {
+				switch {
+				case i == src:
+				case first >= 0 && strings.HasSuffix(p.Scenario, "Profile"):
+					r.Probe = "live-flags"
+				default:
+					continue // another scenario's turn of its own (its telemetry's)
+				}
 			}
 			merged.Requests = append(merged.Requests, r)
+		}
+		if i == 0 {
+			continue
 		}
 		merged.Egress = append(merged.Egress, p.Egress...)
 		merged.Failed = merged.Failed || p.Failed
@@ -135,16 +164,20 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool) {
 			merged.Command = p.Command
 		}
 	}
-	return merged, true
+	return merged, first >= 0, true
 }
 
 // tonight is the snapshot of a build from the night's evidence alone.
 func (n night) tonight(id buildID) *Snapshot {
 	s := &Snapshot{SchemaVersion: schemaVersion, Harness: id.harness, Version: id.version, CapturedAt: n.now}
-	if p, ok := n.profileOf(id); ok {
+	if p, proxied, ok := n.profileOf(id); ok {
 		s.Platform = p.Platform
 		s.Capture = Capture{Command: p.Command, Partial: p.Failed,
 			Notes: []string{"Model requests were answered by a local fixture provider, not the vendor's API; nothing was sent to a model."}}
+		if proxied {
+			s.Capture.Notes = append(s.Capture.Notes, "The first turn ran behind a local proxy that answers every other request empty: "+
+				"the build used the feature flags it ships with. What live flags changed is under live.")
+		}
 		deriveRequestSections(s, p)
 		deriveBehavior(s, p)
 		deriveCLI(s, p)
