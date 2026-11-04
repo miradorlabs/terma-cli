@@ -167,8 +167,19 @@ func needleOf(c *Change) string {
 			return path
 		}
 	case "hooks":
-		if len(p) >= 5 {
+		// A payload field by its last part ("tool_input.command" by "command"), an environment
+		// variable by its name, anything else of an event's by the event.
+		switch {
+		case len(p) >= 5 && (at(3) == "keys" || at(3) == "kinds"):
+			field := strings.TrimSuffix(at(4), "[]")
+			if i := strings.LastIndex(field, "."); i >= 0 {
+				field = strings.TrimSuffix(field[i+1:], "[]")
+			}
+			return field
+		case len(p) >= 5 && (at(3) == "env" || at(3) == "env_paths"):
 			return at(4)
+		case at(1) == "source":
+			return ""
 		}
 		return at(2)
 	case "cli", "config":

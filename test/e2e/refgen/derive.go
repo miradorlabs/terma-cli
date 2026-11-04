@@ -598,6 +598,14 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 			if m, ok := v.(map[string]any); ok {
 				s.Hooks = m
 			}
+		case "hooks-first-turn":
+			// The payloads of the hooks the plain turn ran ({events: …}): the hooks section where
+			// the build had no hooks probe.
+			if _, probed := p.Probes["hooks"]; !probed {
+				if m, ok := v.(map[string]any); ok {
+					s.Hooks = m
+				}
+			}
 		case "telemetry", "signing", "across-turns":
 			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand; the
 			// caching's from the requests.

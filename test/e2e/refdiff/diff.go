@@ -40,6 +40,9 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "support" && len(c.Path) == 3 && c.Path[1] == "capabilities" && c.Op != "changed" {
 			continue
 		}
+		if c.Path[0] == "hooks" && hookEcho(c) {
+			continue
+		}
 		kept = append(kept, c)
 	}
 	out = kept
@@ -48,6 +51,17 @@ func compare(a, b *Snapshot) []Change {
 		classify(&out[i], labels)
 	}
 	return out
+}
+
+// hookEcho reports whether a change in the hooks section only says again what another says: a
+// payload field's kind or an environment variable's path added or removed with the field or
+// variable itself, and why the probe did not fire an event (a note of the capture's, which the
+// event's own change says).
+func hookEcho(c Change) bool {
+	if len(c.Path) > 1 && c.Path[1] == "not_fired" {
+		return true
+	}
+	return len(c.Path) == 5 && c.Path[1] == "events" && (c.Path[3] == "kinds" || c.Path[3] == "env_paths") && c.Op != "changed"
 }
 
 // capabilityLabels are the labels of the capabilities a snapshot's support lists, by their key
@@ -277,7 +291,11 @@ func classify(c *Change, labels map[string]string) {
 	case c.Category == "telemetry" && c.Op == "removed":
 		c.Impact = "notable"
 	case c.Category == "hooks" && c.Op == "removed" && len(c.Path) == 3:
-		c.Impact = "degrading" // a hook event no longer fired
+		c.Impact = "degrading" // a hook event no longer supported, or no longer fired
+	case c.Category == "hooks" && c.Op == "added" && len(c.Path) == 3 && c.Path[1] == "supported":
+		c.Impact = "notable" // a new hook event
+	case c.Category == "hooks" && c.Op == "changed" && len(c.Path) == 5 && c.Path[3] == "control":
+		c.Impact = "notable" // what a hook's answer does
 	case c.Category == "hooks" && c.Op == "removed":
 		c.Impact = "notable"
 	case c.Category == "request" && len(c.Path) > 1 && (c.Path[1] == "betas" || c.Path[1] == "endpoint" || c.Path[1] == "identifiers"):
@@ -422,15 +440,7 @@ func title(c *Change, labels map[string]string) string {
 		}
 		return "Telemetry " + strings.Join(p[1:], ".") + " " + verb + valueNote(c)
 	case "hooks":
-		switch {
-		case len(p) == 3 && c.Op == "added":
-			return "New hook event: " + at(2)
-		case len(p) == 3 && c.Op == "removed":
-			return "Hook event no longer fired: " + at(2)
-		case len(p) == 5:
-			return fmt.Sprintf("%s hook payload field %s %s", at(2), at(4), verb)
-		}
-		return "Hook " + strings.Join(p[2:], ".") + " " + verb
+		return hookTitle(c, verb, arrow)
 	case "cli":
 		switch at(1) {
 		case "flags":
@@ -506,6 +516,51 @@ func title(c *Change, labels map[string]string) string {
 	return strings.Join(p, ".") + " " + verb + valueNote(c)
 }
 
+// hookTitle is a change to the hooks section said in a line: the events a build knows
+// (supported), and what each that fired was handed and did with a hook's answer (events).
+func hookTitle(c *Change, verb string, arrow func() string) string {
+	p := c.Path
+	at := func(i int) string {
+		if i < len(p) {
+			return p[i]
+		}
+		return ""
+	}
+	event := at(2)
+	switch {
+	case at(1) == "supported" && c.Op == "added":
+		return "New hook event: " + event
+	case at(1) == "supported" && c.Op == "removed":
+		return "Hook event no longer supported: " + event
+	case at(1) == "source":
+		return "Hook events read from: " + arrow()
+	case at(1) != "events":
+	case len(p) == 3 && c.Op == "added":
+		return "Hook event now fired: " + event
+	case len(p) == 3 && c.Op == "removed":
+		return "Hook event no longer fired: " + event
+	case len(p) == 5 && at(3) == "keys":
+		return fmt.Sprintf("%s hook payload field %s %s", event, at(4), verb)
+	case len(p) == 5 && at(3) == "kinds":
+		return fmt.Sprintf("%s hook payload field %s: %s", event, at(4), arrow())
+	case len(p) == 5 && at(3) == "env":
+		return fmt.Sprintf("%s hook environment variable %s %s", event, at(4), verb)
+	case len(p) == 5 && at(3) == "env_paths":
+		return fmt.Sprintf("%s hook environment variable %s: %s", event, at(4), arrow())
+	case len(p) == 5 && at(3) == "control" && c.Op == "changed":
+		return fmt.Sprintf("%s hook control (%s): %s", event, at(4), arrow())
+	case len(p) == 5 && at(3) == "control":
+		return fmt.Sprintf("%s hook control (%s) %s", event, at(4), verb)
+	case len(p) == 4 && at(3) == "matcher":
+		return fmt.Sprintf("%s hook takes a matcher: %s", event, arrow())
+	case len(p) == 4 && at(3) == "cwd":
+		return fmt.Sprintf("%s hook working directory: %s", event, arrow())
+	case len(p) == 4 && c.Op == "changed":
+		return fmt.Sprintf("%s hook %s: %s", event, at(3), arrow())
+	}
+	return "Hook " + strings.Join(p[1:], ".") + " " + verb
+}
+
 // valueNote is ": before → after" for a short change of value, nothing otherwise.
 func valueNote(c *Change) string {
 	if c.Op != "changed" || c.TextDiff != nil {
@@ -534,7 +589,8 @@ var genericSegments = map[string]bool{"keys": true, "surfaces": true, "system": 
 	"description": true, "input_schema": true, "events": true, "flags": true, "subcommands": true, "help": true,
 	"headers": true, "betas": true, "params": true, "egress": true, "kinds": true, "class": true, "properties": true,
 	"breakpoints": true, "statuses": true, "result": true, "status": true, "capabilities": true, "default": true,
-	"body_keys": true, "identifiers": true, "aliases": true, "prices": true, "type": true, "required": true}
+	"body_keys": true, "identifiers": true, "aliases": true, "prices": true, "type": true, "required": true,
+	"supported": true, "control": true, "env_paths": true, "matcher": true, "fired": true, "count": true}
 
 // documented reports whether changelog mentions c: the thing it names (a tool, a field, a
 // flag, a model), or for a prompt's change, the prompt.
