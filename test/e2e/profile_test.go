@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/http/httptest"
 	"os/exec"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -62,13 +64,21 @@ func TestCodexProfile(t *testing.T) {
 		PlaceSandbox(t, b, sb)
 		Placeholder(t, b, provider.URL, "<provider>")
 		Placeholder(t, b, profilePrompt, "<prompt>")
-		args := []string{"exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust",
-			"-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`,
+		// A flag an older build does not have would end its run before its first request:
+		// each is passed where the build's own help lists it.
+		args := []string{"exec", "--json"}
+		help := codexExecHelp(b, sb.codexEnv(RouteAPIKey))
+		for _, flag := range []string{"--skip-git-repo-check", "--dangerously-bypass-hook-trust"} {
+			if strings.Contains(help, flag) {
+				args = append(args, flag)
+			}
+		}
+		args = append(args, "-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`,
 			"-c", "features.plugins=false", "-c", "features.remote_plugin=false",
 			"-c", `model_provider="telemetry_fixture"`, "-c", `model_providers.telemetry_fixture.name="Telemetry fixture"`,
-			"-c", "model_providers.telemetry_fixture.base_url=" + tomlQuote(provider.URL),
+			"-c", "model_providers.telemetry_fixture.base_url="+tomlQuote(provider.URL),
 			"-c", `model_providers.telemetry_fixture.wire_api="responses"`,
-			"-c", `model_providers.telemetry_fixture.requires_openai_auth=false`}
+			"-c", `model_providers.telemetry_fixture.requires_openai_auth=false`)
 		RecordCommand(t, b, args)
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 		defer cancel()
@@ -84,4 +94,14 @@ func TestCodexProfile(t *testing.T) {
 		RecordHelp(t, b, sb.codexEnv(RouteAPIKey), "--help")
 		RecordHelp(t, b, sb.codexEnv(RouteAPIKey), "exec", "--help")
 	})
+}
+
+// codexExecHelp is what b's `codex exec --help` prints, "" where it prints nothing.
+func codexExecHelp(b Binary, env []string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, b.Path, "exec", "--help")
+	cmd.Env = env
+	out, _ := cmd.CombinedOutput()
+	return string(out)
 }
