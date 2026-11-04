@@ -588,8 +588,8 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 			if m, ok := v.(map[string]any); ok {
 				s.Hooks = m
 			}
-		case "telemetry":
-			// Merged with the census in deriveTelemetry.
+		case "telemetry", "signing":
+			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand.
 		default:
 			if existing, ok := beh[name].(map[string]any); ok {
 				if m, ok := v.(map[string]any); ok {
@@ -1026,6 +1026,16 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 			}
 			delete(bin, "sha256") // a build's bytes differ from platform to platform; size says enough
 			s.Binary = bin
+		}
+	}
+	// Who signed the build, with which certificate, and whether Gatekeeper still accepts it.
+	if raw, ok := p.Probes["signing"]; ok {
+		var sig map[string]any
+		if json.Unmarshal(raw, &sig) == nil {
+			if s.Binary == nil {
+				s.Binary = map[string]any{}
+			}
+			s.Binary["signing"] = sig
 		}
 	}
 }

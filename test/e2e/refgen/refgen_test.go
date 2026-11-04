@@ -305,3 +305,29 @@ func TestAttemptedBuildIsPublished(t *testing.T) {
 		t.Errorf("a later capture did not fill the attempted build in: %+v", s.Capture)
 	}
 }
+
+// A build's signature is published with its binary, and its certificate's revocation reads as
+// a notable change; when it was checked does not.
+func TestSigningChange(t *testing.T) {
+	sig := func(status string, at time.Time) json.RawMessage {
+		data, _ := json.Marshal(map[string]any{"format": "developer-id", "team_id": "2DC432GLL2", "status": status, "checked_at": at})
+		return data
+	}
+	a := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	a.Probes = map[string]json.RawMessage{"signing": sig("valid", time.Now())}
+	b := claudeProfile("1.0.1", "Be brief.", []string{"Bash"}, "", "")
+	b.Probes = map[string]json.RawMessage{"signing": sig("revoked", time.Now().Add(time.Hour))}
+	sa := night{now: time.Now(), profiles: []e2e.Profile{a}}.tonight(buildID{"claude", "1.0.0"})
+	sb := night{now: time.Now(), profiles: []e2e.Profile{b}}.tonight(buildID{"claude", "1.0.1"})
+	if sb.Binary["signing"].(map[string]any)["status"] != "revoked" {
+		t.Fatalf("binary = %v", sb.Binary)
+	}
+	d := newDiff(sa, sb, nil, time.Now())
+	c := changeByID(d, "binary.signing.status")
+	if c == nil || c.Impact != "notable" || c.Title != "Signing certificate revoked" {
+		t.Errorf("signing change = %+v", c)
+	}
+	if changeByID(d, "binary.signing.checked_at") != nil {
+		t.Error("when the signature was checked read as a change")
+	}
+}

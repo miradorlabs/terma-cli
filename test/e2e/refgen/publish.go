@@ -193,6 +193,11 @@ func publish(dir string, n night, opt options) error {
 			s := byVersion[v]
 			e := VersionEntry{Version: v, CapturedAt: s.CapturedAt, Platforms: platformsOf(s), Support: supportOf(s),
 				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{}}
+			if sig, ok := s.Binary["signing"].(map[string]any); ok {
+				if st, ok := sig["status"].(string); ok {
+					e.Signing = &st
+				}
+			}
 			if t, ok := dates[v]; ok {
 				e.ReleasedAt = &t
 			} else if prev, ok := pub.versions[h][v]; ok {

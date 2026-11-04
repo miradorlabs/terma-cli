@@ -77,7 +77,8 @@ The harness's entry from `index.json`, and every version tracked, newest first:
       "categories": { "prompt": 2, "tools": 1, "telemetry": 4 },
       "impact": { "breaking": 0, "degrading": 0, "notable": 3, "informational": 4 },
       "undocumented": 5,
-      "highlights": ["System prompt changed (+212 −40 chars)", "New tool: Monitor", "New telemetry event: tool_decision"]
+      "highlights": ["System prompt changed (+212 −40 chars)", "New tool: Monitor", "New telemetry event: tool_decision"],
+      "signing": "valid"
     }
   ]
 }
@@ -86,7 +87,17 @@ The harness's entry from `index.json`, and every version tracked, newest first:
 `released_at` is the registry's publish time; `captured_at` when a snapshot of it was last
 taken. `previous` is the build the diff compares it with, null for the first tracked.
 `undocumented` counts changes the vendor's changelog for the version does not mention (null
-where there is no changelog to read).
+where there is no changelog to read). `signing` is Gatekeeper's verdict on the build's macOS
+code signature when last checked (`valid`, `revoked`, `rejected`, `unsigned`), null where it
+was not checked.
+
+`binary.signing` (macOS builds that are Mach-O executables) says who signed the build: its
+Developer ID authority chain, team, the leaf certificate (serial, SHA-256, validity), the
+signature's secure timestamp, whether it is notarized, and Gatekeeper's verdict when
+`checked_at`. Revocation is a fact of when it was checked, not of the build: a certificate
+revoked later turns its builds' status to `revoked`. `resigned` marks a build whose revoked
+signature was replaced by an ad hoc one so that it would run for the capture; what it was
+signed with is read before.
 
 ## versions/<version>.json: a snapshot
 
@@ -191,7 +202,18 @@ model's) is part of the name and stays.
     "transcript": { "path": "<claude-config>/projects/<project>/<session>.jsonl", "format": "jsonl", "record_types": { "assistant": ["message", "uuid", "parentUuid"] } }
   },
 
-  "binary": { "runtime": "node v26.3.0", "sdk": { "@anthropic-ai/sdk": "0.127.0" }, "size_bytes": 212000000 },
+  "binary": {
+    "runtime": "node v26.3.0", "sdk": { "@anthropic-ai/sdk": "0.127.0" }, "size_bytes": 212000000,
+    "signing": {
+      "format": "developer-id",
+      "authority": ["Developer ID Application: OpenAI, L.L.C. (2DC432GLL2)", "Developer ID Certification Authority", "Apple Root CA"],
+      "team_id": "2DC432GLL2", "identifier": "codex", "signed_at": "25 Jan 2026 at 17:11:12", "hardened_runtime": true,
+      "certificate": { "subject": "Developer ID Application: OpenAI, L.L.C. (2DC432GLL2)", "serial": "68A68AF8A434EE4FDE46F8680B23BDCC",
+                       "sha256": "9935b17b…", "not_before": "2024-01-23T06:19:53Z", "not_after": "2029-01-23T06:19:52Z" },
+      "status": "revoked", "notarized": false, "assessment": "CSSMERR_TP_CERT_REVOKED",
+      "checked_at": "2026-11-04T04:35:53Z", "resigned": true
+    }
+  },
 
   "support": {
     "status": "supported",

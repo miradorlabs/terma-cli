@@ -2,8 +2,10 @@
 # Backfill the Harness Reference with a harness's older builds: run by hand, once, not in
 # CI. Each build runs on its own, so one that can no longer be fetched or driven is a line
 # in the summary, not the end of the run; a build already captured in the output is skipped,
-# so a run stopped half way picks up where it stopped. Downloads stay cached
-# (TERMA_E2E_VERSIONS_DIR), so a later run with more probes needs none again.
+# so a run stopped half way picks up where it stopped. Each build is downloaded into the
+# run's own folder and removed once captured: a hundred builds never sit on disk at once.
+# (Its own folder, too, because macOS holds at launch whatever is put at a path it once
+# rejected, and an older run may have had a revoked build rejected at the shared cache's.)
 #
 #   test/e2e/reference/backfill.sh claude 100 ../../live/backfill
 #   test/e2e/reference/backfill.sh codex 100 ../../live/backfill
@@ -52,10 +54,12 @@ for v in $versions; do
 	start=$(date +%s)
 	status=pass
 	if ! env TERMA_ENV=dev TERMA_E2E=1 TERMA_E2E_BINARY="$bin/terma" TERMA_E2E_REPORT="$dir" "$var=$v" \
+		TERMA_E2E_VERSIONS_DIR="$out/.versions" \
 		"$bin/e2e.test" -test.v -test.timeout 15m -test.run "^Test${name}(Profile|Probe)" >"$dir/log" 2>&1; then
 		status=fail
 	fi
 	[ -s "$dir/profiles.json" ] || status="$status, no profile"
+	rm -rf "$out/.versions/$harness/$v"
 	printf '%s\t%s\t%s\t%ss\n' "$harness" "$v" "$status" "$(($(date +%s) - start))" | tee -a "$summary"
 	echo "  [$i/$total]" >&2
 done

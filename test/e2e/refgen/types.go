@@ -69,6 +69,9 @@ type VersionEntry struct {
 	Impact       map[string]int `json:"impact"`
 	Undocumented *int           `json:"undocumented"`
 	Highlights   []string       `json:"highlights"`
+	// Signing is Gatekeeper's verdict on the build's signature when last checked: "valid",
+	// "revoked", "rejected" or "unsigned"; nil where it was not checked (off macOS, a script).
+	Signing *string `json:"signing"`
 }
 
 // Snapshot is docs/harnesses/<harness>/versions/<version>.json. Each section is what one kind

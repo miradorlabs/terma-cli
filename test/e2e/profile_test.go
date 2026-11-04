@@ -46,6 +46,7 @@ func TestClaudeProfile(t *testing.T) {
 			t.Fatal("Claude Code sent its provider no message request")
 		}
 		RecordHelp(t, b, sb.claudeEnv(RouteAPIKey), "--help")
+		RecordSigning(t, b)
 	})
 }
 
@@ -93,6 +94,7 @@ func TestCodexProfile(t *testing.T) {
 		}
 		RecordHelp(t, b, sb.codexEnv(RouteAPIKey), "--help")
 		RecordHelp(t, b, sb.codexEnv(RouteAPIKey), "exec", "--help")
+		RecordSigning(t, b)
 	})
 }
 

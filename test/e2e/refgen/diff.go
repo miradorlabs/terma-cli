@@ -17,7 +17,8 @@ import (
 // section, its impact what it means for someone relying on the harness, terma included.
 
 // skipKeys are derived from what they sit beside, and would only repeat a text change.
-var skipKeys = map[string]bool{"sha256": true, "chars": true}
+// checked_at is when a signature was checked, not what it says.
+var skipKeys = map[string]bool{"sha256": true, "chars": true, "checked_at": true}
 
 // compare is every change from a to b.
 func compare(a, b *Snapshot) []Change {
@@ -247,6 +248,9 @@ func classify(c *Change) {
 		c.Impact = "notable"
 	case c.Category == "request" && len(c.Path) > 1 && (c.Path[1] == "betas" || c.Path[1] == "endpoint" || c.Path[1] == "identifiers"):
 		c.Impact = "notable"
+	case c.Category == "binary" && len(c.Path) > 2 && c.Path[1] == "signing" &&
+		(c.Path[2] == "status" || c.Path[2] == "team_id" || c.Path[2] == "format" || c.Path[2] == "certificate"):
+		c.Impact = "notable" // a new signer, a new certificate, or one revoked
 	case notableCategories[c.Category]:
 		c.Impact = "notable"
 	}
@@ -429,6 +433,22 @@ func title(c *Change) string {
 	case "storage":
 		return "On-disk " + strings.Join(p[1:], " ") + " " + verb + valueNote(c)
 	case "binary":
+		if at(1) == "signing" {
+			switch at(2) {
+			case "status":
+				if c.After == "revoked" {
+					return "Signing certificate revoked"
+				}
+				return "Code signature status: " + arrow()
+			case "certificate":
+				return "Signed with a different certificate"
+			case "team_id":
+				return "Signed by a different team: " + arrow()
+			case "format":
+				return "Code signature: " + arrow()
+			}
+			return "Code signature " + strings.Join(p[2:], ".") + ": " + arrow()
+		}
 		return "Binary " + strings.Join(p[1:], ".") + ": " + arrow()
 	case "support":
 		if len(p) >= 4 && at(3) == "result" {

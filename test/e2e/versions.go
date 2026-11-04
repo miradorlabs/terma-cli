@@ -239,10 +239,7 @@ func ensureClaude(version string) (string, error) {
 	if hex.EncodeToString(sum[:]) != want {
 		return "", fmt.Errorf("claude %s: checksum mismatch", version)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(path, bin, 0o755); err != nil {
+	if err := writeBuild(path, bin); err != nil {
 		return "", err
 	}
 	return abs(path), nil
@@ -338,10 +335,7 @@ func ensureCodexExecutable(version, name string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(path, bin, 0o755); err != nil {
+		if err := writeBuild(path, bin); err != nil {
 			return "", err
 		}
 		return abs(path), nil
