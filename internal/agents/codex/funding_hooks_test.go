@@ -25,6 +25,7 @@ func fundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("OPENAI_BASE_URL", "")
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
@@ -18,11 +20,22 @@ const (
 	sourceClaudeTranscript  = "claude_transcript"
 )
 
-// claudeFunding is the stored login as a hook sees it: the evidence to spool, and whether
-// that login is the session's credential (oauthEffective).
+// claudeFunding is the stored login as a hook sees it: the evidence to spool, the route the
+// session's settings configure, and whether that login is the session's credential
+// (oauthEffective).
 type claudeFunding struct {
 	hookrun.FundingEvidence
+	route          claudeRoute
 	oauthEffective bool
+}
+
+// claudeRoute is what a hook sees of how Claude Code reaches its model: the env blocks of the
+// settings files, highest precedence first, and whether one configures an apiKeyHelper.
+type claudeRoute struct {
+	envs   []map[string]json.RawMessage
+	helper bool
+	// unreadable is a settings file that exists but cannot be read, which may hide either.
+	unreadable bool
 }
 
 // readFunding reads the stored login's metadata and visible credential hints: the hook's view,
@@ -67,7 +80,8 @@ func readFunding(repoRoot string) claudeFunding {
 			}
 		}
 	}
-	f := claudeFunding{FundingEvidence: e, oauthEffective: oauthAccountIsEffective(repoRoot, configPath)}
+	route := readClaudeRoute(repoRoot, configPath)
+	f := claudeFunding{FundingEvidence: e, route: route, oauthEffective: oauthAccountIsEffective(route)}
 	// The cached login's email is withheld wherever the session may use another credential: it would
 	// name a person who did not run the session (a CI machine's baked-in ~/.claude.json).
 	if !f.oauthEffective {
@@ -76,32 +90,111 @@ func readFunding(repoRoot string) claudeFunding {
 	return f
 }
 
-// oauthAccountIsEffective reports whether the cached OAuth login is the session's credential: no
-// env key or token, no cloud provider, no visible OAuth token, and apiKeyHelper positively not
-// configured. Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so its absence tells nothing.
-func oauthAccountIsEffective(repoRoot, configPath string) bool {
-	// isOn's truthiness, so a "yes"-enabled cloud route withholds the cached OAuth account too.
-	if os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != "" || os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" ||
-		isOn(os.Getenv("CLAUDE_CODE_USE_BEDROCK")) || isOn(os.Getenv("CLAUDE_CODE_USE_VERTEX")) || isOn(os.Getenv("CLAUDE_CODE_USE_FOUNDRY")) {
-		return false
-	}
-	// Presence in files, not effective settings: --settings and MDM overrides are not observable.
-	// Never execute or export the command.
-	paths := []string{configPath}
+// readClaudeRoute reads the settings files a session in repoRoot layers, highest precedence
+// first: settings.local.json, the project's settings.json, then the user's. The environment
+// outranks them all (lookup), except a machine-wide managed env block, which is not read.
+// Presence in files, not effective settings: --settings and MDM overrides are not observable.
+func readClaudeRoute(repoRoot, configPath string) claudeRoute {
+	var paths []string
 	if repoRoot != "" {
-		paths = append(paths, filepath.Join(repoRoot, ".claude", "settings.json"), filepath.Join(repoRoot, ".claude", "settings.local.json"))
+		paths = append(paths, filepath.Join(repoRoot, ".claude", "settings.local.json"), filepath.Join(repoRoot, ".claude", "settings.json"))
 	}
+	paths = append(paths, configPath)
+	var r claudeRoute
+	// A host that manages the provider has Claude Code ignore the route the settings files set.
+	managed := isOn(os.Getenv("CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"))
 	for _, path := range paths {
 		settings, status := hookrun.ReadEvidenceJSON(path)
-		if status != "present" && status != "missing" {
-			return false
+		if status != hookrun.StatusPresent && status != "missing" {
+			r.unreadable = true
+			continue
 		}
+		var env map[string]json.RawMessage
+		if !managed && json.Unmarshal(settings["env"], &env) == nil {
+			r.envs = append(r.envs, env)
+		}
+		// Never execute or export the command.
 		if raw, ok := settings["apiKeyHelper"]; ok {
 			var command string
 			if json.Unmarshal(raw, &command) != nil || strings.TrimSpace(command) != "" {
-				return false
+				r.helper = true
 			}
 		}
 	}
-	return true
+	return r
+}
+
+// claudeCredentialVars are the first-party keys and tokens the session uses before the stored
+// login.
+var claudeCredentialVars = []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"}
+
+// lookup is key's value as the session sees it: the environment's, else that of the first
+// settings env block that sets it, an empty value included at either level: a source that
+// clears a key overrides those below it. The hook inherits the environment Claude Code built
+// from its settings, so the files decide only what it does not pass down, such as the
+// credentials it strips from hooks: an empty credential in the environment says nothing.
+func (r claudeRoute) lookup(key string) string {
+	if v, ok := os.LookupEnv(key); ok && (v != "" || !slices.Contains(claudeCredentialVars, key)) {
+		return strings.TrimSpace(v)
+	}
+	for _, env := range r.envs {
+		if raw, ok := env[key]; ok {
+			var v string
+			_ = json.Unmarshal(raw, &v)
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// claudeCloud is a cloud provider route: the switch that selects it, the variable its client
+// reads its endpoint from (an LLM gateway's, say), else the provider's own host, the kinds of
+// host that are the provider's own, and the backend that serves it.
+type claudeCloud struct {
+	switchVar, baseURLVar string
+	own                   []servinghost.Kind
+	backend               string
+}
+
+// claudeClouds are the cloud provider routes, in the order Claude Code checks their switches.
+var claudeClouds = []claudeCloud{
+	{"CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BEDROCK_BASE_URL", []servinghost.Kind{servinghost.Bedrock}, semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_BASE_URL", []servinghost.Kind{servinghost.Azure}, semconv.TermaServingBackendAzureFoundry},
+	{"CLAUDE_CODE_USE_ANTHROPIC_AWS", "ANTHROPIC_AWS_BASE_URL", []servinghost.Kind{servinghost.AnthropicAWS},
+		semconv.TermaServingBackendAnthropicAws},
+	{"CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+		[]servinghost.Kind{servinghost.AnthropicGoogleCloud, servinghost.GooglePSC}, semconv.TermaServingBackendAnthropicGoogleCloud},
+	{claudeUseMantle, "ANTHROPIC_BEDROCK_MANTLE_BASE_URL", []servinghost.Kind{servinghost.Bedrock}, semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_VERTEX", "ANTHROPIC_VERTEX_BASE_URL", []servinghost.Kind{servinghost.Vertex, servinghost.GooglePSC},
+		semconv.TermaServingBackendGoogleVertex},
+}
+
+// claudeUseMantle selects Amazon Bedrock's Mantle endpoint, also beside the Bedrock switch.
+const claudeUseMantle = "CLAUDE_CODE_USE_MANTLE"
+
+// cloudRoute is the cloud provider route Claude Code takes: the first whose switch lookup
+// finds on, Bedrock's Mantle endpoint when its switch is on beside Bedrock's.
+func cloudRoute(lookup func(string) string) (claudeCloud, bool) {
+	i := slices.IndexFunc(claudeClouds, func(c claudeCloud) bool { return isOn(lookup(c.switchVar)) })
+	if i < 0 {
+		return claudeCloud{}, false
+	}
+	if i == 0 && isOn(lookup(claudeUseMantle)) {
+		i = slices.IndexFunc(claudeClouds, func(c claudeCloud) bool { return c.switchVar == claudeUseMantle })
+	}
+	return claudeClouds[i], true
+}
+
+// firstPartyKey reports whether lookup finds a first-party key or token, which the session
+// uses before the stored login.
+func firstPartyKey(lookup func(string) string) bool {
+	return slices.ContainsFunc(claudeCredentialVars, func(key string) bool { return lookup(key) != "" })
+}
+
+// oauthAccountIsEffective reports whether the cached OAuth login is the session's credential: no
+// key or token, no cloud provider, and apiKeyHelper positively not configured. Claude Code strips
+// CLAUDE_CODE_OAUTH_TOKEN from hooks' environment, so only a settings file can show it.
+func oauthAccountIsEffective(r claudeRoute) bool {
+	_, cloud := cloudRoute(r.lookup)
+	return !r.unreadable && !r.helper && !cloud && !firstPartyKey(r.lookup)
 }
