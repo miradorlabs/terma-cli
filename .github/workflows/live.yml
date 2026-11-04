@@ -208,7 +208,7 @@ jobs:
         with:
           go-version-file: test/e2e/go.mod
           cache-dependency-path: test/e2e/go.sum
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: "{compat,fields}-*"
           path: test/e2e/runs
