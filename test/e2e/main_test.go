@@ -25,6 +25,9 @@ func TestMain(m *testing.M) {
 		if err := WriteFields(dir, terma); err != nil {
 			os.Stderr.WriteString("live fields: " + err.Error() + "\n")
 		}
+		if err := WriteProfiles(dir); err != nil {
+			os.Stderr.WriteString("live profiles: " + err.Error() + "\n")
+		}
 	}
 	os.Exit(code)
 }

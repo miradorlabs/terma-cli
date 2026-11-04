@@ -141,6 +141,16 @@ jobs:
             test/e2e/report/census.json
           if-no-files-found: ignore
           retention-days: 30
+      # What each build sends its provider on a user's first turn, and its help: the evidence
+      # each build's published snapshot is normalized from (profile.go).
+      - name: Upload this platform's harness profiles
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: profiles-macos
+          path: test/e2e/report/profiles.json
+          if-no-files-found: ignore
+          retention-days: 90
       - name: Remove temporary login
         if: always()
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
