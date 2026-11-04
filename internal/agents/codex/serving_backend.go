@@ -104,6 +104,8 @@ var codexHostBackends = map[servinghost.Kind]string{
 	servinghost.Azure:   semconv.TermaServingBackendAzureOpenai,
 	servinghost.Bedrock: semconv.TermaServingBackendAwsBedrock,
 	servinghost.Vertex:  semconv.TermaServingBackendGoogleVertex,
+	// A Private Service Connect endpoint serves Codex's gcp provider from Vertex AI.
+	servinghost.GooglePSC: semconv.TermaServingBackendGoogleVertex,
 }
 
 // codexBaseURLBackend is the backend serving raw's host; any other host (a gateway, Azure

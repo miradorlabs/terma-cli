@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
@@ -139,19 +140,25 @@ func (r claudeRoute) lookup(key string) string {
 }
 
 // claudeCloud is a cloud provider route: the switch that selects it, the variable its client
-// reads its endpoint from (an LLM gateway's, say), else the provider's own host, and the
-// backend that serves it.
-type claudeCloud struct{ switchVar, baseURLVar, backend string }
+// reads its endpoint from (an LLM gateway's, say), else the provider's own host, the kinds of
+// host that are the provider's own, and the backend that serves it.
+type claudeCloud struct {
+	switchVar, baseURLVar string
+	own                   []servinghost.Kind
+	backend               string
+}
 
 // claudeClouds are the cloud provider routes, in the order Claude Code checks their switches.
-// Claude Platform on AWS and on Google Cloud have no terma.serving.backend value yet: "".
 var claudeClouds = []claudeCloud{
-	{"CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BEDROCK_BASE_URL", semconv.TermaServingBackendAwsBedrock},
-	{"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_BASE_URL", semconv.TermaServingBackendAzureFoundry},
-	{"CLAUDE_CODE_USE_ANTHROPIC_AWS", "", ""},
-	{"CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "", ""},
-	{claudeUseMantle, "ANTHROPIC_BEDROCK_MANTLE_BASE_URL", semconv.TermaServingBackendAwsBedrock},
-	{"CLAUDE_CODE_USE_VERTEX", "ANTHROPIC_VERTEX_BASE_URL", semconv.TermaServingBackendGoogleVertex},
+	{"CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BEDROCK_BASE_URL", []servinghost.Kind{servinghost.Bedrock}, semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_BASE_URL", []servinghost.Kind{servinghost.Azure}, semconv.TermaServingBackendAzureFoundry},
+	{"CLAUDE_CODE_USE_ANTHROPIC_AWS", "ANTHROPIC_AWS_BASE_URL", []servinghost.Kind{servinghost.AnthropicAWS},
+		semconv.TermaServingBackendAnthropicAws},
+	{"CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+		[]servinghost.Kind{servinghost.AnthropicGoogleCloud, servinghost.GooglePSC}, semconv.TermaServingBackendAnthropicGoogleCloud},
+	{claudeUseMantle, "ANTHROPIC_BEDROCK_MANTLE_BASE_URL", []servinghost.Kind{servinghost.Bedrock}, semconv.TermaServingBackendAwsBedrock},
+	{"CLAUDE_CODE_USE_VERTEX", "ANTHROPIC_VERTEX_BASE_URL", []servinghost.Kind{servinghost.Vertex, servinghost.GooglePSC},
+		semconv.TermaServingBackendGoogleVertex},
 }
 
 // claudeUseMantle selects Amazon Bedrock's Mantle endpoint, also beside the Bedrock switch.

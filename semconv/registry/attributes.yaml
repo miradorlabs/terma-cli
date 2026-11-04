@@ -95,6 +95,14 @@ attributes:
           value: azure-openai
           brief: Azure OpenAI.
           stability: development
+        - id: anthropic_aws
+          value: anthropic-aws
+          brief: Anthropic's platform, sold and run on AWS.
+          stability: development
+        - id: anthropic_google_cloud
+          value: anthropic-google-cloud
+          brief: Anthropic's platform, sold and run on Google Cloud.
+          stability: development
         - id: private
           value: private
           brief: >-

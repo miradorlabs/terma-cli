@@ -447,6 +447,10 @@ const (
 	TermaServingBackendOpenai = "openai"
 	// TermaServingBackendAzureOpenai is terma.serving.backend azure-openai: Azure OpenAI.
 	TermaServingBackendAzureOpenai = "azure-openai"
+	// TermaServingBackendAnthropicAws is terma.serving.backend anthropic-aws: Anthropic's platform, sold and run on AWS.
+	TermaServingBackendAnthropicAws = "anthropic-aws"
+	// TermaServingBackendAnthropicGoogleCloud is terma.serving.backend anthropic-google-cloud: Anthropic's platform, sold and run on Google Cloud.
+	TermaServingBackendAnthropicGoogleCloud = "anthropic-google-cloud"
 	// TermaServingBackendPrivate is terma.serving.backend private: An endpoint that is not a recognised public provider: a custom base URL's host, or a custom, self-hosted or local provider.
 	TermaServingBackendPrivate = "private"
 	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.

@@ -2,6 +2,7 @@ package claude
 
 import (
 	"cmp"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -30,16 +31,16 @@ func routeBackend(lookup func(string) string, storedCredential bool) string {
 		return baseURLBackend(base)
 	}
 	if c, ok := cloudRoute(lookup); ok {
-		own := ""
-		if c.baseURLVar != "" {
-			own = lookup(c.baseURLVar)
-		}
+		own := lookup(c.baseURLVar)
 		if own == "" {
 			return c.backend
 		}
 		// Another provider's host is as foreign to this route as a gateway's.
-		if b := baseURLBackend(own); b == "" || b == c.backend {
-			return b
+		switch kind, ok := servinghost.Of(own); {
+		case !ok:
+			return ""
+		case slices.Contains(c.own, kind):
+			return c.backend
 		}
 		return semconv.TermaServingBackendPrivate
 	}
@@ -54,10 +55,13 @@ func routeBackend(lookup func(string) string, storedCredential bool) string {
 
 // claudeHostBackends are the backends serving Claude's API from each kind of host.
 var claudeHostBackends = map[servinghost.Kind]string{
-	servinghost.Anthropic: semconv.TermaServingBackendAnthropic,
-	servinghost.Bedrock:   semconv.TermaServingBackendAwsBedrock,
-	servinghost.Vertex:    semconv.TermaServingBackendGoogleVertex,
-	servinghost.Azure:     semconv.TermaServingBackendAzureFoundry,
+	servinghost.Anthropic:            semconv.TermaServingBackendAnthropic,
+	servinghost.Bedrock:              semconv.TermaServingBackendAwsBedrock,
+	servinghost.Vertex:               semconv.TermaServingBackendGoogleVertex,
+	servinghost.GooglePSC:            semconv.TermaServingBackendGoogleVertex,
+	servinghost.Azure:                semconv.TermaServingBackendAzureFoundry,
+	servinghost.AnthropicAWS:         semconv.TermaServingBackendAnthropicAws,
+	servinghost.AnthropicGoogleCloud: semconv.TermaServingBackendAnthropicGoogleCloud,
 }
 
 // baseURLBackend is the backend serving raw's host; any other host (a gateway, a proxy, a
