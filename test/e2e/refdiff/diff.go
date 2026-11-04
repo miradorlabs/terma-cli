@@ -444,7 +444,9 @@ func title(c *Change, labels map[string]string) string {
 			}
 			return "Subcommand removed: " + at(2)
 		case "help":
-			return "Help for `" + strings.TrimSuffix(at(2), " --help") + "` " + verb + stats
+			// "exec --help" → `codex exec --help`, as a person types it; the build's own help by its
+			// flag alone.
+			return "Help text of `" + at(2) + "` " + verb + stats
 		}
 	case "config":
 		what := map[string]string{"env_vars": "environment variable", "settings_keys": "setting"}[at(1)]

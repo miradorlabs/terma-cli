@@ -1003,9 +1003,11 @@ func deriveCLI(s *Snapshot, p e2e.Profile) {
 	}
 	flags, subs := map[string]bool{}, map[string]bool{}
 	for args, text := range p.Help {
-		prefix := ""
-		if args != "--help" {
-			prefix = strings.TrimSuffix(args, " --help") + " "
+		// "--help", "-h", "exec --help", "exec -h": the command, and its flags under it.
+		cmd := strings.TrimSuffix(strings.TrimSuffix(args, "--help"), "-h")
+		prefix := strings.TrimSpace(cmd)
+		if prefix != "" {
+			prefix += " "
 		}
 		for _, m := range flagRe.FindAllStringSubmatch(text, -1) {
 			flags[prefix+m[1]] = true

@@ -76,10 +76,11 @@ func HelpCommands(help, program string) []string {
 const helpWorkers = 6
 
 // RecordHelpTree records b's --help, and the help of each subcommand it lists (HelpCommands),
-// one level deep, in env; program is the name the build's help calls itself.
+// one level deep, in env; program is the name the build's help calls itself. Each one's -h is
+// kept too where it prints something else (clap's -h is a summary of --help).
 func RecordHelpTree(t *testing.T, b Binary, env []string, program string) {
 	t.Helper()
-	RecordHelp(t, b, env, "--help")
+	recordHelpBoth(t, b, env)
 	p := profileOf(t, b)
 	profilesMu.Lock()
 	top := p.Help["--help"]
@@ -89,7 +90,7 @@ func RecordHelpTree(t *testing.T, b Binary, env []string, program string) {
 	for range helpWorkers {
 		wg.Go(func() {
 			for sub := range subs {
-				RecordHelp(t, b, env, sub, "--help")
+				recordHelpBoth(t, b, env, sub)
 			}
 		})
 	}
@@ -98,4 +99,20 @@ func RecordHelpTree(t *testing.T, b Binary, env []string, program string) {
 	}
 	close(subs)
 	wg.Wait()
+}
+
+// recordHelpBoth records the --help of b's command cmd (none: the build's own), and its -h
+// where that prints something else.
+func recordHelpBoth(t *testing.T, b Binary, env []string, cmd ...string) {
+	t.Helper()
+	long := strings.Join(append(append([]string{}, cmd...), "--help"), " ")
+	short := strings.Join(append(append([]string{}, cmd...), "-h"), " ")
+	RecordHelp(t, b, env, append(append([]string{}, cmd...), "--help")...)
+	RecordHelp(t, b, env, append(append([]string{}, cmd...), "-h")...)
+	p := profileOf(t, b)
+	profilesMu.Lock()
+	defer profilesMu.Unlock()
+	if p.Help[short] == p.Help[long] {
+		delete(p.Help, short)
+	}
 }
