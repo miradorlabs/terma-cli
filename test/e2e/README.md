@@ -314,7 +314,9 @@ next (`reference/SCHEMA.md`). Profile scenarios (`profile_test.go`) run each bui
 defaults, none of the suite's settings, against a fixture provider that records every request
 (`profile.go`): the system prompt and injected context, tools, model and parameters, cache
 breakpoints, headers and betas, side requests, and the build's help. Behaviour probes add how
-it retries, compacts, truncates tool output and delegates; out-of-band captures add its
+it retries, compacts, truncates tool output and delegates, and the hooks probe
+(`hooks_probe.go`) every hook event the build knows, what each hands a hook and what a hook's
+answer does (`TERMA_E2E_PROBES=hooks`); out-of-band captures add its
 network egress, what it writes to disk and what its binary says of itself. The run writes
 `report/profiles.json`, credentials redacted.
 

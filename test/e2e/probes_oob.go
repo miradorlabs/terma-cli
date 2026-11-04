@@ -25,20 +25,21 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Two probes a profile takes beside the provider's requests: the payloads a build hands its
-// hooks ("hooks"), and how it exports its own telemetry ("telemetry"): each metric's type,
-// unit and temporality, each span's parent, and the protocol and interval of each signal's
-// export, measured from when the receiver got them.
+// Two probes a profile takes beside the provider's requests: the payloads a build hands the
+// hooks its plain turn runs ("hooks-first-turn"; the hooks probe, hooks_probe.go, owns
+// "hooks"), and how it exports its own telemetry ("telemetry"): each metric's type, unit and
+// temporality, each span's parent, and the protocol and interval of each signal's export,
+// measured from when the receiver got them.
 
-// HookShape is one hook event's payloads, as the "hooks" probe records them.
+// HookShape is one hook event's payloads, as the "hooks-first-turn" probe records them.
 type HookShape struct {
 	Keys  []string `json:"keys"`
 	Count int      `json:"count"`
 }
 
-// RecordHooks records, as probe "hooks", the payload of every hook b ran in sb: by the event
-// name the payload gives (hook_event_name), else the terma hook it ran, each with the dotted key
-// paths of its payloads, three deep. The recording shim in front of terma kept them.
+// RecordHooks records, as probe "hooks-first-turn", the payload of every hook b ran in sb: by
+// the event name the payload gives (hook_event_name), else the terma hook it ran, each with the
+// dotted key paths of its payloads, three deep. The recording shim in front of terma kept them.
 func RecordHooks(t *testing.T, b Binary, sb *Sandbox) {
 	t.Helper()
 	events := HookShapes(sb.payloadDir())
@@ -46,7 +47,7 @@ func RecordHooks(t *testing.T, b Binary, sb *Sandbox) {
 		t.Logf("%s %s ran no hook", b.Harness, b.Version)
 		return
 	}
-	RecordProbe(t, b, "hooks", map[string]any{"events": events})
+	RecordProbe(t, b, "hooks-first-turn", map[string]any{"events": events})
 }
 
 // HookShapes are the payloads in dir by event.

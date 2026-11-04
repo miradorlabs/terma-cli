@@ -190,7 +190,24 @@ model's) is part of the name and stays.
     "export": { "protocol": "http/protobuf", "interval_ms": { "logs": 5000, "metrics": 60000 } }
   },
 
-  "hooks": { "events": { "PreToolUse": { "keys": ["hook_event_name", "session_id", "tool_input", "tool_name"] } } },
+  "hooks": {
+    "supported": ["Notification", "PostToolUse", "PreToolUse", "SessionStart", "Stop"],
+    "source": "binary",
+    "events": {
+      "PreToolUse": {
+        "fired": true, "count": 11,
+        "keys": ["cwd", "hook_event_name", "session_id", "tool_input", "tool_input.command", "tool_name"],
+        "kinds": { "cwd": "text", "hook_event_name": "text", "session_id": "text", "tool_input": "map", "tool_input.command": "text", "tool_name": "text" },
+        "stdin": "json",
+        "env": ["CLAUDECODE", "CLAUDE_PROJECT_DIR"],
+        "env_paths": { "CLAUDE_PROJECT_DIR": "<repo>" },
+        "cwd": "<repo>",
+        "matcher": true,
+        "control": { "exit_2": "blocks the tool; message to the model", "json_decision": "blocks the tool; message to the model" }
+      }
+    },
+    "not_fired": { "Notification": "fires for an interactive session's prompts and the PushNotification tool, which the build did not offer" }
+  },
 
   "cli": {
     "help": { "--help": "Usage: claude [options] [command] [prompt]…" },
@@ -241,6 +258,40 @@ so). `live` is the same turn as it ran with the vendor's live server-side flags 
 `differs` says whether the live flags changed the prompt. A rollout changes `live` from night to
 night whatever the build, so it is no section: it is never compared, and a diff never says it.
 Absent where there was no proxied turn to compare it with.
+
+### hooks
+
+Every hook event the build knows, and what it hands a hook when one fires (the hooks probe,
+`test/e2e/hooks_probe.go`). `supported` is read from the build itself, never from a list of
+the suite's alone: Claude Code's settings schema's event enum, the input schemas Codex embeds,
+Gemini CLI's event enum, the schema Copilot CLI's packed script embeds. `source` says where:
+`binary` (its executable or package), `source` (its public source at its tag) or `seed` (the
+suite's own list, where the build named none it could read).
+
+The probe registers a recording hook for every supported event, in place of terma's, and runs
+turns that fire as many as it cheaply can: tool calls that succeed, fail and are denied, a
+subagent, a compaction, a resumed session, a custom command, a turn the provider refuses. Each
+event that fired has:
+
+| field | |
+|---|---|
+| `fired`, `count` | whether it fired, and how many times over the probe's runs |
+| `keys`, `kinds` | its payloads' key paths, four deep, a list's items' under `[]` (`tool_calls[].tool_name`); the kind of value each held (`text`, `number`, `bool`, `list`, `map`, `null`), joined with `\|` where runs differed. Never a value |
+| `stdin` | what the hook's standard input held: `json`, `text` or `empty` |
+| `env`, `env_paths` | the environment variables the harness set for the hook (the ones it was started with, and the sandbox's own settings, left out); the value of each that is one path in the sandbox, as its placeholder |
+| `cwd` | the directory its first run ran in |
+| `args` | how many arguments the harness added to the hook's command line, where it added any |
+| `matcher` | whether it takes a matcher: measured, with a second hook whose matcher matches nothing, which runs where the event ignores matchers |
+| `control` | what the build did with a hook's answer, where the probe tried it (Claude Code and Codex: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Stop`): `exit_2` (exit status 2 with a message on stderr), `json_decision` (a JSON deny or block), `additional_context` (context to add). Each says whether the build acted on it (`blocks the tool`, `blocks the prompt`, `keeps the turn going`) and whether the message reached the model; `additional_context` `reaches the model` or is `ignored` |
+
+`not_fired` says, for each supported event no run fired, why. A build captured before the
+hooks probe existed has only `events`, each with its `keys` and `count`: the payloads of the
+hooks its plain first turn ran.
+
+In a diff, a new event in `supported` is notable and one gone degrading; an event no longer
+fired is degrading; a payload field or environment variable gone, and a control point's result
+changed, notable. A field's kind or a variable's path added or removed with it is not a change
+of its own, and neither is `not_fired`.
 
 In `binary.signing`, the certificate is compared as one thing (a new certificate is one change),
 and `signed_at`, `checked_at`, `assessment`, `resigned` and `authority` are never read as
@@ -306,9 +357,9 @@ and `chars` are derived and never read as changes. The changelog is the vendor's
 changelog section for `to` (Claude Code, Copilot CLI) or the release notes of its tag
 (harnesses whose source is public).
 
-Lists are compared by key: tools by `name`, telemetry by surface then key, hooks by event,
-egress by host, method and path, capabilities by `id` and platform. Strings of more than one
-line are compared as text.
+Lists are compared by key: tools by `name`, telemetry by surface then key, hooks by event (a
+list of names, as `supported`, as a set), egress by host, method and path, capabilities by `id`
+and platform. Strings of more than one line are compared as text.
 
 ## <harness>/changelog.json
 
