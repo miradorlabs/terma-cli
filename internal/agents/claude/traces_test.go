@@ -26,6 +26,7 @@ func TestTracesOffNamesWhatKeepsSpans(t *testing.T) {
 		{"all on", `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_TRACES_EXPORTER":"otlp"`, nil},
 		{"an earlier terma's: no beta switch", `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_TRACES_EXPORTER":"otlp"`,
 			[]string{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1"}},
+		{"the beta switch's other name, and a list of exporters", `"CLAUDE_CODE_ENABLE_TELEMETRY":"1","ENABLE_ENHANCED_TELEMETRY_BETA":"1","OTEL_TRACES_EXPORTER":"otlp, console"`, nil},
 		{"telemetry off", `"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_TRACES_EXPORTER":"none"`,
 			[]string{"CLAUDE_CODE_ENABLE_TELEMETRY=1", "OTEL_TRACES_EXPORTER=otlp"}},
 	} {
@@ -43,7 +44,10 @@ func TestTracesOffNamesWhatKeepsSpans(t *testing.T) {
 	if off := (Agent{}).TracesOffIn(env); !slices.Equal(off, []string{claudeEnhancedTelemetry, otelTracesExporter}) {
 		t.Errorf("process env: TracesOffIn = %q", off)
 	}
-	if off := (Agent{}).TracesOffIn([]string{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1", "OTEL_TRACES_EXPORTER=otlp", "HOME=/"}); len(off) != 0 {
-		t.Errorf("process env on: TracesOffIn = %q", off)
+	for _, on := range [][]string{{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1", "OTEL_TRACES_EXPORTER=otlp", "HOME=/"},
+		{"ENABLE_ENHANCED_TELEMETRY_BETA=1", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=0", "OTEL_TRACES_EXPORTER=console,otlp"}} {
+		if off := (Agent{}).TracesOffIn(on); len(off) != 0 {
+			t.Errorf("process env on %q: TracesOffIn = %q", on, off)
+		}
 	}
 }
