@@ -145,7 +145,7 @@ jobs:
       # each build's published snapshot is normalized from (profile.go).
       - name: Upload this platform's harness profiles
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: profiles-macos
           path: test/e2e/report/profiles.json
