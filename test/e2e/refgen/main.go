@@ -39,7 +39,7 @@ func main() {
 	fetch := flag.Bool("fetch", false, "read release dates and changelogs from the web")
 	site := flag.String("site", "https://terma.ai", "the reference's public site, for the links announcements carry")
 	announcePath := flag.String("announce", "", "write the versions to announce (new, newer than any captured before) to this JSON file")
-	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them (a tarball a build)")
+	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them, and read its configuration options and environment variables from it (a tarball a build)")
 	flag.Parse()
 
 	n := night{now: time.Now().UTC(), labels: map[string]string{}}
@@ -107,6 +107,7 @@ func main() {
 	if links != nil {
 		opt.linker = links
 	}
+	n.sources = newSourceConfigs(links)
 	news, err := publish(*out, n, opt)
 	links.close()
 	if err != nil {

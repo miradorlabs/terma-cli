@@ -1067,12 +1067,13 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 		var bin map[string]any
 		if json.Unmarshal(p.Binary, &bin) == nil {
 			cfg := map[string]any{}
-			for _, k := range []string{"env_vars", "env_vars_uncertain", "settings_keys"} {
+			for _, k := range []string{"env_vars", "env_vars_uncertain", "env_source", "settings_keys", "settings"} {
 				if v, ok := bin[k]; ok {
 					cfg[k] = v
 					delete(bin, k)
 				}
 			}
+			configFromBinary(s.Harness, cfg)
 			if len(cfg) > 0 {
 				s.Config = cfg
 			}

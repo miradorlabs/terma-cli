@@ -15,14 +15,17 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/e2e/configschema"
 )
 
 // What a harness build's executable says of itself, read from its bytes, never by running it:
 // its size and digest, the runtime it was built on, the SDKs bundled in it, the environment
-// variables it names and, for Claude Code, the settings keys of its embedded settings schema.
-// Size and digest are facts; everything read out of strings is a best effort, and Heuristic
-// names those fields: a variable named in an error message is listed though nothing reads it,
-// and one built from parts at run time is not.
+// variables it names and, for Claude Code and the Copilot CLI, the options of its settings
+// schema and the variables its JavaScript reads (settingsfacts.go). Size and digest are facts;
+// everything read out of strings or minified code is a best effort, and Heuristic names those
+// fields: a variable named in an error message is listed though nothing reads it, and one
+// built from parts at run time is not.
 
 // BinaryFacts are what RecordBinaryFacts records of a build.
 type BinaryFacts struct {
@@ -43,7 +46,13 @@ type BinaryFacts struct {
 	// EnvVarsUncertain are names seen only running into the text after them, whose last
 	// character may be the next string's (EnvVarsIn).
 	EnvVarsUncertain []string `json:"env_vars_uncertain,omitempty"`
-	SettingsKeys     []string `json:"settings_keys,omitempty"`
+	// EnvSource is how EnvVars were read: "reads" (the names the bundle's code reads, a
+	// JavaScript bundle's process.env), or empty for names found in its strings.
+	EnvSource    string   `json:"env_source,omitempty"`
+	SettingsKeys []string `json:"settings_keys,omitempty"`
+	// Settings are the options of the settings schema the bundle declares, by dotted path
+	// (Claude Code's zod schema, the Copilot CLI's settings registry).
+	Settings configschema.Options `json:"settings,omitempty"`
 	// Heuristic names the fields read out of strings rather than stated by the build.
 	Heuristic []string `json:"heuristic,omitempty"`
 }
@@ -105,6 +114,7 @@ func BinaryFactsOf(b Binary) (BinaryFacts, error) {
 		facts.readExecutable(data)
 	}
 	facts.EnvVars, facts.EnvVarsUncertain = EnvVarsIn(corpus, envPrefixes[b.Harness])
+	facts.readSettings(b.Harness, path, corpus)
 	if len(facts.EnvVars) > 0 {
 		facts.Heuristic = append(facts.Heuristic, "env_vars")
 	}
@@ -114,7 +124,34 @@ func BinaryFactsOf(b Binary) (BinaryFacts, error) {
 			facts.Heuristic = append(facts.Heuristic, "settings_keys")
 		}
 	}
+	if len(facts.Settings) > 0 {
+		facts.Heuristic = append(facts.Heuristic, "settings")
+	}
 	return facts, nil
+}
+
+// readSettings reads what a closed harness's JavaScript declares of its configuration: the
+// options of its settings schema, and the environment variables its code reads, in place of
+// those its strings name. The Copilot CLI's script is packed in its executable.
+func (f *BinaryFacts) readSettings(harness, path string, corpus []byte) {
+	var js []byte
+	switch harness {
+	case "claude":
+		js = corpus
+		f.Settings = ClaudeSettingsIn(js)
+	case "copilot":
+		script, err := seaScript(path)
+		if err != nil {
+			return
+		}
+		js = script
+		f.Settings = CopilotSettingsIn(js)
+	default:
+		return
+	}
+	if names := JSEnvReadsIn(js, envPrefixes[harness]); len(names) > 0 {
+		f.EnvVars, f.EnvVarsUncertain, f.EnvSource = names, nil, "reads"
+	}
 }
 
 var (

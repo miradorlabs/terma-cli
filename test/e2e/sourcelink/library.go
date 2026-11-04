@@ -96,6 +96,7 @@ type tree struct {
 	err   error
 	names *index
 	text  *textIndex
+	env   []string // the environment variables its code reads
 }
 
 // Scan finds needles in a build of s: each the lines that quote it or, for a field, assign

@@ -227,7 +227,17 @@ model's) is part of the name and stays.
     }
   },
 
-  "config": { "env_vars": ["ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK"], "settings_keys": ["model", "permissions.allow"] },
+  "config": {
+    "source": "codex-rs/core/config.schema.json at rust-v0.159.1",
+    "options": {
+      "sandbox_mode": { "type": "string", "description": "Sandbox mode to use.", "enum": ["read-only", "workspace-write", "danger-full-access"] },
+      "sandbox_workspace_write.network_access": { "type": "boolean", "default": false },
+      "mcp_servers.<name>.command": { "type": "string" },
+      "personality": { "type": "string", "deprecated": true }
+    },
+    "env_source": "the variables its source reads",
+    "env_vars": ["CODEX_HOME", "OPENAI_API_KEY"]
+  },
 
   "network": { "egress": [ { "host": "statsig.anthropic.com", "method": "POST", "path": "/v1/rgstr", "body_keys": ["events"], "when": "startup" } ] },
 
@@ -321,6 +331,44 @@ wrapped them, so a narrower terminal is no change. A diff lists each command, op
 argument added or removed, each changed description, value, default, alias, environment
 variable and allowed value; the full help texts are compared too, for what no entry holds
 (examples, notes).
+
+### config
+
+Every configuration option the build reads and every environment variable, with as much as
+the build says of each. `options` are by dotted path from the top of the settings file
+(`sandbox_workspace_write.network_access`); a table of keys the user names is `<name>`
+(`mcp_servers.<name>.command`), a list's items `[]` (`hooks.<name>[].matcher`); paths go four
+keys deep. Each option has, where its source says: `type` (its kinds of value, joined with `|`:
+`string`, `boolean`, `integer`, `number`, `array`, `object`, `null`), `description`, `default`,
+`enum` (the values it takes) and `deprecated`.
+
+`source` is where the options came from, and `env_source` how the variables were read:
+
+| harness | `options` | `env_vars` |
+|---|---|---|
+| Codex | `codex-rs/core/config.schema.json` at the release's tag, `$ref`s resolved, `oneOf`/`anyOf` a union; before the schema, `ConfigToml`'s fields | what its source reads: `std::env::var`, `var_os`, `env!`, clap's `env =`, and functions that read the name they are given |
+| Gemini CLI, Pi | `settings.schema.json` at the tag | `process.env` in its source |
+| OpenCode | its Effect Schema config (`ConfigV1.Info`), read across its modules | `process.env` in its source |
+| omp | the settings its source `register()`s | `process.env` in its source |
+| DeepSeek Harness | `docs/config-catalog.md`, each plugin's config interface under its package's name | `process.env` in its source |
+| Hermes | `DEFAULT_CONFIG`: types from its defaults, descriptions from its comments | `os.environ`, `os.getenv` in its source |
+| Claude Code | the zod settings schema its bundle declares, read from minified code (heuristic: `binary.heuristic` says so) | `process.env` in its bundle, and its own prefixed names read through what it keeps `process.env` under |
+| Copilot CLI | the settings registry its script embeds | `process.env` in its script |
+
+A public harness's are read from its source at refgen time (`refgen -source`), so no capture is
+needed; a source's tests, test helpers, build scripts and comments are not the build's. A build
+captured before then has `env_vars` from its binary's strings (`env_source` "the names its
+strings hold", with `env_vars_uncertain`), and Claude Code's `settings_keys`, the schema's
+top-level keys.
+
+In a diff, options compare key by key: a new one is "New setting: …" (notable where its key
+guards something: sandbox, permission, approval, allow/deny, network, credentials, policy),
+one gone "Setting no longer read: …" (notable), and of one in both a new `default` or `type`
+(notable), a value gained or lost (lost: notable), a new `description` (a text diff), and its
+deprecation (notable). Two builds whose options came from different kinds of source, or whose
+variables were read differently, are not compared item by item: the change is where they were
+read from. `source`'s tag is the build's and is no change. A table whose keys could not be read
+in one build (its options there end at the table) is no evidence its keys were added or removed.
 
 ## diffs/<from>..<to>.json
 

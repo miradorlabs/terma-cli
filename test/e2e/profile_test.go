@@ -58,6 +58,18 @@ func TestClaudeProfile(t *testing.T) {
 	})
 }
 
+// TestClaudeProfileBinary records only what each Claude Code build's executable says of
+// itself and who signed it, with no turn: a backfill re-reads many builds' facts (their
+// settings schema, the variables they read) in the time a few turns take. refgen prefers its
+// facts to an earlier scenario's.
+func TestClaudeProfileBinary(t *testing.T) {
+	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		RecordBinaryFacts(t, b)
+		RecordSigning(t, b)
+	})
+}
+
 // TestCodexProfile is the same for each Codex build's `codex exec`, with its defaults: the
 // sandbox, approval policy and reasoning effort a user's first run has (CodexExec pins the
 // last). Only the fixture provider and plugins (whose catalog clone outlives Codex) are set.
