@@ -57,6 +57,9 @@ type Claim struct {
 	Remote    string    `json:"remote,omitempty"`
 	Branch    string    `json:"branch,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
+	// EndedAt is when the session's agent reported its end, zero while it runs. The relay
+	// ignores it, since the agent still exports as it exits; a later write clears it.
+	EndedAt time.Time `json:"ended_at,omitzero"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
 	PIDs []int `json:"pids,omitempty"`
@@ -176,6 +179,31 @@ func Write(dir, sessionID string, c Claim, now time.Time) bool {
 // placement names no project and no repository; earlier placements keep their records.
 func Mark(dir, sessionID, tool string, pids []int, now time.Time) bool {
 	return write(dir, sessionID, Claim{Tool: tool, PIDs: pids}, now)
+}
+
+// End records that sessionID's session under the state directory dir ended now, keeping its
+// fresh claim for what the agent still sends; it reports whether it wrote.
+func End(dir, sessionID string, now time.Time) bool {
+	p, ok := path(dir, sessionID)
+	if !ok {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
+	unlock, err := flock.Lock(ctx, p+".lock")
+	cancel()
+	if err == nil {
+		defer unlock()
+	}
+	c, ok := Read(dir, sessionID, now)
+	if !ok {
+		return false
+	}
+	c.EndedAt = now.UTC()
+	data, err := json.Marshal(c)
+	if err != nil {
+		return false
+	}
+	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
 }
 
 func write(dir, sessionID string, c Claim, now time.Time) bool {

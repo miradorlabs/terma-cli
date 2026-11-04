@@ -39,30 +39,51 @@ const envFix = "remove those variables where they are set: the process that star
 // it, so the nearest process of each run of running ones is an agent, or what a git hook
 // ran under (a developer's shell), or an exited process's id that another has taken since.
 // All are judged, so the agent always is; the others add a finding only when they too
-// started with exporter variables that bypass the relay. Only variable names are said,
-// never a value: an endpoint or header may hold a credential.
+// started with exporter variables that bypass the relay. A process whose latest claim is
+// a session's end is not judged: once the agent exits, the nearest running process is its
+// launcher. Only variable names are said, never a value: an endpoint or header may hold a
+// credential.
+//
+// Accepted risk: an agent that exits without its end hook (a crash, a kill) leaves its claim
+// fresh for claim.TTL, so its launcher is judged as the agent and a launcher that sets no
+// exporter variable of its own reads as a pass. Telling the agent's own process apart (by
+// its executable) would close it.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	type proc struct {
 		agent string
 		env   []string
+		at    time.Time
+		ended bool
 	}
-	procs := map[int]proc{}
-	unread := false
+	seen := map[int]proc{}
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
 		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
 			continue
 		}
+		// A subagent's claim names its session's processes but never ends: the later word wins.
+		at, ended := c.ClaimedAt, !c.EndedAt.IsZero()
+		if ended {
+			at = c.EndedAt
+		}
 		after := false
 		for _, pid := range c.PIDs {
 			env, alive := environ(pid)
-			switch {
-			case alive && !after && env == nil:
-				unread = true
-			case alive && !after:
-				procs[pid] = proc{a.DisplayName(), env}
+			if prev, ok := seen[pid]; alive && !after && (!ok || at.After(prev.at)) {
+				seen[pid] = proc{a.DisplayName(), env, at, ended}
 			}
 			after = alive
+		}
+	}
+	procs := map[int]proc{}
+	unread := false
+	for pid, p := range seen {
+		switch {
+		case p.ended:
+		case p.env == nil:
+			unread = true
+		default:
+			procs[pid] = p
 		}
 	}
 	switch {

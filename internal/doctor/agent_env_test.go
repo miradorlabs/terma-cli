@@ -232,3 +232,29 @@ func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 		t.Fatalf("check = %+v, want a pass on the readable agent", c)
 	}
 }
+
+// Once a session has ended, its agent has exited and the nearest running process is its
+// launcher, which is not judged: even where a subagent's claim, which never ends, names the
+// same processes. The same agent process claimed again later, for a new session, is.
+func TestAgentEnvCheckSkipsAnEndedSession(t *testing.T) {
+	t.Parallel()
+	reg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
+	relay := Relay{Addr: "127.0.0.1:43180", Token: relayToken}
+	now := time.Now()
+	dir := t.TempDir()
+	chain := []int{hookPID, agentPID, hostPID}
+	claim.Write(dir, "subagent", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: chain}, now.Add(-time.Minute))
+	claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: chain}, now.Add(-time.Minute))
+	claim.End(dir, "s1", now.Add(-time.Second))
+	// The host passes no exporter variable of its own: judged as the agent, it would pass.
+	exited := processes(map[int][]string{hostPID: {"HOME=/home/dev"}})
+	if c := AgentEnvCheck(reg, dir, relay, exited, now); c.Status != Skip {
+		t.Fatalf("check = %+v, want a skip: the agent has exited", c)
+	}
+	// The agent cleared its conversation: one session ended, another runs in the same process.
+	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{101, agentPID, hostPID}}, now)
+	running := processes(map[int][]string{agentPID: {"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}, hostPID: {"HOME=/home/dev"}})
+	if c := AgentEnvCheck(reg, dir, relay, running, now); c.Status != Warn || !strings.Contains(c.Detail, "fake (pid 200)") {
+		t.Fatalf("check = %+v, want the running agent judged", c)
+	}
+}
