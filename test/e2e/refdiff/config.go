@@ -34,6 +34,8 @@ func diffConfig(a, b map[string]any, out *[]Change) {
 	}
 	optsA, okA := a["options"].(map[string]any)
 	optsB, okB := b["options"].(map[string]any)
+	first := len(*out)
+	defer func() { *out = append((*out)[:first], collapseProfiles((*out)[first:])...) }()
 	if okA && okB && srcA == srcB {
 		for _, k := range sortedKeys(union(optsA, optsB)) {
 			x, inA := optsA[k]
@@ -255,4 +257,33 @@ func sayValue(v any) string {
 		return s[:57] + "…"
 	}
 	return s
+}
+
+// profileOption is an option a profile repeats: "profiles.<name>.model" is "model" set for one
+// profile (Codex's [profiles.x] tables take most top-level keys).
+const profileOption = "profiles.<name>."
+
+// collapseProfiles drops a profile's copy of a change its top-level option has the same: a new
+// setting is one change, not one and its profile's. A change only a profile has is kept.
+func collapseProfiles(changes []Change) []Change {
+	top := map[string]bool{}
+	sig := func(c Change, key string) string {
+		data, _ := json.Marshal([]any{c.Op, key, c.Path[3:], c.Before, c.After})
+		return string(data)
+	}
+	for _, c := range changes {
+		if len(c.Path) >= 3 && c.Path[1] == "options" && !strings.HasPrefix(c.Path[2], profileOption) {
+			top[sig(c, c.Path[2])] = true
+		}
+	}
+	out := changes[:0]
+	for _, c := range changes {
+		if len(c.Path) >= 3 && c.Path[1] == "options" {
+			if rest, ok := strings.CutPrefix(c.Path[2], profileOption); ok && top[sig(c, rest)] {
+				continue
+			}
+		}
+		out = append(out, c)
+	}
+	return out
 }

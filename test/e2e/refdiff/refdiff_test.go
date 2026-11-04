@@ -96,3 +96,24 @@ func TestStorageObserved(t *testing.T) {
 		t.Errorf("changes = %+v", d.Changes)
 	}
 }
+
+// A setting new at the top and in profiles is one change; one only a profile has is its own.
+func TestConfigProfilesCollapse(t *testing.T) {
+	opt := func(keys ...string) map[string]any {
+		m := map[string]any{}
+		for _, k := range keys {
+			m[k] = map[string]any{"type": "string"}
+		}
+		return m
+	}
+	a := &Snapshot{Harness: "codex", Version: "0.1.0", Config: map[string]any{"source": "config.schema.json at rust-v0.1.0", "options": opt("model", "profiles.<name>.model")}}
+	b := &Snapshot{Harness: "codex", Version: "0.1.1", Config: map[string]any{"source": "config.schema.json at rust-v0.1.1",
+		"options": opt("model", "profiles.<name>.model", "web_search", "profiles.<name>.web_search", "profiles.<name>.only_here")}}
+	var ids []string
+	for _, c := range New(a, b, nil, time.Now()).Changes {
+		ids = append(ids, c.ID)
+	}
+	if strings.Join(ids, " ") != "config.options.profiles.<name>.only_here config.options.web_search" {
+		t.Errorf("changes = %v", ids)
+	}
+}

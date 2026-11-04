@@ -136,8 +136,9 @@ var (
 		"typescript": regexp.MustCompile(`(?:\bfunction\s+([A-Za-z_$][\w$]*)|([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(|^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\()`),
 		"python":     regexp.MustCompile(`\bdef\s+([a-z_][a-z0-9_]*)`),
 	}
-	// A call with a variable's name, or a constant, as its first argument.
-	envCallRE = regexp.MustCompile(`\b([A-Za-z_$][\w$]*)\(\s*(?:"([A-Z][A-Z0-9_]+)"|([A-Z][A-Z0-9_]+))\s*[,)]`)
+	// A call with a variable's name, or a constant, as its first argument: the constant maybe
+	// by reference, or through its module (auth::CODEX_API_KEY_ENV_VAR, env.HOME_VAR).
+	envCallRE = regexp.MustCompile(`\b([A-Za-z_$][\w$]*)\(\s*&?(?:"([A-Z][A-Z0-9_]+)"|(?:[A-Za-z_][\w]*(?:::|\.))*([A-Z][A-Z0-9_]+))\s*[,)]`)
 )
 
 // envTestish reports a file that is test support though no test (a test server's binary, a

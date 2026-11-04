@@ -28,7 +28,11 @@ func TestEnvReads(t *testing.T) {
 				"fn telemetry() { env_var_present(KEY_ENV); env_var_present(\"CODEX_REFRESH_URL\"); }\n",
 			"codex-rs/rmcp-client/src/bin/test_stdio_server.rs": "fn main() { std::env::var(\"MCP_TEST_PID_FILE\"); }\n",
 			"codex-rs/linux-sandbox/build.rs":                   "fn main() { std::env::var(\"TARGET\"); }\n",
-		}, []string{"CARGO_PKG_VERSION", "CODEX_API_KEY", "CODEX_HOME", "CODEX_REFRESH_URL", "CODEX_SANDBOX", "OPENAI_API_KEY"}},
+			// A wrapper called with a constant from another module, by reference.
+			"codex-rs/login/src/auth.rs": "pub const CODEX_ACCESS_TOKEN_ENV_VAR: &str = \"CODEX_ACCESS_TOKEN\";\n" +
+				"fn read_non_empty_env_var(key: &str) -> Option<String> {\n    std::env::var(key).ok()\n}\n" +
+				"fn token() { read_non_empty_env_var(&crate::auth::CODEX_ACCESS_TOKEN_ENV_VAR); }\n",
+		}, []string{"CARGO_PKG_VERSION", "CODEX_ACCESS_TOKEN", "CODEX_API_KEY", "CODEX_HOME", "CODEX_REFRESH_URL", "CODEX_SANDBOX", "OPENAI_API_KEY"}},
 		{"typescript", map[string]string{
 			"packages/core/src/env.ts": "export const KEY_VAR = 'GEMINI_API_KEY';\n" +
 				"const a = process.env.GEMINI_MODEL ?? process.env['GOOGLE_API_KEY'];\n" +
