@@ -991,8 +991,12 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 					}
 				})
 			}
-			if r.Probe != "" {
-				e["when"] = r.Probe
+			if r.When != "" {
+				e["when"] = r.When
+			}
+			if r.Error != "" {
+				// A host whose TLS the build refused to the recording proxy: pinned.
+				e["error"] = r.Error
 			}
 			egress = append(egress, e)
 		}
@@ -1015,7 +1019,7 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 		var bin map[string]any
 		if json.Unmarshal(p.Binary, &bin) == nil {
 			cfg := map[string]any{}
-			for _, k := range []string{"env_vars", "settings_keys"} {
+			for _, k := range []string{"env_vars", "env_vars_uncertain", "settings_keys"} {
 				if v, ok := bin[k]; ok {
 					cfg[k] = v
 					delete(bin, k)

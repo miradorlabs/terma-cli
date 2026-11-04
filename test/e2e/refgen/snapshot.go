@@ -99,7 +99,14 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool) {
 		if p.Platform != merged.Platform {
 			continue
 		}
-		merged.Requests = append(merged.Requests, p.Requests...)
+		// A scenario beside the plain turn (its egress, its telemetry) takes a first turn of
+		// its own: the plain turn's is the first turn, the others' behaviour probes are kept.
+		for _, r := range p.Requests {
+			if r.Probe == "first-turn" && hasFirstTurn(merged) {
+				continue
+			}
+			merged.Requests = append(merged.Requests, r)
+		}
 		merged.Egress = append(merged.Egress, p.Egress...)
 		merged.Failed = merged.Failed || p.Failed
 		for k, v := range p.Help {
@@ -324,4 +331,13 @@ func present(s *Snapshot) []string {
 		}
 	}
 	return out
+}
+
+func hasFirstTurn(p e2e.Profile) bool {
+	for _, r := range p.Requests {
+		if r.Probe == "first-turn" {
+			return true
+		}
+	}
+	return false
 }
