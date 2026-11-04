@@ -45,9 +45,10 @@ const envFix = "remove those variables where they are set: the process that star
 // credential.
 //
 // Accepted risk: an agent that exits without its end hook completing (a crash, a kill, the
-// hook's timeout) leaves its claim fresh for claim.TTL, so its launcher is judged as the
-// agent and a launcher that sets no exporter variable of its own reads as a pass. Telling the
-// agent's own process apart (by its executable) would close it.
+// hook's timeout) leaves its claim fresh for claim.TTL after the session's last hook, a
+// commit's included, so its launcher is judged as the agent and a launcher that sets no
+// exporter variable of its own reads as a pass. Telling the agent's own process apart (by
+// its executable) would close it.
 func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ Environ, now time.Time) Check {
 	type proc struct {
 		agent string
@@ -59,7 +60,7 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
 		// A session only git hooks claimed (a commit after its claim expired) names no agent process.
-		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" || !c.FromAgent() {
+		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" || !c.Agent {
 			continue
 		}
 		// A subagent's claim names its session's processes but never ends: the later word wins.

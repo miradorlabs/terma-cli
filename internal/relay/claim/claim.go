@@ -97,9 +97,6 @@ const maxPIDs = 64
 
 const maxPlacements = 8
 
-// FromAgent reports whether an agent's hook has claimed the session (Agent).
-func (c Claim) FromAgent() bool { return c.Agent }
-
 // Covers reports whether pid may send under this claim's latest placement.
 func (c Claim) Covers(pid int) bool {
 	return covers(c.PIDs, pid)
@@ -224,7 +221,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) && (prev.Agent || !c.Agent) {
+	if prev, ok := readFresh(p, now); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) && (prev.Agent || !c.Agent) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -239,7 +236,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		defer unlock()
 	}
 	now = now.UTC()
-	prev, havePrev := read(p)
+	prev, havePrev := readFresh(p, now)
 	placements := []Placement{}
 	switch {
 	case !havePrev:
@@ -326,6 +323,12 @@ func Read(dir, sessionID string, now time.Time) (Claim, bool) {
 	if !ok {
 		return Claim{}, false
 	}
+	return readFresh(p, now)
+}
+
+// readFresh reads the claim at p if written less than TTL ago: an older one is gone, though
+// the relay may not have pruned it yet.
+func readFresh(p string, now time.Time) (Claim, bool) {
 	info, err := os.Stat(p)
 	if err != nil || now.Sub(info.ModTime()) >= TTL {
 		return Claim{}, false

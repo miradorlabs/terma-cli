@@ -275,12 +275,13 @@ func TestOnlyAgentHooksClaimAsTheAgent(t *testing.T) {
 	edit := request("fake-edit")
 	edit.Cwd = root
 	Run(context.Background(), h.deps, edit)
-	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || !c.FromAgent() {
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || !c.Agent {
 		t.Fatalf("the agent hook's claim = %+v, %v; want the agent's", c, ok)
 	}
 
-	// The claim expires; the session's edit is then committed by hand.
-	if err := os.Remove(filepath.Join(claim.Dir(h.deps.StateDir), "claims", "s1.json")); err != nil {
+	// The claim expires, unpruned; the session's edit is then committed by hand.
+	expired := time.Now().Add(-claim.TTL - time.Minute)
+	if err := os.Chtimes(filepath.Join(claim.Dir(h.deps.StateDir), "claims", "s1.json"), expired, expired); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "a.go", "package a\n")
@@ -297,7 +298,7 @@ func TestOnlyAgentHooksClaimAsTheAgent(t *testing.T) {
 	if stamped, _ := os.ReadFile(msg); !strings.Contains(string(stamped), "s1") {
 		t.Fatalf("the commit was not stamped with the session: %q", stamped)
 	}
-	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || c.FromAgent() {
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || c.Agent {
 		t.Fatalf("the git hook's claim = %+v, %v; want a claim, not the agent's", c, ok)
 	}
 }
