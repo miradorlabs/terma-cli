@@ -42,7 +42,7 @@ func TestCodexBaseURLBackend(t *testing.T) {
 }
 
 // The session's provider id maps through where config.toml sends it: the built-in openai
-// provider is OpenAI unless openai_base_url or OPENAI_BASE_URL moves it, a local built-in is
+// provider is OpenAI unless openai_base_url moves it (OPENAI_BASE_URL does not), a local built-in is
 // private, a custom id is what its base_url's host says, and an id nothing defines is unknown.
 func TestCodexRoutesBackend(t *testing.T) {
 	const providers = `
@@ -76,9 +76,8 @@ base_url = "https://llm.corp.example/v1"
 		{"openai_base_url to a gateway", `openai_base_url = "https://llm.corp.example/v1"`, "", "openai", semconv.TermaServingBackendPrivate},
 		{"openai_base_url to OpenAI", `openai_base_url = "https://api.openai.com/v1"`, "", "openai", semconv.TermaServingBackendOpenai},
 		{"openai_base_url to Azure", `openai_base_url = "https://res.openai.azure.com/openai/v1"`, "", "openai", semconv.TermaServingBackendAzureOpenai},
-		{"OPENAI_BASE_URL to a gateway", "", "https://llm.corp.example/v1", "openai", semconv.TermaServingBackendPrivate},
-		{"OPENAI_BASE_URL to Azure", "", "https://res.openai.azure.com/openai/v1", "openai", semconv.TermaServingBackendAzureOpenai},
-		{"openai_base_url over OPENAI_BASE_URL", `openai_base_url = "https://api.openai.com/v1"`, "https://llm.corp.example/v1", "openai", semconv.TermaServingBackendOpenai},
+		{"OPENAI_BASE_URL, which Codex ignores", "", "https://llm.corp.example/v1", "openai", semconv.TermaServingBackendOpenai},
+		{"openai_base_url beside OPENAI_BASE_URL", `openai_base_url = "https://llm.corp.example/v1"`, "https://api.openai.com/v1", "openai", semconv.TermaServingBackendPrivate},
 		{"azure", providers, "", "azure", semconv.TermaServingBackendAzureOpenai},
 		{"foundry", providers, "", "foundry", semconv.TermaServingBackendAzureOpenai},
 		{"custom id to OpenAI", providers, "", "direct", semconv.TermaServingBackendOpenai},

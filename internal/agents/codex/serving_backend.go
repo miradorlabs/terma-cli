@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
-	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -79,11 +78,11 @@ func (c codexRoutes) backend(provider string) string {
 		return ""
 	}
 	if provider == codexOpenAIProvider {
-		base := cmp.Or(c.openAIBaseURL, strings.TrimSpace(os.Getenv("OPENAI_BASE_URL")))
-		if base == "" {
+		// Codex reads only openai_base_url for its built-in provider, never OPENAI_BASE_URL.
+		if c.openAIBaseURL == "" {
 			return semconv.TermaServingBackendOpenai
 		}
-		return codexBaseURLBackend(base)
+		return codexBaseURLBackend(c.openAIBaseURL)
 	}
 	if cloud, ok := codexCloudProviders[provider]; ok {
 		base := c.baseURLs[provider]
@@ -99,29 +98,23 @@ func (c codexRoutes) backend(provider string) string {
 	return codexBaseURLBackend(c.baseURLs[provider])
 }
 
-// codexBaseURLBackend recognises OpenAI's host and the cloud providers' (servinghost); any
-// other host (a
-// gateway, Azure API Management, a proxy, a local server) is private, and a URL with no host,
-// or none at all, is "".
+// codexHostBackends are the backends serving Codex's providers from each kind of host.
+var codexHostBackends = map[servinghost.Kind]string{
+	servinghost.OpenAI:  semconv.TermaServingBackendOpenai,
+	servinghost.Azure:   semconv.TermaServingBackendAzureOpenai,
+	servinghost.Bedrock: semconv.TermaServingBackendAwsBedrock,
+	servinghost.Vertex:  semconv.TermaServingBackendGoogleVertex,
+}
+
+// codexBaseURLBackend is the backend serving raw's host; any other host (a gateway, Azure
+// API Management, a proxy, a local server) is private, and a URL with no host, or none at
+// all, is "".
 func codexBaseURLBackend(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
+	kind, ok := servinghost.Of(raw)
+	if !ok {
 		return ""
 	}
-	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-	switch {
-	case host == "":
-		return ""
-	case host == "api.openai.com":
-		return semconv.TermaServingBackendOpenai
-	case servinghost.Azure(host):
-		return semconv.TermaServingBackendAzureOpenai
-	case servinghost.Bedrock(host):
-		return semconv.TermaServingBackendAwsBedrock
-	case servinghost.Vertex(host):
-		return semconv.TermaServingBackendGoogleVertex
-	}
-	return semconv.TermaServingBackendPrivate
+	return cmp.Or(codexHostBackends[kind], semconv.TermaServingBackendPrivate)
 }
 
 // codexSessionProvider is the model provider a rollout's session_meta line names.

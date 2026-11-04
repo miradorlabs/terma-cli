@@ -1,9 +1,27 @@
-// Package servinghost recognises the hosts each cloud provider serves models from, as Claude
-// Code 2.1.314 does (its own-host table): regional, FIPS, private-endpoint and sovereign-cloud
-// hosts included. Any other host is a gateway, a proxy or a local server.
+// Package servinghost tells which provider serves a base URL's host: the model APIs' own
+// hosts and, as Claude Code 2.1.314 recognises them (its own-host table), each cloud
+// provider's regional, FIPS, private-endpoint and sovereign-cloud hosts. Each agent maps a
+// Kind to terma.serving.backend's value.
 package servinghost
 
-import "regexp"
+import (
+	"net/url"
+	"regexp"
+	"strings"
+)
+
+// Kind is who serves a host.
+type Kind int
+
+// The kinds of host; Other is a gateway, a proxy or a local server.
+const (
+	Other Kind = iota
+	Anthropic
+	OpenAI
+	Bedrock
+	Vertex
+	Azure
+)
 
 const (
 	awsRegion  = `[a-z]{2,4}(?:-[a-z]{2,5})?-[a-z]+-\d+`
@@ -14,14 +32,30 @@ const (
 var (
 	bedrock = regexp.MustCompile(`^(?:vpce-[a-z0-9-]+\.)?bedrock(?:-runtime|-mantle)?(?:-fips)?\.` + awsRegion + `\.(?:vpce\.)?` + awsDomains + `$`)
 	vertex  = regexp.MustCompile(`^(?:aiplatform|` + gcpRegion + `-aiplatform|aiplatform\.` + gcpRegion + `\.rep|[a-z0-9-]+\.p)\.googleapis\.com$`)
-	azure   = regexp.MustCompile(`^[a-z0-9-]{2,64}\.(?:services\.ai|cognitiveservices|openai)\.azure\.(?:com|us|cn)$`)
+	// Foundry's and Azure OpenAI's resources.
+	azure = regexp.MustCompile(`^[a-z0-9-]{2,64}\.(?:services\.ai|cognitiveservices|openai)\.azure\.(?:com|us|cn)$`)
 )
 
-// Bedrock reports whether host is Amazon Bedrock's, its Mantle endpoint's included.
-func Bedrock(host string) bool { return bedrock.MatchString(host) }
-
-// Vertex reports whether host is Google Vertex AI's.
-func Vertex(host string) bool { return vertex.MatchString(host) }
-
-// Azure reports whether host is an Azure AI resource's: Foundry's and Azure OpenAI's.
-func Azure(host string) bool { return azure.MatchString(host) }
+// Of is the kind of raw's host; false when raw names no host.
+func Of(raw string) (Kind, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return Other, false
+	}
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	switch {
+	case host == "":
+		return Other, false
+	case host == "api.anthropic.com":
+		return Anthropic, true
+	case host == "api.openai.com":
+		return OpenAI, true
+	case bedrock.MatchString(host):
+		return Bedrock, true
+	case vertex.MatchString(host):
+		return Vertex, true
+	case azure.MatchString(host):
+		return Azure, true
+	}
+	return Other, true
+}

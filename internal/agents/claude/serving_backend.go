@@ -1,8 +1,7 @@
 package claude
 
 import (
-	"net/url"
-	"strings"
+	"cmp"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -53,25 +52,20 @@ func routeBackend(lookup func(string) string, storedCredential bool) string {
 	return ""
 }
 
-// baseURLBackend recognises the hosts each backend serves its API from (servinghost); any
-// other host (a gateway, a proxy, a local server) is private, and a URL with no host is "".
+// claudeHostBackends are the backends serving Claude's API from each kind of host.
+var claudeHostBackends = map[servinghost.Kind]string{
+	servinghost.Anthropic: semconv.TermaServingBackendAnthropic,
+	servinghost.Bedrock:   semconv.TermaServingBackendAwsBedrock,
+	servinghost.Vertex:    semconv.TermaServingBackendGoogleVertex,
+	servinghost.Azure:     semconv.TermaServingBackendAzureFoundry,
+}
+
+// baseURLBackend is the backend serving raw's host; any other host (a gateway, a proxy, a
+// local server) is private, and a URL with no host is "".
 func baseURLBackend(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
+	kind, ok := servinghost.Of(raw)
+	if !ok {
 		return ""
 	}
-	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-	switch {
-	case host == "":
-		return ""
-	case host == "api.anthropic.com":
-		return semconv.TermaServingBackendAnthropic
-	case servinghost.Bedrock(host):
-		return semconv.TermaServingBackendAwsBedrock
-	case servinghost.Vertex(host):
-		return semconv.TermaServingBackendGoogleVertex
-	case servinghost.Azure(host):
-		return semconv.TermaServingBackendAzureFoundry
-	}
-	return semconv.TermaServingBackendPrivate
+	return cmp.Or(claudeHostBackends[kind], semconv.TermaServingBackendPrivate)
 }
