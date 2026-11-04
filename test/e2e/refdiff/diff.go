@@ -3,6 +3,7 @@ package refdiff
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -20,8 +21,20 @@ import (
 // checked_at is when a signature was checked, not what it says.
 // signed_at differs from build to build by nature; assessment, resigned and authority say again
 // what status and the certificate say.
+// backoff_ms is a measured wait, which a busy machine moves: whether the build honours
+// retry-after, and how many times it tries, say what it does. A stored kind's file count and
+// file names are the run's (logs rotate, a cleanup marker comes and goes); its format, records
+// and tables are the build's. When an egress request came (before or after the model's) is the
+// run's timing.
 var skipKeys = map[string]bool{"sha256": true, "chars": true, "checked_at": true, "signed_at": true,
-	"assessment": true, "resigned": true, "authority": true}
+	"assessment": true, "resigned": true, "authority": true, "backoff_ms": true,
+	"files": true, "paths": true, "more_paths": true, "when": true}
+
+// measured are numbers a capture measures, which move a little from run to run: a change of
+// less than measuredSlack of them is none.
+var measured = map[string]bool{"size_bytes": true, "limit_chars": true, "stable_prefix_chars": true}
+
+const measuredSlack = 0.05
 
 // compare is every change from a to b.
 func compare(a, b *Snapshot) []Change {
@@ -35,6 +48,20 @@ func compare(a, b *Snapshot) []Change {
 	}
 	kept := out[:0]
 	for _, c := range out {
+		// Whether an event fired is the run's (SessionEnd races the exit): what a build supports
+		// is hooks.supported, and an event's payload is compared where both fired.
+		if c.Path[0] == "hooks" && len(c.Path) == 3 && c.Path[1] == "events" && c.Op != "changed" {
+			continue
+		}
+		if measured[c.Path[len(c.Path)-1]] && c.Op == "changed" && nearly(c.Before, c.After) {
+			continue
+		}
+		// What a build stored is read from its files as the run left them: a database still
+		// being written reads as no tables, a marker file comes and goes. A kind's structure
+		// absent on one side is not observed; a kind is new or gone only with a structure.
+		if c.Path[0] == "storage" && c.Op != "changed" && (len(c.Path) > 2 || !structured(c.Before, c.After)) {
+			continue
+		}
 		// A capability checked on a platform for one build and not the other was not tested
 		// there, not lost: only a result that changed is a change.
 		if c.Path[0] == "support" && len(c.Path) == 3 && c.Path[1] == "capabilities" && c.Op != "changed" {
@@ -733,4 +760,28 @@ func CompareRange(from, to *Snapshot, notes map[string]ChangelogNote, now time.T
 		note = &ChangelogNote{URL: notes[versions[0]].URL, Text: strings.TrimSpace(sb.String())}
 	}
 	return New(from, to, note, now)
+}
+
+// nearly reports two measurements within measuredSlack of each other.
+func nearly(a, b any) bool {
+	x, okA := a.(float64)
+	y, okB := b.(float64)
+	if !okA || !okB || x == 0 && y == 0 {
+		return okA && okB
+	}
+	return math.Abs(x-y) <= measuredSlack*math.Max(math.Abs(x), math.Abs(y))
+}
+
+// structured reports a stored kind, of either side, with a structure to compare: its records,
+// keys or tables.
+func structured(vs ...any) bool {
+	for _, v := range vs {
+		m, _ := v.(map[string]any)
+		for _, k := range []string{"record_types", "keys", "tables"} {
+			if m[k] != nil {
+				return true
+			}
+		}
+	}
+	return false
 }

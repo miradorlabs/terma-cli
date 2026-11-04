@@ -44,7 +44,6 @@ func TestHookChanges(t *testing.T) {
 	for id, want := range map[string]struct{ title, impact string }{
 		"hooks.supported.PreCompact":                      {"New hook event: PreCompact", "notable"},
 		"hooks.supported.Notification":                    {"Hook event no longer supported: Notification", "degrading"},
-		"hooks.events.Notification":                       {"Hook event no longer fired: Notification", "degrading"},
 		"hooks.events.PreToolUse.keys.tool_input.command": {"PreToolUse hook payload field tool_input.command added", "informational"},
 		"hooks.events.PreToolUse.keys.tool_name":          {"PreToolUse hook payload field tool_name removed", "notable"},
 		"hooks.events.PreToolUse.env.CLAUDE_ENV_FILE":     {"PreToolUse hook environment variable CLAUDE_ENV_FILE added", "informational"},
@@ -62,7 +61,9 @@ func TestHookChanges(t *testing.T) {
 		}
 	}
 	// A field's kind and why an event did not fire say again what another change says.
-	for _, id := range []string{"hooks.events.PreToolUse.kinds.tool_input.command", "hooks.events.PreToolUse.kinds.tool_name", "hooks.not_fired.PreCompact"} {
+	// Whether an event fired is the run's: what is supported says what the build does.
+	for _, id := range []string{"hooks.events.PreToolUse.kinds.tool_input.command", "hooks.events.PreToolUse.kinds.tool_name", "hooks.not_fired.PreCompact",
+		"hooks.events.Notification"} {
 		if _, ok := byID[id]; ok {
 			t.Errorf("%s read as a change of its own", id)
 		}

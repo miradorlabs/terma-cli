@@ -625,6 +625,12 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 					statuses[code] = st
 				}
 				if m, ok := v.(map[string]any); ok {
+					// A run cut short by the probe's own time limit (a busy machine) says nothing
+					// of how the build retries: not observed.
+					if e, _ := m["error"].(string); strings.Contains(e, "did not finish") {
+						delete(statuses, code)
+						continue
+					}
 					for k, x := range m {
 						if k != "status" {
 							st[k] = x
@@ -803,11 +809,9 @@ func compactionOf(reqs []e2e.ProviderRequest) map[string]any {
 			sys += t.(map[string]any)["text"].(string)
 		}
 		if summaryHint.MatchString(text) || summaryHint.MatchString(sys) && len(toolsOf(b)) == 0 {
-			out := map[string]any{"model": b["model"], "prompt": text, "tools": len(toolsOf(b))}
-			if sys != "" {
-				out["system"] = sys
-			}
-			return out
+			// Its own instruction, not the system prompt around it: that is the agent's, and says
+			// again each change of the prompt section.
+			return map[string]any{"model": b["model"], "prompt": text, "tools": len(toolsOf(b))}
 		}
 	}
 	return nil

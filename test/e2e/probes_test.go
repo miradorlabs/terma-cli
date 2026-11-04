@@ -464,7 +464,7 @@ func perMillion(cost float64, tokens int) float64 {
 // TestClaudeProbeInteractive: Claude Code's first turn in an interactive session, in a real
 // pty, as a person starts it (`claude`, no flag but a session id): its system prompt, tools and
 // side requests differ from `claude -p`'s. The synthetic key is approved, as a developer's own
-// is. ~15 s a build.
+// is. It runs behind the recording proxy, with the flags the build ships with. ~15 s a build.
 func TestClaudeProbeInteractive(t *testing.T) {
 	claudeProbe(t, []string{"interactive"}, func(t *testing.T, b Binary, sb *Sandbox) {
 		approveClaudeKey(t, sb, "synthetic-telemetry-key")
@@ -475,7 +475,11 @@ func TestClaudeProbeInteractive(t *testing.T) {
 		Placeholder(t, b, sid, "<session>")
 		args := []string{"--session-id", sid}
 		RecordCommand(t, b, args)
-		term, err := Start(sb.Repo, sb.claudeEnv(RouteAPIKey), 40, 120, sb.claudeLauncher(), args...)
+		// Behind the recording proxy, as the published first turn is: the build's flag service
+		// answers nothing, so the prompt is the one it ships with, not tonight's rollout's.
+		sb.unproxyHooks()
+		proxy := StartEgressProxy(t)
+		term, err := Start(sb.Repo, append(sb.claudeEnv(RouteAPIKey), proxy.Env()...), 40, 120, sb.claudeLauncher(), args...)
 		if err != nil {
 			t.Fatalf("start claude: %v", err)
 		}

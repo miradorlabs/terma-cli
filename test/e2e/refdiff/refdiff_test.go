@@ -81,3 +81,18 @@ func TestWasmBuilds(t *testing.T) {
 		t.Fatalf("GOOS=js GOARCH=wasm go build: %v\n%s", err, out)
 	}
 }
+
+// Storage as a run left it: a database unread, a marker file, are not observed changes; a new
+// kind with records is.
+func TestStorageObserved(t *testing.T) {
+	a := &Snapshot{Harness: "codex", Version: "0.1.0", Storage: map[string]any{
+		"logs":         map[string]any{"format": "sqlite", "path": "<codex-home>/logs.db", "tables": map[string]any{"logs": []any{"id"}}},
+		"last-cleanup": map[string]any{"format": "text", "path": "<claude-config>/.last-cleanup"}}}
+	b := &Snapshot{Harness: "codex", Version: "0.1.1", Storage: map[string]any{
+		"logs":       map[string]any{"format": "sqlite", "path": "<codex-home>/logs.db"},
+		"transcript": map[string]any{"format": "jsonl", "path": "<codex-home>/sessions/x.jsonl", "record_types": map[string]any{"turn": []any{"id"}}}}}
+	d := New(a, b, nil, time.Now())
+	if len(d.Changes) != 1 || d.Changes[0].ID != "storage.transcript" || d.Changes[0].Op != "added" {
+		t.Errorf("changes = %+v", d.Changes)
+	}
+}

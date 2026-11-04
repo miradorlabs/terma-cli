@@ -61,14 +61,21 @@ func normalize(p e2e.Profile) e2e.Profile {
 		for _, form := range forms {
 			literals = append(literals, form)
 			with[form] = name
-			// A harness that keeps state by project names the project by its path, every
-			// character but letters and digits a dash (Claude Code's projects/<slug>/).
-			if strings.HasPrefix(form, "/") {
-				slug := nonAlnum.ReplaceAllString(form, "-")
-				literals = append(literals, slug)
-				with[slug] = strings.TrimSuffix(name, ">") + "-slug>"
-			}
 		}
+	}
+	// A harness that keeps state by project names the project by its path, every character but
+	// letters and digits a dash (Claude Code's projects/<slug>/). A slug the profile named itself
+	// (<project>) keeps its name: one slug, one placeholder, whichever map order.
+	for _, form := range append([]string(nil), literals...) {
+		if !strings.HasPrefix(form, "/") {
+			continue
+		}
+		slug := nonAlnum.ReplaceAllString(form, "-")
+		if _, named := with[slug]; named {
+			continue
+		}
+		literals = append(literals, slug)
+		with[slug] = strings.TrimSuffix(with[form], ">") + "-slug>"
 	}
 	// Longest first, so a sandbox's repository is <repo>, not <sandbox>/repo.
 	sort.Slice(literals, func(i, j int) bool { return len(literals[i]) > len(literals[j]) })
