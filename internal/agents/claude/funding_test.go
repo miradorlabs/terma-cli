@@ -100,7 +100,8 @@ func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 		t.Fatalf("a Bedrock (Mantle) session does not use the cached login: %+v", e)
 	}
 	t.Setenv("CLAUDE_CODE_USE_MANTLE", "")
-	// Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so a settings file is where it shows.
+	// Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so a settings file is where it shows,
+	// even under an empty one in the environment.
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	writeEvidenceFile(t, filepath.Join(repo, ".claude", "settings.local.json"), `{"env":{"CLAUDE_CODE_OAUTH_TOKEN":"never-export-token"}}`)
 	if e = readFunding(repo); e.oauthEffective {

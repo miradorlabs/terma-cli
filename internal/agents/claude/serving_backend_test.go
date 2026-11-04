@@ -147,6 +147,10 @@ func TestServingBackendReadsSettings(t *testing.T) {
 		t.Fatalf("vertex switch cleared by project settings: got %q, want anthropic", got)
 	}
 	hookruntest.WriteFile(t, projectDir, "settings.json", `{"env":{"ANTHROPIC_BASE_URL":"https://other.corp.example"}}`)
+	t.Setenv("CLAUDE_CODE_USE_VERTEX", "")
+	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendAnthropic {
+		t.Fatalf("an empty switch in the environment over settings: got %q, want anthropic", got)
+	}
 	t.Setenv("CLAUDE_CODE_USE_VERTEX", "0")
 	if got := servingBackend(env.Cwd); got != semconv.TermaServingBackendAnthropic {
 		t.Fatalf("the environment over settings: got %q, want anthropic", got)

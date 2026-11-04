@@ -124,12 +124,18 @@ func readClaudeRoute(repoRoot, configPath string) claudeRoute {
 	return r
 }
 
+// claudeCredentialVars are the first-party keys and tokens the session uses before the stored
+// login.
+var claudeCredentialVars = []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"}
+
 // lookup is key's value as the session sees it: the environment's, else that of the first
-// settings env block that sets it, an empty value included: a file that clears a key
-// overrides the files below it.
+// settings env block that sets it, an empty value included at either level: a source that
+// clears a key overrides those below it. The hook inherits the environment Claude Code built
+// from its settings, so the files decide only what it does not pass down, such as the
+// credentials it strips from hooks: an empty credential in the environment says nothing.
 func (r claudeRoute) lookup(key string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
+	if v, ok := os.LookupEnv(key); ok && (v != "" || !slices.Contains(claudeCredentialVars, key)) {
+		return strings.TrimSpace(v)
 	}
 	for _, env := range r.envs {
 		if raw, ok := env[key]; ok {
@@ -182,7 +188,7 @@ func cloudRoute(lookup func(string) string) (claudeCloud, bool) {
 // firstPartyKey reports whether lookup finds a first-party key or token, which the session
 // uses before the stored login.
 func firstPartyKey(lookup func(string) string) bool {
-	return lookup("ANTHROPIC_API_KEY") != "" || lookup("ANTHROPIC_AUTH_TOKEN") != "" || lookup("CLAUDE_CODE_OAUTH_TOKEN") != ""
+	return slices.ContainsFunc(claudeCredentialVars, func(key string) bool { return lookup(key) != "" })
 }
 
 // oauthAccountIsEffective reports whether the cached OAuth login is the session's credential: no

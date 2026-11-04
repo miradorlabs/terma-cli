@@ -26,13 +26,14 @@ func newFundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
-	// Nor the route of a Claude Code the tests run under.
+	// Nor the route of a Claude Code the tests run under: unset, since an empty route variable
+	// in the environment overrides the settings files.
 	for _, key := range []string{"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_MANTLE", "CLAUDE_CODE_USE_ANTHROPIC_AWS",
 		"CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST", "ANTHROPIC_BASE_URL",
 		"CLAUDE_CODE_USE_GATEWAY", "ANTHROPIC_BEDROCK_BASE_URL", "ANTHROPIC_FOUNDRY_BASE_URL",
 		"ANTHROPIC_BEDROCK_MANTLE_BASE_URL", "ANTHROPIC_VERTEX_BASE_URL",
 		"ANTHROPIC_AWS_BASE_URL", "ANTHROPIC_GOOGLE_CLOUD_BASE_URL"} {
-		t.Setenv(key, "")
+		unsetenv(t, key)
 	}
 	root, stateDir, sp := hookruntest.Project(t)
 	return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: hookruntest.Admitting(root), Team: hookruntest.Team}
@@ -71,5 +72,18 @@ func appendLogin(t *testing.T, transcript, sessionID string, at time.Time) {
 	if _, err := fmt.Fprintf(f, `{"type":"user","message":{"role":"user","content":"<command-name>/login</command-name>\n<command-message>login</command-message>\n<command-args></command-args>"},"timestamp":%q,"sessionId":%q}`+"\n",
 		at.UTC().Format(time.RFC3339Nano), sessionID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// unsetenv removes key from the environment for the rest of t, which t.Setenv cannot.
+func unsetenv(t *testing.T, key string) {
+	t.Helper()
+	prev, ok := os.LookupEnv(key)
+	t.Setenv(key, "") // fails a parallel test, as the environment is shared
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Cleanup(func() { _ = os.Setenv(key, prev) })
 	}
 }
