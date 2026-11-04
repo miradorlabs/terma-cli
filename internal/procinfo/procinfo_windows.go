@@ -141,3 +141,6 @@ func tcpTable(af int) ([]byte, bool) {
 	}
 	return nil, false
 }
+
+// environ is not read: another process's environment lives in its own memory.
+func environ(int) ([]string, bool) { return nil, false }
