@@ -23,7 +23,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: 18
@@ -32,7 +32,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
@@ -87,7 +87,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -118,7 +118,7 @@ jobs:
   keychain-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -141,7 +141,7 @@ jobs:
     env:
       TERMA_E2E: "0"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -190,7 +190,7 @@ jobs:
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
       # Every shard's token may bill Copilot requests; none needs it in .git/config.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-go@v6
@@ -234,7 +234,7 @@ jobs:
       run:
         working-directory: internal/agents/opencode/plugin
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -245,7 +245,7 @@ jobs:
   shim-portability:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -263,7 +263,7 @@ jobs:
   release-dry-run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v6
@@ -271,7 +271,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: git tag v0.0.0-ci
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           # `before` is `go test`, which the test job already runs; `sign` needs the
@@ -280,7 +280,7 @@ jobs:
         env:
           # Read only by the cask template; the dry run pushes nothing.
           HOMEBREW_TAP_TOKEN: dry-run
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: release-dry-run
           path: |
@@ -299,8 +299,8 @@ jobs:
     needs: release-dry-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-dry-run
           path: dist
@@ -318,8 +318,8 @@ jobs:
     needs: release-dry-run
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-dry-run
           path: dist
@@ -339,8 +339,8 @@ jobs:
     needs: release-dry-run
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-dry-run
           path: dist
