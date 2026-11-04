@@ -92,6 +92,18 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 	gap := func(offset int64) error {
 		return send(hookrun.FundingEvidence{Source: sourceCodexRollout, Status: "gap"}, offset)
 	}
+	// skip reports a record it cannot read as a gap. That record may have moved the thread to
+	// another turn or provider.
+	// Accepted risk: the backend is then unknown, and not sent, until the thread's next provider
+	// move; reading the provider out of an oversized record would keep it.
+	skip := func(offset int64) error {
+		cursor.Provider = ""
+		if err := gap(offset); err != nil {
+			return err
+		}
+		cursor.TurnID = ""
+		return nil
+	}
 	if reset {
 		if err := gap(0); err != nil {
 			return old, "append_failed", err
@@ -128,14 +140,11 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				}
 				return checkpoint("incomplete", nil)
 			}
-			// The skipped record may move the thread to another provider.
-			cursor.Provider = ""
-			if err := gap(cursor.Offset); err != nil {
+			if err := skip(cursor.Offset); err != nil {
 				return checkpoint("append_failed", err)
 			}
 			cursor.Offset += int64(len(data))
 			cursor.Skipping = true
-			cursor.TurnID = ""
 			return checkpoint("backlog", nil)
 		}
 		if cursor.Skipping {
@@ -152,12 +161,10 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				} `json:"payload"`
 			}
 			if json.Unmarshal(line, &rec) != nil {
-				cursor.Provider = ""
-				if err := gap(cursor.Offset); err != nil {
+				if err := skip(cursor.Offset); err != nil {
 					return checkpoint("append_failed", err)
 				}
 				emitted++
-				cursor.TurnID = ""
 			} else {
 				cursor.track(admits, rec.Type, rec.Payload.Type, rec.Payload.turnFields)
 				switch {

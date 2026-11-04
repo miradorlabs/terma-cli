@@ -94,6 +94,12 @@ func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 	if e.Attrs[semconv.TermaAccountIDKey] != "account-a" {
 		t.Fatalf("account_id stays as raw evidence: %+v", e)
 	}
+	// Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so a settings file is where it shows.
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	writeEvidenceFile(t, filepath.Join(repo, ".claude", "settings.local.json"), `{"env":{"CLAUDE_CODE_OAUTH_TOKEN":"never-export-token"}}`)
+	if e = readFunding(repo); e.oauthEffective {
+		t.Fatalf("a settings file's OAuth token is the session's credential, not the cached login: %+v", e)
+	}
 }
 
 func TestClaudeFundingMissingMalformedAndSpecialFiles(t *testing.T) {

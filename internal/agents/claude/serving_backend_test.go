@@ -36,6 +36,7 @@ func TestRouteBackend(t *testing.T) {
 		{"base URL with no host", map[string]string{"ANTHROPIC_BASE_URL": "api.anthropic.com", "ANTHROPIC_API_KEY": "k"}, false, ""},
 		{"api key", map[string]string{"ANTHROPIC_API_KEY": "k"}, false, semconv.TermaServingBackendAnthropic},
 		{"auth token", map[string]string{"ANTHROPIC_AUTH_TOKEN": "t"}, false, semconv.TermaServingBackendAnthropic},
+		{"oauth token", map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "t"}, false, semconv.TermaServingBackendAnthropic},
 		{"stored login or apiKeyHelper", nil, true, semconv.TermaServingBackendAnthropic},
 		{"no visible credential", nil, false, ""},
 	} {
