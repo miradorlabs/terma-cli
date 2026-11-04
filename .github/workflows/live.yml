@@ -116,14 +116,14 @@ jobs:
           fi
       - name: Upload summary
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-harness-report
           path: test/e2e/report/
           retention-days: 7
       - name: Upload this platform's compatibility rows
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: compat-macos
           path: |
@@ -133,7 +133,7 @@ jobs:
           retention-days: 30
       - name: Upload this platform's field census
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: fields-macos
           path: |
@@ -173,7 +173,7 @@ jobs:
         run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest
       - name: Upload this platform's compatibility rows
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: compat-linux
           path: |
@@ -237,7 +237,7 @@ jobs:
             exit 0
           fi
           curl -fsS -X POST -H 'Content-Type: application/json' --data @report/slack.json "$SLACK_WEBHOOK_URL"
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: compatibility-matrix
           path: |
