@@ -156,6 +156,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 
 	var notes changelogs
 	var news []Announcement
+	var recent []RecentEntry
 	index := Index{SchemaVersion: schemaVersion, GeneratedAt: n.now, Harnesses: []HarnessEntry{}}
 	for _, h := range sortedHarnesses(pub.snapshots) {
 		byVersion := pub.snapshots[h]
@@ -244,7 +245,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		if len(versions) > 1 {
 			from, to := versions[len(versions)-2], versions[len(versions)-1]
 			d := diffs[from+".."+to]
-			entry.LastChange = &LastChange{From: from, To: to, At: byVersion[to].CapturedAt, Changes: d.Summary.Changes, Categories: d.Summary.Categories}
+			entry.LastChange = &LastChange{From: from, To: to, At: byVersion[to].CapturedAt, ReleasedAt: entries[0].ReleasedAt,
+				Changes: d.Summary.Changes, Categories: d.Summary.Categories}
 		}
 		index.Harnesses = append(index.Harnesses, entry)
 
@@ -261,8 +263,38 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			return nil, err
 		}
 		news = append(news, announce(opt.site, entry, entries, diffs, byVersion, before[h])...)
+		for _, e := range entries {
+			if e.Previous != nil {
+				recent = append(recent, RecentEntry{Harness: h, Name: meta.name, VersionEntry: e})
+			}
+		}
+	}
+	if err := writeJSON(filepath.Join(dir, "recent.json"), recentOf(recent, n.now)); err != nil {
+		return nil, err
 	}
 	return news, writeJSON(filepath.Join(dir, "index.json"), index)
+}
+
+// recentLimit bounds the feed.
+const recentLimit = 200
+
+// recentOf is the feed: the newest versions across every harness, newest release first (a
+// version whose release is not known by when it was captured).
+func recentOf(entries []RecentEntry, now time.Time) Recent {
+	when := func(e RecentEntry) time.Time {
+		if e.ReleasedAt != nil {
+			return *e.ReleasedAt
+		}
+		return e.CapturedAt
+	}
+	sort.SliceStable(entries, func(i, j int) bool { return when(entries[i]).After(when(entries[j])) })
+	if len(entries) > recentLimit {
+		entries = entries[:recentLimit]
+	}
+	if entries == nil {
+		entries = []RecentEntry{}
+	}
+	return Recent{SchemaVersion: schemaVersion, GeneratedAt: now, Versions: entries}
 }
 
 // writeHarness writes one harness's tree, and removes what no longer belongs in it.

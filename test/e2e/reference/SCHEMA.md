@@ -15,6 +15,7 @@ an empty list or object means observed and empty.
 
 ```text
 docs/harnesses/index.json                          every harness, its versions, newest first
+docs/harnesses/recent.json                         the newest versions across every harness, for a feed
 docs/harnesses/<harness>/index.json                one harness: every version with its change summary
 docs/harnesses/<harness>/versions/<version>.json   a build's snapshot
 docs/harnesses/<harness>/diffs/<from>..<to>.json   what changed from one build to the next
@@ -46,7 +47,7 @@ numbers them (semver where it is semver); `..` joins the two in a diff's name.
       "support": "supported",
       "versions_tracked": 41,
       "first_tracked": "2026-09-15",
-      "last_change": { "from": "2.1.317", "to": "2.1.318", "at": "2026-11-04T04:41:09Z", "changes": 7,
+      "last_change": { "from": "2.1.317", "to": "2.1.318", "at": "2026-11-04T04:41:09Z", "released_at": "2026-11-03T22:10:00Z", "changes": 7,
                        "categories": { "prompt": 2, "tools": 1, "telemetry": 4 } }
     }
   ]
@@ -244,7 +245,7 @@ model's) is part of the name and stays.
   },
   "changes": [
     {
-      "id": "prompt.system[1]",
+      "id": "prompt.system.1.text",
       "category": "prompt",
       "op": "changed",
       "path": ["prompt", "system", "1", "text"],
@@ -266,7 +267,7 @@ A change:
 
 | field | |
 |---|---|
-| `id` | stable within the diff: the dotted path, list items by their key (`tools.Bash.description`) |
+| `id` | the change's `path` joined with dots: a list item by its key (`tools.Bash.description`, `support.capabilities.relay.telemetry@darwin/arm64.result`), by its position where it has none (`prompt.system.1.text`). Stable from diff to diff for the same thing, so a page may use it as an anchor, and a range's net change matches the timeline's steps by it |
 | `category` | the snapshot section: `model`, `prompt`, `tools`, `caching`, `request`, `side_requests`, `behavior`, `telemetry`, `hooks`, `cli`, `config`, `network`, `storage`, `binary`, `support` |
 | `op` | `added`, `removed` or `changed` |
 | `path` | where in the snapshot, as segments; list items by their key |
@@ -324,6 +325,9 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("refdiff.wasm"
 go.run(instance);
 ```
 
+Its `changelog.text` joins the range's changelogs newest first, each under a `## <version>`
+heading.
+
 `harnessReferenceCompare(fromSnapshotJSON, toSnapshotJSON, changelogJSON)` returns, as a
 string, a diff in the schema above between the two snapshots (`from` and `to` the two
 versions, net of every step between them), each change `documented` where the changelog of
@@ -347,3 +351,18 @@ first publication announce nothing). Each has the version, the one before, its p
 comparison links, counts, highlights, its signing verdict, `text` (a post of at most 280
 characters, a link counted as 23) and `slack` (a Slack message with buttons to the page and
 the comparison).
+
+## recent.json
+
+The newest versions across every harness, at most 200, newest release first (a version whose
+release date is not known by when it was captured): each a version entry as its harness's
+index has it, with `harness` and `name`.
+
+```json
+{ "schema_version": 1, "generated_at": "2026-11-04T05:02:11Z",
+  "versions": [ { "harness": "codex", "name": "Codex CLI", "version": "0.166.0", "released_at": "…", "previous": "0.165.0", "changes": 4, "highlights": ["…"] } ] }
+```
+
+A capability tested on a platform for one build and not the other is no change: only a result
+that changed is. `captured_at` and `capture.sections` move only when what was captured
+changed: a night that captures a build the same as before leaves them.

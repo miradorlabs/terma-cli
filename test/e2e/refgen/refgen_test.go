@@ -376,3 +376,50 @@ func TestAnnouncements(t *testing.T) {
 		t.Errorf("changelog = %+v (%v)", cl, err)
 	}
 }
+
+// A night that captures a build the same as before moves nothing: its capture time stays, so
+// a feed does not read every build as changed tonight.
+func TestSameCaptureKeepsItsTime(t *testing.T) {
+	dir := t.TempDir()
+	at := time.Date(2026, 11, 1, 5, 0, 0, 0, time.UTC)
+	n := night{now: at, profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	n.now = at.Add(24 * time.Hour)
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	var s Snapshot
+	if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+		t.Fatal(err)
+	}
+	if !s.CapturedAt.Equal(at) || !s.Capture.Sections["prompt"].Equal(at) {
+		t.Errorf("captured %v, prompt %v; want both %v", s.CapturedAt, s.Capture.Sections["prompt"], at)
+	}
+	var r Recent
+	if err := readJSON(filepath.Join(dir, "recent.json"), &r); err != nil || r.Versions == nil {
+		t.Errorf("recent = %+v (%v)", r, err)
+	}
+}
+
+// A capability tested on a platform for one build alone was not tested on the other there:
+// no change. A model named in words in the changelog is documented.
+func TestSupportPlatformsAndModelWords(t *testing.T) {
+	a := &Snapshot{Harness: "codex", Version: "0.1.0", Model: map[string]any{"default": "gpt-6-astra"},
+		Support: map[string]any{"status": "supported", "capabilities": []any{
+			map[string]any{"id": "relay.telemetry", "platform": "darwin/arm64", "result": "pass", "label": "Telemetry reaches the project"}}}}
+	b := &Snapshot{Harness: "codex", Version: "0.1.1", Model: map[string]any{"default": "gpt-6.1-sol"},
+		Support: map[string]any{"status": "supported", "capabilities": []any{
+			map[string]any{"id": "relay.telemetry", "platform": "darwin/arm64", "result": "pass", "label": "Telemetry reaches the project"},
+			map[string]any{"id": "global.commits", "platform": "linux/amd64", "result": "pass", "label": "Commits stamped"}}}}
+	d := refdiff.New(a, b, &ChangelogNote{Text: "- Added GPT-6.1 Sol as the default model"}, time.Now())
+	if len(d.Changes) != 1 || d.Changes[0].ID != "model.default" || !*d.Changes[0].Documented {
+		t.Errorf("changes = %+v", d.Changes)
+	}
+	b.Support["capabilities"].([]any)[0].(map[string]any)["result"] = "fail"
+	d = refdiff.New(a, b, nil, time.Now())
+	if c := changeByID(d, "support.capabilities.relay.telemetry@darwin/arm64.result"); c == nil || c.Title != "Terma: Telemetry reaches the project now fails on darwin/arm64" {
+		t.Errorf("capability change = %+v", c)
+	}
+}

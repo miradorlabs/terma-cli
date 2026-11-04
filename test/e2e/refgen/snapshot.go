@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"maps"
+	"reflect"
 	"slices"
 	"sort"
 	"time"
@@ -295,6 +296,11 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	took := false
 	for _, sec := range present(tonight) {
 		if keepWhole && sec != "support" && sec != "telemetry" && ot[sec] != nil {
+			continue
+		}
+		// The same again is no new capture: when a section was captured stays when it last
+		// changed, so a night that only confirms what was known moves nothing.
+		if reflect.DeepEqual(ot[sec], tt[sec]) {
 			continue
 		}
 		ot[sec] = tt[sec]

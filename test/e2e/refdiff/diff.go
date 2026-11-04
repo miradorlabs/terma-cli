@@ -30,8 +30,34 @@ func compare(a, b *Snapshot) []Change {
 		}
 		diffValue([]string{sec}, at[sec], bt[sec], &out)
 	}
+	kept := out[:0]
+	for _, c := range out {
+		// A capability checked on a platform for one build and not the other was not tested
+		// there, not lost: only a result that changed is a change.
+		if c.Path[0] == "support" && len(c.Path) == 3 && c.Path[1] == "capabilities" && c.Op != "changed" {
+			continue
+		}
+		kept = append(kept, c)
+	}
+	out = kept
+	labels := capabilityLabels(bt)
 	for i := range out {
-		classify(&out[i])
+		classify(&out[i], labels)
+	}
+	return out
+}
+
+// capabilityLabels are the labels of the capabilities a snapshot's support lists, by their key
+// in it (id@platform).
+func capabilityLabels(t map[string]any) map[string]string {
+	out := map[string]string{}
+	sup, _ := t["support"].(map[string]any)
+	caps, _ := sup["capabilities"].([]any)
+	for _, c := range caps {
+		m, _ := c.(map[string]any)
+		if l, _ := m["label"].(string); l != "" {
+			out[keyOf(m)] = l
+		}
 	}
 	return out
 }
@@ -213,8 +239,8 @@ func diffList(path []string, a, b []any, out *[]Change) bool {
 var notableCategories = map[string]bool{"prompt": true, "tools": true, "model": true, "caching": true,
 	"network": true, "behavior": true, "side_requests": true}
 
-// classify fills a change's id, category, impact and title.
-func classify(c *Change) {
+// classify fills a change's id, category, impact and title; labels name the capabilities.
+func classify(c *Change, labels map[string]string) {
 	c.Category = c.Path[0]
 	c.ID = strings.Join(c.Path, ".")
 	c.Impact = "informational"
@@ -254,11 +280,11 @@ func classify(c *Change) {
 	case notableCategories[c.Category]:
 		c.Impact = "notable"
 	}
-	c.Title = title(c)
+	c.Title = title(c, labels)
 }
 
 // title is a change said in a line.
-func title(c *Change) string {
+func title(c *Change, labels map[string]string) string {
 	p := c.Path
 	at := func(i int) string {
 		if i < len(p) {
@@ -454,8 +480,14 @@ func title(c *Change) string {
 		if len(p) >= 4 && at(3) == "result" {
 			id, platform, _ := strings.Cut(at(2), "@")
 			label := id
+			if l := labels[at(2)]; l != "" {
+				label = l
+			}
 			if m, ok := c.After.(string); ok && m == "fail" {
 				return fmt.Sprintf("Terma: %s now fails on %s", label, platform)
+			}
+			if c.After == "pass" {
+				return fmt.Sprintf("Terma: %s now passes on %s", label, platform)
 			}
 			return fmt.Sprintf("Terma: %s now %s on %s", label, short(c.After), platform)
 		}
@@ -499,14 +531,20 @@ var genericSegments = map[string]bool{"keys": true, "surfaces": true, "system": 
 // documented reports whether changelog mentions c: the thing it names (a tool, a field, a
 // flag, a model), or for a prompt's change, the prompt.
 func documented(c Change, changelog string) bool {
-	text := strings.ToLower(changelog)
+	// A changelog says gpt-6.1-sol as "GPT-6.1 Sol", and a field's name as words: dashes and
+	// underscores read as spaces on both sides.
+	words := strings.NewReplacer("-", " ", "_", " ")
+	text := words.Replace(strings.ToLower(changelog))
 	if c.Category == "prompt" {
 		return strings.Contains(text, "system prompt")
 	}
 	// A text's change (a tool's description) is said only where the changelog names both the
 	// thing and its wording: a changelog naming Bash for a fix says nothing of its description.
 	if c.TextDiff != nil && len(c.Path) > 1 {
-		owner := strings.ToLower(c.Path[1])
+		owner := words.Replace(strings.ToLower(c.Path[1]))
+		if _, name, ok := strings.Cut(owner, "/"); ok {
+			owner = name // a namespaced tool, by its own name
+		}
 		return strings.Contains(text, owner) && (strings.Contains(text, "description") || strings.Contains(text, "prompt") || strings.Contains(text, "instruction"))
 	}
 	var tokens []string
@@ -529,7 +567,7 @@ func documented(c Change, changelog string) bool {
 			cands = append(cands, t[i+1:])
 		}
 		for _, cand := range cands {
-			if len(cand) >= 4 && strings.Contains(text, cand) {
+			if cand = words.Replace(cand); len(cand) >= 4 && strings.Contains(text, cand) {
 				return true
 			}
 		}

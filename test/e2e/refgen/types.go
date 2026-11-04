@@ -60,9 +60,12 @@ type SourceInfo struct {
 
 // LastChange is the newest diff of a harness.
 type LastChange struct {
-	From       string         `json:"from"`
-	To         string         `json:"to"`
-	At         time.Time      `json:"at"`
+	From string    `json:"from"`
+	To   string    `json:"to"`
+	At   time.Time `json:"at"`
+	// ReleasedAt is when To was published to its registry, nil where that is not known: At is
+	// when it was captured.
+	ReleasedAt *time.Time     `json:"released_at"`
 	Changes    int            `json:"changes"`
 	Categories map[string]int `json:"categories"`
 }
@@ -123,4 +126,19 @@ type TimelineChange struct {
 	Title      string `json:"title"`
 	Impact     string `json:"impact"`
 	Documented *bool  `json:"documented"`
+}
+
+// Recent is docs/harnesses/recent.json: the newest versions across every harness, each with
+// its change summary, newest release first, so a feed needs one request.
+type Recent struct {
+	SchemaVersion int           `json:"schema_version"`
+	GeneratedAt   time.Time     `json:"generated_at"`
+	Versions      []RecentEntry `json:"versions"`
+}
+
+// RecentEntry is one version in the feed: its harness, and its entry in the harness's index.
+type RecentEntry struct {
+	Harness string `json:"harness"`
+	Name    string `json:"name"`
+	VersionEntry
 }
