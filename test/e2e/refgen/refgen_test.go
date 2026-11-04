@@ -456,3 +456,16 @@ func TestProxiedFirstTurn(t *testing.T) {
 		t.Errorf("a failed proxied turn was published: %q, live %v", got, s.Live)
 	}
 }
+
+func TestIsSubagent(t *testing.T) {
+	meta := func(agent string) map[string]any {
+		m, _ := json.Marshal(map[string]string{"agent_name": agent})
+		return map[string]any{"client_metadata": map[string]any{"x-codex-turn-metadata": string(m)}}
+	}
+	if isSubagent(e2e.ProviderRequest{}, meta("/root")) || !isSubagent(e2e.ProviderRequest{}, meta("/root/check")) {
+		t.Error("Codex's root and sub-agent told apart wrongly")
+	}
+	if !isSubagent(e2e.ProviderRequest{Body: json.RawMessage(`{"system":[{"text":"x-anthropic-billing-header: cc_is_subagent=true;"}]}`)}, nil) {
+		t.Error("Claude Code's subagent not told")
+	}
+}

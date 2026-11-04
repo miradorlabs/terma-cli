@@ -559,10 +559,12 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 				s.Live = map[string]any{"prompt": pr, "model": b["model"], "tools": names(toolsOf(b)),
 					"differs": s.Prompt != nil && pr["sha256"] != s.Prompt["sha256"]}
 			}
-		case probe == "compaction":
+		case probe == "compaction" || probe == "compaction-command":
 			if c := compactionOf(reqs); c != nil {
-				beh["compaction"] = c
+				beh[behaviorKey(probe)] = c
 			}
+		case probe == "compaction-setup":
+			// The turns that fill the context before a compaction: no finding of their own.
 		case probe == "subagent":
 			if sa := subagentOf(reqs, mainSystem); sa != nil {
 				beh["subagents"] = sa
@@ -577,7 +579,7 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 			}
 			s.Caching["across_turns"] = acrossTurns(reqs)
 		default:
-			beh[probe] = map[string]any{"requests": len(reqs), "models": modelsOf(reqs)}
+			beh[behaviorKey(probe)] = map[string]any{"requests": len(reqs), "models": modelsOf(reqs)}
 		}
 	}
 	for name, raw := range p.Probes {
@@ -595,9 +597,34 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 			if m, ok := v.(map[string]any); ok {
 				s.Hooks = m
 			}
-		case "telemetry", "signing":
-			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand.
+		case "telemetry", "signing", "across-turns":
+			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand; the
+			// caching's from the requests.
 		default:
+			if code, ok := strings.CutPrefix(name, "retries-"); ok {
+				// What the probe saw of the run's end (whether it succeeded, its error) joins
+				// what its requests say of the retries.
+				retries, _ := beh["retries"].(map[string]any)
+				if retries == nil {
+					retries = map[string]any{"statuses": map[string]any{}}
+					beh["retries"] = retries
+				}
+				statuses := retries["statuses"].(map[string]any)
+				st, _ := statuses[code].(map[string]any)
+				if st == nil {
+					st = map[string]any{}
+					statuses[code] = st
+				}
+				if m, ok := v.(map[string]any); ok {
+					for k, x := range m {
+						if k != "status" {
+							st[k] = x
+						}
+					}
+				}
+				continue
+			}
+			name = behaviorKey(name)
 			if existing, ok := beh[name].(map[string]any); ok {
 				if m, ok := v.(map[string]any); ok {
 					for k, x := range m {
@@ -612,6 +639,16 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 	if len(beh) > 0 {
 		s.Behavior = beh
 	}
+}
+
+// behaviorKey is where a probe's findings sit in the behaviour section: its name, with
+// underscores.
+func behaviorKey(probe string) string {
+	switch probe {
+	case "subagent":
+		return "subagents"
+	}
+	return strings.ReplaceAll(probe, "-", "_")
 }
 
 // probeRequests are probe's requests, model calls or not, in arrival order.
@@ -744,7 +781,8 @@ var summaryHint = regexp.MustCompile(`(?i)summar|compact`)
 // asks for a summary, its prompt and model, and the input tokens the fixture had reported
 // before it.
 func compactionOf(reqs []e2e.ProviderRequest) map[string]any {
-	for i := len(reqs) - 1; i >= 0; i-- {
+	// The first that asks for one: the turns after it carry the summary in their context.
+	for i := range reqs {
 		b := body(reqs[i])
 		if wire(b) == "" {
 			continue
@@ -769,6 +807,17 @@ func compactionOf(reqs []e2e.ProviderRequest) map[string]any {
 // subagentOf is a subagent's request in a subagent probe: a model call whose system prompt
 // is not the agent's own.
 func subagentOf(reqs []e2e.ProviderRequest, mainSHA string) map[string]any {
+	// A request that says it is a subagent's: Claude Code's billing header, Codex's turn
+	// metadata naming an agent other than the root.
+	for _, r := range reqs {
+		b := body(r)
+		w := wire(b)
+		if w == "" || !isSubagent(r, b) {
+			continue
+		}
+		pr := derivePrompt(b, w)
+		return map[string]any{"model": b["model"], "system": pr["system"], "tools": names(toolsOf(b))}
+	}
 	for _, r := range reqs {
 		b := body(r)
 		w := wire(b)
@@ -787,7 +836,23 @@ func subagentOf(reqs []e2e.ProviderRequest, mainSHA string) map[string]any {
 	return nil
 }
 
-var truncationMarker = regexp.MustCompile(`(?i)[^\n]{0,40}(truncat|omitted|elided|characters? (?:were )?removed)[^\n]{0,40}`)
+var (
+	truncationMarker = regexp.MustCompile(`(?i)[^\n]{0,40}(truncat|omitted|elided|characters? (?:were )?removed|too large|persisted-output)[^\n]{0,40}`)
+)
+
+// isSubagent reports a request a subagent sent: Claude Code marks it in its billing header,
+// Codex names the agent in its turn metadata, "/root" for the agent the user runs.
+func isSubagent(r e2e.ProviderRequest, b map[string]any) bool {
+	if strings.Contains(string(r.Body), "cc_is_subagent=true") {
+		return true
+	}
+	meta, _ := b["client_metadata"].(map[string]any)
+	raw, _ := meta["x-codex-turn-metadata"].(string)
+	var turn struct {
+		Agent string `json:"agent_name"`
+	}
+	return json.Unmarshal([]byte(raw), &turn) == nil && turn.Agent != "" && turn.Agent != "/root"
+}
 
 // toolOutputOf is what a tool output probe's build sent back of the tool's ~400 KB: the
 // length of the longest tool result and the marker it put where it cut.

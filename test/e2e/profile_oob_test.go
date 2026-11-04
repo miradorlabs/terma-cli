@@ -39,11 +39,6 @@ func isCodexModelCall(r *http.Request) bool {
 	return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/responses")
 }
 
-// claudeProjectDir is the folder Claude Code keeps a working directory's transcripts in.
-func claudeProjectDir(dir string) string {
-	return regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(dir, "-")
-}
-
 // storageReplace are the sandbox's literals a stored path or key may hold: its paths, and the
 // folder name each harness makes of the working directory, whole (Claude Code's, every
 // character not a letter or digit a dash; Pi's and DeepSeek's, each slash) or from the test's

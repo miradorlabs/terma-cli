@@ -138,7 +138,6 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 			continue
 		}
 		merged.Egress = append(merged.Egress, p.Egress...)
-		merged.Failed = merged.Failed || p.Failed
 		for k, v := range p.Help {
 			if merged.Help == nil {
 				merged.Help = map[string]string{}
@@ -164,6 +163,9 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 			merged.Command = p.Command
 		}
 	}
+	// A probe that failed says nothing of the first turn: only the turn published is the
+	// capture's whole or partial.
+	merged.Failed = src >= 0 && ps[src].Failed
 	return merged, first >= 0, true
 }
 
