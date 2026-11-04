@@ -7,18 +7,6 @@ on:
         description: Also test Claude and Codex subscription logins
         type: boolean
         default: false
-      versions:
-        description: Claude Code and Codex builds to test instead of the checked ones (lastN or a comma list), e.g. last15 to backfill the Harness Reference
-        type: string
-        default: ""
-      tests:
-        description: Only the scenarios matching this pattern (go test -run), e.g. 'Profile$' for a backfill that fits the night's budget
-        type: string
-        default: ""
-      publish:
-        description: Publish this run's matrix, catalog and reference to compat-matrix, as a scheduled night does
-        type: boolean
-        default: false
   schedule:
     - cron: "23 4 * * *"
 
@@ -43,8 +31,8 @@ jobs:
       # being tested, and what is new is judged against it the same night. Without the
       # published history, the last three releases. DeepSeek ships prereleases alone, which
       # "checked" does not pick: its newest build, as before.
-      TERMA_E2E_CLAUDE_VERSIONS: ${{ inputs.versions || 'checked' }}
-      TERMA_E2E_CODEX_VERSIONS: ${{ inputs.versions || 'checked' }}
+      TERMA_E2E_CLAUDE_VERSIONS: checked
+      TERMA_E2E_CODEX_VERSIONS: checked
       TERMA_E2E_OPENCODE_VERSIONS: checked
       TERMA_E2E_GEMINI_VERSIONS: checked
       TERMA_E2E_DSH_VERSIONS: last3
@@ -119,8 +107,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           TERMA_E2E: "1"
           TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
-          TESTS: ${{ inputs.tests }}
-        run: ./bin/e2e.test -test.v -test.timeout 75m ${TESTS:+-test.run "$TESTS"}
+        run: ./bin/e2e.test -test.v -test.timeout 75m
       - name: Publish coverage summary
         if: always()
         run: |
@@ -290,5 +277,5 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
       - name: Publish to the compat-matrix branch
-        if: github.event_name == 'schedule' || inputs.publish
+        if: github.event_name == 'schedule'
         run: test/e2e/compatgen/publish.sh publish
