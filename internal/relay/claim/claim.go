@@ -93,6 +93,10 @@ const maxPIDs = 64
 
 const maxPlacements = 8
 
+// FromAgent reports whether an agent's hook has claimed the session: a git hook's claim
+// names no directory, and keeps the one an agent's hook named.
+func (c Claim) FromAgent() bool { return c.Cwd != "" }
+
 // Covers reports whether pid may send under this claim's latest placement.
 func (c Claim) Covers(pid int) bool {
 	return covers(c.PIDs, pid)
@@ -244,8 +248,8 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		if c.Tool == "" {
 			c.Tool = prev.Tool
 		}
-		// A claim naming no directory is a git hook's, which is no new run of the agent.
-		if c.Cwd == "" {
+		// A git hook's claim is no new run of the agent.
+		if !c.FromAgent() {
 			c.Cwd, c.EndedAt = prev.Cwd, prev.EndedAt
 		}
 		placements = prev.placements()

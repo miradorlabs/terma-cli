@@ -28,7 +28,7 @@ const (
 func claimed(t *testing.T, tool string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if !claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: tool, PIDs: []int{hookPID, agentPID, hostPID}}, time.Now()) {
+	if !claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: tool, Cwd: "/work/a", PIDs: []int{hookPID, agentPID, hostPID}}, time.Now()) {
 		t.Fatal("claim not written")
 	}
 	return dir
@@ -133,7 +133,7 @@ func TestAgentEnvCheckGroupsProcessesByFinding(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()
 	for id, pids := range map[string][]int{"s1": {201}, "s2": {202}, "s3": {203}} {
-		claim.Write(dir, id, claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: pids}, now)
+		claim.Write(dir, id, claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: pids}, now)
 	}
 	bad := []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}
 	table := map[int][]string{201: bad, 202: bad, 203: {"HOME=/home/dev"}}
@@ -174,7 +174,7 @@ func TestAgentEnvCheckJudgesTheAgentInEveryChain(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
 			for _, pids := range tc.chains {
-				claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: pids}, time.Now())
+				claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: pids}, time.Now())
 			}
 			c := AgentEnvCheck(reg, dir, relay, processes(tc.table), time.Now())
 			if c.Status != Warn || !strings.Contains(c.Detail, tc.agent+" started with") || strings.Count(c.Detail, "started with") != 1 {
@@ -193,6 +193,9 @@ func TestAgentEnvCheckSkipsWithoutALiveProcess(t *testing.T) {
 	envReg := agents.New(envAgent{agentstest.Agent{ID: "fake"}})
 	notCollected := t.TempDir()
 	claim.Mark(notCollected, "s1", "fake", []int{hookPID, agentPID}, time.Now())
+	// Its claim expired, then the developer committed its work from a shell: hook script 400, git 401.
+	gitOnly := t.TempDir()
+	claim.Write(gitOnly, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{400, 401, hostPID}}, time.Now())
 	for _, tc := range []struct {
 		name     string
 		reg      *agents.Registry
@@ -204,6 +207,7 @@ func TestAgentEnvCheckSkipsWithoutALiveProcess(t *testing.T) {
 		{"a session not collected", envReg, notCollected, wrong},
 		{"an agent whose exporter ignores its environment", agents.New(agentstest.Agent{ID: "fake"}), claimed(t, "fake"), wrong},
 		{"an agent this build does not know", envReg, claimed(t, "other"), wrong},
+		{"a session only a commit claimed", envReg, gitOnly, map[int][]string{hostPID: {"HOME=/home/dev"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -225,7 +229,7 @@ func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 	}
 	// Beside a readable one (a shell on macOS is not), the readable one is judged.
 	dir := claimed(t, "fake")
-	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: []int{102, 202}}, time.Now())
+	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: []int{102, 202}}, time.Now())
 	table[202] = []string{"HOME=/home/dev"}
 	c = AgentEnvCheck(reg, dir, Relay{Addr: "127.0.0.1:43180", Token: relayToken}, processes(table), time.Now())
 	if c.Status != Pass {
@@ -244,8 +248,8 @@ func TestAgentEnvCheckSkipsAnEndedSession(t *testing.T) {
 	now := time.Now()
 	dir := t.TempDir()
 	chain := []int{hookPID, agentPID, hostPID}
-	claim.Write(dir, "subagent", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: chain}, now.Add(-time.Minute))
-	claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", PIDs: chain}, now.Add(-time.Minute))
+	claim.Write(dir, "subagent", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: chain}, now.Add(-time.Minute))
+	claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: chain}, now.Add(-time.Minute))
 	claim.End(dir, "s1", now.Add(-time.Second))
 	// The host passes no exporter variable of its own: judged as the agent, it would pass.
 	exited := processes(map[int][]string{hostPID: {"HOME=/home/dev"}})

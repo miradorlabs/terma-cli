@@ -58,7 +58,8 @@ func AgentEnvCheck(reg *agents.Registry, stateDir string, relay Relay, environ E
 	seen := map[int]proc{}
 	for _, c := range claim.List(stateDir, now) {
 		a, ok := reg.ForTool(c.Tool)
-		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" {
+		// A session only git hooks claimed (a commit after its claim expired) names no agent process.
+		if _, exports := a.(agents.EnvExporter); !ok || !exports || c.ProjectID == "" || !c.FromAgent() {
 			continue
 		}
 		// A subagent's claim names its session's processes but never ends: the later word wins.
