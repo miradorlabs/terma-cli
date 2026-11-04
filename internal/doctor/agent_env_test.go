@@ -28,7 +28,7 @@ const (
 func claimed(t *testing.T, tool string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if !claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: tool, Cwd: "/work/a", PIDs: []int{hookPID, agentPID, hostPID}}, time.Now()) {
+	if !claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: tool, Agent: true, PIDs: []int{hookPID, agentPID, hostPID}}, time.Now()) {
 		t.Fatal("claim not written")
 	}
 	return dir
@@ -63,8 +63,26 @@ func TestAgentEnvCheckJudgesTheLiveProcessEnvironment(t *testing.T) {
 			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + relayToken}, status: Pass},
 		{name: "the token on the relay's path, no header", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/" + relayToken},
 			status: Pass},
-		{name: "the token on a per-signal path, a header without it", env: []string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/" + relayToken + "/v1/traces",
+		{name: "the token on every signal's path, a header without it", env: []string{
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/" + relayToken + "/v1/traces",
+			"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43180/" + relayToken + "/v1/logs",
+			"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:43180/" + relayToken + "/v1/metrics",
 			"OTEL_EXPORTER_OTLP_HEADERS=x-other=1"}, status: Pass},
+		{name: "(c) the token on one signal's path covers that signal alone", env: []string{
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/" + relayToken + "/v1/traces",
+			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + secret}, status: Warn, want: []string{"OTEL_EXPORTER_OTLP_HEADERS lacks the relay's current token"}},
+		{name: "(c) the token in another header than Authorization", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180",
+			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + secret + ",x-debug=" + relayToken}, status: Warn, want: []string{"OTEL_EXPORTER_OTLP_HEADERS lacks the relay's current token"}},
+		{name: "the token alone on the generic endpoint's path, a stale header", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/" + relayToken,
+			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + secret}, status: Pass},
+		{name: "(c) a signal's own Authorization that is no bearer", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180",
+			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + relayToken, "OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Basic%20old"},
+			status: Warn, want: []string{"OTEL_EXPORTER_OTLP_TRACES_HEADERS lacks the relay's current token"}, absent: []string{"OTEL_EXPORTER_OTLP_HEADERS lacks"}},
+		{name: "every signal's own endpoint on the relay, the generic one elsewhere", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com",
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/v1/traces", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43180/v1/logs",
+			"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:43180/v1/metrics"}, status: Pass},
+		{name: "the token URL-encoded in the header", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180",
+			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20" + relayToken}, status: Pass},
 		{name: "(a) generic endpoint elsewhere", env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"},
 			status: Warn, want: []string{"fake (pid 200)", "OTEL_EXPORTER_OTLP_ENDPOINT sends elsewhere than the local relay"},
 			absent: []string{"otel.example.com", "signal path"}},
@@ -133,7 +151,7 @@ func TestAgentEnvCheckGroupsProcessesByFinding(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()
 	for id, pids := range map[string][]int{"s1": {201}, "s2": {202}, "s3": {203}} {
-		claim.Write(dir, id, claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: pids}, now)
+		claim.Write(dir, id, claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: pids}, now)
 	}
 	bad := []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}
 	table := map[int][]string{201: bad, 202: bad, 203: {"HOME=/home/dev"}}
@@ -174,7 +192,7 @@ func TestAgentEnvCheckJudgesTheAgentInEveryChain(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
 			for _, pids := range tc.chains {
-				claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: pids}, time.Now())
+				claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: pids}, time.Now())
 			}
 			c := AgentEnvCheck(reg, dir, relay, processes(tc.table), time.Now())
 			if c.Status != Warn || !strings.Contains(c.Detail, tc.agent+" started with") || strings.Count(c.Detail, "started with") != 1 {
@@ -229,7 +247,7 @@ func TestAgentEnvCheckSkipsAnUnreadableAgent(t *testing.T) {
 	}
 	// Beside a readable one (a shell on macOS is not), the readable one is judged.
 	dir := claimed(t, "fake")
-	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: []int{102, 202}}, time.Now())
+	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: []int{102, 202}}, time.Now())
 	table[202] = []string{"HOME=/home/dev"}
 	c = AgentEnvCheck(reg, dir, Relay{Addr: "127.0.0.1:43180", Token: relayToken}, processes(table), time.Now())
 	if c.Status != Pass {
@@ -248,8 +266,8 @@ func TestAgentEnvCheckSkipsAnEndedSession(t *testing.T) {
 	now := time.Now()
 	dir := t.TempDir()
 	chain := []int{hookPID, agentPID, hostPID}
-	claim.Write(dir, "subagent", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: chain}, now.Add(-time.Minute))
-	claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: chain}, now.Add(-time.Minute))
+	claim.Write(dir, "subagent", claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: chain}, now.Add(-time.Minute))
+	claim.Write(dir, "s1", claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: chain}, now.Add(-time.Minute))
 	claim.End(dir, "s1", now.Add(-time.Second))
 	// The host passes no exporter variable of its own: judged as the agent, it would pass.
 	exited := processes(map[int][]string{hostPID: {"HOME=/home/dev"}})
@@ -262,7 +280,7 @@ func TestAgentEnvCheckSkipsAnEndedSession(t *testing.T) {
 		t.Fatalf("check after a commit = %+v, want a skip: the agent has exited", c)
 	}
 	// The agent cleared its conversation: one session ended, another runs in the same process.
-	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", Cwd: "/work/a", PIDs: []int{101, agentPID, hostPID}}, now.Add(time.Second))
+	claim.Write(dir, "s2", claim.Claim{ProjectID: "p1", Tool: "fake", Agent: true, PIDs: []int{101, agentPID, hostPID}}, now.Add(time.Second))
 	running := processes(map[int][]string{agentPID: {"OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com"}, hostPID: {"HOME=/home/dev"}})
 	if c := AgentEnvCheck(reg, dir, relay, running, now.Add(time.Second)); c.Status != Warn || !strings.Contains(c.Detail, "fake (pid 200)") {
 		t.Fatalf("check = %+v, want the running agent judged", c)

@@ -43,6 +43,9 @@ type Env struct {
 	Spool   *spool.Spool
 	Version string
 	Debug   bool
+	// AgentHook says an agent's hook runs, not a git hook: its claims name the agent's
+	// processes (claim.Claim.Agent).
+	AgentHook bool
 	// OnClaim, when set, is called after a relay claim with the claimed checkout's root, so
 	// the caller can start the relay and wire that clone.
 	OnClaim func(root string)
@@ -298,7 +301,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
 	c := r.claim(tool)
-	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
+	c.Cwd, c.PIDs, c.Agent = e.workingDir(), claimPIDs(), e.AgentHook
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {
