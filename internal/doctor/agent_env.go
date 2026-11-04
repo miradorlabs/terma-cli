@@ -128,12 +128,15 @@ func exporterEnvFindings(env []string, addr, token string) string {
 			vars[k] = v
 		}
 	}
+	// The generic endpoint is used by no signal whose own endpoint is set.
+	overridden := !slices.ContainsFunc(exporterSet[1:], func(e exporterVars) bool { return vars[e.endpoint] == "" })
 	var out []string
 	for _, e := range exporterSet {
 		v, set := vars[e.endpoint]
 		path, relay := relayPath(v, addr)
 		generic := e.route == ""
-		doubled := generic && signalPath(v)
+		set = set && (!generic || !overridden)
+		doubled := set && generic && signalPath(v)
 		switch {
 		case !set:
 		case !relay:
@@ -157,11 +160,11 @@ func exporterEnvFindings(env []string, addr, token string) string {
 	generic := exporterSet[0]
 	for _, e := range exporterSet[1:] {
 		endpoint := cmp.Or(vars[e.endpoint], vars[generic.endpoint])
-		if path, relay := relayPath(endpoint, addr); relay && strings.HasPrefix(path, "/"+token+"/") {
+		if path, relay := relayPath(endpoint, addr); relay && strings.HasPrefix(strings.TrimRight(path, "/")+"/", "/"+token+"/") {
 			continue
 		}
 		headers := e.headers
-		if bearer(vars[headers]) == "" {
+		if !authorizes(vars[headers]) {
 			headers = generic.headers
 		}
 		if h, set := vars[headers]; set && bearer(h) != token && !slices.Contains(out, headers+" lacks the relay's current token") {
@@ -204,24 +207,34 @@ func relayRoute(path, route, token string) bool {
 	return first != "" && (token == "" || first == token) && rest == route
 }
 
+// authorizes reports whether an OTLP headers value sets an Authorization header, which
+// replaces the generic one whatever it holds.
+func authorizes(headers string) bool {
+	_, ok := authorization(headers)
+	return ok
+}
+
 // bearer is the credential an OTLP headers value's Authorization presents as "Bearer <x>",
-// as the relay reads it; "" when it sets none.
+// as the relay reads it; "" when it presents none.
 func bearer(headers string) string {
+	v, _ := authorization(headers)
+	got, _ := strings.CutPrefix(v, "Bearer ")
+	return strings.TrimSpace(got)
+}
+
+// authorization is an OTLP headers value's Authorization, URL-decoded as the SDK does.
+func authorization(headers string) (string, bool) {
 	for pair := range strings.SplitSeq(strings.Trim(headers, `"'`), ",") {
 		k, v, ok := strings.Cut(pair, "=")
 		if !ok || !strings.EqualFold(strings.TrimSpace(k), "authorization") {
 			continue
 		}
-		// The SDK URL-decodes header values.
 		if decoded, err := url.QueryUnescape(strings.TrimSpace(v)); err == nil {
 			v = decoded
 		}
-		if got, ok := strings.CutPrefix(strings.TrimSpace(v), "Bearer "); ok {
-			return strings.TrimSpace(got)
-		}
-		return ""
+		return strings.TrimSpace(v), true
 	}
-	return ""
+	return "", false
 }
 
 func pidList(pids []int) string {
