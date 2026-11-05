@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -433,5 +434,32 @@ func TestThrowawaySSHKeyOffline(t *testing.T) {
 	key := throwawaySSHKey(t)
 	if !strings.HasPrefix(key, "-----BEGIN OPENSSH PRIVATE KEY-----\n") || throwawaySSHKey(t) == key {
 		t.Errorf("key = %q", key)
+	}
+}
+
+// macOS's /usr/bin/git is a stub that runs Xcode's git with the same arguments, in a child or
+// in its own process: one program, started once. A git it starts with other arguments is its
+// own.
+func TestFilesOfStubHandOffOffline(t *testing.T) {
+	xcode := "/Applications/Xcode.app/Contents/Developer/usr/bin/git"
+	at := time.Unix(1000, 0)
+	events := []TraceEvent{
+		{Pid: 100, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"claude", "-p", "hi"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 101},
+		{Pid: 101, At: at, Kind: "exec", Path: "/usr/bin/git", Argv: []string{"git", "status", "--short"}},
+		{Pid: 101, At: at, Kind: "fork", Child: 102},
+		{Pid: 102, At: at, Kind: "exec", Path: xcode, Argv: []string{xcode, "status", "--short"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 103},
+		{Pid: 103, At: at, Kind: "exec", Path: "/usr/bin/git", Argv: []string{"git", "log", "-1"}},
+		{Pid: 103, At: at, Kind: "exec", Path: xcode, Argv: []string{xcode, "log", "-1"}},
+		{Pid: 103, At: at, Kind: "fork", Child: 104},
+		{Pid: 104, At: at, Kind: "exec", Path: xcode, Argv: []string{xcode, "rev-parse", "HEAD"}},
+	}
+	scope := straceScope()
+	scope.Root = 100
+	got := slices.Sorted(maps.Keys(FilesOf(events, scope).Exec))
+	want := []string{xcode + " rev-parse HEAD", "git log -1", "git status --short"}
+	if !slices.Equal(got, want) {
+		t.Errorf("exec = %q, want %q", got, want)
 	}
 }

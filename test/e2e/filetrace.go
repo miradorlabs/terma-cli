@@ -198,6 +198,7 @@ type traceProc struct {
 	own     bool   // it runs the build's own binary
 	terma   bool   // terma's, or started by terma's
 	execs   int
+	argv    []string // the command line it was started with
 }
 
 // FilesOf is the files profile of events, as scope says to read them.
@@ -267,6 +268,12 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 			if exe == "/proc/self/exe" {
 				exe = p.exe // a build starting itself again
 			}
+			// A stub handing its command line to the real program of its name (macOS's
+			// /usr/bin/git running Xcode's git): the one program, started once.
+			if !p.own && p.argv != nil && programName(ev, exe) == p.program && len(ev.Argv) > 0 && slices.Equal(ev.Argv[1:], p.argv[1:]) {
+				p.exe = exe
+				continue
+			}
 			own := scope.isSelf(exe)
 			argv := scope.normalizeArgv(ev.Argv, ev.Path, own)
 			key := strings.Join(argv, " ")
@@ -278,7 +285,7 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 			}
 			e.Count++
 			e.Phases = addWord(e.Phases, phase)
-			np := &traceProc{program: programName(ev, exe), exe: exe, execs: p.execs + 1, own: own}
+			np := &traceProc{program: programName(ev, exe), exe: exe, execs: p.execs + 1, own: own, argv: ev.Argv}
 			if np.own {
 				np.program = scope.harness()
 			}
