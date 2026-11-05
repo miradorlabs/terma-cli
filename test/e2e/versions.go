@@ -178,16 +178,43 @@ func versionLess(a, b string) bool {
 
 var httpClient = &http.Client{Timeout: 5 * time.Minute}
 
+// fetchAttempts and fetchBackoff are how a download a server or the network failed for a
+// while is tried again: release hosts answer 5xx and drop connections under load (many CI jobs
+// downloading at once), and one such answer would otherwise end a whole run.
+var (
+	fetchAttempts = 5
+	fetchBackoff  = 3 * time.Second
+)
+
 func fetch(url string) ([]byte, error) {
+	var err error
+	for attempt := range fetchAttempts {
+		if attempt > 0 {
+			time.Sleep(fetchBackoff << (attempt - 1))
+		}
+		var body []byte
+		var retry bool
+		body, retry, err = fetchOnce(url)
+		if err == nil || !retry {
+			return body, err
+		}
+	}
+	return nil, err
+}
+
+// fetchOnce downloads url once; retry says whether a failure was the server's or the
+// network's for the moment (5xx, 429, a dropped connection), not the request's (404).
+func fetchOnce(url string) (body []byte, retry bool, err error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+		return nil, resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, 512<<20))
+	body, err = io.ReadAll(io.LimitReader(resp.Body, 512<<20))
+	return body, err != nil, err
 }
 
 // --- Claude Code -------------------------------------------------------------
