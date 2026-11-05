@@ -16,7 +16,8 @@ import (
 // platform's is kept whichever platform the rest of the snapshot was read on. Its paths are
 // normalized when the scenario records them; here only the run's literals the profile names
 // are replaced again, not the volatile patterns, which would take a listener's fixed port for
-// the run's.
+// the run's. Each command's parents, role and purpose are published as the trace has them, its
+// parents' literals replaced as the exec list's keys are, so each still names one of them.
 
 // isFilesScenario reports a files profile's row.
 func isFilesScenario(p e2e.Profile) bool { return strings.HasSuffix(p.Scenario, "ProfileFiles") }

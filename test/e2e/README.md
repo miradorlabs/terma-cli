@@ -351,7 +351,14 @@ the profile's first turn and a tool turn: every path the build reads, writes, cr
 renames or looks for, by phase (startup, turn, exit), the programs it starts, the sockets it
 listens on and connects to, and whether it touches the fake credentials and sockets planted in
 its home and repository (`decoys.go`); refgen publishes it as the snapshot's `filesystem`
-section, by platform. Linux traces with strace, in the machine image (`make machines`, which
+section, by platform. Each program started says which commands started it (`parents`), whether
+it was the build's own doing or the tool call's (`role`), and, for a well-known command, what it
+is for (`purpose`, from `execPurposes` in `filetrace.go`). The run is a clean room
+(`CleanRoom` in `sandbox.go`): no terma setup, hooks, relay or exporter, HOME and the
+harness's config folders the sandbox's, `SHELL` the OS's default login shell (`/bin/zsh` on
+macOS, `/bin/bash` on Linux), and the network only through the recording proxy. The hooks
+probe's recorder is registered for every hook event the build knows, so the build runs as it
+does with hooks configured, and the trace drops it (`dropped.hooks`). Linux traces with strace, in the machine image (`make machines`, which
 runs the scenarios on the image's builds, or on `MACHINE_CLAUDE_VERSIONS` /
 `MACHINE_CODEX_VERSIONS`). macOS traces with Endpoint Security's `eslogger`, which needs root and
 Full Disk Access: the suite runs exactly `sudo -n /usr/bin/eslogger …` (a sudoers rule for it and

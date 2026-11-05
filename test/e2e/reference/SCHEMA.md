@@ -385,7 +385,22 @@ absent; a night that traced one platform keeps the other's from before. Each pla
 platform's own build of the harness, so two platforms differ where the builds do. The turn is the profile's first turn, behind the same recording proxy as the published
 one, then a tool turn: a shell command (`git status --short && git log --oneline -1`) and a
 file written in the repository (Claude Code's `Write`; Codex's shell, `--sandbox
-workspace-write`). terma's hooks are installed as a developer's are.
+workspace-write`).
+
+The run is a clean room: nothing of the capturing machine's own is in it, so nothing of it is
+traced as the build's. No terma: no setup, and none of terma's hooks, relay or exporter settings.
+HOME and the harness's config folders are the sandbox's own, with the decoys planted in them,
+and the build reaches the network only through the recording proxy. `SHELL` is the OS's default
+login shell, `/bin/zsh` on macOS and `/bin/bash` on Linux: HOME being the sandbox's, no rc file
+of a developer's loads, while the system's own do, as for every login shell (macOS's
+`/etc/zprofile` runs `path_helper`, Debian's `/etc/profile` runs `id -u`), so those are part of
+what the build's shells do on a stock machine. The build runs as it does with hooks configured: a
+recording hook is registered for every hook event it knows (the hooks probe's recorder), and the
+trace drops it, its shell, its process and its files, in `dropped.hooks`. What the build hands a
+hook is the [hooks](#hooks) section's. A platform's trace made before the clean room, until a
+later one replaces it, ran with terma's hooks installed: its `exec` lists `terma hook …` and the
+shell that started each, its `dropped` has `terma` (what terma's hooks did after they started)
+and no `hooks`, and its commands have no `parents`, `role` or `purpose`.
 
 ```json
 "filesystem": {
@@ -397,8 +412,15 @@ workspace-write`). terma's hooks are installed as a developer's are.
       "/etc/claude-code/managed-settings.json": { "ops": ["probe"], "phases": ["startup"] }
     },
     "exec": {
-      "rg --no-config --files --hidden <repo>": { "argv": ["rg", "--no-config", "--files", "--hidden", "<repo>"], "phases": ["startup"], "count": 1, "by": "claude" },
-      "terma hook --user session-start": { "argv": ["terma", "hook", "--user", "session-start"], "phases": ["startup"], "count": 1, "by": "sh" }
+      "rg --no-config --files --hidden <repo>": { "argv": ["rg", "--no-config", "--files", "--hidden", "<repo>"], "phases": ["startup"], "count": 1, "by": "claude",
+        "parents": [], "role": "harness", "purpose": "lists the repository's files" },
+      "/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …": { "argv": ["/bin/bash", "-c", "-l", "SNAPSHOT_FILE=…"], "phases": ["turn"], "count": 1, "by": "claude",
+        "parents": [], "role": "harness", "purpose": "the shell snapshot: captures the login shell's environment for the shell tool" },
+      "cat": { "argv": ["cat"], "phases": ["turn"], "count": 1, "by": "bash",
+        "parents": ["/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …"], "role": "harness",
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool" },
+      "git status --short": { "argv": ["git", "status", "--short"], "phases": ["turn"], "count": 1, "by": "bash",
+        "parents": ["/bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh … eval 'git status --short && git log --oneline -1' …"], "role": "tool" }
     },
     "lookups": ["bash", "git", "node", "zsh"],
     "decoys": { "<home>/.aws/credentials": "not touched", "<repo>/.env": "stat", "<home>/.ssh/agent.sock": "not touched" },
@@ -412,7 +434,7 @@ workspace-write`). terma's hooks are installed as a developer's are.
     },
     "macos": { "xpc": { "com.apple.securityd.xpc": { "phases": ["startup"], "count": 1 } },
                "launch_items": { }, "tcc": { }, "task_ports": { } },
-    "dropped": { "libraries": 335, "system": 639, "proc": 241, "terma": 1607, "path-search": 193, "helpers": 12 },
+    "dropped": { "libraries": 335, "system": 639, "proc": 241, "hooks": 1607, "path-search": 193, "helpers": 12 },
     "unobserved": { "paths": ["<claude-config>/statsig"] }
   }
 }
@@ -424,7 +446,10 @@ workspace-write`). terma's hooks are installed as a developer's are.
 | `ops` | what was done to it, of `probe` (looked for and not there: a failed open or stat, ENOENT), `stat` (its metadata or access checked, a link read), `list` (a folder read), `read` (opened to read), `write` (opened to write, truncated, its times or mode set, renamed into place), `create` (made: a folder, a file created where it was not), `delete`, `rename` (renamed away from), `chdir`, `denied` (EACCES, EPERM, EROFS) |
 | `phases` | when: `startup` before the first model request, `turn` from it to the last response, `exit` after |
 | `programs` | the programs other than the build that touched it (`git`, `bash`): a program the build starts is recorded for what it touches of the run's own places, those with a placeholder |
-| `exec` | each program started, by its normalized command line: `argv`, the phases it ran in, how many times (`count`), and the program that started it (`by`: the build, or a shell it started). The build's hooks are terma's and are recorded as started (`terma hook …`), never what terma did after |
+| `exec` | each program started, by its normalized command line: `argv`, the phases it ran in, how many times (`count`), the program that started it (`by`: the build, or a shell it started), and `parents`, `role` and `purpose` (below). The hook recorder is never one: it, the shell the build runs its command line in and what it starts are `dropped.hooks` |
+| `exec.parents` | the exec keys of the commands that started it, sorted: each is a key of `exec` too, so a reader can follow a program up to the build. An empty list is the build itself; where the build started it as well as a command did, `<build>` is first among them |
+| `exec.role` | whose doing it was: `harness` (the build acting on its own: its startup, its context, its shell snapshot), `tool` (the command the scenario's fixture model told a tool call to run, `git status --short && git log --oneline -1` or Codex's `printf … > notes.txt`, and everything around it: the shell, sandbox and helpers between the build and it, whether or not their own command lines show the command whole (strace cuts a long argument short), and the programs it starts), or `both`, a command line that ran as each |
+| `exec.purpose` | what it is for, where its command line is a well-known one (`filetrace.go`'s `execPurposes`, the one table of them): the shell snapshot, a Keychain lookup, a process's start time, the repository's state read for the model's context, the platform and package-manager probe, the tool command's sandbox, the repository's file list, a login shell's own startup (`path_helper`, `id -u`). A program with none of its own takes the purpose of the command that started it, where that one's covers what it starts (the `cat` a shell snapshot runs is the snapshot's; what a sandbox runs is not the sandbox's), so a reader can say "`cat`, started by `/bin/zsh -c -l SNAPSHOT_FILE=…` (the shell snapshot: …)". A tool's command takes only the purposes that hold for a tool's too (a sandbox, a login shell's startup): the model's `git status` is not the build reading the repository. Absent where no rule says; presentation, never compared |
 | `lookups` | the programs the build itself looked for on its PATH, found or not |
 | `decoys` | the planted credentials, each with the most the build did to it: `not touched`, `stat`, `opened` (opened, its content not read), `read`, `connected` (a socket), `written`, `deleted` |
 | `sockets.listening` | each address the build listened on (`listen`, or a UDP bind to a port it chose): `proto host:port`, a port it let the system pick `<ephemeral>` (strace: bound to port 0; lsof: 49152 and up) |
@@ -449,8 +474,12 @@ libraries and the loader's files, `/lib`, `/usr/lib`, `*.so`, `*.dylib`, macOS's
 `system` (what every process reads through its C library or runtime: the resolver's and the
 user database's files, time zones, locales, certificate authorities, terminal descriptions,
 macOS's shared preferences); `self` (the build's own installation: its binary and the folder it
-sits in); `terma` (what terma's hooks do after they start); `test` (the test's own files: the
-hook payloads it records, the proxy's certificate); `path-search` (looking along the PATH for a
+sits in); `hooks` (the recording hook the scenario registers for every hook event: the shell the
+build runs its command line in, the recorder's process and everything it does or starts, and
+every path under the recorder's folder; the [hooks](#hooks) section says what the build hands a
+hook); `terma` (a trace from before the clean room alone: what terma's hooks did after they
+started); `test` (the test's own files, the proxy's certificate, the checkout the suite runs
+from); `path-search` (looking along the PATH for a
 program, which `lookups` says, and an exec that found nothing there); `helpers` (what a program
 the build started touched outside the run's own places: its own installation, the system's
 files); `sandbox-setup` (bubblewrap building the root of a sandbox before it runs the command in
@@ -475,17 +504,21 @@ never what a run measured: a path new or gone ("Now reads ~/.gitconfig", "No lon
 <repo>/CLAUDE.md") and each op it gained or lost, a command new or gone ("New command at
 startup: `git log -n 5`"; one gone and one new that run the same program with at least half the
 same arguments are one "Command changed", with the command line's `text_diff`), the phases a
-command runs in and who starts it, programs looked
+command runs in, who starts it (`by`) and whose doing it is (`role`: "`git status` now runs as
+the build's own doing (was part of the tool call)", notable where it becomes the build's own;
+a build traced before roles were recorded has none, which is no change), programs looked
 for, each decoy's level ("Reads ~/.aws/credentials (a planted decoy)"; "Connects to the decoy
 ssh-agent socket"), listeners ("Now listens on 127.0.0.1, an ephemeral port (tcp)"),
 connections, Unix sockets, names looked up, and macOS's XPC services, launch items ("Adds a
 launch item (runs at login): …"), TCC changes and task ports. A path's phases and programs,
-counts, `dropped` and `argv` are not compared. A macOS trace's paths are not compared at all:
+counts, `dropped`, `argv`, and a command's `parents` and `purpose` (presentation) are not
+compared, nor terma's hooks in a trace from before the clean room (`terma hook …` and the shell
+each ran in): they were the scenario's, not the build's. A macOS trace's paths are not compared at all:
 Endpoint Security logs every path a build resolves, and how far a build's background work (Claude
 Code's cleanup walk) got before it exited is a race, so one build traced twice lists different
 paths; they are each version's to read, and its programs, sockets, decoys and services are
 compared. Nor is what a macOS build does after it exits (a command run only at exit, a command's
-exit phase): eslogger's last events can still be on their way when the trace stops. Linux's
+exit phase, who starts such a command and its role): eslogger's last events can still be on their way when the trace stops. Linux's
 trace compares both. The PATH the build ran with is `<path>` wherever a command line holds it (a shell's
 snapshot exports it). strace's cut of a long argument ends at its last whole line, marked `…`, and SQLite's
 `-wal`, `-shm` and `-journal` files keep no `delete` (removed when the database closes in time).

@@ -12,7 +12,11 @@ import (
 // filesRow is a files profile's row of a build on a platform.
 func filesRow(version, platform string, paths map[string]any) e2e.Profile {
 	probe, _ := json.Marshal(map[string]any{"platform": platform, "tracer": "strace", "paths": paths,
-		"exec":    map[string]any{"git status": map[string]any{"argv": []string{"git", "status"}, "phases": []string{"startup"}, "count": 1, "by": "claude"}},
+		"exec": map[string]any{
+			"git status": map[string]any{"argv": []string{"git", "status"}, "phases": []string{"startup"}, "count": 1, "by": "claude",
+				"parents": []string{}, "role": "harness", "purpose": "reads the repository's state for the model's context"},
+			"cat": map[string]any{"argv": []string{"cat"}, "phases": []string{"turn"}, "count": 1, "by": "zsh",
+				"parents": []string{"/bin/zsh -c -l SNAPSHOT_FILE=/tmp/TestX/001/home/s.sh"}, "role": "harness"}},
 		"lookups": []string{}, "decoys": map[string]any{"<home>/.aws/credentials": "not touched"},
 		"sockets": map[string]any{"listening": map[string]any{"tcp 127.0.0.1:7777": map[string]any{"phases": []string{"startup"}, "count": 1}},
 			"connections": map[string]any{}, "unix": map[string]any{}, "dns": []string{}}})
@@ -39,6 +43,16 @@ func TestFilesystemSection(t *testing.T) {
 	paths, _ := fs["paths"].(map[string]any)
 	if paths["<home>/.claude.json"] == nil {
 		t.Fatalf("filesystem = %v", s.Filesystem)
+	}
+	// Each command's parents, role and purpose are published, its parents' literals in their
+	// placeholders as the exec list's keys are.
+	exec, _ := fs["exec"].(map[string]any)
+	git, _ := exec["git status"].(map[string]any)
+	if git["role"] != "harness" || git["purpose"] != "reads the repository's state for the model's context" || !reflect.DeepEqual(git["parents"], []any{}) {
+		t.Errorf("git status = %v", git)
+	}
+	if cat, _ := exec["cat"].(map[string]any); !reflect.DeepEqual(cat["parents"], []any{"/bin/zsh -c -l SNAPSHOT_FILE=<home>/s.sh"}) {
+		t.Errorf("cat = %v", cat)
 	}
 	// A fixed port is no run's loopback address.
 	if l, _ := fs["sockets"].(map[string]any)["listening"].(map[string]any); l["tcp 127.0.0.1:7777"] == nil {

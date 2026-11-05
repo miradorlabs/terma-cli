@@ -32,8 +32,12 @@ func TestFilesystemChanges(t *testing.T) {
 	    "<home>/.config/sometimes": {"ops": ["read"], "phases": ["exit"]}
 	  },
 	  "exec": {
-	    "git status --porcelain": {"argv": ["git", "status", "--porcelain"], "phases": ["startup"], "count": 2, "by": "claude"},
+	    "git status --porcelain": {"argv": ["git", "status", "--porcelain"], "phases": ["startup"], "count": 2, "by": "claude",
+	      "parents": ["bash -c x"], "role": "tool"},
+	    "uname -s": {"argv": ["uname", "-s"], "phases": ["startup"], "count": 1, "by": "sh"},
 	    "rg --files": {"argv": ["rg", "--files"], "phases": ["startup"], "count": 1, "by": "claude"},
+	    "/bin/sh -c [ -x 'terma' ] && 'terma' hook --user stop || true": {"argv": ["/bin/sh", "-c", "…"], "phases": ["exit"], "count": 1, "by": "claude"},
+	    "terma hook --user stop": {"argv": ["terma", "hook", "--user", "stop"], "phases": ["exit"], "count": 1, "by": "sh"},
 	    "bash -c -l S=1\necho old": {"argv": ["bash", "-c", "-l", "S=1\necho old"], "phases": ["turn"], "count": 1, "by": "claude"}
 	  },
 	  "lookups": ["git", "node"],
@@ -51,7 +55,10 @@ func TestFilesystemChanges(t *testing.T) {
 	    "<tmp>/claude-<id>-cwd": {"ops": ["write"], "phases": ["turn"]}
 	  },
 	  "exec": {
-	    "git status --porcelain": {"argv": ["git", "status", "--porcelain"], "phases": ["startup", "exit"], "count": 5, "by": "claude"},
+	    "git status --porcelain": {"argv": ["git", "status", "--porcelain"], "phases": ["startup", "exit"], "count": 5, "by": "claude",
+	      "parents": [], "role": "harness", "purpose": "reads the repository's state for the model's context"},
+	    "uname -s": {"argv": ["uname", "-s"], "phases": ["startup"], "count": 1, "by": "sh", "parents": ["sh -c uname -s"],
+	      "role": "harness", "purpose": "detects the platform and installed package managers"},
 	    "git log -n 5": {"argv": ["git", "log", "-n", "5"], "phases": ["startup"], "count": 1, "by": "claude"},
 	    "bash -c -l S=1\necho new": {"argv": ["bash", "-c", "-l", "S=1\necho new"], "phases": ["turn"], "count": 1, "by": "claude"}
 	  },
@@ -94,6 +101,7 @@ func TestFilesystemChanges(t *testing.T) {
 		L + "exec.git log -n 5":                                                              {"New command at startup: `git log -n 5` (linux/amd64)", "notable"},
 		L + "exec.rg --files":                                                                {"Command no longer run: `rg --files` (linux/amd64)", "informational"},
 		L + "exec.git status --porcelain.phases.exit":                                        {"`git status --porcelain` now also runs at exit (linux/amd64)", "informational"},
+		L + "exec.git status --porcelain.role":                                               {"`git status --porcelain` now runs as the build's own doing (was part of the tool call) (linux/amd64)", "notable"},
 		L + "lookups.rg":                                                                     {"Now looks for the program rg on the PATH (linux/amd64)", "notable"},
 		L + "lookups.node":                                                                   {"No longer looks for the program node on the PATH (linux/amd64)", "informational"},
 		L + "decoys.<home>/.aws/credentials":                                                 {"Reads ~/.aws/credentials (a planted decoy) (linux/amd64)", "notable"},
@@ -119,8 +127,13 @@ func TestFilesystemChanges(t *testing.T) {
 	}
 	// No change: counts and when a path was touched or by which helper, what was dropped, a
 	// decoy planted in one build alone, a run's temporary names (a lock, a temporary file),
-	// what the builds either side have and this run missed, a platform one build lacks.
+	// what the builds either side have and this run missed, a platform one build lacks; a
+	// command's parents and purpose, and a role one build was traced too early to have; terma's
+	// hooks, which a build traced before the clean room ran.
 	for _, id := range []string{
+		L + "exec./bin/sh -c [ -x 'terma' ] && 'terma' hook --user stop || true", L + "exec.terma hook --user stop",
+		L + "exec.git status --porcelain.parents", L + "exec.git status --porcelain.purpose", L + "exec.uname -s",
+		L + "exec.uname -s.role", L + "exec.uname -s.parents", L + "exec.uname -s.purpose",
 		L + "paths.<claude-config>/statsig", L + "paths.<claude-config>/statsig.phases.turn",
 		L + "exec.git status --porcelain.count", L + "dropped.libraries", L + "decoys.<home>/.npmrc",
 		L + "decoys.<home>/.ssh/id_ed25519", L + "paths.<claude-config>/.claude.json.lock", L + "paths.<tmp>/claude-<id>-cwd",
@@ -179,8 +192,10 @@ func TestFilesystemMacOSExitNotComparedOffline(t *testing.T) {
 		  "sockets": {"listening": {}, "connections": {}, "unix": {}, "dns": []}, "exec": `+exec+`}`)
 	}
 	before := probe(`{"git status": {"argv": ["git", "status"], "phases": ["startup", "exit"], "by": "codex"},
-	  "terma hook --user codex-session-end": {"argv": ["terma"], "phases": ["exit"], "by": "zsh"}}`)
+	  "git log": {"argv": ["git", "log"], "phases": ["exit"], "by": "codex", "role": "tool"},
+	  "rm -f x": {"argv": ["rm", "-f", "x"], "phases": ["exit"], "by": "zsh"}}`)
 	after := probe(`{"git status": {"argv": ["git", "status"], "phases": ["startup"], "by": "codex"},
+	  "git log": {"argv": ["git", "log"], "phases": ["exit"], "by": "zsh", "role": "harness"},
 	  "uname -s": {"argv": ["uname", "-s"], "phases": ["startup"], "by": "codex"}}`)
 	d := New(&Snapshot{Harness: "codex", Version: "1.0.0", Filesystem: map[string]any{"darwin/arm64": before}},
 		&Snapshot{Harness: "codex", Version: "1.0.1", Filesystem: map[string]any{"darwin/arm64": after}}, nil, time.Now())

@@ -23,7 +23,7 @@ var fsVolatile = regexp.MustCompile(`<(?:uuid|hash|id|time|date)>|\.lock\b|\.tmp
 
 func init() {
 	for _, s := range []string{"paths", "exec", "ops", "phases", "decoys", "sockets", "listening", "connections", "unix",
-		"dns", "macos", "xpc", "launch_items", "tcc", "task_ports", "lookups", "by", "linux/amd64", "linux/arm64",
+		"dns", "macos", "xpc", "launch_items", "tcc", "task_ports", "lookups", "by", "role", "linux/amd64", "linux/arm64",
 		"darwin/arm64", "darwin/amd64"} {
 		genericSegments[s] = true
 	}
@@ -93,10 +93,15 @@ func diffFilesystem(a, b any, out *[]Change) {
 			})
 		}
 		before := len(*out)
-		keyed(at("exec"), sub(x, "exec"), sub(y, "exec"), false, func(k string, xv, yv map[string]any) {
+		keyed(at("exec"), withoutTermaHooks(sub(x, "exec")), withoutTermaHooks(sub(y, "exec")), false, func(k string, xv, yv map[string]any) {
 			words(at("exec", k, "phases"), strs(xv["phases"]), strs(yv["phases"]))
-			if xb, yb := xv["by"], yv["by"]; xb != nil && yb != nil && xb != yb {
-				*out = append(*out, Change{Op: "changed", Path: at("exec", k, "by"), Before: xb, After: yb})
+			// Who starts it, and whose doing it is (the build's own, the tool call's): a build
+			// traced before roles were recorded has none, which is no change. Its parents and
+			// purpose are presentation: never compared.
+			for _, field := range []string{"by", "role"} {
+				if xb, yb := xv[field], yv[field]; xb != nil && yb != nil && xb != yb {
+					*out = append(*out, Change{Op: "changed", Path: at("exec", k, field), Before: xb, After: yb})
+				}
 			}
 		})
 		// A command gone and one new that run the same program with most of the same arguments
@@ -112,16 +117,21 @@ func diffFilesystem(a, b any, out *[]Change) {
 		*out = append(append((*out)[:before], inner...), pairCommands(commands)...)
 		// What a macOS build does after it exits (a session-end hook, a last git status) reaches
 		// the trace or not: eslogger's last events can still be on their way when the trace stops.
-		// A command that ran only at exit, or a command's exit phase, is not compared there.
+		// A command that ran only at exit, or a command's exit phase, is not compared there, nor
+		// who started such a command or whose doing it was.
 		if asString(x["tracer"]) == "eslogger" || asString(y["tracer"]) == "eslogger" {
 			atExit := func(v any) bool {
 				m, _ := v.(map[string]any)
 				ph := strs(m["phases"])
 				return len(ph) == 1 && ph[0] == "exit"
 			}
+			xe, ye := sub(x, "exec"), sub(y, "exec")
 			*out = append((*out)[:before], slices.DeleteFunc((*out)[before:], func(c Change) bool {
 				if len(c.Path) == 6 && c.Path[4] == "phases" {
 					return c.Path[5] == "exit"
+				}
+				if len(c.Path) == 5 {
+					return atExit(xe[c.Path[3]]) || atExit(ye[c.Path[3]])
 				}
 				return len(c.Path) == 4 && c.Op != "changed" && (atExit(c.Before) || atExit(c.After))
 			})...)
@@ -146,6 +156,20 @@ func diffFilesystem(a, b any, out *[]Change) {
 			}
 		}
 	}
+}
+
+// withoutTermaHooks is an exec list without terma's hooks: a trace from before the files
+// profile was a clean room ran with them (`terma hook …`, and the shell each ran in, `sh -c [ -x
+// 'terma' ] && 'terma' hook …`). They were the scenario's, not the build's, so a build traced
+// with them and one traced without differ in nothing there.
+func withoutTermaHooks(exec map[string]any) map[string]any {
+	out := make(map[string]any, len(exec))
+	for k, v := range exec {
+		if !strings.HasPrefix(k, "terma hook ") && !strings.Contains(k, "'terma' hook ") {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func sub(m map[string]any, k string) map[string]any {
@@ -247,6 +271,8 @@ func filesystemImpact(c *Change) string {
 		}
 	case part == "exec" && len(p) == 4 && c.Op == "added":
 		return "notable"
+	case part == "exec" && len(p) == 5 && p[4] == "role" && c.After != "tool":
+		return "notable" // the build now runs on its own what was the tool call's
 	case part == "lookups" && c.Op == "added":
 		return "notable"
 	case part == "sockets" && c.Op == "added" && len(p) == 5:
@@ -271,6 +297,10 @@ func filesystemImpact(c *Change) string {
 }
 
 func asString(v any) string { s, _ := v.(string); return s }
+
+// roleWords say an exec entry's role in a title.
+var roleWords = map[string]string{"harness": "the build's own doing", "tool": "part of the tool call",
+	"both": "both the build's own and the tool call's"}
 
 var decoyOrder = []string{"not touched", "stat", "opened", "read", "connected", "written", "deleted"}
 
@@ -317,6 +347,8 @@ func filesystemTitle(c *Change) string {
 			return cmd + " no longer runs at " + p[5] + on
 		case len(p) == 5 && p[4] == "by":
 			return cmd + " now started by " + asString(c.After) + " (was " + asString(c.Before) + ")" + on
+		case len(p) == 5 && p[4] == "role":
+			return cmd + " now runs as " + roleWords[asString(c.After)] + " (was " + roleWords[asString(c.Before)] + ")" + on
 		}
 	case "lookups":
 		if c.Op == "added" {
