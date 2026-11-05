@@ -384,6 +384,45 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 			u.Ops = slices.DeleteFunc(u.Ops, func(op string) bool { return op == "probe" })
 		}
 	}
+	// A folder the build made in the temporary folder with mkdtemp's six random characters
+	// after a dash is the run's, whatever its letters (fswatch-probe-hjcdgr).
+	for _, key := range slices.Sorted(maps.Keys(out.Paths)) {
+		u := out.Paths[key]
+		if u == nil || !strings.HasPrefix(key, "<tmp>/") || !slices.Contains(u.Ops, "create") || !mkdtempRE.MatchString(key) {
+			continue
+		}
+		renamed := key[:len(key)-6] + "<id>"
+		for _, k := range slices.Sorted(maps.Keys(out.Paths)) {
+			if k != key && !strings.HasPrefix(k, key+"/") {
+				continue
+			}
+			to := renamed + strings.TrimPrefix(k, key)
+			v := out.Paths[k]
+			delete(out.Paths, k)
+			if w := out.Paths[to]; w != nil {
+				for _, op := range v.Ops {
+					w.Ops = addWord(w.Ops, op)
+				}
+				for _, ph := range v.Phases {
+					w.Phases = addWord(w.Phases, ph)
+				}
+				for _, pr := range v.Programs {
+					w.Programs = addWord(w.Programs, pr)
+				}
+				continue
+			}
+			out.Paths[to] = v
+		}
+	}
+	// SQLite removes a database's -wal, -shm and -journal files when its last connection closes:
+	// whether that came before the build exited is timing, not what the build does.
+	for key, u := range out.Paths {
+		if strings.HasSuffix(key, "-wal") || strings.HasSuffix(key, "-shm") || strings.HasSuffix(key, "-journal") {
+			if len(u.Ops) > 1 {
+				u.Ops = slices.DeleteFunc(u.Ops, func(op string) bool { return op == "delete" })
+			}
+		}
+	}
 	// The temporary folder is the machine's, shared with every other program and every run
 	// before this one. Whether a path the build makes when it is missing was there already is
 	// the machine's state, so its create reads as a stat either way. What the build only found
@@ -748,6 +787,9 @@ func volatileSegment(seg string, inTmp bool) string {
 	seg = afterRunValueRE.ReplaceAllString(seg, "$1-<id>")
 	return strings.ReplaceAll(seg, "\x00", "ed25519")
 }
+
+// mkdtempRE is a path ending in a dash and six letters or digits, as mkdtemp names a folder.
+var mkdtempRE = regexp.MustCompile(`/[^/]*-[A-Za-z0-9]{6}$`)
 
 // tmpTokenStemRE is a file name that is a short lower-case token and an extension.
 var tmpTokenStemRE = regexp.MustCompile(`^[a-z0-9]{8,12}(\.[a-z]+)$`)

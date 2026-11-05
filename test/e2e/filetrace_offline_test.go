@@ -501,3 +501,41 @@ func TestFilesOfSharedTmpOffline(t *testing.T) {
 		}
 	}
 }
+
+// strace cuts a long argument at its -s length: the cut ends at the last whole line, so a
+// longer path before it does not move where the argument ends.
+func TestStraceTruncatedOffline(t *testing.T) {
+	for in, want := range map[string]string{
+		`"SNAPSHOT_FILE=/tmp/a\n  # When sourced\n  # which can cause unexpected behavior when functions use commands t"...`: "SNAPSHOT_FILE=/tmp/a\n  # When sourced\n…",
+		`"SNAPSHOT_FILE=/tmp/abc\n  # When sourced\n  # which can cause unexpected behavior when functions use"...`:          "SNAPSHOT_FILE=/tmp/abc\n  # When sourced\n…",
+		`"git status --short"`: "git status --short",
+	} {
+		if got, ok := unquote(in); !ok || got != want {
+			t.Errorf("unquote(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// A folder the build makes with mkdtemp is the run's whatever its letters; SQLite's sidecar
+// files are removed when the database closes in time, which is no difference between builds.
+func TestFilesOfMkdtempAndSQLiteOffline(t *testing.T) {
+	at := time.Unix(1000, 0)
+	events := []TraceEvent{
+		{Pid: 100, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"claude", "-p", "hi"}},
+		{Pid: 100, At: at, Kind: "mkdir", Path: "/tmp/claude-1000/fswatch-probe-hjcdgr"},
+		{Pid: 100, At: at, Kind: "open", Path: "/tmp/claude-1000/fswatch-probe-hjcdgr/probe", Write: true, Create: true},
+		{Pid: 100, At: at, Kind: "open", Path: "/sb/claude/goals_1.sqlite-shm", Write: true, Create: true},
+		{Pid: 100, At: at, Kind: "unlink", Path: "/sb/claude/goals_1.sqlite-shm"},
+	}
+	scope := straceScope()
+	scope.Root = 100
+	files := FilesOf(events, scope)
+	for _, p := range []string{"<tmp>/claude-<id>/fswatch-probe-<id>", "<tmp>/claude-<id>/fswatch-probe-<id>/probe"} {
+		if files.Paths[p] == nil {
+			t.Errorf("no %s among %q", p, slices.Sorted(maps.Keys(files.Paths)))
+		}
+	}
+	if u := files.Paths["<claude-config>/goals_1.sqlite-shm"]; u == nil || slices.Contains(u.Ops, "delete") {
+		t.Errorf("sqlite-shm = %+v, want no delete", u)
+	}
+}

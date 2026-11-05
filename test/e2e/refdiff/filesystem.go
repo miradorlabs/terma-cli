@@ -15,7 +15,8 @@ import (
 // services, launch items, TCC changes and task ports. Counts are the run's. A path or socket
 // whose name is the run's own (a lock file, a temporary name, an id) that one build touched and
 // the other did not is no change, and neither is one the builds either side of a build have and
-// its run missed (unobserved, set by refgen).
+// its run missed (unobserved, set by refgen). A macOS trace's paths are not compared (see
+// diffFilesystem).
 
 // fsVolatile matches a name a run makes for itself.
 var fsVolatile = regexp.MustCompile(`<(?:uuid|hash|id|time|date)>|\.lock\b|\.tmp\b|~$|-(?:journal|wal|shm)$|\.swp$`)
@@ -79,12 +80,18 @@ func diffFilesystem(a, b any, out *[]Change) {
 				}
 			}
 		}
-		keyed(at("paths"), sub(x, "paths"), sub(y, "paths"), true, func(k string, xv, yv map[string]any) {
-			// What a run's own temporary file had done to it is the run's.
-			if !fsVolatile.MatchString(k) {
-				words(at("paths", k, "ops"), strs(xv["ops"]), strs(yv["ops"]))
-			}
-		})
+		// Endpoint Security logs every path a build resolves, and what a build's background work
+		// (Claude Code's cleanup walk) reached before it exited is a race: the same build traced
+		// twice lists different paths. Its paths are each build's own to read, never compared;
+		// its programs, sockets, decoys and services are.
+		if asString(x["tracer"]) != "eslogger" && asString(y["tracer"]) != "eslogger" {
+			keyed(at("paths"), sub(x, "paths"), sub(y, "paths"), true, func(k string, xv, yv map[string]any) {
+				// What a run's own temporary file had done to it is the run's.
+				if !fsVolatile.MatchString(k) {
+					words(at("paths", k, "ops"), strs(xv["ops"]), strs(yv["ops"]))
+				}
+			})
+		}
 		before := len(*out)
 		keyed(at("exec"), sub(x, "exec"), sub(y, "exec"), false, func(k string, xv, yv map[string]any) {
 			words(at("exec", k, "phases"), strs(xv["phases"]), strs(yv["phases"]))

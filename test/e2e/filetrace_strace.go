@@ -400,9 +400,21 @@ func splitArgs(s string) ([]string, int) {
 	return args, -1
 }
 
+// truncated is a string strace cut at its -s length, ended at its last whole line (or word)
+// and marked: where the cut falls moves with the run's own values (a path's length) before it.
+func truncated(v string) string {
+	if i := strings.LastIndexByte(v, '\n'); i > 0 {
+		return v[:i] + "\n…"
+	}
+	if i := strings.LastIndexByte(v, ' '); i > 0 {
+		return v[:i] + " …"
+	}
+	return v + "…"
+}
+
 // unquote is a string argument's value: "" where it is no string.
 func unquote(arg string) (string, bool) {
-	arg = strings.TrimSuffix(arg, "...")
+	arg, cut := strings.CutSuffix(arg, "...")
 	if !strings.HasPrefix(arg, `"`) && !strings.HasPrefix(arg, `@"`) {
 		return "", false
 	}
@@ -412,6 +424,9 @@ func unquote(arg string) (string, bool) {
 		return "", false
 	}
 	v := string(cUnescape(arg[1 : len(arg)-1]))
+	if cut {
+		v = truncated(v)
+	}
 	if abstract {
 		v = "@" + v
 	}

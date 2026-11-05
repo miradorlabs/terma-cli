@@ -478,7 +478,13 @@ for, each decoy's level ("Reads ~/.aws/credentials (a planted decoy)"; "Connects
 ssh-agent socket"), listeners ("Now listens on 127.0.0.1, an ephemeral port (tcp)"),
 connections, Unix sockets, names looked up, and macOS's XPC services, launch items ("Adds a
 launch item (runs at login): …"), TCC changes and task ports. A path's phases and programs,
-counts, `dropped` and `argv` are not compared. A path or Unix socket whose name is the run's own
+counts, `dropped` and `argv` are not compared. A macOS trace's paths are not compared at all:
+Endpoint Security logs every path a build resolves, and how far a build's background work (Claude
+Code's cleanup walk) got before it exited is a race, so one build traced twice lists different
+paths; they are each version's to read, and its programs, sockets, decoys and services are
+compared. strace's cut of a long argument ends at its last whole line, marked `…`, and SQLite's
+`-wal`, `-shm` and `-journal` files keep no `delete` (removed when the database closes in time).
+A path or Unix socket whose name is the run's own
 (a lock, a temporary or journal file, a name with `<uuid>`, `<hash>`, `<id>`, `<time>`; a
 process id's `<n>` names the same file in every run) touched by one build and not the other is
 no change, nor what was done to it, and neither is anything `unobserved` on

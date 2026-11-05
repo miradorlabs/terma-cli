@@ -149,3 +149,24 @@ func TestFilesystemChanges(t *testing.T) {
 		t.Errorf("highlights = %v", h)
 	}
 }
+
+// A macOS trace's paths differ between two runs of one build (what its background work reached
+// before it exited), so they are not compared; its programs are.
+func TestFilesystemMacOSPathsNotComparedOffline(t *testing.T) {
+	before := fsProbe(t, `{"platform": "darwin/arm64", "tracer": "eslogger",
+	  "paths": {"<claude-config>/logs": {"ops": ["probe"], "phases": ["startup"]}},
+	  "exec": {}, "lookups": [], "decoys": {}, "sockets": {"listening": {}, "connections": {}, "unix": {}, "dns": []}}`)
+	after := fsProbe(t, `{"platform": "darwin/arm64", "tracer": "eslogger",
+	  "paths": {"<claude-config>/todos": {"ops": ["probe"], "phases": ["startup"]}},
+	  "exec": {"uname -s": {"argv": ["uname", "-s"], "phases": ["startup"], "count": 1, "by": "claude"}},
+	  "lookups": [], "decoys": {}, "sockets": {"listening": {}, "connections": {}, "unix": {}, "dns": []}}`)
+	d := New(&Snapshot{Harness: "claude", Version: "1.0.0", Filesystem: map[string]any{"darwin/arm64": before}},
+		&Snapshot{Harness: "claude", Version: "1.0.1", Filesystem: map[string]any{"darwin/arm64": after}}, nil, time.Now())
+	var ids []string
+	for _, c := range d.Changes {
+		ids = append(ids, c.ID)
+	}
+	if len(ids) != 1 || ids[0] != "filesystem.darwin/arm64.exec.uname -s" {
+		t.Errorf("changes = %q, want only the new command", ids)
+	}
+}
