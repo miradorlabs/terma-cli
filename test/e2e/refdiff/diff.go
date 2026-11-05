@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -658,6 +659,13 @@ func title(c *Change, labels map[string]string) string {
 			}
 			return "Code signature " + strings.Join(p[2:], ".") + ": " + arrow()
 		}
+		if at(1) == "size_bytes" {
+			b, okB := c.Before.(float64)
+			a, okA := c.After.(float64)
+			if okB && okA {
+				return fmt.Sprintf("Binary size: %s → %s bytes (%s → %s)", grouped(b), grouped(a), humanBytes(b), humanBytes(a))
+			}
+		}
 		return "Binary " + strings.Join(p[1:], ".") + ": " + arrow()
 	case "support":
 		if len(p) >= 4 && at(3) == "result" {
@@ -972,4 +980,31 @@ func eventUnobserved(t map[string]any, endpoint, name string) bool {
 		}
 	}
 	return false
+}
+
+// grouped is a whole number with thousands separators: 212,412,032.
+func grouped(n float64) string {
+	s := strconv.FormatFloat(n, 'f', 0, 64)
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// humanBytes is a byte count in decimal units, as Finder shows it: 212.4 MB.
+func humanBytes(n float64) string {
+	units := []string{"bytes", "KB", "MB", "GB", "TB"}
+	i := 0
+	for n >= 1000 && i < len(units)-1 {
+		n /= 1000
+		i++
+	}
+	if i == 0 {
+		return strconv.FormatFloat(n, 'f', 0, 64) + " bytes"
+	}
+	return strconv.FormatFloat(n, 'f', 1, 64) + " " + units[i]
 }

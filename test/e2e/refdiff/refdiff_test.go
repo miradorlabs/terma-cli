@@ -158,3 +158,12 @@ func TestApproximateConfig(t *testing.T) {
 		t.Errorf("changes = %v", ids)
 	}
 }
+
+func TestBinarySizeTitle(t *testing.T) {
+	a := &Snapshot{Harness: "codex", Version: "1", Binary: map[string]any{"size_bytes": float64(46_114_544)}}
+	b := &Snapshot{Harness: "codex", Version: "2", Binary: map[string]any{"size_bytes": float64(52_400_000)}}
+	d := New(a, b, nil, time.Now())
+	if len(d.Changes) != 1 || d.Changes[0].Title != "Binary size: 46,114,544 → 52,400,000 bytes (46.1 MB → 52.4 MB)" {
+		t.Errorf("changes = %+v", d.Changes)
+	}
+}
