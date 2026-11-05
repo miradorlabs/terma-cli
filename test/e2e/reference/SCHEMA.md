@@ -198,15 +198,17 @@ model's) is part of the name and stays.
         "fired": true, "count": 11,
         "keys": ["cwd", "hook_event_name", "session_id", "tool_input", "tool_input.command", "tool_name"],
         "kinds": { "cwd": "text", "hook_event_name": "text", "session_id": "text", "tool_input": "map", "tool_input.command": "text", "tool_name": "text" },
+        "example": { "cwd": "<repo>", "hook_event_name": "PreToolUse", "session_id": "<session>", "tool_input": { "command": "printf hooks-ok" }, "tool_name": "Bash" },
         "stdin": "json",
-        "env": ["CLAUDECODE", "CLAUDE_PROJECT_DIR"],
+        "env": ["CLAUDECODE", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_PROJECT_DIR"],
         "env_paths": { "CLAUDE_PROJECT_DIR": "<repo>" },
+        "env_values": { "CLAUDECODE": "1", "CLAUDE_CODE_MESSAGING_TOKEN": "<redacted>", "CLAUDE_PROJECT_DIR": "<repo>" },
         "cwd": "<repo>",
         "matcher": true,
         "control": { "exit_2": "blocks the tool; message to the model", "json_decision": "blocks the tool; message to the model" }
       }
     },
-    "not_fired": { "Notification": "fires for an interactive session's prompts and the PushNotification tool, which the build did not offer" }
+    "not_fired": { "Notification": "tried: an interactive session's permission prompt left unanswered; the build notified of none" }
   },
 
   "cli": {
@@ -294,29 +296,36 @@ Gemini CLI's event enum, the schema Copilot CLI's packed script embeds. `source`
 suite's own list, where the build named none it could read).
 
 The probe registers a recording hook for every supported event, in place of terma's, and runs
-turns that fire as many as it cheaply can: tool calls that succeed, fail and are denied, a
-subagent, a compaction, a resumed session, a custom command, a turn the provider refuses. Each
-event that fired has:
+what fires each one: tool calls that succeed, fail and are denied, a subagent, one in a
+worktree of its own, a compaction, a resumed session, a custom command, a turn the provider
+refuses; for Claude Code also tasks and a teammate (the task tools and agent teams turned on in
+the sandbox), an MCP server whose tool asks the user a question, and an interactive session in a
+terminal (`/add-dir`, a settings file and a watched file changed from outside, a permission
+prompt left unanswered, the session left idle). Each event that fired has:
 
 | field | |
 |---|---|
 | `fired`, `count` | whether it fired, and how many times over the probe's runs |
-| `keys`, `kinds` | its payloads' key paths, four deep, a list's items' under `[]` (`tool_calls[].tool_name`); the kind of value each held (`text`, `number`, `bool`, `list`, `map`, `null`), joined with `\|` where runs differed. Never a value |
+| `keys`, `kinds` | its payloads' key paths, four deep, a list's items' under `[]` (`tool_calls[].tool_name`); the kind of value each held (`text`, `number`, `bool`, `list`, `map`, `null`), joined with `\|` where runs differed |
+| `example` | one payload whole, with its values: the one with the most key paths. The run's paths, session, ids and times are placeholders (`<repo>`, `<session>`, `<uuid>`, `<timestamp>`); a value whose key or variable name says it is a secret (a token, key, password), or that has a credential's shape, is `<redacted>`; a path of the machine's outside the sandbox (a home folder, what a package manager installed) is `<machine-path>`, the machine's and its user's names `<host>` and `<user>`, the PATH `<path>`; a text over 2,000 characters is cut there, ending `…<cut: N more characters>`. A JSON string where the hook's standard input was text; absent where it was empty |
 | `stdin` | what the hook's standard input held: `json`, `text` or `empty` |
 | `env`, `env_paths` | the environment variables the harness set for the hook (the ones it was started with, and the sandbox's own settings, left out); the value of each that is one path in the sandbox, as its placeholder |
+| `env_values` | the value of each of `env`, as the event's first run had it, scrubbed as `example` is: a secret's `<redacted>`, a list of folders `<path>` |
 | `cwd` | the directory its first run ran in |
 | `args` | how many arguments the harness added to the hook's command line, where it added any |
 | `matcher` | whether it takes a matcher: measured, with a second hook whose matcher matches nothing, which runs where the event ignores matchers |
 | `control` | what the build did with a hook's answer, where the probe tried it (Claude Code and Codex: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Stop`): `exit_2` (exit status 2 with a message on stderr), `json_decision` (a JSON deny or block), `additional_context` (context to add). Each says whether the build acted on it (`blocks the tool`, `blocks the prompt`, `keeps the turn going`) and whether the message reached the model; `additional_context` `reaches the model` or is `ignored` |
 
-`not_fired` says, for each supported event no run fired, why. A build captured before the
-hooks probe existed has only `events`, each with its `keys` and `count`: the payloads of the
-hooks its plain first turn ran.
+`not_fired` says, for each supported event no run fired, why: what the probe tried, where it
+tried something the build did not answer. A build captured before the hooks probe existed has
+only `events`, each with its `keys` and `count`: the payloads of the hooks its plain first turn
+ran; one captured before examples has no `example` or `env_values`.
 
 In a diff, a new event in `supported` is notable and one gone degrading; an event no longer
 fired is degrading; a payload field or environment variable gone, and a control point's result
 changed, notable. A field's kind or a variable's path added or removed with it is not a change
-of its own, and neither is `not_fired`.
+of its own, and neither is `not_fired`. `example` and `env_values` are the run's values and are
+never compared: what a build hands a hook is its keys, their kinds and the variables' names.
 
 In `binary.signing`, the certificate is compared as one thing (a new certificate is one change),
 and `signed_at`, `checked_at`, `assessment`, `resigned` and `authority` are never read as

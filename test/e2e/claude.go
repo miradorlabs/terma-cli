@@ -111,34 +111,9 @@ func (sb *Sandbox) ClaudeInteractiveTurns(route Route, prompts []string, replies
 		run.Raw = term.Raw()
 	}()
 
-	// Dialogs a fresh config directory may show, each answered once. Dialogs are
-	// checked before the prompt because their option lists use the same cursor.
-	deadline := time.Now().Add(90 * time.Second)
-	for {
-		i, err := term.ExpectAny(time.Until(deadline), loginRE, trustRE, themeRE, bypassRE, promptRE)
-		if err != nil {
-			t.Fatalf("claude never showed a prompt:\n%s", tail(term.Text(), 3000))
-		}
-		switch i {
-		case 0:
-			t.Fatalf("claude asked to log in: no usable credential for route %s\n%s", route, tail(term.Text(), 1500))
-		case 1:
-			// The trust dialog defaults to "No, exit"; move to "Yes" first.
-			time.Sleep(500 * time.Millisecond)
-			if yesSecondRE.MatchString(term.TextSince()) {
-				_ = term.Send("\x1b[B")
-				time.Sleep(300 * time.Millisecond)
-			}
-			term.Consume()
-			_ = term.Send("\r")
-		case 2, 3:
-			term.Consume()
-			_ = term.Send("\r")
-		case 4:
-			goto ready
-		}
+	if err := claudePastDialogs(term, 90*time.Second); err != nil {
+		t.Fatalf("route %s: %v", route, err)
 	}
-ready:
 	time.Sleep(1500 * time.Millisecond) // the start-of-session status line render
 	for turn, prompt := range prompts {
 		term.Consume()
@@ -164,6 +139,62 @@ ready:
 		t.Logf("claude exit: %v", err)
 	}
 	return run
+}
+
+// claudePastDialogs answers the dialogs a fresh config directory may show, each once, until
+// the session shows its prompt. Dialogs are checked before the prompt because their option
+// lists use the same cursor.
+func claudePastDialogs(term *Terminal, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		i, err := term.ExpectAny(time.Until(deadline), loginRE, trustRE, themeRE, bypassRE, promptRE)
+		if err != nil {
+			return fmt.Errorf("claude never showed a prompt:\n%s", tail(term.Text(), 3000))
+		}
+		switch i {
+		case 0:
+			return fmt.Errorf("claude asked to log in: no usable credential\n%s", tail(term.Text(), 1500))
+		case 1:
+			// The trust dialog defaults to "No, exit"; move to "Yes" first.
+			time.Sleep(500 * time.Millisecond)
+			if yesSecondRE.MatchString(term.TextSince()) {
+				_ = term.Send("\x1b[B")
+				time.Sleep(300 * time.Millisecond)
+			}
+			term.Consume()
+			_ = term.Send("\r")
+		case 2, 3:
+			term.Consume()
+			_ = term.Send("\r")
+		case 4:
+			return nil
+		}
+	}
+}
+
+// approveClaudeKey records key as approved in Claude Code's state in sb, as it is for a
+// developer who has used it: an interactive session asks about a key it has not seen.
+func (sb *Sandbox) approveClaudeKey(key string) {
+	sb.T.Helper()
+	if len(key) < 20 {
+		return
+	}
+	sb.editClaudeState(func(state map[string]any) {
+		state["customApiKeyResponses"] = map[string]any{"approved": []string{key[len(key)-20:]}, "rejected": []string{}}
+	})
+}
+
+// editClaudeState rewrites Claude Code's state file in sb (.claude.json) with edit, starting
+// from an empty one where there is none yet.
+func (sb *Sandbox) editClaudeState(edit func(state map[string]any)) {
+	sb.T.Helper()
+	path := filepath.Join(sb.ClaudeConfig, ".claude.json")
+	state := map[string]any{}
+	raw, _ := os.ReadFile(path)
+	_ = json.Unmarshal(raw, &state)
+	edit(state)
+	raw, _ = json.MarshalIndent(state, "", "  ")
+	sb.writeAbs(path, string(raw))
 }
 
 // ClaudeHeadless runs `claude -p` and returns its JSON result.

@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 )
@@ -212,7 +213,10 @@ type claudeHooksFixture struct {
 	steps   []claudeStep
 	planned bool
 	fail    bool
-	ids     atomic.Int32
+	// tools are the names of the tools the main thread's last request offered, a deferred one
+	// marked so.
+	tools []string
+	ids   atomic.Int32
 	// main counts the main thread's requests.
 	main atomic.Int32
 }
@@ -221,7 +225,15 @@ type claudeHooksFixture struct {
 func (f *claudeHooksFixture) reset(plan func(tools map[string]map[string]any) []claudeStep, fail bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.plan, f.steps, f.planned, f.fail = plan, nil, false, fail
+	f.plan, f.steps, f.planned, f.fail, f.tools = plan, nil, false, fail, nil
+}
+
+// offered are the tools the main thread's last request offered: what a run's log says, where
+// the build did not offer what a step needs.
+func (f *claudeHooksFixture) offered() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.tools)
 }
 
 func (f *claudeHooksFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -284,6 +296,14 @@ func (f *claudeHooksFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if replies < len(f.steps) {
 			calls = f.steps[replies]
 		}
+		f.tools = f.tools[:0]
+		for name, tool := range tools {
+			if d, _ := tool["defer_loading"].(bool); d {
+				name += " (deferred)"
+			}
+			f.tools = append(f.tools, name)
+		}
+		slices.Sort(f.tools)
 		f.mu.Unlock()
 	}
 	writeClaudeTurn(w, req.Model, int(f.ids.Add(1)), calls)
@@ -338,65 +358,139 @@ func writeClaudeRecorderHooks(t *testing.T, sb *Sandbox, dir string, events []st
 // filter: FileChanged's names the files the build watches, and the probe changes the README.
 var claudeHookMatchers = map[string]string{"FileChanged": "README.md"}
 
-// claudeHookReasons are why a Claude Code event does not fire in the probe's runs.
+// claudeHookReasons are why a Claude Code event did not fire in the probe's runs, each saying
+// what the probe tried: where it says it, the build did not fire it for that.
 var claudeHookReasons = map[string]string{
-	"Notification":      "fires for an interactive session's prompts and the PushNotification tool, which the build did not offer",
-	"DirectoryAdded":    "fires for /add-dir in an interactive session, not for --add-dir at start",
-	"ConfigChange":      "fires when a watched settings file changes; the probe's -p turn changed one and the build did not see it",
-	"PermissionDenied":  "fires for the auto mode classifier's denials; the build's auto mode denied nothing here",
-	"TeammateIdle":      "agent teams only, an experimental feature the probe leaves off",
-	"TaskCreated":       "fires for the task tools, which -p does not offer",
-	"TaskCompleted":     "fires for the task tools, which -p does not offer",
-	"Elicitation":       "needs an MCP server that asks the user for input",
-	"ElicitationResult": "needs an MCP server that asks the user for input",
-	"FileChanged":       "fires for the files its matcher names as they change on disk; the build did not see the README change",
+	"Notification": "tried: an MCP server's question in -p, an interactive session's permission prompt left unanswered and its idle prompt; " +
+		"the build notified of none",
+	"DirectoryAdded": "tried: /add-dir in an interactive session (--add-dir at start does not fire it); the build did not run it",
+	"ConfigChange":   "tried: the local settings file changed, by a tool in -p and from outside an interactive session; the build did not see either",
+	"FileChanged": "tried: the file its matcher names (README.md) changed on disk, by a tool in -p and from outside an interactive session watching by polling; " +
+		"the build did not see either",
+	"PermissionDenied": "tried: auto mode with its classifier's request answered with no verdict; the build's auto mode denied nothing",
+	"TeammateIdle": "tried: agent teams on (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1, teammateMode in-process) and a named teammate spawned in an interactive session; " +
+		"the build did not run it",
+	"TaskCreated":       "tried: the task tools on (CLAUDE_CODE_ENABLE_TODO_TOOLS=1) and a TaskCreate call; the build did not offer the tool or run it",
+	"TaskCompleted":     "tried: the task tools on (CLAUDE_CODE_ENABLE_TODO_TOOLS=1) and a TaskUpdate to completed; the build did not offer the tool or run it",
+	"Elicitation":       "tried: a stdio MCP server whose tool sends elicitation/create, in -p; the build did not run it",
+	"ElicitationResult": "tried: a stdio MCP server whose tool sends elicitation/create, in -p, the question left to the build to answer; the build did not run it",
+	"WorktreeCreate":    "tried: a subagent with isolation worktree and EnterWorktree, the hook naming the folder; the build offered neither or did not run it",
+	"WorktreeRemove":    "tried: ExitWorktree removing the session's worktree (a subagent's hook-made worktree is kept); the build did not offer it or run it",
+	"StopFailure":       "tried: a turn the provider refuses (400 invalid_request_error); the build did not run it",
+	"Setup":             "tried: --init-only; the build did not run it",
+}
+
+// claudeTeamEnv are the variables the probe's run of tasks and its interactive session start
+// the build with, in the sandbox alone: the task tools and agent teams, each behind one, and
+// file watching by polling (CHOKIDAR_USEPOLLING), where the machine's native events do not
+// reach the build (it says so: fs_watch_silent).
+var claudeTeamEnv = []string{"CLAUDE_CODE_ENABLE_TODO_TOOLS=1", "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1", "CHOKIDAR_USEPOLLING=1"}
+
+// claudeHooksRig is what a Claude Code hooks probe's runs share: the events the build knows,
+// its fixture provider, the recorder's folder, the environment the build starts with, and the
+// folders the runs name.
+type claudeHooksRig struct {
+	supported    []string
+	source       string
+	fx           *claudeHooksFixture
+	rec          string
+	env          []string
+	extra, added string
+}
+
+// claudeHooksSetup readies sb for a Claude Code hooks probe of b: the fixture provider, the
+// recorder in place of every hook, and what the runs need.
+func claudeHooksSetup(t *testing.T, b Binary, sb *Sandbox) claudeHooksRig {
+	t.Helper()
+	supported, source := supportedHookEvents(t, b)
+	events := supported
+	if len(events) == 0 {
+		events = hookSeeds["claude"]
+	}
+	fx := &claudeHooksFixture{}
+	serveClaude(t, b, sb, fx)
+	rec := filepath.Join(sb.Dir, "hook-recorder")
+	writeClaudeRecorderHooks(t, sb, rec, events, true)
+	// terma's exporter settings go too: they point at a relay no run starts, whose flush would
+	// hold every run's exit, and the variables they set for hooks are terma's.
+	// A teammate runs in the session's own process, not a terminal pane the sandbox has none of.
+	editJSON(t, filepath.Join(sb.ClaudeConfig, "settings.json"), func(doc map[string]any) {
+		delete(doc, "env")
+		doc["teammateMode"] = "in-process"
+	})
+	// An interactive session notifies that it is waiting a second after it went idle; the
+	// repository is trusted, as a developer's is after its first session, which a session's
+	// worktree needs (-p never asks).
+	sb.editClaudeState(func(doc map[string]any) {
+		doc["messageIdleNotifThresholdMs"] = 1000
+		projects, _ := doc["projects"].(map[string]any)
+		if projects == nil {
+			projects = map[string]any{}
+		}
+		dirs := []string{sb.Repo}
+		if real, err := filepath.EvalSymlinks(sb.Repo); err == nil && real != sb.Repo {
+			dirs = append(dirs, real)
+		}
+		for _, d := range dirs {
+			p, _ := projects[d].(map[string]any)
+			if p == nil {
+				p = map[string]any{}
+			}
+			p["hasTrustDialogAccepted"] = true
+			projects[d] = p
+		}
+		doc["projects"] = projects
+	})
+	// What the runs need: instructions to load, a command to expand, a folder to cd to, one
+	// to add, and one a WorktreeCreate hook names as the worktree it made.
+	sb.write("CLAUDE.md", "# Probe\n\nAnswer briefly.\n")
+	sb.write(".claude/commands/terma-probe.md", "Say hello. TERMA_HOOKS_PROBE\n")
+	sb.write("sub/.keep", "")
+	extra := filepath.Join(sb.Dir, "extra")
+	added := filepath.Join(sb.Dir, "added")
+	// The worktree by its real path: the build refuses to remove one a symlink leads to (macOS's
+	// /var is one).
+	real, err := filepath.EvalSymlinks(sb.Dir)
+	if err != nil {
+		real = sb.Dir
+	}
+	worktree := filepath.Join(real, "worktree")
+	for _, d := range []string{extra, added, worktree} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeHookControls(t, rec, hookControls{"WorktreeCreate": {Stdout: worktree + "\n"}})
+	Placeholder(t, b, hooksPrompt, "<prompt>")
+	Placeholder(t, b, extra, "<extra-dir>")
+	Placeholder(t, b, added, "<added-dir>")
+	Placeholder(t, b, worktree, "<worktree>")
+	env := sb.claudeEnv(RouteAPIKey)
+
+	return claudeHooksRig{supported: supported, source: source, fx: fx, rec: rec, env: env, extra: extra, added: added}
 }
 
 // TestClaudeProbeHooks: every hook event each Claude Code build knows (ClaudeHookEventsIn), a
 // recording hook for each, and the runs that fire them: a turn of tool calls (Bash and Read at
 // once, an Edit, a Bash that fails, a Write that is denied, a cd, a settings change, a subagent,
-// a push notification where the build offers one, a worktree entered and left), /compact, a
-// custom command, /model, --init-only, a turn the provider refuses, and one in auto mode whose
-// classifier denies a command. Then a control pass: SessionStart, UserPromptSubmit, PreToolUse
-// and Stop answered with exit 2, a JSON decision and added context, each pass a fresh session.
-// RecordProbe("hooks", HooksProbe). ~70 s a build.
+// one in a worktree of its own, a push notification where the build offers one, the session in
+// a worktree entered and removed), /compact, a custom command, /model, --init-only, a turn the
+// provider refuses, one in auto mode whose classifier denies a command, a task created and
+// completed, an MCP server's tool that asks the user a question, and an interactive session
+// (/add-dir, a settings file and a watched file changed, a teammate, a permission prompt left
+// unanswered, the session left idle). Then a control pass: SessionStart, UserPromptSubmit,
+// PreToolUse and Stop answered with exit 2, a JSON decision and added context, each pass a fresh
+// session. RecordProbe("hooks", HooksProbe). ~4 min a build.
 func TestClaudeProbeHooks(t *testing.T) {
 	claudeProbe(t, []string{"hooks"}, func(t *testing.T, b Binary, sb *Sandbox) {
 		start := time.Now()
-		supported, source := supportedHookEvents(t, b)
-		events := supported
-		if len(events) == 0 {
-			events = hookSeeds["claude"]
-		}
-		fx := &claudeHooksFixture{}
-		serveClaude(t, b, sb, fx)
-		rec := filepath.Join(sb.Dir, "hook-recorder")
-		writeClaudeRecorderHooks(t, sb, rec, events, true)
-		// terma's exporter settings go too: they point at a relay no run starts, whose flush would
-		// hold every run's exit, and the variables they set for hooks are terma's.
-		editJSON(t, filepath.Join(sb.ClaudeConfig, "settings.json"), func(doc map[string]any) { delete(doc, "env") })
-		// What the runs need: instructions to load, a command to expand, a folder to cd to, one
-		// to add, and one a WorktreeCreate hook names as the worktree it made.
-		sb.write("CLAUDE.md", "# Probe\n\nAnswer briefly.\n")
-		sb.write(".claude/commands/terma-probe.md", "Say hello. TERMA_HOOKS_PROBE\n")
-		sb.write("sub/.keep", "")
-		extra := filepath.Join(sb.Dir, "extra")
-		worktree := filepath.Join(sb.Dir, "worktree")
-		for _, d := range []string{extra, worktree} {
-			if err := os.MkdirAll(d, 0o755); err != nil {
-				t.Fatal(err)
-			}
-		}
-		writeHookControls(t, rec, hookControls{"WorktreeCreate": {Stdout: worktree + "\n"}})
-		Placeholder(t, b, hooksPrompt, "<prompt>")
-		Placeholder(t, b, extra, "<extra-dir>")
-		Placeholder(t, b, worktree, "<worktree>")
-		env := sb.claudeEnv(RouteAPIKey)
+		rig := claudeHooksSetup(t, b, sb)
+		supported, source, fx, rec, env, extra, added := rig.supported, rig.source, rig.fx, rig.rec, rig.env, rig.extra, rig.added
 
 		sid := uuid.NewString()
 		Placeholder(t, b, sid, "<session>")
 		args := []string{"--output-format", "json", "--max-turns", "30", "--session-id", sid, "--permission-mode", "default",
-			"--allowedTools", "Bash,Read,Edit,Agent,Task,EnterWorktree,ExitWorktree", "--add-dir", extra}
+			"--allowedTools", "Bash,Read,Edit,Agent,Task,EnterWorktree,ExitWorktree,ToolSearch", "--add-dir", extra}
 		RecordCommand(t, b, args)
 		lap := lapper(t)
 		fx.reset(func(tools map[string]map[string]any) []claudeStep { return claudeHookSteps(sb, tools) }, false)
@@ -438,10 +532,22 @@ func TestClaudeProbeHooks(t *testing.T) {
 			t.Logf("auto mode: %v", err)
 		}
 		lap("auto mode")
+		// Tasks: one created, started and completed, the task tools turned on.
+		fx.reset(claudeTaskSteps, false)
+		if _, err := claudeHooksRunEnv(sb, claudeTeamEnv, hooksTurnTimeout, hooksPrompt, "--output-format", "json", "--max-turns", "8", "--session-id", uuid.NewString(),
+			"--allowedTools", "TaskCreate,TaskUpdate,TaskList,ToolSearch"); err != nil {
+			t.Logf("tasks: %v", err)
+		}
+		t.Logf("tasks: the build offered %v", fx.offered())
+		lap("tasks")
+		claudeHooksElicitation(t, sb, fx)
+		lap("an MCP server's question")
+		claudeHooksInteractive(t, sb, fx, rec, added)
+		lap("the interactive session")
 
 		calls := HookCallsIn(rec)
 		t.Logf("hooks run: %s", hookSequence(calls))
-		probe := HooksProbeOf(supported, source, calls, env, sb.Dir)
+		probe := HooksProbeOf(supported, source, calls, append(slices.Clone(env), claudeTeamEnv...), sb.Dir)
 		claudeHookControls(t, sb, fx, &probe, lap)
 		notFired(&probe, claudeHookReasons)
 		RecordProbe(t, b, "hooks", probe)
@@ -511,11 +617,16 @@ func runFinished(t *testing.T, cmd *exec.Cmd, finished func(stdout string) bool)
 // claudeHooksRun is claudeRun for the hooks probe's many runs, stopped hooksExitGrace after it
 // printed its result.
 func claudeHooksRun(sb *Sandbox, timeout time.Duration, prompt string, args ...string) (map[string]any, error) {
+	return claudeHooksRunEnv(sb, nil, timeout, prompt, args...)
+}
+
+// claudeHooksRunEnv is claudeHooksRun with env added to the build's environment.
+func claudeHooksRunEnv(sb *Sandbox, env []string, timeout time.Duration, prompt string, args ...string) (map[string]any, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sb.claudeLauncher(), append([]string{"-p", prompt}, args...)...)
 	cmd.Dir = sb.workDir()
-	cmd.Env = sb.claudeEnv(RouteAPIKey)
+	cmd.Env = append(sb.claudeEnv(RouteAPIKey), env...)
 	var result map[string]any
 	stdout, stderr, stopped, err := runFinished(sb.T, cmd, func(out string) bool {
 		var r map[string]any
@@ -604,9 +715,28 @@ func claudeHookSteps(sb *Sandbox, tools map[string]map[string]any) []claudeStep 
 		{bash("cd sub")},
 		{bash("printf '{}\\n' > " + shellWord(filepath.Join(sb.Repo, ".claude", "settings.local.json")) + "; printf 'more\\n' >> " + shellWord(readme))},
 		{{"name": "Agent", "input": map[string]any{"description": "check", "prompt": hooksSubagentTask, "subagent_type": "general-purpose"}}},
+		// A subagent in a worktree of its own: the WorktreeCreate hook makes it (names its
+		// folder). A build may remove it when the subagent is done (WorktreeRemove); 2.1.318
+		// keeps a hook-made one, so the session's own worktree below is removed too.
+		{{"name": "Agent", "input": map[string]any{"description": "isolated check", "prompt": hooksSubagentTask, "subagent_type": "general-purpose",
+			"isolation": "worktree"}}},
 		{{"name": "PushNotification", "input": requiredInput(tools["PushNotification"])}},
-		{{"name": "EnterWorktree", "input": map[string]any{"name": "terma-probe"}}},
-		{{"name": "ExitWorktree", "input": map[string]any{"action": "remove", "discard_changes": true}}},
+	}
+	// The session in a worktree of its own: the WorktreeCreate hook makes it, and leaving it to
+	// remove it runs WorktreeRemove (a subagent's hook-made worktree is kept). The worktree
+	// tools may be deferred: loaded first.
+	load, offered := loadingSteps(tools, "EnterWorktree", "ExitWorktree")
+	tools = maps.Clone(tools)
+	for name := range offered {
+		if tools[name] == nil {
+			tools[name] = map[string]any{}
+		}
+	}
+	if offered["EnterWorktree"] {
+		all = append(all, load...)
+		all = append(all,
+			claudeStep{{"name": "EnterWorktree", "input": map[string]any{"name": "terma-probe"}}},
+			claudeStep{{"name": "ExitWorktree", "input": map[string]any{"action": "remove", "discard_changes": true}}})
 	}
 	var steps []claudeStep
 	for _, s := range all {
@@ -617,15 +747,251 @@ func claudeHookSteps(sb *Sandbox, tools map[string]map[string]any) []claudeStep 
 				call = map[string]any{"name": "Task", "input": call["input"]}
 				name = "Task"
 			}
-			if tools[name] != nil {
-				kept = append(kept, call)
+			if tools[name] == nil {
+				continue
 			}
+			if input, _ := call["input"].(map[string]any); input["isolation"] != nil {
+				if !hasProperty(tools[name], "isolation") {
+					continue
+				}
+				// The main thread waits for it, so the session is still there to remove it.
+				if hasProperty(tools[name], "run_in_background") {
+					input = maps.Clone(input)
+					input["run_in_background"] = false
+					call = map[string]any{"name": name, "input": input}
+				}
+			}
+			kept = append(kept, call)
 		}
 		if len(kept) > 0 {
 			steps = append(steps, kept)
 		}
 	}
 	return steps
+}
+
+// hasProperty reports whether tool's input schema has a property named name.
+func hasProperty(tool map[string]any, name string) bool {
+	schema, _ := tool["input_schema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	_, ok := props[name]
+	return ok
+}
+
+// loadingSteps are a step that loads those of names the request defers (ToolSearch, a select:
+// query), where there are any and the build offers ToolSearch, and which of names can be called:
+// each the request offers, or defers. A build defers a tool by marking it (defer_loading) or by
+// leaving it out, its name only in a list the model searches: a name the request leaves out is
+// loaded where the build offers ToolSearch, and a call of one it does not have fails as a tool
+// call, nothing more.
+func loadingSteps(tools map[string]map[string]any, names ...string) (load []claudeStep, offered map[string]bool) {
+	offered = map[string]bool{}
+	var deferred []string
+	for _, n := range names {
+		tool := tools[n]
+		if tool == nil {
+			if tools["ToolSearch"] != nil {
+				offered[n] = true
+				deferred = append(deferred, n)
+			}
+			continue
+		}
+		offered[n] = true
+		if d, _ := tool["defer_loading"].(bool); d {
+			deferred = append(deferred, n)
+		}
+	}
+	if len(deferred) > 0 && tools["ToolSearch"] != nil {
+		load = append(load, claudeStep{{"name": "ToolSearch", "input": map[string]any{"query": "select:" + strings.Join(deferred, ","), "max_results": len(deferred)}}})
+	}
+	return load, offered
+}
+
+// claudeTaskSteps are the main thread's calls of the run of tasks, of those tools the build
+// offers: a task created, set in progress and completed (TaskCreated, TaskCompleted).
+func claudeTaskSteps(tools map[string]map[string]any) []claudeStep {
+	steps, offered := loadingSteps(tools, "TaskCreate", "TaskUpdate")
+	if offered["TaskCreate"] {
+		steps = append(steps, claudeStep{{"name": "TaskCreate", "input": map[string]any{"subject": "Probe the hooks", "description": "TERMA hooks probe task",
+			"activeForm": "Probing the hooks"}}})
+		if offered["TaskUpdate"] {
+			steps = append(steps,
+				claudeStep{{"name": "TaskUpdate", "input": map[string]any{"taskId": "1", "status": "in_progress"}}},
+				claudeStep{{"name": "TaskUpdate", "input": map[string]any{"taskId": "1", "status": "completed"}}})
+		}
+	}
+	return steps
+}
+
+// claudeTeammateSteps are a call that spawns a named teammate (an agent team's member), which
+// reads, replies and goes idle (TeammateIdle), where the build's agent tool takes a name. An
+// agent of a type is spawned as a subagent, not a teammate: it has none. A build has a team
+// only in an interactive session.
+func claudeTeammateSteps(tools map[string]map[string]any) []claudeStep {
+	agent := "Agent"
+	if tools[agent] == nil {
+		agent = "Task"
+	}
+	if !hasProperty(tools[agent], "name") {
+		return nil
+	}
+	return []claudeStep{{{"name": agent, "input": map[string]any{"description": "teammate check", "prompt": hooksSubagentTask, "name": "probe-mate"}}}}
+}
+
+// claudeHooksElicitation is a -p turn whose one tool call is an MCP server's that asks the user
+// a question (serveElicitingMCP): the Elicitation hooks run first, then, the question left to
+// the build, ElicitationResult with how it answered and a Notification of it.
+func claudeHooksElicitation(t *testing.T, sb *Sandbox, fx *claudeHooksFixture) {
+	t.Helper()
+	exe, args, err := HookMCPCommand()
+	if err != nil {
+		t.Logf("an MCP server's question: %v", err)
+		return
+	}
+	config, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"termaprobe": map[string]any{"type": "stdio", "command": exe, "args": args}}})
+	path := filepath.Join(sb.Dir, "mcp.json")
+	sb.writeAbs(path, string(config)+"\n")
+	tool := "mcp__termaprobe__" + hookMCPTool
+	fx.reset(func(tools map[string]map[string]any) []claudeStep {
+		steps, offered := loadingSteps(tools, tool)
+		if !offered[tool] {
+			return nil
+		}
+		return append(steps, claudeStep{{"name": tool, "input": map[string]any{}}})
+	}, false)
+	if _, err := claudeHooksRun(sb, probeTimeout, hooksPrompt, "--output-format", "json", "--max-turns", "5", "--session-id", uuid.NewString(),
+		"--mcp-config", path, "--allowedTools", tool+",ToolSearch"); err != nil {
+		t.Logf("an MCP server's question: %v", err)
+	}
+	if offered := fx.offered(); !slices.ContainsFunc(offered, func(n string) bool { return strings.HasPrefix(n, tool) }) {
+		t.Logf("an MCP server's question: the build did not offer %s: %v", tool, offered)
+	}
+}
+
+// claudeHooksInteractive is a session in a terminal, for what fires only there: /add-dir adds a
+// folder (DirectoryAdded); the test changes the local settings file the session watches
+// (ConfigChange) and the file a FileChanged hook's matcher names (FileChanged); a turn asks to
+// write a file, which the session must ask about, left unanswered until the build notifies of
+// the prompt (Notification), then declined; the session left idle (Notification, idle_prompt).
+// Each step waits for its event, a while at most. The terminal takes keys a second or two after
+// they are sent, and an Enter it takes before the text it follows is a new line: each text is
+// typed slowly and seen on the screen before its Enter.
+func claudeHooksInteractive(t *testing.T, sb *Sandbox, fx *claudeHooksFixture, rec, added string) {
+	t.Helper()
+	sb.approveClaudeKey(ClaudeCredentials().APIKey)
+	// A teammate first, which works while the main thread's write waits on the person.
+	fx.reset(func(tools map[string]map[string]any) []claudeStep {
+		return append(claudeTeammateSteps(tools),
+			claudeStep{{"name": "Write", "input": map[string]any{"file_path": filepath.Join(sb.Repo, "notified.txt"), "content": "notified\n"}}})
+	}, false)
+	sid := uuid.NewString()
+	env := append(sb.claudeEnv(RouteAPIKey), claudeTeamEnv...)
+	term, err := Start(sb.Repo, env, 40, 120, sb.claudeLauncher(), "--session-id", sid, "--permission-mode", "default", "--allowedTools", "Read,Agent")
+	if err != nil {
+		t.Logf("the interactive session: %v", err)
+		return
+	}
+	defer func() { _ = term.Close("", 2*time.Second) }()
+	if err := claudePastDialogs(term, 90*time.Second); err != nil {
+		t.Logf("the interactive session: %v", err)
+		return
+	}
+	count := func(event string) int {
+		n := 0
+		for _, c := range HookCallsIn(rec) {
+			if c.Event == event && c.Variant == hookMatchAll {
+				n++
+			}
+		}
+		return n
+	}
+	screen := func() string { return tail(strings.TrimSpace(term.Screen()), 2500) }
+	// waitFor waits up to d for one more run of event than there were before, and says whether
+	// it came, the screen logged where it did not.
+	waitFor := func(event string, before int, d time.Duration) bool {
+		for deadline := time.Now().Add(d); time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
+			if count(event) > before {
+				return true
+			}
+		}
+		t.Logf("the interactive session: no %s in %v; the screen:\n%s", event, d, screen())
+		return false
+	}
+	// shows waits up to d for the screen to show text, its spaces and box lines aside (a long
+	// line wraps).
+	squeeze := func(s string) string {
+		return strings.Map(func(r rune) rune {
+			if unicode.IsSpace(r) || r == '│' {
+				return -1
+			}
+			return r
+		}, s)
+	}
+	shows := func(text string, d time.Duration) bool {
+		for deadline := time.Now().Add(d); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+			if strings.Contains(squeeze(term.Screen()), squeeze(text)) {
+				return true
+			}
+		}
+		return false
+	}
+	// enter types text and, once the screen shows it, Enter.
+	enter := func(text string) bool {
+		for _, r := range text {
+			_ = term.Send(string(r))
+			time.Sleep(30 * time.Millisecond)
+		}
+		if !shows(text, 10*time.Second) {
+			t.Logf("the interactive session: %q never showed; the screen:\n%s", text, screen())
+			return false
+		}
+		time.Sleep(700 * time.Millisecond)
+		return term.Send("\r") == nil
+	}
+	time.Sleep(3 * time.Second)
+
+	// /add-dir asks for the folder in a dialog of its own; the folder by its path from the
+	// repository, short enough not to wrap.
+	before := count("DirectoryAdded")
+	if enter("/add-dir") && shows("Enter the path to the directory", 10*time.Second) && enter(filepath.Join("..", filepath.Base(added))) {
+		if !waitFor("DirectoryAdded", before, 5*time.Second) {
+			_ = term.Send("\r") // a question about the folder (for this session)
+			waitFor("DirectoryAdded", before, 5*time.Second)
+		}
+	} else {
+		t.Logf("the interactive session: /add-dir showed no dialog; the screen:\n%s", screen())
+	}
+	time.Sleep(time.Second)
+	_ = term.Send("\x1b") // any dialog still open
+	time.Sleep(time.Second)
+
+	before = count("ConfigChange")
+	sb.write(".claude/settings.local.json", `{"cleanupPeriodDays": 30}`+"\n")
+	waitFor("ConfigChange", before, 10*time.Second)
+
+	before = count("FileChanged")
+	readme := filepath.Join(sb.Repo, "README.md")
+	if data, err := os.ReadFile(readme); err == nil {
+		sb.writeAbs(readme, string(data)+"changed on disk\n")
+	}
+	waitFor("FileChanged", before, 10*time.Second)
+
+	before = count("Notification")
+	idle := count("TeammateIdle")
+	if enter(hooksPrompt) {
+		waitFor("Notification", before, 20*time.Second)
+		waitFor("TeammateIdle", idle, 15*time.Second)
+	}
+	_ = term.Send("\x1b") // decline the write
+	time.Sleep(time.Second)
+	waitFor("Notification", count("Notification"), 8*time.Second) // idle_prompt
+
+	_ = term.Send("\x03")
+	time.Sleep(400 * time.Millisecond)
+	_ = term.Send("\x03")
+	if err := term.Close("", 20*time.Second); err != nil {
+		t.Logf("the interactive session: exit: %v", err)
+	}
 }
 
 // requiredInput is an input for tool with each required property its schema names given a

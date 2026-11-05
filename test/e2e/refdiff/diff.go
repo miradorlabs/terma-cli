@@ -94,6 +94,11 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "hooks" && len(c.Path) == 4 && c.Path[1] == "events" && (c.Path[3] == "count" || c.Path[3] == "cwd") {
 			continue
 		}
+		// So are the values an event was handed (its example payload, its variables' values):
+		// what a build hands a hook is its keys and their kinds, and the variables' names.
+		if c.Path[0] == "hooks" && len(c.Path) >= 4 && c.Path[1] == "events" && (c.Path[3] == "example" || c.Path[3] == "env_values") {
+			continue
+		}
 		// A tool that became deferred keeps no schema in the request: that is its deferral (one
 		// change), not its description and parameters removed.
 		if c.Path[0] == "tools" && len(c.Path) >= 3 && c.Op == "removed" && deferredIn(bt, c.Path[1]) {
