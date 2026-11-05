@@ -172,6 +172,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		}
 
 		markUnobserved(versions, byVersion)
+		markUnobservedEvents(versions, byVersion)
 
 		// The vendor's reference tonight goes with tonight's newest build that has its
 		// configuration captured; an older build keeps what it got when it was the newest.
@@ -517,6 +518,53 @@ func markUnobserved(versions []string, byVersion map[string]*Snapshot) {
 		if len(gaps) > 0 {
 			sort.Strings(gaps)
 			byVersion[v].Config["unobserved"] = gaps
+		}
+	}
+}
+
+// markUnobservedEvents says, of each build's vendor telemetry endpoint, the events builds
+// before and after it reported there and its run did not: an event a run reports only
+// sometimes (a sampled sweep, a feature check), not one the build stopped sending.
+func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
+	type seen = map[string]map[string]bool // endpoint → event names
+	per := make([]seen, len(versions))
+	for i, v := range versions {
+		per[i] = seen{}
+		tel, _ := byVersion[v].Network["telemetry"].(map[string]any)
+		for ep, raw := range tel {
+			m, _ := raw.(map[string]any)
+			delete(m, "unobserved")
+			evs, _ := m["events"].(map[string]any)
+			per[i][ep] = map[string]bool{}
+			for name := range evs {
+				per[i][ep][name] = true
+			}
+		}
+	}
+	for i, v := range versions {
+		tel, _ := byVersion[v].Network["telemetry"].(map[string]any)
+		for ep, raw := range tel {
+			before, after := map[string]bool{}, map[string]bool{}
+			for j := range i {
+				for name := range per[j][ep] {
+					before[name] = true
+				}
+			}
+			for j := i + 1; j < len(versions); j++ {
+				for name := range per[j][ep] {
+					after[name] = true
+				}
+			}
+			var gaps []string
+			for name := range before {
+				if after[name] && !per[i][ep][name] {
+					gaps = append(gaps, name)
+				}
+			}
+			if len(gaps) > 0 {
+				sort.Strings(gaps)
+				raw.(map[string]any)["unobserved"] = gaps
+			}
 		}
 	}
 }

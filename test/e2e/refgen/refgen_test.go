@@ -665,3 +665,43 @@ func TestDeferredToolsAndSystemMessages(t *testing.T) {
 		t.Errorf("new deferred = %+v", c)
 	}
 }
+
+// A harness's own telemetry is read from its egress: Claude Code's events by their
+// event_data's event_name, Clearcut's from the JSON its field holds; names and fields, no
+// values; a run's count is no change.
+func TestVendorTelemetry(t *testing.T) {
+	claudeBatch := json.RawMessage(`{"events":[{"event_type":"ClaudeCodeInternalEvent","event_data":{"event_name":"tengu_feature_ok","device_id":"abc","env":{"platform":"darwin"}}},` +
+		`{"event_type":"ClaudeCodeInternalEvent","event_data":{"event_name":"tengu_feature_ok","device_id":"abc"}},{"event_data":{"event_name":"tengu_run_hook","session_id":"s"}}]}`)
+	clearcut := json.RawMessage(`[{"log_source_name":"CONCORD","log_event":[[{"source_extension_json":"{\"event_name\":\"startup_stats\",\"console_type\":\"GEMINI_CLI\"}"}]]}]`)
+	tel := vendorTelemetry([]e2e.ProviderRequest{
+		{Method: "POST", Host: "api.anthropic.com", Path: "/api/event_logging/v2/batch", Body: claudeBatch},
+		{Method: "POST", Host: "play.googleapis.com", Path: "/log", Body: clearcut},
+		{Method: "GET", Host: "api.anthropic.com", Path: "/mcp-registry/v0/servers"},
+	})
+	ep := tel["POST api.anthropic.com/api/event_logging/v2/batch"].(map[string]any)
+	if got := strings.Join(sortedEventNames(ep), ","); got != "tengu_feature_ok,tengu_run_hook" {
+		t.Errorf("events = %s", got)
+	}
+	ok := ep["events"].(map[string]any)["tengu_feature_ok"].(map[string]any)
+	if ok["count"] != 2 || strings.Join(ok["fields"].([]string), ",") != "device_id,env,env.platform,event_name" {
+		t.Errorf("tengu_feature_ok = %v", ok)
+	}
+	if strings.Contains(fmt.Sprint(tel), "abc") || strings.Contains(fmt.Sprint(tel), "darwin") {
+		t.Error("a value reached the published telemetry")
+	}
+	if g := tel["POST play.googleapis.com/log"].(map[string]any); strings.Join(sortedEventNames(g), ",") != "startup_stats" {
+		t.Errorf("clearcut = %v", g)
+	}
+	a := &Snapshot{Harness: "claude", Version: "1", Network: map[string]any{"telemetry": jsonOf(tel)}}
+	tel2 := vendorTelemetry([]e2e.ProviderRequest{{Method: "POST", Host: "api.anthropic.com", Path: "/api/event_logging/v2/batch",
+		Body: json.RawMessage(`{"events":[{"event_data":{"event_name":"tengu_feature_ok","device_id":"x","env":{"platform":"y"}}},{"event_data":{"event_name":"tengu_new","session_id":"s"}},{"event_data":{"event_name":"tengu_run_hook","session_id":"s"}}]}`)},
+		{Method: "POST", Host: "play.googleapis.com", Path: "/log", Body: clearcut}})
+	b := &Snapshot{Harness: "claude", Version: "2", Network: map[string]any{"telemetry": jsonOf(tel2)}}
+	var titles []string
+	for _, c := range refdiff.New(a, b, nil, time.Now()).Changes {
+		titles = append(titles, c.Title)
+	}
+	if strings.Join(titles, " | ") != "New vendor telemetry event: tengu_new" {
+		t.Errorf("changes = %v", titles)
+	}
+}

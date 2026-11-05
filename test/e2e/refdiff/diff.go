@@ -44,6 +44,11 @@ func compare(a, b *Snapshot) []Change {
 		if at[sec] == nil || bt[sec] == nil {
 			continue
 		}
+		// A build whose interception failed somewhere (a TLS handshake the proxy lost) saw less
+		// than one that did not: their egress is not compared. Both failing (a pinned host) is.
+		if sec == "network" && interceptFailed(at) != interceptFailed(bt) {
+			continue
+		}
 		if a, b, ok := configs(sec, at[sec], bt[sec]); ok {
 			diffConfig(a, b, &out) // option by option (config.go)
 			continue
@@ -65,6 +70,19 @@ func compare(a, b *Snapshot) []Change {
 		// A retry probe's status there in one build and not the other was cut short in one: not
 		// observed, not a change of the build.
 		if c.Path[0] == "behavior" && len(c.Path) == 4 && c.Path[1] == "retries" && c.Path[2] == "statuses" && c.Op != "changed" {
+			continue
+		}
+		// An event a run reports only sometimes, missing where builds either side have it, is
+		// not observed there.
+		if c.Path[0] == "network" && len(c.Path) == 5 && c.Path[1] == "telemetry" && c.Path[3] == "events" && c.Op != "changed" &&
+			(eventUnobserved(at, c.Path[2], c.Path[4]) || eventUnobserved(bt, c.Path[2], c.Path[4])) {
+			continue
+		}
+		if c.Path[0] == "network" && len(c.Path) >= 4 && c.Path[1] == "telemetry" && c.Path[3] == "unobserved" {
+			continue
+		}
+		// How many times a run reported a vendor telemetry event is the run's.
+		if c.Path[0] == "network" && len(c.Path) == 6 && c.Path[1] == "telemetry" && c.Path[5] == "count" {
 			continue
 		}
 		// How many times an event fired, and where the session was when it did, are the run's.
@@ -591,6 +609,24 @@ func title(c *Change, labels map[string]string) string {
 			return t
 		}
 	case "network":
+		if at(1) == "telemetry" {
+			switch {
+			case len(p) == 2 && c.Op == "added":
+				return "Now sends its own telemetry to its vendor"
+			case len(p) == 2 && c.Op == "removed":
+				return "No longer sends its own telemetry to its vendor"
+			case len(p) == 3 && c.Op == "added":
+				return "New vendor telemetry endpoint: " + at(2)
+			case len(p) == 3:
+				return "Vendor telemetry endpoint no longer used: " + at(2)
+			case len(p) == 5 && c.Op == "added":
+				return "New vendor telemetry event: " + at(4)
+			case len(p) == 5:
+				return "Vendor telemetry event no longer sent: " + at(4)
+			case len(p) == 7 && at(5) == "fields":
+				return fmt.Sprintf("%s telemetry event field %s %s", at(4), at(6), verb)
+			}
+		}
 		if len(p) == 3 {
 			if c.Op == "added" {
 				return "New network request: " + at(2)
@@ -599,7 +635,10 @@ func title(c *Change, labels map[string]string) string {
 				return "Network request no longer made: " + at(2)
 			}
 		}
-		return "Network request " + at(2) + " " + strings.Join(p[3:], ".") + " " + verb
+		if len(p) > 3 {
+			return "Network request " + at(2) + " " + strings.Join(p[3:], ".") + " " + verb
+		}
+		return "Network " + strings.Join(p[1:], ".") + " " + verb
 	case "storage":
 		return "On-disk " + strings.Join(p[1:], " ") + " " + verb + valueNote(c)
 	case "binary":
@@ -900,4 +939,37 @@ func deferredValue(v any) bool {
 	m, _ := v.(map[string]any)
 	d, _ := m["deferred"].(bool)
 	return d
+}
+
+// interceptFailed reports a snapshot whose egress has a request the proxy could not read.
+func interceptFailed(t map[string]any) bool {
+	net, _ := t["network"].(map[string]any)
+	egress, _ := net["egress"].([]any)
+	for _, e := range egress {
+		if m, _ := e.(map[string]any); m["error"] != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// eventUnobserved reports an event a snapshot's run missed at an endpoint.
+func eventUnobserved(t map[string]any, endpoint, name string) bool {
+	net, _ := t["network"].(map[string]any)
+	tel, _ := net["telemetry"].(map[string]any)
+	ep, _ := tel[endpoint].(map[string]any)
+	list, _ := ep["unobserved"].([]any)
+	for _, v := range list {
+		if v == name {
+			return true
+		}
+	}
+	if ss, ok := ep["unobserved"].([]string); ok {
+		for _, v := range ss {
+			if v == name {
+				return true
+			}
+		}
+	}
+	return false
 }

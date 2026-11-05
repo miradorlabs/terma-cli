@@ -1072,6 +1072,9 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 			return fmt.Sprint(a["host"], a["path"], a["method"]) < fmt.Sprint(b["host"], b["path"], b["method"])
 		})
 		s.Network = map[string]any{"egress": egress}
+		if t := vendorTelemetry(p.Egress); t != nil {
+			s.Network["telemetry"] = t
+		}
 	}
 	if len(p.Files) > 0 {
 		s.Storage = map[string]any{}

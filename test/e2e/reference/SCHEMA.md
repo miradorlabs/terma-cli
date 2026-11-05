@@ -349,6 +349,29 @@ be read), the reference's `Global config` keys (kept in `~/.claude.json`, outsid
 schema) aside. The variable lists are as good as `config.env_vars`, a heuristic for a closed
 harness: a name the build composes at run time is not found, and one it only sets may be.
 
+### network
+
+`egress` lists each request the build made to anything but its model provider, through the
+recording proxy (`method`, `host`, `path`, `body_keys`, `when`: before, during or after its
+model calls; `error` where the proxy could not read it, a TLS handshake refused). Every request is
+answered locally and empty, never forwarded: this is what the build asks for when its servers
+answer nothing.
+
+`telemetry` is the build's own telemetry to its vendor, read from those requests' bodies
+(Claude Code's `event_logging` batches, Gemini CLI's Clearcut log), by endpoint:
+
+```json
+"telemetry": { "POST api.anthropic.com/api/event_logging/v2/batch": {
+  "events": { "tengu_deferred_tools_pool_change": { "count": 1, "fields": ["device_id", "env", "env.platform", "event_name", "session_id"] } },
+  "unobserved": ["tengu_retention_sweep"] } }
+```
+
+Event names, how many times the run reported each, and their fields two keys deep; never their
+values. `count` is the run's and is not compared. `unobserved` are events builds before and after
+this one reported there and its run did not (one reported only sometimes): not compared as
+removed and added. Two builds where one's interception failed (an egress `error` the other has
+not) are not compared in `network`.
+
 ### tools and prompt context
 
 A tool a build names but defers (its schema loaded on demand, through its tool search: Claude
