@@ -299,6 +299,12 @@ func ensureCodex(version string) (string, error) {
 			return "", err
 		}
 	}
+	// On Linux, the bubblewrap its sandbox runs tool commands in where the system has none,
+	// beside it, as npm installs it (linux-sandbox/src/bundled_bwrap.rs). A release that ships
+	// none uses the system's.
+	if runtime.GOOS == "linux" {
+		_, _ = ensureCodexExecutable(version, "bwrap")
+	}
 	return path, nil
 }
 

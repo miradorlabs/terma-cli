@@ -41,7 +41,12 @@ run: build
 MACHINE_IMAGE   := terma-e2e-machine
 CLAUDE_VERSION  ?= 2.1.285
 CODEX_VERSION   ?= 0.158.0
-MACHINE_RUN     ?= ^(TestGlobalMode.*|TestRelayClaude|TestRelayCodex|TestRelayNegativeControls|TestRelayResumedElsewhere)$$
+# The files profile (profile_files_test.go) traces each build with strace here, the Linux
+# build of each harness: MACHINE_CLAUDE_VERSIONS / MACHINE_CODEX_VERSIONS pick other builds
+# than the image's (a version list the suite fetches), as the reference's frequent check does.
+MACHINE_RUN     ?= ^(TestGlobalMode.*|TestRelayClaude|TestRelayCodex|TestRelayNegativeControls|TestRelayResumedElsewhere|TestClaudeProfileFiles|TestCodexProfileFiles)$$
+MACHINE_CLAUDE_VERSIONS ?= installed
+MACHINE_CODEX_VERSIONS  ?= installed
 LINUX_GO := docker run --rm -v "$(ROOT)":/src -w /src/test/e2e \
        -v terma-cli-gocache:/root/.cache/go-build -v terma-cli-gomod:/go/pkg/mod \
        -e CGO_ENABLED=0 -e GOTOOLCHAIN=auto -e GOOS=linux -e GOARCH=$(HOST_ARCH) $(GO_IMAGE)
@@ -58,12 +63,13 @@ machines: machine-image
 	# profile forbids ("bwrap: Failed to make / slave"). Docker Desktop applies neither. An
 	# Ubuntu 24.04+ host also gives bwrap no capabilities in its user namespace ("bwrap:
 	# loopback: Failed RTM_NEWADDR") until `sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`,
-	# which CI's machine job runs first.
-	docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined -v "$(CURDIR)":/work/e2e -w /work/e2e \
+	# which CI's machine job runs first. SYS_PTRACE: strace follows the files profile's builds,
+	# which a host's ptrace policy (Yama) may otherwise refuse inside the container.
+	docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined --cap-add SYS_PTRACE -v "$(CURDIR)":/work/e2e -w /work/e2e \
 	 -e TERMA_E2E=1 -e TERMA_ENV=dev -e TERMA_E2E_BINARY=/work/e2e/bin/linux/terma \
-	 -e TERMA_E2E_CLAUDE_VERSIONS=installed -e TERMA_E2E_CODEX_VERSIONS=installed \
+	 -e TERMA_E2E_CLAUDE_VERSIONS=$(MACHINE_CLAUDE_VERSIONS) -e TERMA_E2E_CODEX_VERSIONS=$(MACHINE_CODEX_VERSIONS) \
 	 -e TERMA_E2E_KNOWN_UPSTREAM=codex-session-end -e TERMA_E2E_REPORT=report/linux \
-	 -e TERMA_E2E_UNCLASSIFIED \
+	 -e TERMA_E2E_UNCLASSIFIED -e TERMA_E2E_TRACE_DIR -e TERMA_E2E_VERSIONS_DIR=versions/linux \
 	 $(MACHINE_IMAGE):$(CLAUDE_VERSION)-$(CODEX_VERSION) \
 	 ./bin/linux/e2e.test -test.v -test.timeout 40m -test.run '$(if $(RUN),$(RUN),$(MACHINE_RUN))'
 
