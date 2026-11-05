@@ -22,6 +22,7 @@ docs/harnesses/<harness>/diffs/<from>..<to>.json   what changed from one build t
 docs/harnesses/<harness>/prompts/<version>.md      the build's system prompt, as text
 docs/harnesses/<harness>/changelog.json            what the vendor's changelog says of each version
 docs/harnesses/<harness>/timeline.json             every step's changes, without their values
+docs/harnesses/<harness>/lineage.json              since which version each command, option, setting and variable is there
 docs/harnesses/refdiff.wasm, wasm_exec.js          the comparison of any two versions, for a browser
 ```
 
@@ -653,6 +654,68 @@ version made each change (a net change matches its steps by `id`).
   "steps": [ { "version": "2.1.318", "previous": "2.1.317",
                "changes": [ { "id": "tools.Monitor", "category": "tools", "op": "added", "title": "New tool: Monitor", "impact": "notable", "documented": true } ] } ] }
 ```
+
+## <harness>/lineage.json
+
+Since which version the harness has each of its subcommands, command-line options,
+configuration settings and environment variables, and until which: read from every published
+snapshot of it, each time refgen renders. Nothing in it says when it was made, so a history
+that did not change is a file that did not.
+
+```json
+{ "schema_version": 1, "harness": "codex",
+  "window": { "oldest": "0.90.0", "newest": "0.166.0", "builds": 100 },
+  "items": {
+    "cli.commands.codex.options.--profile-v2": { "kind": "option",
+      "ranges": [ { "since": "0.131.0", "until": "0.133.0", "removed": "0.134.0" } ], "since_bounded": true },
+    "cli.commands.codex exec.options.--json": { "kind": "option",
+      "ranges": [ { "since": "0.29.0", "until": null, "removed": null } ], "since_bounded": true,
+      "source": { "tag": "rust-v0.29.0", "version": "0.29.0", "commit": "…", "url": "https://github.com/openai/codex/commit/…",
+                  "file": "codex-rs/exec/src/cli.rs", "line": 61, "permalink": "https://github.com/openai/codex/blob/rust-v0.29.0/codex-rs/exec/src/cli.rs#L61",
+                  "verified": "absent at rust-v0.28.0, present at rust-v0.29.0; … adds it",
+                  "current": { "tag": "rust-v0.166.0", "version": "0.166.0", "file": "codex-rs/exec/src/cli.rs", "line": 88, "permalink": "…" } } } } }
+```
+
+`window` is the builds it was read from: the oldest and newest tracked and how many. Each item
+is keyed by its path in a snapshot, joined with dots as a diff's change `id` is, so the two
+join: `cli.commands.<command>` (`kind` `subcommand`: a command beneath the harness's own),
+`cli.commands.<command>.options.<flag>` (`option`, by its first long name),
+`config.options.<key>` (`setting`) and `config.env_vars.<NAME>` (`env_var`).
+
+`ranges` are the spans of builds that have it, oldest first, more than one where it went and
+came back: `since` the first build seen with it, `until` the last (null while the newest build
+that observed it has it), `removed` the first build seen without it after `until` (null with
+it). A build that did not observe the part an item would be in says nothing of it, and neither
+ends a range nor starts one: a section not captured, a command whose own help was not read
+(`helped` false: its options), a command the help that would list it was not read of, a
+configuration read another way than the newest build's (`config.source` and `env_source`
+without the tag), and what a minified reading misses where a diff takes it for not observed (a
+nested key, a top-level one in `config.unobserved`, a table whose keys could not be read).
+`since_bounded` is false where no build before the first range was seen without it, mostly
+one in the oldest build tracked: its `since` is "that version or earlier".
+
+`source`, where the harness's source is public, is where an item already in the oldest build
+came from: the earliest release tag (`tag`, `version`) whose source defines it, read the way
+its snapshots are (its command line as clap's derive makes it from the structs and enums of
+its source, its settings from the configuration source -source reads, its variables from the
+names its code reads), the releases walked back from the oldest build until one does not; the
+commit (`commit`, `url`) of those between that release and the one before that touch its
+definition, the first whose tree defines it and whose parent's does not; and the line that
+defines it there (`file`, `line`, `permalink`). `verified` says what was checked. `current` is
+where the newest build tracked defines it, null where it is gone; a render moves it to a newer
+build by looking in the file it was in first. With a source, the first range's `since` is its
+release and `since_bounded` true. An item whose release or commit could not be told has none:
+it is not guessed. Sources are looked up once, by hand (`refgen -lineage-sources`, below), and
+every later render keeps them without the source; an item introduced within the window needs
+none, as every release in it is tracked.
+
+`refgen -lineage-sources` (Codex only so far) reads a local clone of the harness's repository,
+kept between runs under `-source-clones` (else `$TERMA_SOURCE_CLONES`, else
+`$XDG_CACHE_HOME/terma-harness-reference`, `~/.cache/terma-harness-reference`), as
+`<owner>-<name>`: `openai-codex`. It clones it there the first time (blobless: a tree's files
+are fetched the first time something reads them) and fetches its new tags after. Any render
+that finds a clone there reads a release's source from it (for `-source` too) rather than its
+tarball, and falls back to the network for a tag it does not have.
 
 ## Comparing any two versions
 

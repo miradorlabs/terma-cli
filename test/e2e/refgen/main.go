@@ -40,6 +40,8 @@ func main() {
 	site := flag.String("site", "https://terma.ai", "the reference's public site, for the links announcements carry")
 	announcePath := flag.String("announce", "", "write the versions to announce (new, newer than any captured before) to this JSON file")
 	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them, and read its configuration options and environment variables from it (a tarball a build)")
+	clones := flag.String("source-clones", defaultCloneRoot(), "where local clones of public harnesses' sources are kept (<owner>-<name>); a release's source is read from its clone where there is one ($"+envSourceClones+")")
+	lineageSources := flag.Bool("lineage-sources", false, "look up, in a clone of each harness's source under -source-clones (cloned, or its tags fetched, first), the release and commit that introduced each item its oldest build tracked has (lineage.json); a one-time backfill, by hand")
 	flag.Parse()
 
 	n := night{now: time.Now().UTC(), labels: map[string]string{}}
@@ -106,7 +108,13 @@ func main() {
 	links := newLinker(*source)
 	if links != nil {
 		opt.linker = links
+		useClones(links.lib, *clones)
 	}
+	lineage, err := lineageSourcers(*clones, links, *lineageSources)
+	if err != nil {
+		fail(err)
+	}
+	opt.lineage = lineage
 	n.sources = newSourceConfigs(links)
 	news, err := publish(*out, n, opt)
 	links.close()
