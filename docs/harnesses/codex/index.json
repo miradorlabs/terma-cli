@@ -18,7 +18,7 @@
     "last_change": {
       "from": "0.165.0",
       "to": "0.166.0",
-      "at": "2026-11-05T02:11:01.502194Z",
+      "at": "2026-11-05T04:27:34.46041Z",
       "released_at": "2026-10-29T19:56:19.746Z",
       "changes": 63,
       "categories": {
@@ -32,7 +32,7 @@
     {
       "version": "0.166.0",
       "released_at": "2026-10-29T19:56:19.746Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T04:27:34.46041Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -62,7 +62,7 @@
     {
       "version": "0.165.0",
       "released_at": "2026-10-27T20:14:25.378Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T04:27:34.46041Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -91,7 +91,7 @@
     {
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T04:27:34.46041Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"

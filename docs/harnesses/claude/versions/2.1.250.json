@@ -3,7 +3,7 @@
   "harness": "claude",
   "version": "2.1.250",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-05T02:11:01.502194Z",
+  "captured_at": "2026-11-05T04:27:34.46041Z",
   "capture": {
     "command": [
       "claude",
@@ -25,6 +25,7 @@
       "caching": "2026-11-05T02:11:01.502194Z",
       "cli": "2026-11-05T02:11:01.502194Z",
       "config": "2026-11-05T02:11:01.502194Z",
+      "filesystem": "2026-11-05T04:27:34.46041Z",
       "hooks": "2026-11-05T02:11:01.502194Z",
       "model": "2026-11-05T02:11:01.502194Z",
       "network": "2026-11-05T02:11:01.502194Z",
@@ -8665,6 +8666,3826 @@
           "version"
         ]
       }
+    }
+  },
+  "filesystem": {
+    "darwin/arm64": {
+      "decoys": {
+        "<home>/.aws/credentials": "not touched",
+        "<home>/.config/gh/hosts.yml": "not touched",
+        "<home>/.docker/config.json": "not touched",
+        "<home>/.docker/run/docker.sock": "not touched",
+        "<home>/.git-credentials": "not touched",
+        "<home>/.netrc": "not touched",
+        "<home>/.npmrc": "not touched",
+        "<home>/.ssh/agent.sock": "not touched",
+        "<home>/.ssh/id_ed25519": "not touched",
+        "<repo>/.env": "not touched",
+        "<repo>/secrets.json": "not touched"
+      },
+      "dropped": {
+        "dev": 142565,
+        "helpers": 1342,
+        "libraries": 764,
+        "machine": 10,
+        "path-search": 481,
+        "self": 95,
+        "system": 509,
+        "terma": 3213,
+        "test": 95
+      },
+      "exec": {
+        "/bin/sh -c [ -x 'terma' ] && 'terma' hook --user post-tool-use || true": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "[ -x 'terma' ] && 'terma' hook --user post-tool-use || true"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "/bin/sh -c [ -x 'terma' ] && 'terma' hook --user session-end || true": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "[ -x 'terma' ] && 'terma' hook --user session-end || true"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "exit"
+          ]
+        },
+        "/bin/sh -c [ -x 'terma' ] && 'terma' hook --user session-start || true": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "[ -x 'terma' ] && 'terma' hook --user session-start || true"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/bin/sh -c [ -x 'terma' ] && 'terma' hook --user stop || true": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "[ -x 'terma' ] && 'terma' hook --user stop || true"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "exit"
+          ]
+        },
+        "/bin/sh -c [ -x 'terma' ] && 'terma' hook --user user-prompt-submit || true": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "[ -x 'terma' ] && 'terma' hook --user user-prompt-submit || true"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/bin/sh -c ioreg -rd1 -c \"IOPlatformExpertDevice\"": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "ioreg -rd1 -c \"IOPlatformExpertDevice\""
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/bin/sh -c ps aux | grep -E \"Visual Studio Code|Code Helper|Cursor Helper|Windsurf Helper|Devin Helper|Devin.app|IntelliJ IDEA|PyCharm|WebStorm|PhpStorm|RubyMine|CLion|GoLand|Rider|DataGrip|AppCode|DataSpell|Aqua|Gateway|Fleet|Android Studio\" | grep -v grep": {
+          "argv": [
+            "/bin/sh",
+            "-c",
+            "ps aux | grep -E \"Visual Studio Code|Code Helper|Cursor Helper|Windsurf Helper|Devin Helper|Devin.app|IntelliJ IDEA|PyCharm|WebStorm|PhpStorm|RubyMine|CLion|GoLand|Rider|DataGrip|AppCode|DataSpell|Aqua|Gateway|Fleet|Android Studio\" | grep -v grep"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      # Check for rg availability\n      echo \"# Check for rg availability\" >> \"$SNAPSHOT_FILE\"\n      echo \"if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then\" >> \"$SNAPSHOT_FILE\"\n  \n      cat >> \"$SNAPSHOT_FILE\" << 'RIPGREP_FUNC_END'\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nRIPGREP_FUNC_END\n    \n      echo \"fi\" >> \"$SNAPSHOT_FILE\"\n  \n      # Shadow find/grep with embedded bfs/ugrep (ant-native only)\n      echo \"# Shadow find/grep with embedded bfs/ugrep\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'FIND_GREP_FUNC_END'\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\nFIND_GREP_FUNC_END\n    \n      echo \"# Shadow pkill to refuse patterns matching the CLI process\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'PKILL_FUNC_END'\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nPKILL_FUNC_END\n    \n\n      # Add PATH to the file\n      cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\nexport PATH=<path>\nPATH_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ": {
+          "argv": [
+            "/bin/zsh",
+            "-c",
+            "-l",
+            "SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      # Check for rg availability\n      echo \"# Check for rg availability\" >> \"$SNAPSHOT_FILE\"\n      echo \"if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then\" >> \"$SNAPSHOT_FILE\"\n  \n      cat >> \"$SNAPSHOT_FILE\" << 'RIPGREP_FUNC_END'\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nRIPGREP_FUNC_END\n    \n      echo \"fi\" >> \"$SNAPSHOT_FILE\"\n  \n      # Shadow find/grep with embedded bfs/ugrep (ant-native only)\n      echo \"# Shadow find/grep with embedded bfs/ugrep\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'FIND_GREP_FUNC_END'\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\nFIND_GREP_FUNC_END\n    \n      echo \"# Shadow pkill to refuse patterns matching the CLI process\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'PKILL_FUNC_END'\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nPKILL_FUNC_END\n    \n\n      # Add PATH to the file\n      cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\nexport PATH=<path>\nPATH_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    "
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "/bin/zsh -c env": {
+          "argv": [
+            "/bin/zsh",
+            "-c",
+            "env"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd": {
+          "argv": [
+            "/bin/zsh",
+            "-c",
+            "source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin": {
+          "argv": [
+            "/usr/bin/git",
+            "-c",
+            "core.askPass=",
+            "-c",
+            "protocol.ext.allow=never",
+            "-c",
+            "submodule.recurse=false",
+            "-c",
+            "log.showSignature=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=",
+            "remote",
+            "get-url",
+            "origin"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5": {
+          "argv": [
+            "/usr/bin/git",
+            "-c",
+            "core.fsmonitor=",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.askPass=",
+            "-c",
+            "protocol.ext.allow=never",
+            "-c",
+            "submodule.recurse=false",
+            "-c",
+            "log.showSignature=false",
+            "--no-optional-locks",
+            "log",
+            "--oneline",
+            "-n",
+            "5"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short": {
+          "argv": [
+            "/usr/bin/git",
+            "-c",
+            "core.fsmonitor=",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.askPass=",
+            "-c",
+            "protocol.ext.allow=never",
+            "-c",
+            "submodule.recurse=false",
+            "-c",
+            "log.showSignature=false",
+            "--no-optional-locks",
+            "status",
+            "--short"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name": {
+          "argv": [
+            "/usr/bin/git",
+            "-c",
+            "core.fsmonitor=",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.askPass=",
+            "-c",
+            "protocol.ext.allow=never",
+            "-c",
+            "submodule.recurse=false",
+            "-c",
+            "log.showSignature=false",
+            "config",
+            "user.name"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/libexec/path_helper -s": {
+          "argv": [
+            "/usr/libexec/path_helper",
+            "-s"
+          ],
+          "by": "zsh",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "cat": {
+          "argv": [
+            "cat"
+          ],
+          "by": "zsh",
+          "count": 4,
+          "phases": [
+            "turn"
+          ]
+        },
+        "env": {
+          "argv": [
+            "env"
+          ],
+          "by": "zsh",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "git log --oneline -1": {
+          "argv": [
+            "git",
+            "log",
+            "--oneline",
+            "-1"
+          ],
+          "by": "zsh",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "git status --short": {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "by": "zsh",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "grep -E Visual Studio Code|Code Helper|Cursor Helper|Windsurf Helper|Devin Helper|Devin.app|IntelliJ IDEA|PyCharm|WebStorm|PhpStorm|RubyMine|CLion|GoLand|Rider|DataGrip|AppCode|DataSpell|Aqua|Gateway|Fleet|Android Studio": {
+          "argv": [
+            "grep",
+            "-E",
+            "Visual Studio Code|Code Helper|Cursor Helper|Windsurf Helper|Devin Helper|Devin.app|IntelliJ IDEA|PyCharm|WebStorm|PhpStorm|RubyMine|CLion|GoLand|Rider|DataGrip|AppCode|DataSpell|Aqua|Gateway|Fleet|Android Studio"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "grep -v grep": {
+          "argv": [
+            "grep",
+            "-v",
+            "grep"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "ioreg -rd1 -c IOPlatformExpertDevice": {
+          "argv": [
+            "ioreg",
+            "-rd1",
+            "-c",
+            "IOPlatformExpertDevice"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "ps -o lstart= -p <n>": {
+          "argv": [
+            "ps",
+            "-o",
+            "lstart=",
+            "-p",
+            "<n>"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "ps aux": {
+          "argv": [
+            "ps",
+            "aux"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "rg --no-config --files --hidden --no-ignore --max-depth <n> --glob .orphaned_at <claude-config>/plugins/cache": {
+          "argv": [
+            "rg",
+            "--no-config",
+            "--files",
+            "--hidden",
+            "--no-ignore",
+            "--max-depth",
+            "<n>",
+            "--glob",
+            ".orphaned_at",
+            "<claude-config>/plugins/cache"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "rg --no-config --files --hidden <repo>": {
+          "argv": [
+            "rg",
+            "--no-config",
+            "--files",
+            "--hidden",
+            "<repo>"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "rg --version": {
+          "argv": [
+            "rg",
+            "--version"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "security find-generic-password -a unknown -w -s Claude Code-<hash>": {
+          "argv": [
+            "security",
+            "find-generic-password",
+            "-a",
+            "unknown",
+            "-w",
+            "-s",
+            "Claude Code-<hash>"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "security find-generic-password -a unknown -w -s Claude Code-credentials-<hash>": {
+          "argv": [
+            "security",
+            "find-generic-password",
+            "-a",
+            "unknown",
+            "-w",
+            "-s",
+            "Claude Code-credentials-<hash>"
+          ],
+          "by": "claude",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "terma hook --user post-tool-use": {
+          "argv": [
+            "terma",
+            "hook",
+            "--user",
+            "post-tool-use"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "turn"
+          ]
+        },
+        "terma hook --user session-end": {
+          "argv": [
+            "terma",
+            "hook",
+            "--user",
+            "session-end"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "exit"
+          ]
+        },
+        "terma hook --user session-start": {
+          "argv": [
+            "terma",
+            "hook",
+            "--user",
+            "session-start"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        },
+        "terma hook --user stop": {
+          "argv": [
+            "terma",
+            "hook",
+            "--user",
+            "stop"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "exit"
+          ]
+        },
+        "terma hook --user user-prompt-submit": {
+          "argv": [
+            "terma",
+            "hook",
+            "--user",
+            "user-prompt-submit"
+          ],
+          "by": "sh",
+          "count": 1,
+          "phases": [
+            "startup"
+          ]
+        }
+      },
+      "lookups": [
+        "bash",
+        "bun",
+        "deno",
+        "git",
+        "node",
+        "npm",
+        "pnpm",
+        "ps",
+        "security",
+        "sh",
+        "yarn",
+        "zsh"
+      ],
+      "macos": {
+        "launch_items": {},
+        "task_ports": {
+          "<processes>": {
+            "count": 836,
+            "phases": [
+              "startup"
+            ],
+            "programs": [
+              "ps"
+            ]
+          }
+        },
+        "tcc": {},
+        "xpc": {
+          "com.apple.analyticsd": {
+            "count": 3,
+            "phases": [
+              "startup"
+            ],
+            "programs": [
+              "security"
+            ]
+          },
+          "com.apple.cfprefsd.agent": {
+            "count": 2,
+            "phases": [
+              "startup"
+            ],
+            "programs": [
+              "security"
+            ]
+          },
+          "com.apple.cfprefsd.daemon": {
+            "count": 3,
+            "phases": [
+              "startup"
+            ],
+            "programs": [
+              "security"
+            ]
+          },
+          "com.apple.securityd.xpc": {
+            "count": 1,
+            "phases": [
+              "startup"
+            ]
+          },
+          "com.apple.system.opendirectoryd.libinfo": {
+            "count": 14,
+            "phases": [
+              "startup",
+              "turn"
+            ],
+            "programs": [
+              "git",
+              "ioreg",
+              "ps",
+              "security",
+              "zsh"
+            ]
+          },
+          "com.apple.system.opendirectoryd.membership": {
+            "count": 6,
+            "phases": [
+              "startup",
+              "turn"
+            ],
+            "programs": [
+              "git"
+            ]
+          },
+          "com.apple.trustd.agent": {
+            "count": 1,
+            "phases": [
+              "startup"
+            ]
+          }
+        }
+      },
+      "paths": {
+        "/": {
+          "ops": [
+            "stat",
+            "list",
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/.claude/agents": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/.claude/commands": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/.claude/output-styles": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/.claude/skills": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/managed-mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/managed-settings.d": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/Library/Application Support/ClaudeCode/managed-settings.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Keychains": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Keychains/System.keychain": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Keychains/System.keychain-db": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Managed Preferences/com.anthropic.claudecode.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Managed Preferences/unknown/com.anthropic.claudecode.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Preferences/Logging/com.apple.diagnosticd.filter.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/System": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Users": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/bin": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/bin/bash": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/bin/ps": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/bin/zsh": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/etc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/home/claude/.claude/remote/.oauth_token": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/home/claude/.claude/remote/.session_ingress_token": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/lib": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/private": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/private/.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/etc": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/private/var": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/private/var/.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/private/var/folders/.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/folders/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var/run/systemkeychaincheck.done": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/sbin": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/usr/bin/git": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/bin/security": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/var": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/var/run/systemkeychaincheck.done": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>": {
+          "ops": [
+            "stat",
+            "list",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/.cc-writes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/.claude.json": {
+          "ops": [
+            "stat",
+            "read",
+            "write"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/.claude.json.lock": {
+          "ops": [
+            "stat",
+            "create",
+            "delete"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/.claude.json.tmp.<n>.<id>": {
+          "ops": [
+            "write",
+            "create",
+            "rename"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/.config.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/.credentials.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/agents": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/backups": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/backups/.claude.json.backup.<n>": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/cache/changelog.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/commands": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/cowork_plugins": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<claude-config>/cowork_plugins/installed_plugins.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<claude-config>/ide": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/output-styles": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/plans": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/plugins": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/plugins/cache": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/plugins/flagged-plugins.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/plugins/installed_plugins.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/plugins/installed_plugins_v2.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/plugins/known_marketplaces.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/projects": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/projects/<repo-slug>": {
+          "ops": [
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/projects/<repo-slug>/<uuid>.jsonl": {
+          "ops": [
+            "read",
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup",
+            "turn",
+            "exit"
+          ]
+        },
+        "<claude-config>/projects/<repo-slug>/<uuid>/remote-agents": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/projects/<repo-slug>/memory": {
+          "ops": [
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/projects/<repo-slug>/memory/MEMORY.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/session-env": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/session-env/<uuid>": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/sessions": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/sessions/.fleetview-heartbeat": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<claude-config>/sessions/<n>.<hash>.key": {
+          "ops": [
+            "write",
+            "delete"
+          ],
+          "phases": [
+            "startup",
+            "exit"
+          ]
+        },
+        "<claude-config>/sessions/<n>.<hash>.key.tmp.<id>": {
+          "ops": [
+            "write",
+            "create",
+            "rename"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/sessions/<n>.json": {
+          "ops": [
+            "write",
+            "create",
+            "delete"
+          ],
+          "phases": [
+            "startup",
+            "exit"
+          ]
+        },
+        "<claude-config>/settings.json": {
+          "ops": [
+            "stat",
+            "read",
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/settings.json.tmp.<n>.<id>": {
+          "ops": [
+            "write",
+            "create",
+            "rename"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/shell-snapshots": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh": {
+          "ops": [
+            "stat",
+            "read",
+            "write",
+            "create",
+            "delete"
+          ],
+          "phases": [
+            "turn",
+            "exit"
+          ],
+          "programs": [
+            "cat",
+            "zsh"
+          ]
+        },
+        "<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh.zwc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<claude-config>/skills": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<claude-config>/skills/synced": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/telemetry": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "exit"
+          ]
+        },
+        "<claude-config>/themes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<claude-config>/workflows": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "security"
+          ]
+        },
+        "<home>/.claude/ide": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>/.config/anthropic/active_config": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>/.config/anthropic/configs/default.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>/.config/git/attributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/.config/git/config": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>/.config/git/ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/.gitconfig": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>/.zlogin": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<home>/.zlogin.zwc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<home>/.zprofile": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<home>/.zprofile.zwc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<home>/.zshenv": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<home>/.zshenv.zwc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<home>/.zshrc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<home>/Library": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "security"
+          ]
+        },
+        "<home>/Library/Developer/Toolchains": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/Library/Keychains/login.keychain": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "security"
+          ]
+        },
+        "<home>/Library/Keychains/login.keychain-db": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "security"
+          ]
+        },
+        "<home>/Library/Preferences/com.apple.security.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "security"
+          ]
+        },
+        "<repo>": {
+          "ops": [
+            "stat",
+            "list",
+            "read",
+            "chdir"
+          ],
+          "phases": [
+            "startup",
+            "turn",
+            "exit"
+          ],
+          "programs": [
+            "git",
+            "path_helper",
+            "sh",
+            "zsh"
+          ]
+        },
+        "<repo>/.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/agents": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/commands": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/output-styles": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/scheduled_tasks.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/settings.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/settings.local.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/skills": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.claude/workflows": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git": {
+          "ops": [
+            "stat",
+            "list",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/BISECT_LOG": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/CHERRY_PICK_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/HEAD": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/MERGE_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/REVERT_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/commondir": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/config": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/hooks": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/hooks/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/hooks/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/hooks/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/hooks/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/hooks/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/hooks/post-index-change": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/index": {
+          "ops": [
+            "read",
+            "write"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/index.lock": {
+          "ops": [
+            "stat",
+            "write",
+            "create",
+            "rename"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/info/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/info/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/info/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/info/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/info/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/info/attributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/exclude": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/grafts": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/logs": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/heads": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/heads/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/heads/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/heads/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/heads/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/logs/refs/heads/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/<id>": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/<id>/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/<id>/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/<id>/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/<id>/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/<id>/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/<id>/<hash>": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/info/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/info/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/info/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/info/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/info/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/info/alternates": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/commit-graph": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/commit-graphs/commit-graph-chain": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/pack/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/pack/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/pack/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/pack/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/objects/pack/multi-pack-index": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack/multi-pack-index.d/multi-pack-index-chain": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/packed-refs": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/rebase-apply": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/rebase-merge": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/heads/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/heads/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/heads/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/heads/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/heads/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/heads/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads/main": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/remotes/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/HEAD/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/origin": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/remotes/origin/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/remotes/origin/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/remotes/origin/master": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.git/refs/tags/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/sequencer/todo": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/shallow": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/worktrees": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.gitattributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.mailmap": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/README.md": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/notes.txt": {
+          "ops": [
+            "stat",
+            "write"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<repo>/notes.txt.tmp.<n>.<id>": {
+          "ops": [
+            "write",
+            "create",
+            "rename"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<sandbox>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git",
+            "security"
+          ]
+        },
+        "<sandbox>/..": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git",
+            "security"
+          ]
+        },
+        "<sandbox>/../.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/../CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<sandbox>/gitconfig": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<tmp>": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git",
+            "security",
+            "zsh"
+          ]
+        },
+        "<tmp>/../../.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../../CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/../CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.claude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.claude/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.claude/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.git/info/exclude": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.mcp.json": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/.rgignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/<id>": {
+          "ops": [
+            "stat",
+            "read",
+            "write",
+            "delete"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<tmp>/CLAUDE.local.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/CLAUDE.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/cc-socks": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/cc-socks/<n>.sock": {
+          "ops": [
+            "stat",
+            "delete"
+          ],
+          "phases": [
+            "startup",
+            "exit"
+          ]
+        },
+        "<tmp>/claude-<id>-cwd": {
+          "ops": [
+            "stat",
+            "read",
+            "write",
+            "delete"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "zsh"
+          ]
+        },
+        "<tmp>/claude-<n>": {
+          "ops": [
+            "stat",
+            "list",
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<tmp>/claude-<n>/<repo-slug>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<tmp>/claude-<n>/<repo-slug>/<uuid>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<tmp>/claude-<n>/<repo-slug>/<uuid>/tasks": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<tmp>/claude-<n>/<repo-slug>/<uuid>/tasks/<id>.output": {
+          "ops": [
+            "stat",
+            "read",
+            "write",
+            "delete"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git",
+            "zsh"
+          ]
+        },
+        "<tmp>/xcrun_db": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<user-home>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "security",
+            "zsh"
+          ]
+        },
+        "<user-home>/.CFUserTextEncoding": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git",
+            "ioreg",
+            "security"
+          ]
+        }
+      },
+      "platform": "darwin/arm64",
+      "sockets": {
+        "connections": {
+          "tcp <provider>": {
+            "count": 1,
+            "phases": [
+              "exit"
+            ],
+            "role": "provider"
+          },
+          "tcp <proxy>": {
+            "count": 1,
+            "phases": [
+              "startup"
+            ],
+            "role": "proxy"
+          }
+        },
+        "dns": [],
+        "listening": {},
+        "unix": {
+          "<tmp>/cc-socks/<n>.sock": {
+            "count": 1,
+            "ops": [
+              "bind"
+            ],
+            "phases": [
+              "startup"
+            ]
+          }
+        }
+      },
+      "tracer": "eslogger"
     }
   },
   "binary": {
