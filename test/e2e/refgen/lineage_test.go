@@ -194,3 +194,29 @@ func TestLineageDeterministic(t *testing.T) {
 		t.Error("a lineage says when it was made")
 	}
 }
+
+// A nested setting is no older than its setting: first seen with it where its start is known,
+// it starts there too; one seen later, where nested settings were not read before, stays "or
+// earlier".
+func TestLineageNestedBounded(t *testing.T) {
+	l := &Lineage{Items: map[string]*LineageItem{
+		"config.options.marketplaces":              {Kind: kindSetting, Ranges: []LineageRange{{Since: "2.1.232"}}, SinceBounded: true},
+		"config.options.marketplaces.<name>":       {Kind: kindSetting, Ranges: []LineageRange{{Since: "2.1.232"}}},
+		"config.options.marketplaces.<name>.auto":  {Kind: kindSetting, Ranges: []LineageRange{{Since: "2.1.232"}}},
+		"config.options.marketplaces.<name>.later": {Kind: kindSetting, Ranges: []LineageRange{{Since: "2.1.250"}}},
+		"config.options.old.nested":                {Kind: kindSetting, Ranges: []LineageRange{{Since: "2.1.206"}}},
+		"config.options.old":                       {Kind: kindSetting, Ranges: []LineageRange{{Since: "2.1.206"}}},
+	}}
+	boundNested(l)
+	for id, want := range map[string]bool{
+		"config.options.marketplaces.<name>": true, "config.options.marketplaces.<name>.auto": true,
+		"config.options.marketplaces.<name>.later": false, "config.options.old.nested": false,
+	} {
+		if got := l.Items[id].SinceBounded; got != want {
+			t.Errorf("%s since_bounded = %v, want %v", id, got, want)
+		}
+	}
+	if lineageParent("cli.commands.codex exec.options.--json") != "cli.commands.codex exec" {
+		t.Errorf("option parent = %q", lineageParent("cli.commands.codex exec.options.--json"))
+	}
+}

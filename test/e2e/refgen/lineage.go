@@ -147,7 +147,40 @@ func lineageOf(harness string, versions []string, byVersion map[string]*Snapshot
 		}
 		l.Items[id] = item
 	}
+	boundNested(l)
 	return l
+}
+
+// boundNested bounds a nested setting, or a subcommand's option, by what holds it: no older
+// than it, an item first seen with it where its start is known starts there too. (Builds that
+// read settings only to the top level say nothing of nested ones, so alone they would read "or
+// earlier".)
+func boundNested(l *Lineage) {
+	for _, id := range slices.SortedFunc(maps.Keys(l.Items), func(a, b string) int { return len(a) - len(b) }) {
+		item := l.Items[id]
+		parent := l.Items[lineageParent(id)]
+		if item.SinceBounded || parent == nil || !parent.SinceBounded || len(parent.Ranges) == 0 || len(item.Ranges) == 0 {
+			continue
+		}
+		if item.Ranges[0].Since == parent.Ranges[0].Since {
+			item.SinceBounded = true
+		}
+	}
+}
+
+// lineageParent is the id of what holds an item: a nested setting's setting, a subcommand
+// option's subcommand; "" for a top-level item.
+func lineageParent(id string) string {
+	if rest, ok := strings.CutPrefix(id, "config.options."); ok {
+		if i := strings.LastIndexByte(rest, '.'); i > 0 {
+			return "config.options." + rest[:i]
+		}
+		return ""
+	}
+	if cmd, _, ok := strings.Cut(id, ".options."); ok && strings.HasPrefix(id, "cli.commands.") {
+		return cmd
+	}
+	return ""
 }
 
 // referenceKinds are how the newest build that has them read its configuration's options

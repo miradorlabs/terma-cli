@@ -739,7 +739,10 @@ configuration read another way than the newest build's (`config.source` and `env
 without the tag), and what a minified reading misses where a diff takes it for not observed (a
 nested key, a top-level one in `config.unobserved`, a table whose keys could not be read).
 `since_bounded` is false where no build before the first range was seen without it, mostly
-one in the oldest build tracked: its `since` is "that version or earlier".
+one in the oldest build tracked: its `since` is "that version or earlier". A nested setting, or
+a subcommand's option, is no older than what holds it: first seen in the same build as it,
+where that one's start is known, it is bounded too (builds that read settings only to the top
+level say nothing of nested ones).
 
 `source`, where the harness's source is public, is where an item already in the oldest build
 came from: the earliest release tag (`tag`, `version`) whose source defines it, read the way
