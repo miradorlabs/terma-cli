@@ -751,6 +751,9 @@ func (s TraceScope) normalizeText(text string) string {
 	// An id the run made, in a name (Claude Code's keychain entry is named by a hash of its
 	// configuration folder).
 	text = uuidRE.ReplaceAllString(text, "<uuid>")
+	// A heredoc's delimiter the run picks at random (Claude Code's shell snapshot:
+	// `<< 'PATH_END_c3ph6ooejs'`).
+	text = heredocTagRE.ReplaceAllString(text, "${1}_<id>")
 	return argHexRE.ReplaceAllStringFunc(text, func(tok string) string {
 		if strings.ContainsAny(tok, "0123456789") {
 			return "<hash>"
@@ -761,6 +764,10 @@ func (s TraceScope) normalizeText(text string) string {
 
 // argHexRE is a hex token in a command line, eight digits or more.
 var argHexRE = regexp.MustCompile(`\b[0-9a-f]{8,}\b`)
+
+// heredocTagRE is an upper-case word with a random lower-case suffix: a heredoc delimiter a
+// program made unique.
+var heredocTagRE = regexp.MustCompile(`\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)_[a-z0-9]{6,16}\b`)
 
 // socketEvent records a socket call.
 func (s TraceScope) socketEvent(out *FilesProbe, ev TraceEvent, phase, program string, dns map[string]bool) {

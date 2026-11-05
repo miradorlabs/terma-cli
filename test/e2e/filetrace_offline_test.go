@@ -304,6 +304,17 @@ func TestTraceNormalizeOffline(t *testing.T) {
 			t.Errorf("normalize(%q) = %q, want %q", in, got, want)
 		}
 	}
+	// A command line: its paths, and the heredoc delimiters Claude Code makes for each run.
+	for in, want := range map[string]string{
+		`cat >> "$SNAPSHOT_FILE" << 'PATH_END_c3ph6ooejs'`:           `cat >> "$SNAPSHOT_FILE" << 'PATH_END_<id>'`,
+		`cat >> "$SNAPSHOT_FILE" << 'CLAUDE_CODE_END_s77gn0jo7vj'`:   `cat >> "$SNAPSHOT_FILE" << 'CLAUDE_CODE_END_<id>'`,
+		`cat >> "$SNAPSHOT_FILE" << 'RIPGREP_FUNC_END'`:              `cat >> "$SNAPSHOT_FILE" << 'RIPGREP_FUNC_END'`,
+		`env CLAUDE_CODE_ENTRYPOINT=cli NODE_OPTIONS=--max_old=4096`: `env CLAUDE_CODE_ENTRYPOINT=cli NODE_OPTIONS=--max_old=4096`,
+	} {
+		if got := s.normalizeText(in); got != want {
+			t.Errorf("normalizeText(%q) = %q, want %q", in, got, want)
+		}
+	}
 }
 
 // eslogger lines as Endpoint Security's JSON has them (the fields the trace reads, and enough
