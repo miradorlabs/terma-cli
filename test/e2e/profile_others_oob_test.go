@@ -22,8 +22,8 @@ import (
 // usage statistics and update checks, OpenCode's autoupdate and sharing, DeepSeek's session
 // telemetry, Pi's --offline), and none of terma's plugins, whose traffic is terma's. The same
 // turn's files, the hooks a harness runs itself (Gemini's), and the build's executable and help
-// are recorded beside its egress. Copilot CLI, which only runs against GitHub's service, records
-// its executable and help alone (TestCopilotProfileBinary).
+// are recorded beside its egress. Copilot CLI's runs against a provider of the user's (BYOK), the
+// fixture; its signing is recorded by TestCopilotProfileBinary, which takes no turn.
 
 // otherProfile is how one harness's out-of-band profile turn is taken.
 type otherProfile struct {
@@ -223,7 +223,10 @@ func TestHermesProfileEgress(t *testing.T) {
 			program:     "hermes",
 			isModelCall: isChatCompletion,
 			provider:    func(calls *atomic.Int32) http.Handler { return hermesProvider(calls, "", nil) },
-			setup:       func(sb *Sandbox, url string) { sb.UseHermes(url) },
+			setup: func(sb *Sandbox, url string) {
+				sb.UseHermes(url)
+				sb.PrepareHermesHome()
+			},
 			run: func(t *testing.T, sb *Sandbox, b Binary) []string {
 				sb.HermesRun(b, sb.Repo, profilePrompt)
 				return []string{"chat", "-Q", "--yolo"}
@@ -251,6 +254,56 @@ func TestDshProfileEgress(t *testing.T) {
 			},
 			kinds: []StorageKind{{regexp.MustCompile(`/sessions/session-<uuid>\.json$`), "transcript"}},
 		})
+	})
+}
+
+// TestCopilotProfileEgress: `copilot -p` against the Anthropic Messages fixture (BYOK, as
+// TestCopilotProfile), with auto-update and the CLI's own telemetry as their defaults have them:
+// what a build sends besides its model requests when it is pointed at a provider of the user's.
+// The build under test still runs: the proxy forwards no update.
+func TestCopilotProfileEgress(t *testing.T) {
+	forEachCopilotBuild(t, func(t *testing.T, b Binary) {
+		profileOtherOutOfBand(t, b, otherProfile{
+			program:     "copilot",
+			isModelCall: isClaudeModelCall,
+			provider:    func(calls *atomic.Int32) http.Handler { return claudeProbeProvider(calls, nil, nil) },
+			setup: func(sb *Sandbox, url string) {
+				sb.ExtraEnv = append(sb.ExtraEnv, slices.DeleteFunc(copilotFixtureEnv(sb, url), func(kv string) bool {
+					return strings.HasPrefix(kv, "COPILOT_AUTO_UPDATE=")
+				})...)
+			},
+			run: func(t *testing.T, sb *Sandbox, b Binary) []string {
+				runProfileCommand(t, b, sb.Repo, sb.termaEnv(), "-p", profilePrompt)
+				return []string{"-p"}
+			},
+			kinds: []StorageKind{{regexp.MustCompile(`^<home>/\.copilot/session-state/`), "transcript"}},
+		})
+	})
+}
+
+// TestCopilotProfileTelemetry records how each Copilot CLI build exports its own telemetry, with
+// the exporter terma's launch sets (internal/agents/copilot LaunchEnv: OTel on, OTLP over
+// http/json, message content captured) pointed at the timing receiver, in a BYOK turn against the
+// fixture, as TestClaudeProfileTelemetry does for Claude Code.
+func TestCopilotProfileTelemetry(t *testing.T) {
+	forEachCopilotBuild(t, func(t *testing.T, b Binary) {
+		track(t)
+		sb := New(t, Isolated)
+		front := TimeReceiver(t, sb.Receiver)
+		var hold HoldFirst
+		var calls atomic.Int32
+		provider := httptest.NewServer(hold.Wrap(telemetryHold, isClaudeModelCall, claudeProbeProvider(&calls, nil, nil)))
+		defer provider.Close()
+		sb.ExtraEnv = append(sb.ExtraEnv, copilotFixtureEnv(sb, provider.URL)...)
+		sb.ExtraEnv = append(sb.ExtraEnv, "COPILOT_OTEL_ENABLED=true", "OTEL_EXPORTER_OTLP_ENDPOINT="+front.URL,
+			"OTEL_EXPORTER_OTLP_PROTOCOL=http/json", "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true")
+		PlaceSandbox(t, b, sb)
+		Placeholder(t, b, provider.URL, "<provider>")
+		Placeholder(t, b, front.URL, "<receiver>")
+		RecordCommand(t, b, []string{"-p"})
+		runProfileCommand(t, b, sb.Repo, sb.termaEnv(), "-p", profilePrompt)
+		time.Sleep(egressSettle)
+		RecordTelemetry(t, b, front, hold.Answered())
 	})
 }
 

@@ -81,6 +81,16 @@ func (sb *Sandbox) UseHermesPluginDirect() {
 	sb.hermes("plugins", "enable", "terma")
 }
 
+// PrepareHermesHome has Hermes build the sandbox's HERMES_HOME its dependency environment
+// before anything is recorded. Since 0.22, dependency state is per data root: the first launch
+// under a HERMES_HOME other than the install's own downloads and syncs one (uv, from PyPI),
+// which a user's home already has, and which behind the recording proxy cannot be fetched at
+// all. Any command that is not --help or --version prepares it; `plugins list` does nothing else.
+func (sb *Sandbox) PrepareHermesHome() {
+	sb.T.Helper()
+	sb.hermes("plugins", "list")
+}
+
 // hermes runs a Hermes subcommand in the sandbox.
 func (sb *Sandbox) hermes(args ...string) string {
 	t := sb.T

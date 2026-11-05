@@ -1494,26 +1494,74 @@ func TestGeminiProbeHooks(t *testing.T) {
 	})
 }
 
-// TestCopilotProbeHooks: the hook events each Copilot CLI build knows (CopilotHookEventsIn, from
-// the schema its packed script embeds). Copilot CLI runs only against GitHub's service, which the
-// suite has no fixture for, so none is fired. Seconds a build.
+// copilotHookReasons are why a Copilot CLI event does not fire in the probe's run.
+var copilotHookReasons = map[string]string{
+	"preCompact":        "fires before the conversation is compacted; the probe's one turn compacts nothing",
+	"preMcpToolCall":    "fires before an MCP server's tool runs; the probe configures no MCP server",
+	"permissionRequest": "fires when a tool asks for permission; the probe's run is -p --allow-all-tools",
+	"notification":      "fires for an interactive session's notifications; the probe's run is -p",
+	"prePRDescription":  "fires before Copilot writes a pull request's description; the probe opens none",
+	"subagentStart":     "fires when a subagent starts; the probe's turn starts none",
+	"subagentStop":      "fires when a subagent stops; the probe's turn starts none",
+}
+
+// TestCopilotProbeHooks: every hook event each Copilot CLI build knows (CopilotHookEventsIn, from
+// the schema its packed script embeds), a recording hook for each in a hooks file of the probe's
+// own in COPILOT_HOME's hooks directory (where terma's setup puts terma's), under Copilot's own
+// camelCase names, and one `copilot -p --allow-all-tools` turn against the Anthropic Messages
+// fixture (BYOK, as TestCopilotProfile) that runs a shell command and views a file that does not
+// exist. No control pass. Seconds a build.
 func TestCopilotProbeHooks(t *testing.T) {
 	skipUnlessProbe(t, "hooks")
-	if !Enabled() {
-		t.Skip("live tests run only with TERMA_E2E=1")
-	}
-	for _, b := range CopilotBinaries(t) {
-		t.Run(b.Label(), func(t *testing.T) {
-			scenarioOf(t, b.Harness)
-			track(t)
-			supported, source := supportedHookEvents(t, b)
-			probe := HooksProbeOf(supported, source, nil, nil, "")
-			reasons := map[string]string{}
-			for _, e := range supported {
-				reasons[e] = "Copilot CLI runs only against GitHub's service, which the suite has no fixture provider for"
+	forEachCopilotBuild(t, func(t *testing.T, b Binary) {
+		track(t)
+		profileOf(t, b)
+		start := time.Now()
+		sb := New(t, Isolated)
+		PlaceSandbox(t, b, sb)
+		supported, source := supportedHookEvents(t, b)
+		events := supported
+		if len(events) == 0 {
+			events = hookSeeds["copilot"]
+		}
+		var calls atomic.Int32
+		provider := httptest.NewServer(claudeProbeProvider(&calls, []claudeStep{
+			{{"name": "bash", "input": map[string]any{"command": "printf hooks-ok", "description": "Print a marker"}}},
+			{{"name": "view", "input": map[string]any{"path": filepath.Join(sb.Repo, "missing.txt")}}},
+		}, nil))
+		t.Cleanup(provider.Close)
+		Placeholder(t, b, provider.URL, "<provider>")
+		Placeholder(t, b, hooksPrompt, "<prompt>")
+		rec := filepath.Join(sb.Dir, "hook-recorder")
+		hooks := map[string]any{}
+		for _, e := range events {
+			cmd, err := HookRecorderCommand(rec, e, hookMatchAll)
+			if err != nil {
+				t.Fatal(err)
 			}
-			notFired(&probe, reasons)
-			RecordProbe(t, b, "hooks", probe)
-		})
-	}
+			hooks[e] = []any{map[string]any{"type": "command", "bash": cmd, "timeoutSec": 30}}
+		}
+		data, _ := json.Marshal(map[string]any{"version": 1, "hooks": hooks})
+		env := append(sb.termaEnv(), copilotFixtureEnv(sb, provider.URL)...)
+		sb.writeAbs(filepath.Join(sb.Home, ".copilot", "hooks", "terma-hooks-probe.json"), string(data)+"\n")
+		args := []string{"-p", hooksPrompt, "--allow-all-tools"}
+		RecordCommand(t, b, args[2:])
+		ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, b.Path, args...)
+		cmd.Dir, cmd.Env = sb.Repo, env
+		cmd.WaitDelay = 5 * time.Second
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Logf("copilot -p: %v\n%s", err, tail(string(out), 3000))
+		}
+		if calls.Load() == 0 {
+			t.Errorf("Copilot CLI sent its provider no model request")
+		}
+		hookCalls := HookCallsIn(rec)
+		t.Logf("hooks run: %s", hookSequence(hookCalls))
+		probe := HooksProbeOf(supported, source, hookCalls, env, sb.Dir)
+		notFired(&probe, copilotHookReasons)
+		RecordProbe(t, b, "hooks", probe)
+		t.Logf("hooks probe of %s %s: %d events fired of %d, %v", b.Harness, b.Version, firedCount(probe), len(probe.Supported), time.Since(start).Round(time.Second))
+	})
 }
