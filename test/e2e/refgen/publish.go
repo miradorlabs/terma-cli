@@ -27,6 +27,9 @@ type options struct {
 	fetch  bool   // release dates and changelogs from the web
 	linker linker // source links; nil leaves changes unlinked
 	site   string // the reference's public site, for announcements' links
+	// lineage reads a harness's source for where its items came from; nil, or a nil
+	// sourcer, keeps the sources its lineage has (lineage.go).
+	lineage func(harness string) lineageSourcer
 }
 
 // linker says where a harness's public source names what a change is about.
@@ -277,6 +280,13 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			}
 		}
 		if err := writeHarness(filepath.Join(dir, h), entry, entries, byVersion, diffs, cl); err != nil {
+			return nil, err
+		}
+		var src lineageSourcer
+		if opt.lineage != nil {
+			src = opt.lineage(h)
+		}
+		if err := writeLineage(filepath.Join(dir, h), h, versions, byVersion, src); err != nil {
 			return nil, err
 		}
 		news = append(news, announce(opt.site, entry, entries, diffs, byVersion, before[h])...)
