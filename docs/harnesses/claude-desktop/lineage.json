@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "harness": "claude-desktop",
+  "window": {
+    "oldest": "2.1.202",
+    "newest": "2.1.318",
+    "builds": 18
+  },
+  "items": {}
+}

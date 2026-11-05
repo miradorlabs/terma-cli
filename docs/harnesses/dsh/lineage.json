@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "harness": "dsh",
+  "window": {
+    "oldest": "0.2.0-rc.2",
+    "newest": "0.2.1-rc.5",
+    "builds": 3
+  },
+  "items": {}
+}

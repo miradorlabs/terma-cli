@@ -1193,6 +1193,7 @@
     "stream": true,
     "wire": "messages"
   },
+  "side_requests": [],
   "behavior": {
     "compaction": {
       "outcome": "compacted",

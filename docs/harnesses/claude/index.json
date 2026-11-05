@@ -14,7 +14,7 @@
     "last_change": {
       "from": "2.1.317",
       "to": "2.1.318",
-      "at": "2026-11-05T04:27:34.46041Z",
+      "at": "2026-11-05T06:31:08.621178Z",
       "released_at": "2026-11-03T21:55:17.247Z",
       "changes": 26,
       "categories": {
@@ -26,7 +26,7 @@
     {
       "version": "2.1.318",
       "released_at": "2026-11-03T21:55:17.247Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -54,26 +54,27 @@
     {
       "version": "2.1.317",
       "released_at": "2026-11-02T23:57:53.069Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.316",
-      "changes": 49,
+      "changes": 50,
       "categories": {
         "config": 1,
+        "hooks": 1,
         "prompt": 2,
         "telemetry": 46
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 47,
+        "informational": 48,
         "notable": 2
       },
-      "undocumented": 3,
+      "undocumented": 4,
       "highlights": [
         "Interactive system prompt changed (+265 −188 chars)",
         "System prompt changed (+265 −188 chars)",
@@ -84,27 +85,23 @@
     {
       "version": "2.1.316",
       "released_at": "2026-10-31T00:42:05.743Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.315",
-      "changes": 1,
-      "categories": {
-        "hooks": 1
-      },
+      "changes": 0,
+      "categories": {},
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 0,
         "notable": 0
       },
-      "undocumented": 1,
-      "highlights": [
-        "SessionEnd hook payload field prompt_id added"
-      ],
+      "undocumented": 0,
+      "highlights": [],
       "signing": "valid"
     },
     {

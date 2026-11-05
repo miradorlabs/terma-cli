@@ -400,6 +400,7 @@
     "stream": true,
     "wire": "responses"
   },
+  "side_requests": [],
   "behavior": {
     "retries": {
       "statuses": {

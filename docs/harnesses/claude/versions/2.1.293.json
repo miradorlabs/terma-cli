@@ -1273,6 +1273,7 @@
     "stream": true,
     "wire": "messages"
   },
+  "side_requests": [],
   "behavior": {
     "compaction": {
       "model": "claude-opus-5-5",

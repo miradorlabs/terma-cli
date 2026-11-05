@@ -1,13 +1,36 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T04:27:34.46041Z",
+  "generated_at": "2026-11-05T06:31:08.621178Z",
   "versions": [
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.67.0",
+      "released_at": "2026-11-04T20:32:45.08Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.66.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
       "version": "2.1.318",
       "released_at": "2026-11-03T21:55:17.247Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -37,26 +60,27 @@
       "name": "Claude Code",
       "version": "2.1.317",
       "released_at": "2026-11-02T23:57:53.069Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.316",
-      "changes": 49,
+      "changes": 50,
       "categories": {
         "config": 1,
+        "hooks": 1,
         "prompt": 2,
         "telemetry": 46
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 47,
+        "informational": 48,
         "notable": 2
       },
-      "undocumented": 3,
+      "undocumented": 4,
       "highlights": [
         "Interactive system prompt changed (+265 −188 chars)",
         "System prompt changed (+265 −188 chars)",
@@ -92,27 +116,23 @@
       "name": "Claude Code",
       "version": "2.1.316",
       "released_at": "2026-10-31T00:42:05.743Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.315",
-      "changes": 1,
-      "categories": {
-        "hooks": 1
-      },
+      "changes": 0,
+      "categories": {},
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 0,
         "notable": 0
       },
-      "undocumented": 1,
-      "highlights": [
-        "SessionEnd hook payload field prompt_id added"
-      ],
+      "undocumented": 0,
+      "highlights": [],
       "signing": "valid"
     },
     {
@@ -185,7 +205,7 @@
       "name": "Codex CLI",
       "version": "0.166.0",
       "released_at": "2026-10-29T19:56:19.746Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -286,7 +306,7 @@
       "name": "Codex CLI",
       "version": "0.165.0",
       "released_at": "2026-10-27T20:14:25.378Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -414,7 +434,7 @@
       "name": "Codex CLI",
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-05T04:27:34.46041Z",
+      "captured_at": "2026-11-05T06:31:08.621178Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -6050,41 +6070,6 @@
         "Injected context changed (+70 −0 chars)",
         "New setting: mcp_servers.<name>.oauth_resource",
         "New setting: audio"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.106.0",
-      "released_at": "2026-02-26T23:12:45.073Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
-      "platforms": [
-        "darwin/arm64"
-      ],
-      "support": "untested",
-      "previous": "0.105.0",
-      "changes": 15,
-      "categories": {
-        "behavior": 5,
-        "binary": 1,
-        "cli": 2,
-        "config": 3,
-        "model": 2,
-        "prompt": 1,
-        "request": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 6,
-        "notable": 9
-      },
-      "undocumented": 7,
-      "highlights": [
-        "Default model: gpt-5.2-codex → gpt-5.3-codex",
-        "Model parameter text added",
-        "System prompt changed (+7574 −4413 chars)"
       ],
       "signing": "revoked"
     }

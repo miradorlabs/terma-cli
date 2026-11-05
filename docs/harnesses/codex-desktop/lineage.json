@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "harness": "codex-desktop",
+  "window": {
+    "oldest": "0.161.0",
+    "newest": "0.166.0",
+    "builds": 7
+  },
+  "items": {}
+}

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T04:27:34.46041Z",
+  "generated_at": "2026-11-05T06:31:08.621178Z",
   "harnesses": [
     {
       "id": "claude",
@@ -16,7 +16,7 @@
       "last_change": {
         "from": "2.1.317",
         "to": "2.1.318",
-        "at": "2026-11-05T04:27:34.46041Z",
+        "at": "2026-11-05T06:31:08.621178Z",
         "released_at": "2026-11-03T21:55:17.247Z",
         "changes": 26,
         "categories": {
@@ -62,7 +62,7 @@
       "last_change": {
         "from": "0.165.0",
         "to": "0.166.0",
-        "at": "2026-11-05T04:27:34.46041Z",
+        "at": "2026-11-05T06:31:08.621178Z",
         "released_at": "2026-10-29T19:56:19.746Z",
         "changes": 63,
         "categories": {
@@ -130,15 +130,15 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/google-gemini/gemini-cli/releases",
-      "latest": "0.66.0",
+      "latest": "0.67.0",
       "support": "supported",
-      "versions_tracked": 6,
+      "versions_tracked": 7,
       "first_tracked": "2026-09-24",
       "last_change": {
-        "from": "0.65.0",
-        "to": "0.66.0",
-        "at": "2026-11-05T02:11:01.502194Z",
-        "released_at": "2026-10-27T20:30:04.263Z",
+        "from": "0.66.0",
+        "to": "0.67.0",
+        "at": "2026-11-05T06:31:08.621178Z",
+        "released_at": "2026-11-04T20:32:45.08Z",
         "changes": 0,
         "categories": {}
       }

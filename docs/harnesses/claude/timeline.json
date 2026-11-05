@@ -605,6 +605,14 @@
           "documented": true
         },
         {
+          "id": "hooks.events.PostToolUse.keys.tool_response.task.description",
+          "category": "hooks",
+          "op": "added",
+          "title": "PostToolUse hook payload field tool_response.task.description added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
           "id": "config.env_vars",
           "category": "config",
           "op": "changed",
@@ -617,16 +625,7 @@
     {
       "version": "2.1.316",
       "previous": "2.1.315",
-      "changes": [
-        {
-          "id": "hooks.events.SessionEnd.keys.prompt_id",
-          "category": "hooks",
-          "op": "added",
-          "title": "SessionEnd hook payload field prompt_id added",
-          "impact": "informational",
-          "documented": false
-        }
-      ]
+      "changes": []
     },
     {
       "version": "2.1.315",

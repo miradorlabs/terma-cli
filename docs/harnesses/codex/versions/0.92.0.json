@@ -308,6 +308,7 @@
     "stream": true,
     "wire": "responses"
   },
+  "side_requests": [],
   "behavior": {
     "compaction": {
       "model": "gpt-5.2-codex",
