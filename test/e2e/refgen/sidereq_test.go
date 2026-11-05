@@ -33,3 +33,11 @@ func TestLoadEmptySideRequests(t *testing.T) {
 		t.Errorf("history-only build's side_requests = %#v, want not observed", got)
 	}
 }
+
+// A platform a build's files were traced on is one it was captured on.
+func TestPlatformsIncludeTraces(t *testing.T) {
+	s := &Snapshot{Platform: "darwin/arm64", Filesystem: map[string]any{"linux/amd64": map[string]any{}, "darwin/arm64": map[string]any{}}}
+	if got := platformsOf(s); len(got) != 2 || got[0] != "darwin/arm64" || got[1] != "linux/amd64" {
+		t.Errorf("platforms = %v, want darwin/arm64 and linux/amd64", got)
+	}
+}

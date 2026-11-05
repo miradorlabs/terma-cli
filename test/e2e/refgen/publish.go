@@ -457,6 +457,10 @@ func platformsOf(s *Snapshot) []string {
 			}
 		}
 	}
+	// A platform the build's files and processes were traced on is one it was captured on.
+	for p := range s.Filesystem {
+		seen[p] = true
+	}
 	return sortedKeys(seen)
 }
 
