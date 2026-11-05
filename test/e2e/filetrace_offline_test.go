@@ -279,6 +279,7 @@ func TestStraceParseDetailsOffline(t *testing.T) {
 
 func TestTraceNormalizeOffline(t *testing.T) {
 	s := straceScope()
+	s.Path = "/sb/path:/Users/me/.grok/bin:/usr/bin"
 	for in, want := range map[string]string{
 		"/sb/claude/projects/-sb-repo/0f8fad5b-d9cb-469f-a165-70867728950e.jsonl": "<claude-config>/projects/<repo-slug>/<uuid>.jsonl",
 		"/tmp/claude-3f2a-cwd":           "<tmp>/claude-<id>-cwd",
@@ -316,6 +317,7 @@ func TestTraceNormalizeOffline(t *testing.T) {
 		`cat >> "$SNAPSHOT_FILE" << 'CLAUDE_CODE_END_s77gn0jo7vj'`:   `cat >> "$SNAPSHOT_FILE" << 'CLAUDE_CODE_END_<id>'`,
 		`cat >> "$SNAPSHOT_FILE" << 'RIPGREP_FUNC_END'`:              `cat >> "$SNAPSHOT_FILE" << 'RIPGREP_FUNC_END'`,
 		`env CLAUDE_CODE_ENTRYPOINT=cli NODE_OPTIONS=--max_old=4096`: `env CLAUDE_CODE_ENTRYPOINT=cli NODE_OPTIONS=--max_old=4096`,
+		"export PATH=/sb/path:/Users/me/.grok/bin:/usr/bin\nrg":      "export PATH=<path>\nrg",
 	} {
 		if got := s.normalizeText(in); got != want {
 			t.Errorf("normalizeText(%q) = %q, want %q", in, got, want)
@@ -477,6 +479,7 @@ func TestFilesOfSharedTmpOffline(t *testing.T) {
 	events := []TraceEvent{
 		{Pid: 100, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"claude", "-p", "hi"}},
 		{Pid: 100, At: at, Kind: "list", Path: "/tmp/claude-1000"},
+		{Pid: 100, At: at, Kind: "open", Path: "/opt/homebrew/Cellar/node/25.6.0/bin/node", Read: true},
 		{Pid: 100, At: at, Kind: "list", Path: "/tmp/claude-1000/harness-survey"},
 		{Pid: 100, At: at, Kind: "unlink", Path: "/tmp/claude-1000/old-session/out.txt"},
 		{Pid: 100, At: at, Kind: "stat", Path: "/tmp/claude-1000/speculation", Err: "ENOENT"},
@@ -491,8 +494,8 @@ func TestFilesOfSharedTmpOffline(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("paths = %q, want %q", got, want)
 	}
-	if files.Dropped["machine"] != 1 {
-		t.Errorf("dropped machine = %d, want 1", files.Dropped["machine"])
+	if files.Dropped["machine"] != 2 {
+		t.Errorf("dropped machine = %d, want 2 (another session's folder, an installed program)", files.Dropped["machine"])
 	}
 	// Made when missing: the same whether an earlier run left it.
 	for path, ops := range map[string][]string{"<tmp>/claude-<id>/tasks": {"stat"}, "<tmp>/claude-<id>/tasks/a.output": {"write"}} {

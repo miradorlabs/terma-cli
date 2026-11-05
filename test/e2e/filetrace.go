@@ -88,6 +88,9 @@ type TraceScope struct {
 	// PathDirs are the PATH the build ran with: what it looks for there is a program, not a
 	// path.
 	PathDirs []string
+	// Path is that PATH as one value: in a command line (a shell's snapshot exports it) it is
+	// <path>, never the machine's list of what it has installed.
+	Path string
 	// Turn is the run's model calls: from the first request to the last response.
 	TurnStart, TurnEnd time.Time
 	// Decoys are the planted files and sockets, by absolute path.
@@ -644,6 +647,13 @@ func (s TraceScope) dropReason(path string) string {
 	if slices.Contains(s.TestWay, path) {
 		return "test"
 	}
+	// What a package manager installed is the machine's: a build that looks for npm or pnpm
+	// finds whatever versions this one has.
+	for _, d := range installedDirs {
+		if strings.HasPrefix(path, d) {
+			return "machine"
+		}
+	}
 	base := filepath.Base(path)
 	if strings.HasSuffix(base, ".so") || strings.Contains(base, ".so.") || strings.HasSuffix(base, ".dylib") {
 		return "libraries"
@@ -788,6 +798,9 @@ func volatileSegment(seg string, inTmp bool) string {
 	return strings.ReplaceAll(seg, "\x00", "ed25519")
 }
 
+// installedDirs are where package managers install programs.
+var installedDirs = []string{"/opt/homebrew/", "/usr/local/Cellar/", "/usr/local/lib/node_modules/", "/usr/local/opt/", "/home/linuxbrew/"}
+
 // mkdtempRE is a path ending in a dash and six letters or digits, as mkdtemp names a folder.
 var mkdtempRE = regexp.MustCompile(`/[^/]*-[A-Za-z0-9]{6}$`)
 
@@ -836,6 +849,9 @@ func (s TraceScope) normalizeArgv(argv []string, exe string, own bool) []string 
 // normalizeText is a string with every path in it normalized: an argument may hold several
 // (a shell's command).
 func (s TraceScope) normalizeText(text string) string {
+	if len(s.Path) > 1 {
+		text = strings.ReplaceAll(text, s.Path, "<path>")
+	}
 	for _, t := range s.Terma {
 		text = strings.ReplaceAll(text, t, "terma")
 	}

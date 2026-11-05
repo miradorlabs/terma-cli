@@ -186,6 +186,7 @@ func filesScope(b Binary, sb *Sandbox, tracer string, env []string, decoys *Deco
 	}
 	for _, kv := range env {
 		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
+			s.Path = v
 			for _, d := range strings.Split(v, ":") {
 				if d != "" {
 					s.PathDirs = append(s.PathDirs, bothForms(filepath.Clean(d))...)

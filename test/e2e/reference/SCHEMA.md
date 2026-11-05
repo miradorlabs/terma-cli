@@ -454,8 +454,10 @@ hook payloads it records, the proxy's certificate); `path-search` (looking along
 program, which `lookups` says, and an exec that found nothing there); `helpers` (what a program
 the build started touched outside the run's own places: its own installation, the system's
 files); `sandbox-setup` (bubblewrap building the root of a sandbox before it runs the command in
-it, which its command line in `exec` says); `machine` (what the build only found and looked at in the
-machine's shared temporary folder: other programs' and sessions' folders it lists as it
+it, which its command line in `exec` says); `machine` (what the machine has, not what the build does: the programs a
+package manager installed, `/opt/homebrew`, `/usr/local/Cellar` and the like, which a build
+looking for npm or pnpm finds at whatever versions the machine has; and what the build only
+found and looked at in the machine's shared temporary folder: other programs' and sessions' folders it lists as it
 cleans up; what it made, read, wrote or removed there, what it looked for and did not find,
 and the folders on the way to what it made stay). In the temporary folder a path's `create`
 reads as `stat`: whether a path the build makes when it is missing was there already is the
@@ -482,7 +484,8 @@ counts, `dropped` and `argv` are not compared. A macOS trace's paths are not com
 Endpoint Security logs every path a build resolves, and how far a build's background work (Claude
 Code's cleanup walk) got before it exited is a race, so one build traced twice lists different
 paths; they are each version's to read, and its programs, sockets, decoys and services are
-compared. strace's cut of a long argument ends at its last whole line, marked `…`, and SQLite's
+compared. The PATH the build ran with is `<path>` wherever a command line holds it (a shell's
+snapshot exports it). strace's cut of a long argument ends at its last whole line, marked `…`, and SQLite's
 `-wal`, `-shm` and `-journal` files keep no `delete` (removed when the database closes in time).
 A path or Unix socket whose name is the run's own
 (a lock, a temporary or journal file, a name with `<uuid>`, `<hash>`, `<id>`, `<time>`; a
