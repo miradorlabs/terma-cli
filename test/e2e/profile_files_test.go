@@ -166,6 +166,24 @@ func filesScope(b Binary, sb *Sandbox, tracer string, env []string, decoys *Deco
 	for _, p := range []string{sb.payloadDir(), filepath.Dir(proxy.CAFile)} {
 		s.Test = append(s.Test, bothForms(p)...)
 	}
+	// The checkout the suite runs from (test/e2e's repository): the builds it downloads, the
+	// logs a backfill writes, which the build inherits as its output, are in it.
+	// The machine image mounts test/e2e alone (/work/e2e): there it is the checkout.
+	if wd, err := os.Getwd(); err == nil {
+		checkout := wd
+		if filepath.Base(wd) == "e2e" && filepath.Base(filepath.Dir(wd)) == "test" {
+			checkout = filepath.Dir(filepath.Dir(wd))
+		}
+		if strings.Count(checkout, "/") < 2 {
+			checkout = wd // never a folder as wide as /work: the machine's own files are in it
+		}
+		s.Test = append(s.Test, bothForms(checkout)...)
+		if home, err := os.UserHomeDir(); err == nil && len(home) > 1 {
+			for d := filepath.Dir(checkout); strings.HasPrefix(d, home+"/"); d = filepath.Dir(d) {
+				s.TestWay = append(s.TestWay, bothForms(d)...)
+			}
+		}
+	}
 	for _, kv := range env {
 		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
 			for _, d := range strings.Split(v, ":") {

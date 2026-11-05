@@ -288,18 +288,23 @@ func TestTraceNormalizeOffline(t *testing.T) {
 		"/sb/claude/statsig/statsig.cached.evaluations.1234567890": "<claude-config>/statsig/statsig.cached.evaluations.<n>",
 		// What real builds write: Claude Code's atomic writes and per-process files, Codex's
 		// tempfile names, git's object folders, mkdtemp's and short hex names in /tmp.
-		"/sb/claude/.claude.json.tmp.56.0e1234b5":                           "<claude-config>/.claude.json.tmp.<n>.<id>",
-		"/sb/claude/.tmpG2j1eb":                                             "<claude-config>/.tmp<id>",
-		"/sb/claude/sessions/56.json":                                       "<claude-config>/sessions/<n>.json",
-		"/sb/repo/.git/objects/3a/abcdef0123456789abcdef0123456789abcdef01": "<repo>/.git/objects/<id>/<hash>",
-		"/tmp/claude-1000/fswatch-probe-FgdbpF":                             "<tmp>/claude-<id>/fswatch-probe-<id>",
-		"/tmp/claude-3f2e-cwd":                                              "<tmp>/claude-<id>-cwd",
-		"/tmp/cc-socks/56.sock":                                             "<tmp>/cc-socks/<n>.sock",
-		"/sb/home/.ssh/id_ed25519":                                          "<home>/.ssh/id_ed25519",
-		"/sb/claude/sessions/2026/11/05/rollout-x.jsonl":                    "<claude-config>/sessions/<n>/<n>/<n>/rollout-x.jsonl",
-		"/newroot/sb/repo/.git":                                             "/newroot/<repo>/.git",
-		"/etc/os-release":                                                   "/etc/os-release",
-		"/usr/share/zoneinfo/Etc/UTC":                                       "/usr/share/zoneinfo/Etc/UTC",
+		"/sb/claude/.claude.json.tmp.56.0e1234b5":                             "<claude-config>/.claude.json.tmp.<n>.<id>",
+		"/sb/claude/.tmpG2j1eb":                                               "<claude-config>/.tmp<id>",
+		"/sb/claude/sessions/56.json":                                         "<claude-config>/sessions/<n>.json",
+		"/sb/repo/.git/objects/3a/abcdef0123456789abcdef0123456789abcdef01":   "<repo>/.git/objects/<id>/<hash>",
+		"/tmp/claude-1000/fswatch-probe-FgdbpF":                               "<tmp>/claude-<id>/fswatch-probe-<id>",
+		"/tmp/claude-3f2e-cwd":                                                "<tmp>/claude-<id>-cwd",
+		"/tmp/cc-socks/56.sock":                                               "<tmp>/cc-socks/<n>.sock",
+		"/sb/home/.ssh/id_ed25519":                                            "<home>/.ssh/id_ed25519",
+		"/sb/claude/sessions/2026/11/05/rollout-x.jsonl":                      "<claude-config>/sessions/<n>/<n>/<n>/rollout-x.jsonl",
+		"/newroot/sb/repo/.git":                                               "/newroot/<repo>/.git",
+		"/etc/os-release":                                                     "/etc/os-release",
+		"/sb/claude/shell-snapshots/snapshot-zsh-1762300000000-rbqfzy.sh":     "<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh",
+		"/sb/claude/shell-snapshots/snapshot-zsh-1762300000000-rbqfzy.sh.zwc": "<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh.zwc",
+		"/tmp/claude-1000/fswatch-probe-WJPDWS":                               "<tmp>/claude-<id>/fswatch-probe-<id>",
+		"/tmp/claude-1000/harness-survey":                                     "<tmp>/claude-<id>/harness-survey",
+		"/tmp/claude-1000/sb-repo/0f8fad5b-d9cb-469f-a165-70867728950e/tasks/bkjuwxtnl.output": "<tmp>/claude-<id>/sb-repo/<uuid>/tasks/<id>.output",
+		"/usr/share/zoneinfo/Etc/UTC": "/usr/share/zoneinfo/Etc/UTC",
 	} {
 		if got := s.normalize(in); got != want {
 			t.Errorf("normalize(%q) = %q, want %q", in, got, want)
@@ -461,5 +466,38 @@ func TestFilesOfStubHandOffOffline(t *testing.T) {
 	want := []string{xcode + " rev-parse HEAD", "git log -1", "git status --short"}
 	if !slices.Equal(got, want) {
 		t.Errorf("exec = %q, want %q", got, want)
+	}
+}
+
+// The temporary folder is shared: another session's folder the build only lists is the
+// machine's; what the build made or removed there, the folders on its way, and what it looked
+// for and did not find are its own.
+func TestFilesOfSharedTmpOffline(t *testing.T) {
+	at := time.Unix(1000, 0)
+	events := []TraceEvent{
+		{Pid: 100, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"claude", "-p", "hi"}},
+		{Pid: 100, At: at, Kind: "list", Path: "/tmp/claude-1000"},
+		{Pid: 100, At: at, Kind: "list", Path: "/tmp/claude-1000/harness-survey"},
+		{Pid: 100, At: at, Kind: "unlink", Path: "/tmp/claude-1000/old-session/out.txt"},
+		{Pid: 100, At: at, Kind: "stat", Path: "/tmp/claude-1000/speculation", Err: "ENOENT"},
+		{Pid: 100, At: at, Kind: "mkdir", Path: "/tmp/claude-1000/tasks"},
+		{Pid: 100, At: at, Kind: "open", Path: "/tmp/claude-1000/tasks/a.output", Write: true, Create: true},
+	}
+	scope := straceScope()
+	scope.Root = 100
+	files := FilesOf(events, scope)
+	got := slices.Sorted(maps.Keys(files.Paths))
+	want := []string{"<tmp>/claude-<id>", "<tmp>/claude-<id>/old-session/out.txt", "<tmp>/claude-<id>/speculation", "<tmp>/claude-<id>/tasks", "<tmp>/claude-<id>/tasks/a.output"}
+	if !slices.Equal(got, want) {
+		t.Errorf("paths = %q, want %q", got, want)
+	}
+	if files.Dropped["machine"] != 1 {
+		t.Errorf("dropped machine = %d, want 1", files.Dropped["machine"])
+	}
+	// Made when missing: the same whether an earlier run left it.
+	for path, ops := range map[string][]string{"<tmp>/claude-<id>/tasks": {"stat"}, "<tmp>/claude-<id>/tasks/a.output": {"write"}} {
+		if u := files.Paths[path]; u == nil || !slices.Equal(u.Ops, ops) {
+			t.Errorf("%s = %+v, want ops %q", path, u, ops)
+		}
 	}
 }

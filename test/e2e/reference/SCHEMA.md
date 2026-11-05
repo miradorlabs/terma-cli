@@ -454,7 +454,12 @@ hook payloads it records, the proxy's certificate); `path-search` (looking along
 program, which `lookups` says, and an exec that found nothing there); `helpers` (what a program
 the build started touched outside the run's own places: its own installation, the system's
 files); `sandbox-setup` (bubblewrap building the root of a sandbox before it runs the command in
-it, which its command line in `exec` says). `lost` is not the build's: it counts the events
+it, which its command line in `exec` says); `machine` (what the build only found and looked at in the
+machine's shared temporary folder: other programs' and sessions' folders it lists as it
+cleans up; what it made, read, wrote or removed there, what it looked for and did not find,
+and the folders on the way to what it made stay). In the temporary folder a path's `create`
+reads as `stat`: whether a path the build makes when it is missing was there already is the
+machine's state (an earlier run's), not the build's. `lost` is not the build's: it counts the events
 Endpoint Security dropped because eslogger did not read them in time. A trace that lost any is
 not published (the section keeps the last whole one): it says nothing of what the build did
 not do.

@@ -79,8 +79,12 @@ type TraceScope struct {
 	// Terma are terma's executables (the recording shim, the binary): a process that runs one
 	// is recorded as started, and nothing it does after.
 	Terma []string
-	// Test are folders and files that are the test's own (the hook payloads it records).
+	// Test are folders and files that are the test's own (the hook payloads it records, the
+	// checkout the suite runs from, with the builds it downloads and the logs it writes).
 	Test []string
+	// TestWay are the folders on the way to the test's own, below the home it runs in: a build
+	// resolving its own path looks each one up.
+	TestWay []string
 	// PathDirs are the PATH the build ran with: what it looks for there is a program, not a
 	// path.
 	PathDirs []string
@@ -380,6 +384,33 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 			u.Ops = slices.DeleteFunc(u.Ops, func(op string) bool { return op == "probe" })
 		}
 	}
+	// The temporary folder is the machine's, shared with every other program and every run
+	// before this one. Whether a path the build makes when it is missing was there already is
+	// the machine's state, so its create reads as a stat either way. What the build only found
+	// there and looked at (another session's folders, which it lists as it cleans up) is the
+	// machine's, not the build's; what it made, read, wrote or removed, what it looked for and
+	// did not find, and the folders on the way to what it made are its own.
+	var made []string
+	for key, u := range out.Paths {
+		if strings.HasPrefix(key, "<tmp>/") && (slices.Contains(u.Ops, "create") || slices.Contains(u.Ops, "write")) {
+			made = append(made, key)
+		}
+	}
+	for key, u := range out.Paths {
+		if !strings.HasPrefix(key, "<tmp>/") {
+			continue
+		}
+		if i := slices.Index(u.Ops, "create"); i >= 0 {
+			u.Ops = addWord(slices.Delete(u.Ops, i, i+1), "stat")
+		}
+		if slices.Contains(made, key) || slices.ContainsFunc(made, func(m string) bool { return strings.HasPrefix(m, key+"/") }) {
+			continue
+		}
+		if !slices.ContainsFunc(u.Ops, func(op string) bool { return op != "stat" && op != "list" }) {
+			delete(out.Paths, key)
+			out.Dropped["machine"]++
+		}
+	}
 	out.Lookups = append([]string{}, slices.Sorted(maps.Keys(lookups))...)
 	out.Sockets.DNS = append([]string{}, slices.Sorted(maps.Keys(dns))...)
 	for _, u := range out.Paths {
@@ -571,6 +602,9 @@ func (s TraceScope) dropReason(path string) string {
 			return "test"
 		}
 	}
+	if slices.Contains(s.TestWay, path) {
+		return "test"
+	}
 	base := filepath.Base(path)
 	if strings.HasSuffix(base, ".so") || strings.Contains(base, ".so.") || strings.HasSuffix(base, ".dylib") {
 		return "libraries"
@@ -674,9 +708,15 @@ func volatileSegment(seg string, inTmp bool) string {
 	seg = datetimeRE.ReplaceAllString(seg, "<time>")
 	seg = hexRE.ReplaceAllString(seg, "<hash>")
 	seg = tempNameRE.ReplaceAllString(seg, "$1<id>")
+	// A file in the temporary folder named by a short random token alone, letters only now and
+	// then (Claude Code's task output, tasks/bkjuwxtnl.output).
+	if inTmp {
+		seg = tmpTokenStemRE.ReplaceAllString(seg, "<id>$1")
+	}
 	if inTmp {
 		seg = dashTempRE.ReplaceAllStringFunc(seg, func(m string) string {
-			if mixedToken(m[1:]) {
+			// mkdtemp's letters and digits, all of one case now and then (fswatch-probe-WJPDWS).
+			if mixedToken(m[1:]) || strings.Trim(m[1:], "ABCDEFGHIJKLMNOPQRSTUVWXYZ") == "" {
 				return "-<id>"
 			}
 			return m
@@ -703,8 +743,17 @@ func volatileSegment(seg string, inTmp bool) string {
 		}
 		return tok
 	})
+	// A short token after one of the run's values is the run's too, whatever its letters
+	// (Claude Code's shell snapshot, snapshot-zsh-<n>-rbqfzy.sh).
+	seg = afterRunValueRE.ReplaceAllString(seg, "$1-<id>")
 	return strings.ReplaceAll(seg, "\x00", "ed25519")
 }
+
+// tmpTokenStemRE is a file name that is a short lower-case token and an extension.
+var tmpTokenStemRE = regexp.MustCompile(`^[a-z0-9]{8,12}(\.[a-z]+)$`)
+
+// afterRunValueRE is a placeholder, a dash and a six-character token.
+var afterRunValueRE = regexp.MustCompile(`(<(?:n|id|hash|uuid|time)>)-[A-Za-z0-9]{6}\b`)
 
 // digitStemRE is a segment that is a number, or a number and an extension.
 var digitStemRE = regexp.MustCompile(`^\d+((?:\.[A-Za-z]+)*)$`)
