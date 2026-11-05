@@ -132,6 +132,11 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "hooks" && hookEcho(c) {
 			continue
 		}
+		// How many of its variables a desktop app passed on to its agent as it had them is the
+		// machine's count, not the app's choice: what the app sets is cli.launch.env.
+		if c.Path[0] == "cli" && len(c.Path) == 3 && c.Path[1] == "launch" && c.Path[2] == "inherited" {
+			continue
+		}
 		kept = append(kept, c)
 	}
 	out = kept
@@ -410,6 +415,13 @@ func classify(c *Change, labels map[string]string) {
 	case c.Category == "binary" && len(c.Path) > 2 && c.Path[1] == "signing" &&
 		(c.Path[2] == "status" || c.Path[2] == "team_id" || c.Path[2] == "format" || c.Path[2] == "certificate"):
 		c.Impact = "notable" // a new signer, a new certificate, or one revoked
+	case c.Category == "binary" && len(c.Path) > 3 && c.Path[1] == "app" && c.Path[2] == "signing" &&
+		(c.Path[3] == "status" || c.Path[3] == "team_id" || c.Path[3] == "format" || c.Path[3] == "certificate" || c.Path[3] == "notarized"):
+		c.Impact = "notable" // the app's signer, certificate or notarization
+	case c.Category == "binary" && len(c.Path) == 3 && c.Path[1] == "agent" && (c.Path[2] == "version" || c.Path[2] == "harness" || c.Path[2] == "source"):
+		c.Impact = "notable" // a desktop app that runs another build of its agent
+	case c.Category == "cli" && len(c.Path) >= 2 && c.Path[1] == "launch":
+		c.Impact = "notable" // how a desktop app starts its agent
 	case c.Category == "cli" && len(c.Path) >= 3 && c.Path[1] == "commands" &&
 		(c.Op == "removed" && (len(c.Path) == 3 || len(c.Path) == 5) || last == "default" || len(c.Path) > 5 && c.Path[5] == "choices"):
 		c.Impact = "notable" // a command or flag gone, a default moved, an allowed value added or dropped
@@ -565,6 +577,15 @@ func title(c *Change, labels map[string]string) string {
 		if at(1) == "help" {
 			return "Full help text of `" + at(2) + "` " + verb + stats
 		}
+		if at(1) == "launch" {
+			return launchTitle(c, verb, arrow, short)
+		}
+		if at(1) == "app_server" && len(p) == 4 {
+			if c.Op == "added" {
+				return "New app-server method (" + at(2) + "): `" + short(c.After) + "`"
+			}
+			return "App-server method removed (" + at(2) + "): `" + short(c.Before) + "`"
+		}
 		if at(1) != "commands" {
 			break
 		}
@@ -662,6 +683,25 @@ func title(c *Change, labels map[string]string) string {
 	case "filesystem":
 		return filesystemTitle(c)
 	case "binary":
+		if at(1) == "agent" && at(2) == "version" {
+			return "Runs its agent's build " + short(c.After) + " (was " + short(c.Before) + ")"
+		}
+		if at(1) == "app" && at(2) == "signing" {
+			switch at(3) {
+			case "status":
+				if c.After == "revoked" {
+					return "The app's signing certificate revoked"
+				}
+				return "The app's code signature status: " + arrow()
+			case "certificate":
+				return "The app is signed with a different certificate"
+			case "team_id":
+				return "The app is signed by a different team: " + arrow()
+			case "notarized":
+				return "The app's notarization: " + arrow()
+			}
+			return "The app's code signature " + strings.Join(p[3:], ".") + ": " + arrow()
+		}
 		if at(1) == "signing" {
 			switch at(2) {
 			case "status":
@@ -706,6 +746,26 @@ func title(c *Change, labels map[string]string) string {
 		}
 	}
 	return strings.Join(p, ".") + " " + verb + valueNote(c)
+}
+
+// launchTitle is a change to how a desktop app starts its agent (cli.launch) said in a line.
+func launchTitle(c *Change, verb string, arrow func() string, short func(any) string) string {
+	p := c.Path
+	switch {
+	case len(p) == 4 && p[2] == "argv" && c.Op == "added":
+		return "The app now starts its agent with `" + short(c.After) + "`"
+	case len(p) == 4 && p[2] == "argv" && c.Op == "removed":
+		return "The app no longer starts its agent with `" + short(c.Before) + "`"
+	case len(p) == 4 && p[2] == "env" && c.Op == "added":
+		return "The app now sets its agent's " + short(c.After)
+	case len(p) == 4 && p[2] == "env" && c.Op == "removed":
+		return "The app no longer sets its agent's " + short(c.Before)
+	case len(p) == 4 && p[2] == "env_values":
+		return "The app's agent's " + p[3] + ": " + arrow()
+	case len(p) >= 3 && p[2] == "parents":
+		return "The processes between the app and its agent " + verb
+	}
+	return "How the app starts its agent: " + strings.Join(p[2:], ".") + " " + verb
 }
 
 // hookTitle is a change to the hooks section said in a line: the events a build knows

@@ -624,6 +624,64 @@ variables were read differently, are not compared item by item: the change is wh
 read from. `source`'s tag is the build's and is no change. A table whose keys could not be read
 in one build (its options there end at the table) is no evidence its keys were added or removed.
 
+### desktop apps
+
+`claude-desktop` (Claude Desktop, whose Code tab runs Claude Code through the Agent SDK) and
+`codex-desktop` (the Codex app, which runs its threads in the `codex app-server` it bundles) are
+versioned by the app's own release, its `CFBundleShortVersionString` (`4.16336.0`,
+`26.1029.70936`), as the app's own update feed lists it: Claude Desktop's Squirrel
+`RELEASES.json` (its current release alone), the Codex app's Sparkle appcast. Each release is
+run whole (`test/e2e/profile_desktop_test.go`) on a hosted macOS runner, a fresh machine with a
+desktop session, for one first turn against the fixture provider, its window driven as a person
+drives it: so what the agent sends the model, and how the app starts it, are the app's own.
+`capture.notes` say how each run differed from a person's at the app: how it was signed in
+without an account (Claude Desktop in its third-party inference mode, set up as an
+organization sets it up; the Codex app with an API key and the fixture as its model provider),
+and how its window was driven (the accessibility API; the app's DevTools protocol).
+
+A desktop app's snapshot has the agent's sections as the agent's own snapshot has them (`model`,
+`prompt`, `tools`, `request`, `caching`, `side_requests`; `storage`, what the agent and the app's
+record of its sessions wrote; `config`, the agent's, read from its executable or, for Codex, its
+source at the build the app runs), and:
+
+```json
+"cli": {
+  "help": { "--help": "…the agent's, as the app bundles it…" }, "commands": { },
+  "launch": { "argv": ["<app-data>/claude-code/2.1.317/91184d3d9ba3/claude.app/Contents/MacOS/claude", "--output-format", "stream-json", "--model=claude-opus-5-5", "…"],
+              "env": ["ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_ENTRYPOINT", "…"], "env_values": { "CLAUDE_CODE_ENTRYPOINT": "claude-desktop-3p", "ANTHROPIC_AUTH_TOKEN": "<redacted>" },
+              "inherited": 12, "parents": ["<app>/Contents/Helpers/disclaimer --pgroup -- <app-data>/claude-code/2.1.317/…"] },
+  "app_server": { "ClientRequest": ["thread/start", "turn/start", "…"], "ServerNotification": ["turn/completed", "…"] }
+},
+"binary": {
+  "…": "the agent executable's facts, as for the agent's own snapshot", "signing": { "…": "the agent's signature" },
+  "agent": { "harness": "claude", "version": "2.1.317", "path": "<agent>", "source": "downloaded",
+             "download": "https://downloads.claude.ai/claude-code-releases/2.1.317/darwin-arm64/claude.app.tar.zst",
+             "checksum": "…", "sdk": "@anthropic-ai/claude-agent-sdk 0.3.317" },
+  "app": { "name": "Claude.app", "bundle_id": "com.anthropic.claudefordesktop", "version": "<version>", "build": "<version>",
+           "download": "https://downloads.claude.ai/releases/darwin/universal/<version>/Claude-<hex>.zip", "size_bytes": 996455044,
+           "signing": { "format": "developer-id", "team_id": "Q6L2SF6YDW", "notarized": true, "status": "valid", "…": "as binary.signing" } }
+}
+```
+
+| field | |
+|---|---|
+| `cli.launch` | how the app started its agent: the command line and environment its process was started with, read from the kernel (`KERN_PROCARGS2`), and the processes between the app and it (`parents`, the agent's parent first). `env` are the variables the app set: those neither the app's own environment nor its user's login shell's has with the same value; `inherited` how many more it passed on as it had them. `env_values` are their values, a secret's `<redacted>` (by its name or its shape), a list of folders `<path>`, a login session's variable the app changed `<session>`, a key made for the run `<key>`, the machine's user and OS release `<user>` and `<os-release>` |
+| `cli.app_server` | the JSON-RPC methods of the app-server the app drives, by the schema file of its `generate-json-schema` that names them: `ClientRequest`, `ClientNotification`, `ServerRequest`, `ServerNotification` |
+| `binary.agent` | the agent the app runs: its harness and build, where the app runs it from, and how it comes by it: `bundled` in the app, or `downloaded` (Claude Desktop's, from `download` on first use, checked against `checksum`, the release's pin), and the SDK the app drives it with |
+| `binary.app` | the app bundle: its name, bundle id, version and build, where it was downloaded from, its size, and its signature, read before it first ran (Developer ID, team, certificate, notarization, Gatekeeper's verdict) |
+
+Placeholders of a desktop app's run, besides the agent's: `<app>` (the app bundle), `<app-dir>`
+(the folder it was unpacked in), `<app-data>` (the app's own folder in Application Support),
+`<agent>` (the agent's executable) and `<home>` (the runner's home, where the app and its agent
+keep their state, as a person's do).
+
+`support` is the capability checks of the build of the agent the release runs: the relay
+scenarios run the agent build the app pins, launched as the app launches it
+(`TestRelayClaudeDesktop`), and are recorded by that build's version, so they make no release of
+their own and join each release that runs that build. Snapshots of `claude-desktop` and
+`codex-desktop` published before the apps' own profiles are versioned by the agent build their
+checks ran (`2.1.318`, `0.166.0`) and hold `support` alone.
+
 ## diffs/<from>..<to>.json
 
 ```json

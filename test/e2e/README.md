@@ -376,6 +376,22 @@ make machines HOST_ARCH=arm64 MACHINE_CLAUDE_VERSIONS=2.1.318 MACHINE_CODEX_VERS
 TERMA_E2E_ESLOGGER_VIA="ssh localhost" make run RUN='^(TestClaudeProfileFiles|TestCodexProfileFiles)$'
 ```
 
+The desktop apps' profiles (`TestClaudeDesktopProfile`, `TestCodexDesktopProfile`,
+`profile_desktop_test.go`, `desktop.go`) run each release of Claude Desktop and of the Codex
+app whole, versioned by the app's own release, fetched from its update feed: one first turn
+against the fixture provider, the window driven as a person drives it (Claude Desktop through
+the accessibility API, `desktop/ui.swift`, built with swiftc; the Codex app through its DevTools
+protocol, `cdp.go`), the app's other requests through the recording proxy. Claude Desktop runs
+in its third-party inference mode, set up with an organization's managed preferences; the Codex
+app signed in with an API key, its model provider the fixture. Besides the agent's sections
+they record how the app started its agent (its command line and environment, read from the
+kernel), the app bundle's signature and the agent it bundles or downloads. They change
+machine-wide settings (managed preferences, the proxy's CA trusted in the System keychain) and
+put them back, so they run only on a CI runner: `TERMA_E2E_DESKTOP_APPS=1` opts in;
+`TERMA_E2E_CLAUDE_DESKTOP_APP_VERSIONS` / `TERMA_E2E_CODEX_DESKTOP_APP_VERSIONS` pick releases
+(`latest`, `lastN` or versions the feed lists); `TERMA_E2E_DESKTOP_DEBUG` keeps screenshots,
+the window's accessibility tree and the app's logs.
+
 Harnesses release more often than nightly, so `reference.yml` checks every quarter hour:
 `reference/new-builds.sh` asks each registry for builds newer than the newest the reference
 has published (a few requests, no build; nothing else runs when nothing is new), and only

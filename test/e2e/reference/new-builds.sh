@@ -55,3 +55,30 @@ for entry in "${harnesses[@]}"; do
 	[ -n "$new" ] || continue
 	echo "$harness=$(paste -sd, - <<<"$new")"
 done
+
+# The desktop apps (TERMA_E2E_<APP>_APP_VERSIONS), by the update feed each one's updater reads:
+# Claude Desktop's Squirrel RELEASES.json names its current release alone, the Codex app's
+# Sparkle appcast every release. Only the newest is the frequent check's: the app's update feed
+# is all there is to fetch an app by, and an older release than the newest is the night's.
+desktop=(
+	"claude-desktop https://downloads.claude.ai/releases/darwin/universal/RELEASES.json squirrel"
+	"codex-desktop https://persistent.oaistatic.com/codex-app-prod/appcast.xml sparkle"
+)
+for entry in "${desktop[@]}"; do
+	read -r harness feed kind <<<"$entry"
+	if ! doc=$(curl -fsSL --max-time 30 "$feed"); then
+		echo "::warning::could not read $harness's update feed" >&2
+		continue
+	fi
+	if [ "$kind" = squirrel ]; then
+		newest=$(jq -r '.releases[].updateTo.version // empty' <<<"$doc" | sort -V | tail -n 1)
+	else
+		newest=$(grep -o '<sparkle:shortVersionString>[^<]*' <<<"$doc" | sed 's/.*>//' | sort -V | tail -n 1)
+	fi
+	[ -n "$newest" ] || continue
+	if index=$(curl -fsSL --max-time 30 "$base/$harness/index.json" 2>/dev/null) &&
+		jq -r '.versions[].version' <<<"$index" | grep -qxF "$newest"; then
+		continue
+	fi
+	echo "$harness=$newest"
+done

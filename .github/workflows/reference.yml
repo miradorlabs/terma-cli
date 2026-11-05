@@ -3,7 +3,8 @@ name: Harness Reference new builds
 # Harnesses release more often than nightly: every quarter hour, a check asks each registry
 # for builds the Harness Reference has not published (test/e2e/reference/new-builds.sh, a
 # few requests and no build), and only when there are, captures those builds' profiles on
-# macOS, and Claude Code's and Codex's files profiles on Linux, and publishes them (refgen,
+# macOS, and Claude Code's and Codex's files profiles on Linux, and the desktop apps' (Claude
+# Desktop's, the Codex app's) on a macOS runner of their own, and publishes them (refgen,
 # publish.sh publish-reference). The nightly E2E harness
 # contracts (live.yml) still run every contract and the field census, and publish the matrix.
 
@@ -35,6 +36,9 @@ jobs:
       opencode: ${{ steps.new.outputs.opencode }}
       copilot: ${{ steps.new.outputs.copilot }}
       dsh: ${{ steps.new.outputs.dsh }}
+      claude_desktop: ${{ steps.new.outputs.claude_desktop }}
+      codex_desktop: ${{ steps.new.outputs.codex_desktop }}
+      desktop_tests: ${{ steps.new.outputs.desktop_tests }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,22 +52,31 @@ jobs:
             echo 'Nothing new since the reference was last published.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          # Each new harness's scenarios, by the name its tests carry.
+          # Each new harness's scenarios, by the name its tests carry; a desktop app's are its
+          # job's own (capture-desktop).
           names=()
+          desktop=()
           while IFS='=' read -r harness versions; do
-            echo "$harness=$versions" >> "$GITHUB_OUTPUT"
+            echo "${harness//-/_}=$versions" >> "$GITHUB_OUTPUT"
             case "$harness" in
               opencode) names+=(OpenCode) ;;
+              claude-desktop) desktop+=(TestClaudeDesktopProfile) ;;
+              codex-desktop) desktop+=(TestCodexDesktopProfile) ;;
               *) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}") ;;
             esac
           done <<<"$builds"
-          echo "tests=^Test($(IFS='|'; echo "${names[*]}"))(Profile|Probe)" >> "$GITHUB_OUTPUT"
+          if [ ${#names[@]} -gt 0 ]; then
+            echo "tests=^Test($(IFS='|'; echo "${names[*]}"))(Profile|Probe)" >> "$GITHUB_OUTPUT"
+          fi
+          if [ ${#desktop[@]} -gt 0 ]; then
+            echo "desktop_tests=^($(IFS='|'; echo "${desktop[*]}"))\$" >> "$GITHUB_OUTPUT"
+          fi
           { echo 'builds<<EOF'; echo "$builds"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
           { echo '| harness | new builds |'; echo '|---|---|'; sed 's/=/ | /; s/^/| /; s/$/ |/' <<<"$builds"; } >> "$GITHUB_STEP_SUMMARY"
 
   capture:
     needs: detect
-    if: needs.detect.outputs.builds != ''
+    if: needs.detect.outputs.tests != ''
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -151,8 +164,57 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  # The desktop apps' profiles (test/e2e/profile_desktop_test.go): each new release, from its
+  # update feed, run whole on a machine of its own, as the scenarios change machine-wide settings
+  # (an organization's managed preferences, a trusted CA for the recording proxy) and put them back.
+  capture-desktop:
+    needs: detect
+    if: needs.detect.outputs.desktop_tests != ''
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: |
+            go.sum
+            test/e2e/go.sum
+      - name: Build native test binaries
+        run: |
+          go build -o test/e2e/bin/terma ./cmd/terma
+          cd test/e2e
+          go test -c -o bin/e2e.test .
+      # The runner's user as a new Mac's: zsh, the macOS default, its login shell, and none of the
+      # image's shell startup files, so an app's agent gets a stock login shell's environment.
+      - name: A new Mac's user
+        run: |
+          sudo dscl . -create "/Users/$USER" UserShell /bin/zsh
+          for f in .bash_profile .bashrc .profile .zshrc .zprofile .zshenv .zlogin .zlogout; do
+            if [ -e "$HOME/$f" ]; then mv "$HOME/$f" "$HOME/$f.runner-image"; fi
+          done
+      - name: Capture the new desktop releases
+        working-directory: test/e2e
+        env:
+          TERMA_E2E: "1"
+          TERMA_E2E_DESKTOP_APPS: "1"
+          TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
+          TERMA_E2E_UNCLASSIFIED: note
+          TERMA_E2E_CLAUDE_DESKTOP_APP_VERSIONS: ${{ needs.detect.outputs.claude_desktop }}
+          TERMA_E2E_CODEX_DESKTOP_APP_VERSIONS: ${{ needs.detect.outputs.codex_desktop }}
+          TESTS: ${{ needs.detect.outputs.desktop_tests }}
+        run: ./bin/e2e.test -test.v -test.timeout 40m -test.run "$TESTS"
+      - name: Upload the profiles
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: profiles-desktop
+          path: test/e2e/report/profiles.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   publish:
-    needs: [detect, capture, capture-linux]
+    needs: [detect, capture, capture-linux, capture-desktop]
     # A capture that failed outright still publishes its builds, partial, so the next check
     # does not take them for new again; the night tries them again.
     if: always() && needs.detect.outputs.builds != ''
