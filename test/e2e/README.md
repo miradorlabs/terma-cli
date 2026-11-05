@@ -346,6 +346,27 @@ schema and the variables its JavaScript reads. `TestClaudeProfileBinary` and
 `TestCopilotProfileBinary` take only a build's binary facts and signing, no turn, for a backfill
 that re-reads many builds' facts quickly; refgen prefers their facts to an earlier scenario's.
 
+The files profile (`TestClaudeProfileFiles`, `TestCodexProfileFiles`, `filetrace.go`) traces
+the profile's first turn and a tool turn: every path the build reads, writes, creates, deletes,
+renames or looks for, by phase (startup, turn, exit), the programs it starts, the sockets it
+listens on and connects to, and whether it touches the fake credentials and sockets planted in
+its home and repository (`decoys.go`); refgen publishes it as the snapshot's `filesystem`
+section, by platform. Linux traces with strace, in the machine image (`make machines`, which
+runs the scenarios on the image's builds, or on `MACHINE_CLAUDE_VERSIONS` /
+`MACHINE_CODEX_VERSIONS`). macOS traces with Endpoint Security's `eslogger`, which needs root and
+Full Disk Access: the suite runs exactly `sudo -n /usr/bin/eslogger …` (a sudoers rule for it and
+`/usr/sbin/lsof` alone), directly, or through `TERMA_E2E_ESLOGGER_VIA` (`ssh localhost`, where
+Remote Login grants its sessions Full Disk Access and the terminal has none), and samples
+sockets with lsof. Where neither tracer can run, the scenarios skip and say why.
+`TestFileTracerCheck` traces a shell script, to check a machine's tracer, and that no eslogger is
+left running. `TERMA_E2E_TRACE_DIR` keeps each raw trace (it holds the decoys' fake contents and
+the build's environment: never publish it).
+
+```sh
+make machines HOST_ARCH=arm64 MACHINE_CLAUDE_VERSIONS=2.1.318 MACHINE_CODEX_VERSIONS=0.166.0 RUN='^(TestClaudeProfileFiles|TestCodexProfileFiles)$'
+TERMA_E2E_ESLOGGER_VIA="ssh localhost" make run RUN='^(TestClaudeProfileFiles|TestCodexProfileFiles)$'
+```
+
 Harnesses release more often than nightly, so `reference.yml` checks every quarter hour:
 `reference/new-builds.sh` asks each registry for builds newer than the newest the reference
 has published (a few requests, no build; nothing else runs when nothing is new), and only
