@@ -461,6 +461,19 @@ func TestProxiedFirstTurn(t *testing.T) {
 	}
 }
 
+// The capture's command is the published turn's, not that of a probe whose scenario sorts first.
+func TestCaptureCommandIsTheTurns(t *testing.T) {
+	probe := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "darwin/arm64", Scenario: "TestClaudeProbeHooks",
+		Command: []string{"claude", "--allowedTools", "Bash"}}
+	proxied := claudeProfile("1.0.0", "Shipped defaults.", []string{"Bash"}, "", "")
+	proxied.Scenario = "TestClaudeProfileEgress"
+	proxied.Command = []string{"claude", "--output-format", "json"}
+	s := night{now: time.Now(), profiles: []e2e.Profile{probe, proxied}}.tonight(buildID{"claude", "1.0.0"})
+	if got := strings.Join(s.Capture.Command, " "); got != "claude --output-format json" {
+		t.Errorf("capture command = %q", got)
+	}
+}
+
 func TestIsSubagent(t *testing.T) {
 	meta := func(agent string) map[string]any {
 		m, _ := json.Marshal(map[string]string{"agent_name": agent})

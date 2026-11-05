@@ -165,6 +165,11 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 			merged.Command = p.Command
 		}
 	}
+	// The command published is the one that took the turn published, not a probe's that sorts
+	// before it (TestGeminiProbeHooks before TestGeminiProfileEgress).
+	if src >= 0 && len(ps[src].Command) > 0 {
+		merged.Command = ps[src].Command
+	}
 	preferBinaryScenario(&merged, ps)
 	// A probe that failed says nothing of the first turn: only the turn published is the
 	// capture's whole or partial.
