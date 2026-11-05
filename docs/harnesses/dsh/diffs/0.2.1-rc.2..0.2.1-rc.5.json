@@ -3,7 +3,7 @@
   "harness": "dsh",
   "from": "0.2.1-rc.2",
   "to": "0.2.1-rc.5",
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "source": {
     "compare": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.2...dsh-v0.2.1-rc.5"
   },

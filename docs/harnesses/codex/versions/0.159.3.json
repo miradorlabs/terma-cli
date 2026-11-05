@@ -3,7 +3,7 @@
   "harness": "codex",
   "version": "0.159.3",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-04T16:16:16.239171Z",
+  "captured_at": "2026-11-05T02:11:01.502194Z",
   "capture": {
     "command": [
       "codex",
@@ -36,18 +36,18 @@
       "The first turn ran behind a local proxy that answers every other request empty: the build used the feature flags it ships with. What live flags changed is under live."
     ],
     "sections": {
-      "behavior": "2026-11-04T16:16:16.239171Z",
-      "binary": "2026-11-04T16:16:16.239171Z",
-      "caching": "2026-11-04T16:16:16.239171Z",
-      "cli": "2026-11-04T16:16:16.239171Z",
-      "config": "2026-11-04T16:16:16.239171Z",
-      "hooks": "2026-11-04T16:16:16.239171Z",
-      "model": "2026-11-04T16:16:16.239171Z",
-      "prompt": "2026-11-04T16:16:16.239171Z",
-      "request": "2026-11-04T16:16:16.239171Z",
-      "side_requests": "2026-11-04T16:16:16.239171Z",
-      "storage": "2026-11-04T16:16:16.239171Z",
-      "tools": "2026-11-04T16:16:16.239171Z"
+      "behavior": "2026-11-05T02:11:01.502194Z",
+      "binary": "2026-11-05T02:11:01.502194Z",
+      "caching": "2026-11-05T02:11:01.502194Z",
+      "cli": "2026-11-05T02:11:01.502194Z",
+      "config": "2026-11-05T02:11:01.502194Z",
+      "hooks": "2026-11-05T02:11:01.502194Z",
+      "model": "2026-11-05T02:11:01.502194Z",
+      "prompt": "2026-11-05T02:11:01.502194Z",
+      "request": "2026-11-05T02:11:01.502194Z",
+      "side_requests": "2026-11-05T02:11:01.502194Z",
+      "storage": "2026-11-05T02:11:01.502194Z",
+      "tools": "2026-11-05T02:11:01.502194Z"
     }
   },
   "model": {

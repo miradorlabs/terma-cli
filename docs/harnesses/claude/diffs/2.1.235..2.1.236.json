@@ -3,23 +3,24 @@
   "harness": "claude",
   "from": "2.1.235",
   "to": "2.1.236",
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Added `ANTHROPIC_DEFAULT_MODEL` environment variable: sets the model new sessions start on, while a `/model` pick still overrides it and persists across restarts (unlike `ANTHROPIC_MODEL`)\n- Added `notify_when_idle` to cross-session `SendMessage`: ask another Claude Code session on this machine to send one notice when it next goes idle — opt-in, one-shot, no polling (macOS and Linux)\n- Sandbox: on macOS, wildcard read-deny rules (e.g. `**/.env`) now take precedence inside allowed read regions, cover matched directories' contents, and can't be bypassed by renaming the denied file\n- Fixed clipboard copy, background housekeeping, background sessions, and local MCP logs breaking after the directory a session had switched into was removed (since 2.1.229)\n- Fixed the fullscreen renderer failing permanently after a single failed start: it now falls back to the classic renderer instead of exiting on every subsequent launch\n- Fixed the `/model` picker rendering taller than the terminal: it now shows only as many models as fit the window, with the rest reachable by scrolling\n- Fixed `SendMessage` calls being rejected when a malformed closing tag left the message text inside the summary field\n- Fixed unhandled promise rejections when a subprocess fails to start, for example `powershell.exe` on WSL with Windows interop disabled (regression in 2.1.234)\n- Fixed fullscreen mode sometimes not showing a newly sent message until the next update after the terminal was resized\n- Fixed a blank band that could remain above the prompt after clearing a multi-line prompt, and panes not repainting after resizing the terminal away and back, in fullscreen mode\n- Fixed the managed-settings approval prompt sometimes not appearing at startup while still capturing the first keypress as approval\n- Fixed terminal tab titles jumping in tmux (iTerm tmux integration): the title is now written only when its text changes instead of animating every 960ms\n- Fixed an unclear error when the cloud environments list came back empty or malformed\n- Fixed the Fable 5 first-time usage-credits prompt auto-selecting the fallback model after 60 seconds with no answer when using Remote Control\n- Fixed spinner tips never appearing, with a repeated background error, when the cached guest-pass reward in `~/.claude.json` was malformed\n- Fixed skills hot-reload in SDK/VS Code sessions raising an error on every skills change after the session's working directory was deleted (2.1.229+)\n- Fixed self-hosted runner sessions released on idle, retire, or startup timeout occasionally resuming on another runner before the post-session hook had finished\n- Fixed the Clawd mascot's eyes and feet rendering unevenly in iTerm2 at some font sizes\n- Fixed occasional runaway session recaps: recap text (automatic and `/recap`) is now capped at 400 characters, cut at a word boundary\n- Improved startup performance: the session counter is now written in the background\n- Improved auto mode: `Monitor` allow rules are now set aside while auto mode is active, so Monitor commands are reviewed the same way Bash commands are\n- Improved auto mode on Bedrock, Vertex AI, and Foundry, and when telemetry is disabled: the classifier now uses the same defaults as on the Claude API, including severity-scored classification\n- Improved auto mode: the git status check can no longer be fooled by a repo's `status.showUntrackedFiles=no` setting into reporting a clean tree\n- Changed the `/model` picker to highlight only the newest model's name, so the highlight marks the new release rather than an arbitrary subset of the list\n- `/goal`: an idle session whose goal is parked behind long-running background work now checks in automatically after 30 minutes (then 1h, 2h) instead of waiting for you to return\n- `/usage` now shows the usage-credits spend row for Team and Enterprise members, and shows a capped row at 0% before anything is spent\n- SIGTERM in print/SDK mode no longer records an interrupted turn or synthetic tool denials before exiting; running commands are still terminated and the process still exits with code 143\n- Pressing Enter on a slash-command typo or a command unavailable in this session now reports it instead of running the closest fuzzy match; prefixes and aliases still run\n- Remote Control now marks a session offline within seconds when the CLI exits or its terminal closes\n- `SendMessage` now refuses further messages to a session up front once a rapid burst would exceed what that session's inbox accepts, instead of reporting them sent while they were dropped\n- Aligned the session title chip on the prompt border with the footer's right edge\n- Right-aligned footer items (goal indicator, session state, background agent status) and truncated notices now share a consistent right margin with the rest of the prompt area\n- [VSCode] Added screen reader support for the transcript: live announcements for replies, permission requests, errors, and status changes, plus per-turn heading navigation"
   },
   "summary": {
-    "changes": 10,
+    "changes": 11,
     "categories": {
       "config": 8,
-      "hooks": 2
+      "hooks": 2,
+      "network": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 8,
-      "notable": 2
+      "notable": 3
     },
     "undocumented": 9
   },
@@ -207,6 +208,66 @@
       "terma": null,
       "source": null,
       "documented": false
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shutdown_pending_state",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_shutdown_pending_state"
+      ],
+      "title": "New vendor telemetry event: tengu_shutdown_pending_state",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "count": 1,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
     }
   ]
 }

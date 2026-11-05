@@ -18,7 +18,7 @@
     "last_change": {
       "from": "0.165.0",
       "to": "0.166.0",
-      "at": "2026-11-04T16:16:16.239171Z",
+      "at": "2026-11-05T02:11:01.502194Z",
       "released_at": "2026-10-29T19:56:19.746Z",
       "changes": 63,
       "categories": {
@@ -32,7 +32,7 @@
     {
       "version": "0.166.0",
       "released_at": "2026-10-29T19:56:19.746Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -62,7 +62,7 @@
     {
       "version": "0.165.0",
       "released_at": "2026-10-27T20:14:25.378Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -91,7 +91,7 @@
     {
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -123,7 +123,7 @@
     {
       "version": "0.163.0",
       "released_at": "2026-10-15T21:37:11.083Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -155,7 +155,7 @@
     {
       "version": "0.162.1",
       "released_at": "2026-10-09T19:50:30.512Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -184,7 +184,7 @@
     {
       "version": "0.162.0",
       "released_at": "2026-10-08T19:01:18.07Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -216,7 +216,7 @@
     {
       "version": "0.161.0",
       "released_at": "2026-10-07T16:04:02.844Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -246,7 +246,7 @@
     {
       "version": "0.160.1",
       "released_at": "2026-10-05T18:33:51.98Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -274,7 +274,7 @@
     {
       "version": "0.160.0",
       "released_at": "2026-10-01T20:26:19.286Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -304,7 +304,7 @@
     {
       "version": "0.159.3",
       "released_at": "2026-09-30T23:02:02.182Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -331,7 +331,7 @@
     {
       "version": "0.159.2",
       "released_at": "2026-09-30T00:03:49.293Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -356,7 +356,7 @@
     {
       "version": "0.159.1",
       "released_at": "2026-09-29T20:36:58.049Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -388,7 +388,7 @@
     {
       "version": "0.159.0",
       "released_at": "2026-09-29T08:10:59.17Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -419,7 +419,7 @@
     {
       "version": "0.158.0",
       "released_at": "2026-09-28T05:12:20.266Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -447,7 +447,7 @@
     {
       "version": "0.157.1",
       "released_at": "2026-09-26T01:06:57.149Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -468,7 +468,7 @@
     {
       "version": "0.157.0",
       "released_at": "2026-09-25T02:35:19.752Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -499,7 +499,7 @@
     {
       "version": "0.156.1",
       "released_at": "2026-09-23T02:45:25.21Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -524,7 +524,7 @@
     {
       "version": "0.156.0",
       "released_at": "2026-09-22T19:55:37.255Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -556,7 +556,7 @@
     {
       "version": "0.155.1",
       "released_at": "2026-09-18T20:09:23.628Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -585,7 +585,7 @@
     {
       "version": "0.155.0",
       "released_at": "2026-09-17T23:19:02.781Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -615,7 +615,7 @@
     {
       "version": "0.154.0",
       "released_at": "2026-09-09T22:40:10.746Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -646,7 +646,7 @@
     {
       "version": "0.153.4",
       "released_at": "2026-09-04T23:31:18.513Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -677,7 +677,7 @@
     {
       "version": "0.153.3",
       "released_at": "2026-09-04T19:07:16.079Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -703,7 +703,7 @@
     {
       "version": "0.153.2",
       "released_at": "2026-09-03T23:57:21.074Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -730,7 +730,7 @@
     {
       "version": "0.153.1",
       "released_at": "2026-09-03T21:09:57.109Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -758,7 +758,7 @@
     {
       "version": "0.153.0",
       "released_at": "2026-09-03T01:42:05.774Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -787,7 +787,7 @@
     {
       "version": "0.152.1",
       "released_at": "2026-09-01T22:36:50.784Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -814,7 +814,7 @@
     {
       "version": "0.152.0",
       "released_at": "2026-09-01T02:02:46.635Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -844,7 +844,7 @@
     {
       "version": "0.151.0",
       "released_at": "2026-08-29T09:59:26.3Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -875,7 +875,7 @@
     {
       "version": "0.150.1",
       "released_at": "2026-08-27T02:01:46.851Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -896,7 +896,7 @@
     {
       "version": "0.150.0",
       "released_at": "2026-08-26T19:43:31.702Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -928,7 +928,7 @@
     {
       "version": "0.149.1",
       "released_at": "2026-08-24T00:32:45.066Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -956,7 +956,7 @@
     {
       "version": "0.149.0",
       "released_at": "2026-08-20T21:09:05.284Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -987,7 +987,7 @@
     {
       "version": "0.148.0",
       "released_at": "2026-08-18T22:30:14.842Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1020,7 +1020,7 @@
     {
       "version": "0.147.0",
       "released_at": "2026-08-07T01:47:21.081Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1053,7 +1053,7 @@
     {
       "version": "0.146.1",
       "released_at": "2026-08-05T16:00:31.441Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1082,7 +1082,7 @@
     {
       "version": "0.146.0",
       "released_at": "2026-07-29T01:45:57.696Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1113,7 +1113,7 @@
     {
       "version": "0.145.0",
       "released_at": "2026-07-21T18:24:11.494Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1145,7 +1145,7 @@
     {
       "version": "0.144.6",
       "released_at": "2026-07-18T13:54:50.572Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1174,7 +1174,7 @@
     {
       "version": "0.144.5",
       "released_at": "2026-07-16T02:57:51.857Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1203,7 +1203,7 @@
     {
       "version": "0.144.4",
       "released_at": "2026-07-14T05:10:51.485Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1231,7 +1231,7 @@
     {
       "version": "0.144.3",
       "released_at": "2026-07-13T06:15:20.67Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1261,7 +1261,7 @@
     {
       "version": "0.144.2",
       "released_at": "2026-07-13T04:42:46.19Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1290,7 +1290,7 @@
     {
       "version": "0.144.1",
       "released_at": "2026-07-09T23:05:40.041Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1319,7 +1319,7 @@
     {
       "version": "0.144.0",
       "released_at": "2026-07-09T16:50:26.998Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1353,7 +1353,7 @@
     {
       "version": "0.143.0",
       "released_at": "2026-07-08T01:34:38.318Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1383,7 +1383,7 @@
     {
       "version": "0.142.5",
       "released_at": "2026-07-01T01:18:19.998Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1409,7 +1409,7 @@
     {
       "version": "0.142.4",
       "released_at": "2026-06-29T05:07:05.914Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1438,7 +1438,7 @@
     {
       "version": "0.142.3",
       "released_at": "2026-06-26T21:32:08.704Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1466,7 +1466,7 @@
     {
       "version": "0.142.2",
       "released_at": "2026-06-25T07:34:58.281Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1496,7 +1496,7 @@
     {
       "version": "0.142.1",
       "released_at": "2026-06-25T00:38:54.309Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1524,7 +1524,7 @@
     {
       "version": "0.142.0",
       "released_at": "2026-06-22T22:22:41.166Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1552,7 +1552,7 @@
     {
       "version": "0.141.0",
       "released_at": "2026-06-18T04:45:39.921Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1582,7 +1582,7 @@
     {
       "version": "0.140.0",
       "released_at": "2026-06-15T21:09:21.79Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1615,7 +1615,7 @@
     {
       "version": "0.139.0",
       "released_at": "2026-06-09T20:17:25.855Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1646,7 +1646,7 @@
     {
       "version": "0.138.0",
       "released_at": "2026-06-08T23:03:39.681Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1673,7 +1673,7 @@
     {
       "version": "0.137.0",
       "released_at": "2026-06-04T01:41:31.275Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1701,7 +1701,7 @@
     {
       "version": "0.136.0",
       "released_at": "2026-06-01T18:53:55.315Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1733,7 +1733,7 @@
     {
       "version": "0.135.0",
       "released_at": "2026-05-28T19:08:37.797Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1763,7 +1763,7 @@
     {
       "version": "0.134.0",
       "released_at": "2026-05-26T19:33:51.389Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1792,7 +1792,7 @@
     {
       "version": "0.133.0",
       "released_at": "2026-05-21T17:13:06.253Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1825,7 +1825,7 @@
     {
       "version": "0.132.0",
       "released_at": "2026-05-20T02:39:00.388Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1856,7 +1856,7 @@
     {
       "version": "0.131.0",
       "released_at": "2026-05-18T18:08:19.71Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1889,7 +1889,7 @@
     {
       "version": "0.130.0",
       "released_at": "2026-05-08T23:12:58.744Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1917,7 +1917,7 @@
     {
       "version": "0.129.0",
       "released_at": "2026-05-07T17:05:37.553Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1948,7 +1948,7 @@
     {
       "version": "0.128.0",
       "released_at": "2026-04-30T16:43:46.064Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1979,7 +1979,7 @@
     {
       "version": "0.125.0",
       "released_at": "2026-04-24T18:01:41.002Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2012,7 +2012,7 @@
     {
       "version": "0.124.0",
       "released_at": "2026-04-23T18:30:45.892Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2043,7 +2043,7 @@
     {
       "version": "0.123.0",
       "released_at": "2026-04-23T01:27:03.972Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2076,7 +2076,7 @@
     {
       "version": "0.122.0",
       "released_at": "2026-04-20T18:39:33.583Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2105,7 +2105,7 @@
     {
       "version": "0.121.0",
       "released_at": "2026-04-15T20:46:45.517Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2135,7 +2135,7 @@
     {
       "version": "0.120.0",
       "released_at": "2026-04-11T02:54:37.375Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2160,7 +2160,7 @@
     {
       "version": "0.119.0",
       "released_at": "2026-04-10T22:45:06.804Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2192,7 +2192,7 @@
     {
       "version": "0.118.0",
       "released_at": "2026-03-31T17:03:18.49Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2221,7 +2221,7 @@
     {
       "version": "0.117.0",
       "released_at": "2026-03-26T22:28:43.427Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2254,7 +2254,7 @@
     {
       "version": "0.116.0",
       "released_at": "2026-03-19T17:52:17.991Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2285,7 +2285,7 @@
     {
       "version": "0.115.0",
       "released_at": "2026-03-16T19:38:16.363Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2318,7 +2318,7 @@
     {
       "version": "0.114.0",
       "released_at": "2026-03-11T00:29:28.692Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2346,7 +2346,7 @@
     {
       "version": "0.113.0",
       "released_at": "2026-03-10T05:25:37.995Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2379,7 +2379,7 @@
     {
       "version": "0.112.0",
       "released_at": "2026-03-08T20:44:58.047Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2410,7 +2410,7 @@
     {
       "version": "0.111.0",
       "released_at": "2026-03-05T19:13:00.697Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2440,7 +2440,7 @@
     {
       "version": "0.110.0",
       "released_at": "2026-03-05T02:23:39.861Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2470,7 +2470,7 @@
     {
       "version": "0.107.0",
       "released_at": "2026-03-02T18:00:55.212Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2498,7 +2498,7 @@
     {
       "version": "0.106.0",
       "released_at": "2026-02-26T23:12:45.073Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2531,7 +2531,7 @@
     {
       "version": "0.105.0",
       "released_at": "2026-02-25T17:22:34.496Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2561,7 +2561,7 @@
     {
       "version": "0.104.0",
       "released_at": "2026-02-18T07:13:25.235Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2588,7 +2588,7 @@
     {
       "version": "0.103.0",
       "released_at": "2026-02-17T23:03:50.048Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2616,7 +2616,7 @@
     {
       "version": "0.102.0",
       "released_at": "2026-02-17T20:03:25.029Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2645,7 +2645,7 @@
     {
       "version": "0.101.0",
       "released_at": "2026-02-12T20:06:40.829Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2666,7 +2666,7 @@
     {
       "version": "0.100.0",
       "released_at": "2026-02-12T18:30:51.007Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2696,7 +2696,7 @@
     {
       "version": "0.99.0",
       "released_at": "2026-02-11T20:43:52.809Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2728,7 +2728,7 @@
     {
       "version": "0.98.0",
       "released_at": "2026-02-05T17:01:54.85Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2749,7 +2749,7 @@
     {
       "version": "0.97.0",
       "released_at": "2026-02-05T05:12:14.841Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2776,7 +2776,7 @@
     {
       "version": "0.96.0",
       "released_at": "2026-02-04T18:24:44.133Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2804,7 +2804,7 @@
     {
       "version": "0.95.0",
       "released_at": "2026-02-04T04:55:36.663Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2834,7 +2834,7 @@
     {
       "version": "0.94.0",
       "released_at": "2026-02-02T18:28:42.99Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2863,7 +2863,7 @@
     {
       "version": "0.93.0",
       "released_at": "2026-01-31T07:00:56.838Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2894,7 +2894,7 @@
     {
       "version": "0.92.0",
       "released_at": "2026-01-27T11:51:59.692Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2922,7 +2922,7 @@
     {
       "version": "0.91.0",
       "released_at": "2026-01-25T17:34:45.939Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2943,7 +2943,7 @@
     {
       "version": "0.90.0",
       "released_at": "2026-01-25T16:38:42.443Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],

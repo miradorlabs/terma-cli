@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "versions": [
     {
       "harness": "claude",
       "name": "Claude Code",
       "version": "2.1.318",
       "released_at": "2026-11-03T21:55:17.247Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -37,7 +37,7 @@
       "name": "Claude Code",
       "version": "2.1.317",
       "released_at": "2026-11-02T23:57:53.069Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -69,7 +69,7 @@
       "name": "Pi",
       "version": "1.5.0",
       "released_at": "2026-11-02T11:05:09.564Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -92,7 +92,7 @@
       "name": "Claude Code",
       "version": "2.1.316",
       "released_at": "2026-10-31T00:42:05.743Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -120,7 +120,7 @@
       "name": "Claude Code",
       "version": "2.1.315",
       "released_at": "2026-10-30T21:05:24.08Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -152,24 +152,25 @@
       "name": "Claude Code",
       "version": "2.1.314",
       "released_at": "2026-10-30T00:12:56.911Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.312",
-      "changes": 18,
+      "changes": 19,
       "categories": {
         "cli": 3,
         "config": 11,
+        "network": 1,
         "prompt": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 14,
-        "notable": 4
+        "notable": 5
       },
       "undocumented": 15,
       "highlights": [
@@ -184,7 +185,7 @@
       "name": "Codex CLI",
       "version": "0.166.0",
       "released_at": "2026-10-29T19:56:19.746Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -216,7 +217,7 @@
       "name": "DeepSeek Harness",
       "version": "0.2.1-rc.5",
       "released_at": "2026-10-29T14:15:23.355Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -239,7 +240,7 @@
       "name": "OpenCode",
       "version": "1.19.5",
       "released_at": "2026-10-28T06:17:11.1Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -262,7 +263,7 @@
       "name": "Gemini CLI",
       "version": "0.66.0",
       "released_at": "2026-10-27T20:30:04.263Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -285,7 +286,7 @@
       "name": "Codex CLI",
       "version": "0.165.0",
       "released_at": "2026-10-27T20:14:25.378Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -316,7 +317,7 @@
       "name": "Claude Code",
       "version": "2.1.312",
       "released_at": "2026-10-27T18:36:10.16Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -346,19 +347,18 @@
       "name": "Claude Code",
       "version": "2.1.311",
       "released_at": "2026-10-26T19:47:57.395Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.310",
-      "changes": 11,
+      "changes": 9,
       "categories": {
         "binary": 1,
         "cli": 3,
         "config": 1,
-        "network": 2,
         "prompt": 2,
         "storage": 1,
         "tools": 1
@@ -367,9 +367,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 6,
-        "notable": 5
+        "notable": 3
       },
-      "undocumented": 8,
+      "undocumented": 6,
       "highlights": [
         "Injected context changed (+689 −492 chars)",
         "Interactive session's injected context changed (+689 −492 chars)",
@@ -382,17 +382,16 @@
       "name": "Claude Code",
       "version": "2.1.310",
       "released_at": "2026-10-23T21:20:46.54Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.309",
-      "changes": 12,
+      "changes": 10,
       "categories": {
         "config": 6,
-        "network": 2,
         "prompt": 2,
         "tools": 2
       },
@@ -400,9 +399,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 6,
-        "notable": 6
+        "notable": 4
       },
-      "undocumented": 10,
+      "undocumented": 8,
       "highlights": [
         "Injected context changed (+7 −0 chars)",
         "Interactive session's injected context changed (+7 −0 chars)",
@@ -415,7 +414,7 @@
       "name": "Codex CLI",
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -449,7 +448,7 @@
       "name": "Claude Code",
       "version": "2.1.309",
       "released_at": "2026-10-22T20:34:13.713Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -482,7 +481,7 @@
       "name": "OpenCode",
       "version": "1.19.4",
       "released_at": "2026-10-22T13:03:43.704Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -505,7 +504,7 @@
       "name": "Claude Code",
       "version": "2.1.308",
       "released_at": "2026-10-22T04:19:48.902Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -536,7 +535,7 @@
       "name": "Pi",
       "version": "1.4.0",
       "released_at": "2026-10-21T22:48:58.431Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -559,7 +558,7 @@
       "name": "Claude Code",
       "version": "2.1.307",
       "released_at": "2026-10-21T20:47:18.383Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -590,7 +589,7 @@
       "name": "Claude Code",
       "version": "2.1.306",
       "released_at": "2026-10-21T02:28:47.495Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -614,7 +613,7 @@
       "name": "Gemini CLI",
       "version": "0.65.0",
       "released_at": "2026-10-20T21:26:34.492Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -637,23 +636,24 @@
       "name": "Claude Code",
       "version": "2.1.305",
       "released_at": "2026-10-20T19:29:36.816Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "2.1.304",
-      "changes": 19,
+      "changes": 20,
       "categories": {
-        "config": 19
+        "config": 19,
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 16,
-        "notable": 3
+        "notable": 4
       },
-      "undocumented": 15,
+      "undocumented": 16,
       "highlights": [
         "New setting: attributionProjectPolicy",
         "Setting policyHelper.refreshIntervalMs lost value 60000",
@@ -666,19 +666,20 @@
       "name": "Claude Code",
       "version": "2.1.304",
       "released_at": "2026-10-19T19:47:15.337Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.303",
-      "changes": 93,
+      "changes": 95,
       "categories": {
         "behavior": 12,
         "cli": 9,
         "config": 17,
         "hooks": 24,
+        "network": 2,
         "prompt": 17,
         "request": 1,
         "tools": 13
@@ -687,7 +688,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 31,
-        "notable": 62
+        "notable": 64
       },
       "undocumented": 39,
       "highlights": [
@@ -702,7 +703,7 @@
       "name": "Claude Code",
       "version": "2.1.303",
       "released_at": "2026-10-18T21:15:23.178Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -726,7 +727,7 @@
       "name": "DeepSeek Harness",
       "version": "0.2.1-rc.2",
       "released_at": "2026-10-17T08:36:31.655Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -749,18 +750,19 @@
       "name": "Claude Code",
       "version": "2.1.302",
       "released_at": "2026-10-16T16:48:28.057Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.301",
-      "changes": 21,
+      "changes": 23,
       "categories": {
         "binary": 2,
         "config": 6,
         "model": 1,
+        "network": 2,
         "prompt": 1,
         "request": 3,
         "support": 4,
@@ -770,7 +772,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 9,
-        "notable": 12
+        "notable": 14
       },
       "undocumented": 13,
       "highlights": [
@@ -785,7 +787,7 @@
       "name": "OpenCode",
       "version": "1.19.3",
       "released_at": "2026-10-16T12:32:00.28Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -808,7 +810,7 @@
       "name": "OpenCode",
       "version": "1.19.2",
       "released_at": "2026-10-16T02:29:31.737Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -831,7 +833,7 @@
       "name": "Codex CLI",
       "version": "0.163.0",
       "released_at": "2026-10-15T21:37:11.083Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -865,7 +867,7 @@
       "name": "OpenCode",
       "version": "1.19.1",
       "released_at": "2026-10-15T19:20:16.648Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -888,7 +890,7 @@
       "name": "Pi",
       "version": "1.3.0",
       "released_at": "2026-10-15T19:13:30.662Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -911,7 +913,7 @@
       "name": "Claude Code",
       "version": "2.1.301",
       "released_at": "2026-10-15T14:34:23.33Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -942,29 +944,30 @@
       "name": "Claude Code",
       "version": "2.1.300",
       "released_at": "2026-10-14T14:27:26.554Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.299",
-      "changes": 7,
+      "changes": 8,
       "categories": {
         "cli": 2,
-        "config": 5
+        "config": 5,
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 7,
-        "notable": 0
+        "notable": 1
       },
       "undocumented": 5,
       "highlights": [
+        "New vendor telemetry event: tengu_auto_compact_window_in_force",
         "`claude --restricted`: description changed (+308 −314 chars)",
-        "Full help text of `--help` changed (+966 −972 chars)",
-        "New environment variable: CLAUDE_CODE_ATTACHMENTS_BY_PATH"
+        "Full help text of `--help` changed (+966 −972 chars)"
       ],
       "signing": "valid"
     },
@@ -973,17 +976,17 @@
       "name": "Claude Code",
       "version": "2.1.299",
       "released_at": "2026-10-14T00:23:19.588Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.296",
-      "changes": 39,
+      "changes": 40,
       "categories": {
         "config": 35,
-        "network": 2,
+        "network": 3,
         "request": 1,
         "tools": 1
       },
@@ -991,7 +994,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 32,
-        "notable": 7
+        "notable": 8
       },
       "undocumented": 32,
       "highlights": [
@@ -1006,7 +1009,7 @@
       "name": "Gemini CLI",
       "version": "0.64.0",
       "released_at": "2026-10-13T20:48:24.183Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1029,7 +1032,7 @@
       "name": "OpenCode",
       "version": "1.19.0",
       "released_at": "2026-10-11T01:38:53.143Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1052,7 +1055,7 @@
       "name": "Codex CLI",
       "version": "0.162.1",
       "released_at": "2026-10-09T19:50:30.512Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -1083,7 +1086,7 @@
       "name": "Claude Code",
       "version": "2.1.296",
       "released_at": "2026-10-09T16:58:10.924Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -1115,7 +1118,7 @@
       "name": "Codex CLI",
       "version": "0.162.0",
       "released_at": "2026-10-08T19:01:18.07Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1149,7 +1152,7 @@
       "name": "Claude Code",
       "version": "2.1.295",
       "released_at": "2026-10-08T18:22:58.621Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1179,7 +1182,7 @@
       "name": "Claude Code",
       "version": "2.1.294",
       "released_at": "2026-10-08T03:42:57.084Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1202,24 +1205,25 @@
       "name": "Claude Code",
       "version": "2.1.293",
       "released_at": "2026-10-07T17:18:04.464Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.292",
-      "changes": 12,
+      "changes": 13,
       "categories": {
         "config": 6,
         "hooks": 1,
         "model": 3,
+        "network": 1,
         "prompt": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 7,
-        "notable": 5
+        "notable": 6
       },
       "undocumented": 10,
       "highlights": [
@@ -1234,7 +1238,7 @@
       "name": "Codex CLI",
       "version": "0.161.0",
       "released_at": "2026-10-07T16:04:02.844Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1266,7 +1270,7 @@
       "name": "Gemini CLI",
       "version": "0.63.0",
       "released_at": "2026-10-06T20:58:43.642Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1289,7 +1293,7 @@
       "name": "OpenCode",
       "version": "1.18.35",
       "released_at": "2026-10-06T20:21:30.784Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1312,7 +1316,7 @@
       "name": "Claude Code",
       "version": "2.1.292",
       "released_at": "2026-10-06T17:10:31.715Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -1343,7 +1347,7 @@
       "name": "Claude Code",
       "version": "2.1.291",
       "released_at": "2026-10-06T03:32:36.856Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1366,7 +1370,7 @@
       "name": "Codex CLI",
       "version": "0.160.1",
       "released_at": "2026-10-05T18:33:51.98Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -1396,15 +1400,15 @@
       "name": "Claude Code",
       "version": "2.1.290",
       "released_at": "2026-10-05T18:12:44.907Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.289",
-      "changes": 39,
+      "changes": 38,
       "categories": {
-        "cli": 8,
+        "cli": 7,
         "config": 27,
         "prompt": 2,
         "tools": 2
@@ -1412,7 +1416,7 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 33,
+        "informational": 32,
         "notable": 6
       },
       "undocumented": 32,
@@ -1428,7 +1432,7 @@
       "name": "Claude Code",
       "version": "2.1.289",
       "released_at": "2026-10-03T20:12:02.717Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1457,7 +1461,7 @@
       "name": "Claude Code",
       "version": "2.1.288",
       "released_at": "2026-10-02T18:30:40.093Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1490,7 +1494,7 @@
       "name": "Codex CLI",
       "version": "0.160.0",
       "released_at": "2026-10-01T20:26:19.286Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1522,7 +1526,7 @@
       "name": "Claude Code",
       "version": "2.1.287",
       "released_at": "2026-10-01T16:59:25.986Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1552,7 +1556,7 @@
       "name": "Codex CLI",
       "version": "0.159.3",
       "released_at": "2026-09-30T23:02:02.182Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1581,26 +1585,26 @@
       "name": "Claude Code",
       "version": "2.1.286",
       "released_at": "2026-09-30T17:14:38.859Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.285",
-      "changes": 15,
+      "changes": 16,
       "categories": {
         "cli": 2,
         "config": 10,
-        "network": 1,
+        "network": 2,
         "prompt": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 12,
-        "notable": 3
+        "notable": 4
       },
-      "undocumented": 14,
+      "undocumented": 15,
       "highlights": [
         "Injected context changed (+249 −0 chars)",
         "Interactive session's injected context changed (+249 −0 chars)",
@@ -1613,7 +1617,7 @@
       "name": "Codex CLI",
       "version": "0.159.2",
       "released_at": "2026-09-30T00:03:49.293Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1640,7 +1644,7 @@
       "name": "Gemini CLI",
       "version": "0.62.0",
       "released_at": "2026-09-29T21:25:44.188Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1663,7 +1667,7 @@
       "name": "Codex CLI",
       "version": "0.159.1",
       "released_at": "2026-09-29T20:36:58.049Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1697,20 +1701,20 @@
       "name": "Claude Code",
       "version": "2.1.285",
       "released_at": "2026-09-29T17:32:09.173Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.284",
-      "changes": 54,
+      "changes": 55,
       "categories": {
         "behavior": 4,
         "binary": 2,
         "cli": 4,
         "config": 28,
         "model": 1,
-        "network": 1,
+        "network": 2,
         "prompt": 6,
         "request": 5,
         "tools": 3
@@ -1719,7 +1723,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 35,
-        "notable": 19
+        "notable": 20
       },
       "undocumented": 32,
       "highlights": [
@@ -1734,7 +1738,7 @@
       "name": "Codex CLI",
       "version": "0.159.0",
       "released_at": "2026-09-29T08:10:59.17Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1767,18 +1771,19 @@
       "name": "Claude Code",
       "version": "2.1.284",
       "released_at": "2026-09-28T17:11:59.75Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.283",
-      "changes": 25,
+      "changes": 26,
       "categories": {
         "binary": 1,
         "cli": 2,
         "config": 14,
         "model": 5,
+        "network": 1,
         "prompt": 2,
         "tools": 1
       },
@@ -1786,7 +1791,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 17,
-        "notable": 8
+        "notable": 9
       },
       "undocumented": 12,
       "highlights": [
@@ -1801,7 +1806,7 @@
       "name": "Codex CLI",
       "version": "0.158.0",
       "released_at": "2026-09-28T05:12:20.266Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1831,7 +1836,7 @@
       "name": "Codex CLI",
       "version": "0.157.1",
       "released_at": "2026-09-26T01:06:57.149Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1854,7 +1859,7 @@
       "name": "Claude Code",
       "version": "2.1.283",
       "released_at": "2026-09-25T18:46:11.33Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1885,7 +1890,7 @@
       "name": "Codex CLI",
       "version": "0.157.0",
       "released_at": "2026-09-25T02:35:19.752Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1918,28 +1923,29 @@
       "name": "Claude Code",
       "version": "2.1.282",
       "released_at": "2026-09-24T15:56:22.706Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.281",
-      "changes": 17,
+      "changes": 20,
       "categories": {
         "config": 16,
+        "network": 3,
         "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 15,
-        "notable": 2
+        "notable": 5
       },
       "undocumented": 14,
       "highlights": [
         "Beta dropped: fallback-credit-2026-06-01",
         "New setting: allowClaudeInChromeWithManagedMcp",
-        "allowManagedPermissionRulesOnly description changed (+403 −104 chars)"
+        "New vendor telemetry event: tengu_context_rendering_recorded"
       ],
       "signing": "valid"
     },
@@ -1948,29 +1954,30 @@
       "name": "Claude Code",
       "version": "2.1.281",
       "released_at": "2026-09-23T17:01:17.78Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.280",
-      "changes": 20,
+      "changes": 22,
       "categories": {
         "cli": 3,
         "config": 15,
-        "hooks": 2
+        "hooks": 2,
+        "network": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 20,
-        "notable": 0
+        "notable": 2
       },
       "undocumented": 14,
       "highlights": [
-        "PostToolUse hook payload field tool_response.originalCwdMissing added",
-        "PostToolUse hook payload field tool_response.restoredCwd added",
-        "`claude --agents`: description changed (+177 −126 chars)"
+        "New vendor telemetry event: tengu_context_announcement",
+        "New vendor telemetry event: tengu_reminder_fold_recorded",
+        "PostToolUse hook payload field tool_response.originalCwdMissing added"
       ],
       "signing": "valid"
     },
@@ -1979,7 +1986,7 @@
       "name": "Codex CLI",
       "version": "0.156.1",
       "released_at": "2026-09-23T02:45:25.21Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2006,7 +2013,7 @@
       "name": "Codex CLI",
       "version": "0.156.0",
       "released_at": "2026-09-22T19:55:37.255Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2040,18 +2047,19 @@
       "name": "Claude Code",
       "version": "2.1.280",
       "released_at": "2026-09-22T15:44:39.443Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.278",
-      "changes": 37,
+      "changes": 39,
       "categories": {
         "behavior": 2,
         "cli": 3,
         "config": 16,
         "model": 7,
+        "network": 2,
         "prompt": 7,
         "request": 1,
         "tools": 1
@@ -2060,7 +2068,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 19,
-        "notable": 18
+        "notable": 20
       },
       "undocumented": 22,
       "highlights": [
@@ -2075,7 +2083,7 @@
       "name": "Claude Code",
       "version": "2.1.278",
       "released_at": "2026-09-19T01:48:59.758Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2102,7 +2110,7 @@
       "name": "Codex CLI",
       "version": "0.155.1",
       "released_at": "2026-09-18T20:09:23.628Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2133,17 +2141,18 @@
       "name": "Claude Code",
       "version": "2.1.277",
       "released_at": "2026-09-18T16:22:26.548Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.276",
-      "changes": 14,
+      "changes": 15,
       "categories": {
         "behavior": 1,
         "config": 8,
         "hooks": 2,
+        "network": 1,
         "prompt": 1,
         "storage": 1,
         "tools": 1
@@ -2152,7 +2161,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 8,
-        "notable": 6
+        "notable": 7
       },
       "undocumented": 9,
       "highlights": [
@@ -2167,7 +2176,7 @@
       "name": "Claude Code",
       "version": "2.1.276",
       "released_at": "2026-09-18T01:39:31.986Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2195,7 +2204,7 @@
       "name": "Codex CLI",
       "version": "0.155.0",
       "released_at": "2026-09-17T23:19:02.781Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2227,7 +2236,7 @@
       "name": "Claude Code",
       "version": "2.1.275",
       "released_at": "2026-09-17T20:20:31.805Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2258,7 +2267,7 @@
       "name": "Claude Code",
       "version": "2.1.274",
       "released_at": "2026-09-16T22:36:09.883Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2290,7 +2299,7 @@
       "name": "Claude Code",
       "version": "2.1.273",
       "released_at": "2026-09-15T18:06:34.098Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2319,22 +2328,26 @@
       "name": "Claude Code",
       "version": "2.1.272",
       "released_at": "2026-09-14T23:34:13.565Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.271",
-      "changes": 0,
-      "categories": {},
+      "changes": 1,
+      "categories": {
+        "network": 1
+      },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 0,
-        "notable": 0
+        "notable": 1
       },
-      "undocumented": 0,
-      "highlights": [],
+      "undocumented": 1,
+      "highlights": [
+        "New vendor telemetry event: tengu_config_lock_contention"
+      ],
       "signing": "valid"
     },
     {
@@ -2342,7 +2355,7 @@
       "name": "Claude Code",
       "version": "2.1.271",
       "released_at": "2026-09-14T19:45:19.456Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2374,7 +2387,7 @@
       "name": "Claude Code",
       "version": "2.1.270",
       "released_at": "2026-09-12T18:52:44.937Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2401,13 +2414,13 @@
       "name": "Claude Code",
       "version": "2.1.269",
       "released_at": "2026-09-11T18:12:49.253Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.268",
-      "changes": 56,
+      "changes": 57,
       "categories": {
         "behavior": 6,
         "binary": 1,
@@ -2415,7 +2428,7 @@
         "cli": 2,
         "config": 17,
         "hooks": 24,
-        "network": 1,
+        "network": 2,
         "prompt": 3,
         "request": 1
       },
@@ -2423,7 +2436,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 44,
-        "notable": 12
+        "notable": 13
       },
       "undocumented": 45,
       "highlights": [
@@ -2438,18 +2451,18 @@
       "name": "Claude Code",
       "version": "2.1.268",
       "released_at": "2026-09-10T18:41:11.77Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.267",
-      "changes": 35,
+      "changes": 36,
       "categories": {
         "cli": 3,
         "config": 13,
         "hooks": 3,
-        "network": 1,
+        "network": 2,
         "prompt": 12,
         "tools": 3
       },
@@ -2457,7 +2470,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 13,
-        "notable": 22
+        "notable": 23
       },
       "undocumented": 15,
       "highlights": [
@@ -2472,7 +2485,7 @@
       "name": "Codex CLI",
       "version": "0.154.0",
       "released_at": "2026-09-09T22:40:10.746Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2505,29 +2518,30 @@
       "name": "Claude Code",
       "version": "2.1.267",
       "released_at": "2026-09-09T18:25:42.82Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.266",
-      "changes": 15,
+      "changes": 16,
       "categories": {
         "config": 13,
         "hooks": 1,
+        "network": 1,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 14,
-        "notable": 1
+        "notable": 2
       },
-      "undocumented": 11,
+      "undocumented": 12,
       "highlights": [
         "Bash tool parameter description: description changed (+167 −0 chars)",
-        "PostModelSwitch hook payload field prompt_id added",
-        "New setting: maxEffortLevel"
+        "Vendor telemetry event no longer sent: tengu_artifact_mcp_switch",
+        "PostModelSwitch hook payload field prompt_id added"
       ],
       "signing": "valid"
     },
@@ -2536,7 +2550,7 @@
       "name": "Claude Code",
       "version": "2.1.266",
       "released_at": "2026-09-08T23:32:32.88Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2559,25 +2573,26 @@
       "name": "Claude Code",
       "version": "2.1.265",
       "released_at": "2026-09-08T19:05:16.492Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.263",
-      "changes": 24,
+      "changes": 25,
       "categories": {
         "behavior": 2,
         "caching": 1,
         "cli": 8,
         "config": 12,
-        "hooks": 1
+        "hooks": 1,
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 14,
-        "notable": 10
+        "notable": 11
       },
       "undocumented": 14,
       "highlights": [
@@ -2592,7 +2607,7 @@
       "name": "Claude Code",
       "version": "2.1.263",
       "released_at": "2026-09-06T02:07:58.391Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2619,7 +2634,7 @@
       "name": "Codex CLI",
       "version": "0.153.4",
       "released_at": "2026-09-04T23:31:18.513Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2652,7 +2667,7 @@
       "name": "Codex CLI",
       "version": "0.153.3",
       "released_at": "2026-09-04T19:07:16.079Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2680,28 +2695,29 @@
       "name": "Claude Code",
       "version": "2.1.261",
       "released_at": "2026-09-04T17:49:34.927Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.260",
-      "changes": 7,
+      "changes": 9,
       "categories": {
         "config": 6,
-        "hooks": 1
+        "hooks": 1,
+        "network": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 6,
-        "notable": 1
+        "notable": 3
       },
       "undocumented": 4,
       "highlights": [
         "Setting keybindingFlavor deprecated",
-        "PostModelSwitch hook payload field prompt_id added",
-        "New setting: bashOutputMaxChars"
+        "New vendor telemetry event: tengu_feature_bad",
+        "New vendor telemetry event: tengu_feature_sad"
       ],
       "signing": "valid"
     },
@@ -2710,7 +2726,7 @@
       "name": "Codex CLI",
       "version": "0.153.2",
       "released_at": "2026-09-03T23:57:21.074Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2739,7 +2755,7 @@
       "name": "Claude Code",
       "version": "2.1.260",
       "released_at": "2026-09-03T22:32:02.087Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2769,7 +2785,7 @@
       "name": "Codex CLI",
       "version": "0.153.1",
       "released_at": "2026-09-03T21:09:57.109Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2799,7 +2815,7 @@
       "name": "Codex CLI",
       "version": "0.153.0",
       "released_at": "2026-09-03T01:42:05.774Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2830,7 +2846,7 @@
       "name": "Claude Code",
       "version": "2.1.259",
       "released_at": "2026-09-02T21:21:42.115Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2860,7 +2876,7 @@
       "name": "Codex CLI",
       "version": "0.152.1",
       "released_at": "2026-09-01T22:36:50.784Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2889,7 +2905,7 @@
       "name": "Claude Code",
       "version": "2.1.258",
       "released_at": "2026-09-01T22:25:07.449Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2916,24 +2932,25 @@
       "name": "Claude Code",
       "version": "2.1.257",
       "released_at": "2026-09-01T17:15:33.223Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.252",
-      "changes": 38,
+      "changes": 42,
       "categories": {
         "cli": 3,
         "config": 30,
         "hooks": 1,
+        "network": 4,
         "prompt": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 32,
-        "notable": 6
+        "notable": 10
       },
       "undocumented": 21,
       "highlights": [
@@ -2948,7 +2965,7 @@
       "name": "Codex CLI",
       "version": "0.152.0",
       "released_at": "2026-09-01T02:02:46.635Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2980,7 +2997,7 @@
       "name": "Claude Code",
       "version": "2.1.252",
       "released_at": "2026-08-31T17:07:28.168Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3003,7 +3020,7 @@
       "name": "Codex CLI",
       "version": "0.151.0",
       "released_at": "2026-08-29T09:59:26.3Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3036,7 +3053,7 @@
       "name": "Claude Code",
       "version": "2.1.251",
       "released_at": "2026-08-28T15:34:26.421Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3071,7 +3088,7 @@
       "name": "Claude Code",
       "version": "2.1.250",
       "released_at": "2026-08-27T22:27:48.314Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3098,19 +3115,20 @@
       "name": "Claude Code",
       "version": "2.1.248",
       "released_at": "2026-08-27T20:35:36.671Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.247",
-      "changes": 126,
+      "changes": 128,
       "categories": {
         "binary": 1,
         "caching": 4,
         "cli": 4,
         "config": 103,
         "hooks": 1,
+        "network": 2,
         "prompt": 5,
         "tools": 8
       },
@@ -3118,7 +3136,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 104,
-        "notable": 22
+        "notable": 24
       },
       "undocumented": 85,
       "highlights": [
@@ -3133,7 +3151,7 @@
       "name": "Codex CLI",
       "version": "0.150.1",
       "released_at": "2026-08-27T02:01:46.851Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3156,7 +3174,7 @@
       "name": "Codex CLI",
       "version": "0.150.0",
       "released_at": "2026-08-26T19:43:31.702Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3190,7 +3208,7 @@
       "name": "Claude Code",
       "version": "2.1.247",
       "released_at": "2026-08-26T18:02:01.046Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3219,7 +3237,7 @@
       "name": "Claude Code",
       "version": "2.1.246",
       "released_at": "2026-08-25T19:17:34.421Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3251,7 +3269,7 @@
       "name": "Claude Code",
       "version": "2.1.245",
       "released_at": "2026-08-25T04:45:52.102Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3279,7 +3297,7 @@
       "name": "Claude Code",
       "version": "2.1.243",
       "released_at": "2026-08-24T23:10:45.498Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3306,7 +3324,7 @@
       "name": "Claude Code",
       "version": "2.1.242",
       "released_at": "2026-08-24T19:16:14.767Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3337,7 +3355,7 @@
       "name": "Codex CLI",
       "version": "0.149.1",
       "released_at": "2026-08-24T00:32:45.066Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3367,7 +3385,7 @@
       "name": "Claude Code",
       "version": "2.1.241",
       "released_at": "2026-08-22T23:58:33.046Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3390,7 +3408,7 @@
       "name": "Claude Code",
       "version": "2.1.240",
       "released_at": "2026-08-22T13:03:23.566Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3420,7 +3438,7 @@
       "name": "Claude Code",
       "version": "2.1.239",
       "released_at": "2026-08-21T17:18:54.506Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3451,7 +3469,7 @@
       "name": "Codex CLI",
       "version": "0.149.0",
       "released_at": "2026-08-20T21:09:05.284Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3484,7 +3502,7 @@
       "name": "Claude Code",
       "version": "2.1.238",
       "released_at": "2026-08-20T18:01:54.712Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3515,7 +3533,7 @@
       "name": "Claude Code",
       "version": "2.1.237",
       "released_at": "2026-08-19T23:57:54.833Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3547,28 +3565,29 @@
       "name": "Claude Code",
       "version": "2.1.236",
       "released_at": "2026-08-19T18:45:14.539Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.235",
-      "changes": 10,
+      "changes": 11,
       "categories": {
         "config": 8,
-        "hooks": 2
+        "hooks": 2,
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 8,
-        "notable": 2
+        "notable": 3
       },
       "undocumented": 9,
       "highlights": [
         "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
         "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-        "New environment variable: ANTHROPIC_DEFAULT_MODEL"
+        "New vendor telemetry event: tengu_shutdown_pending_state"
       ],
       "signing": "valid"
     },
@@ -3577,7 +3596,7 @@
       "name": "Codex CLI",
       "version": "0.148.0",
       "released_at": "2026-08-18T22:30:14.842Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3612,7 +3631,7 @@
       "name": "Claude Code",
       "version": "2.1.235",
       "released_at": "2026-08-18T18:24:10.21Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3642,7 +3661,7 @@
       "name": "Claude Code",
       "version": "2.1.234",
       "released_at": "2026-08-17T18:19:13.187Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3673,7 +3692,7 @@
       "name": "Claude Code",
       "version": "2.1.233",
       "released_at": "2026-08-14T18:50:44.102Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3707,27 +3726,28 @@
       "name": "Claude Code",
       "version": "2.1.232",
       "released_at": "2026-08-13T21:30:53.194Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.231",
-      "changes": 20,
+      "changes": 21,
       "categories": {
-        "config": 20
+        "config": 20,
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 19,
-        "notable": 1
+        "notable": 2
       },
       "undocumented": 16,
       "highlights": [
         "New setting: allowedMarketplaces",
-        "New setting: additionalMarketplaces",
-        "policyHelpers description changed (+890 −283 chars)"
+        "New vendor telemetry event: tengu_turn_end",
+        "New setting: additionalMarketplaces"
       ],
       "signing": "valid"
     },
@@ -3736,7 +3756,7 @@
       "name": "Claude Code",
       "version": "2.1.231",
       "released_at": "2026-08-13T08:27:21.757Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3759,7 +3779,7 @@
       "name": "Claude Code",
       "version": "2.1.229",
       "released_at": "2026-08-12T19:28:48.616Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3790,7 +3810,7 @@
       "name": "Claude Code",
       "version": "2.1.228",
       "released_at": "2026-08-11T17:45:45.882Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3821,7 +3841,7 @@
       "name": "Claude Code",
       "version": "2.1.227",
       "released_at": "2026-08-10T20:56:57.591Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3854,7 +3874,7 @@
       "name": "Claude Code",
       "version": "2.1.226",
       "released_at": "2026-08-08T01:53:22.182Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3881,7 +3901,7 @@
       "name": "Claude Code",
       "version": "2.1.225",
       "released_at": "2026-08-07T23:08:56.171Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3911,7 +3931,7 @@
       "name": "Codex CLI",
       "version": "0.147.0",
       "released_at": "2026-08-07T01:47:21.081Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3946,7 +3966,7 @@
       "name": "Claude Code",
       "version": "2.1.224",
       "released_at": "2026-08-07T01:36:32.682Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -3978,7 +3998,7 @@
       "name": "Claude Code",
       "version": "2.1.223",
       "released_at": "2026-08-05T22:51:13.206Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4009,7 +4029,7 @@
       "name": "Codex CLI",
       "version": "0.146.1",
       "released_at": "2026-08-05T16:00:31.441Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4040,7 +4060,7 @@
       "name": "Claude Code",
       "version": "2.1.222",
       "released_at": "2026-08-04T20:37:17.953Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4070,7 +4090,7 @@
       "name": "Claude Code",
       "version": "2.1.221",
       "released_at": "2026-08-03T22:16:25.561Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4102,7 +4122,7 @@
       "name": "Codex CLI",
       "version": "0.146.0",
       "released_at": "2026-07-29T01:45:57.696Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4135,7 +4155,7 @@
       "name": "Claude Code",
       "version": "2.1.220",
       "released_at": "2026-07-24T23:11:21.821Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4158,18 +4178,19 @@
       "name": "Claude Code",
       "version": "2.1.219",
       "released_at": "2026-07-24T16:11:49.832Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.218",
-      "changes": 22,
+      "changes": 24,
       "categories": {
         "behavior": 3,
         "config": 4,
         "hooks": 2,
         "model": 5,
+        "network": 2,
         "prompt": 4,
         "request": 1,
         "tools": 3
@@ -4178,9 +4199,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 5,
-        "notable": 17
+        "notable": 19
       },
-      "undocumented": 10,
+      "undocumented": 12,
       "highlights": [
         "Model alias \"opus\": claude-opus-4-8 → claude-opus-5",
         "Model alias \"opus[1m]\": claude-opus-4-8 → claude-opus-5",
@@ -4193,7 +4214,7 @@
       "name": "Claude Code",
       "version": "2.1.218",
       "released_at": "2026-07-22T19:55:32.144Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4225,7 +4246,7 @@
       "name": "Claude Code",
       "version": "2.1.217",
       "released_at": "2026-07-21T19:55:38.926Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4257,7 +4278,7 @@
       "name": "Codex CLI",
       "version": "0.145.0",
       "released_at": "2026-07-21T18:24:11.494Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4291,7 +4312,7 @@
       "name": "Claude Code",
       "version": "2.1.216",
       "released_at": "2026-07-20T20:19:37.447Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4322,7 +4343,7 @@
       "name": "Claude Code",
       "version": "2.1.215",
       "released_at": "2026-07-19T00:53:37.17Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4353,7 +4374,7 @@
       "name": "Codex CLI",
       "version": "0.144.6",
       "released_at": "2026-07-18T13:54:50.572Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4384,7 +4405,7 @@
       "name": "Claude Code",
       "version": "2.1.214",
       "released_at": "2026-07-18T00:13:41.661Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4407,7 +4428,7 @@
       "name": "Claude Code",
       "version": "2.1.213",
       "released_at": "2026-07-17T22:26:26.753Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4438,7 +4459,7 @@
       "name": "Claude Code",
       "version": "2.1.212",
       "released_at": "2026-07-16T19:20:24.324Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4471,7 +4492,7 @@
       "name": "Codex CLI",
       "version": "0.144.5",
       "released_at": "2026-07-16T02:57:51.857Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4502,7 +4523,7 @@
       "name": "Claude Code",
       "version": "2.1.211",
       "released_at": "2026-07-15T19:24:07.013Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4533,27 +4554,28 @@
       "name": "Claude Code",
       "version": "2.1.210",
       "released_at": "2026-07-14T19:39:21.73Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "2.1.209",
-      "changes": 4,
+      "changes": 6,
       "categories": {
-        "config": 4
+        "config": 4,
+        "network": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 4,
-        "notable": 0
+        "notable": 2
       },
       "undocumented": 4,
       "highlights": [
-        "New setting: processWrapper",
-        "New environment variable: CLAUDE_CODE_DISABLE_MEMORY_STREAM_LIST",
-        "New environment variable: CLAUDE_CODE_DISABLE_ORG_MEMORY"
+        "New vendor telemetry event: tengu_headless_latency",
+        "New vendor telemetry event: tengu_retention_sweep",
+        "New setting: processWrapper"
       ],
       "signing": "valid"
     },
@@ -4562,7 +4584,7 @@
       "name": "Codex CLI",
       "version": "0.144.4",
       "released_at": "2026-07-14T05:10:51.485Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4592,7 +4614,7 @@
       "name": "Claude Code",
       "version": "2.1.209",
       "released_at": "2026-07-14T04:45:37.792Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4622,7 +4644,7 @@
       "name": "Claude Code",
       "version": "2.1.208",
       "released_at": "2026-07-13T21:31:27.921Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4654,7 +4676,7 @@
       "name": "Codex CLI",
       "version": "0.144.3",
       "released_at": "2026-07-13T06:15:20.67Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4686,7 +4708,7 @@
       "name": "Codex CLI",
       "version": "0.144.2",
       "released_at": "2026-07-13T04:42:46.19Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4717,7 +4739,7 @@
       "name": "Claude Code",
       "version": "2.1.207",
       "released_at": "2026-07-10T22:25:09.43Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4748,7 +4770,7 @@
       "name": "Codex CLI",
       "version": "0.144.1",
       "released_at": "2026-07-09T23:05:40.041Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4779,7 +4801,7 @@
       "name": "Codex CLI",
       "version": "0.144.0",
       "released_at": "2026-07-09T16:50:26.998Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4815,7 +4837,7 @@
       "name": "Codex CLI",
       "version": "0.143.0",
       "released_at": "2026-07-08T01:34:38.318Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4847,7 +4869,7 @@
       "name": "Codex CLI",
       "version": "0.142.5",
       "released_at": "2026-07-01T01:18:19.998Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4875,7 +4897,7 @@
       "name": "Codex CLI",
       "version": "0.142.4",
       "released_at": "2026-06-29T05:07:05.914Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4906,7 +4928,7 @@
       "name": "Codex CLI",
       "version": "0.142.3",
       "released_at": "2026-06-26T21:32:08.704Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4936,7 +4958,7 @@
       "name": "Codex CLI",
       "version": "0.142.2",
       "released_at": "2026-06-25T07:34:58.281Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4968,7 +4990,7 @@
       "name": "Codex CLI",
       "version": "0.142.1",
       "released_at": "2026-06-25T00:38:54.309Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -4998,7 +5020,7 @@
       "name": "Codex CLI",
       "version": "0.142.0",
       "released_at": "2026-06-22T22:22:41.166Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5028,7 +5050,7 @@
       "name": "Codex CLI",
       "version": "0.141.0",
       "released_at": "2026-06-18T04:45:39.921Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5060,7 +5082,7 @@
       "name": "Codex CLI",
       "version": "0.140.0",
       "released_at": "2026-06-15T21:09:21.79Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5095,7 +5117,7 @@
       "name": "Codex CLI",
       "version": "0.139.0",
       "released_at": "2026-06-09T20:17:25.855Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5128,7 +5150,7 @@
       "name": "Codex CLI",
       "version": "0.138.0",
       "released_at": "2026-06-08T23:03:39.681Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5157,7 +5179,7 @@
       "name": "Codex CLI",
       "version": "0.137.0",
       "released_at": "2026-06-04T01:41:31.275Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5187,7 +5209,7 @@
       "name": "Codex CLI",
       "version": "0.136.0",
       "released_at": "2026-06-01T18:53:55.315Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5221,7 +5243,7 @@
       "name": "Codex CLI",
       "version": "0.135.0",
       "released_at": "2026-05-28T19:08:37.797Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5253,7 +5275,7 @@
       "name": "Codex CLI",
       "version": "0.134.0",
       "released_at": "2026-05-26T19:33:51.389Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5284,7 +5306,7 @@
       "name": "Codex CLI",
       "version": "0.133.0",
       "released_at": "2026-05-21T17:13:06.253Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5319,7 +5341,7 @@
       "name": "Codex CLI",
       "version": "0.132.0",
       "released_at": "2026-05-20T02:39:00.388Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5352,7 +5374,7 @@
       "name": "Codex CLI",
       "version": "0.131.0",
       "released_at": "2026-05-18T18:08:19.71Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5387,7 +5409,7 @@
       "name": "Codex CLI",
       "version": "0.130.0",
       "released_at": "2026-05-08T23:12:58.744Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5417,7 +5439,7 @@
       "name": "Codex CLI",
       "version": "0.129.0",
       "released_at": "2026-05-07T17:05:37.553Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5450,7 +5472,7 @@
       "name": "Codex CLI",
       "version": "0.128.0",
       "released_at": "2026-04-30T16:43:46.064Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5483,7 +5505,7 @@
       "name": "Codex CLI",
       "version": "0.125.0",
       "released_at": "2026-04-24T18:01:41.002Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5518,7 +5540,7 @@
       "name": "Codex CLI",
       "version": "0.124.0",
       "released_at": "2026-04-23T18:30:45.892Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5551,7 +5573,7 @@
       "name": "Codex CLI",
       "version": "0.123.0",
       "released_at": "2026-04-23T01:27:03.972Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5586,7 +5608,7 @@
       "name": "Codex CLI",
       "version": "0.122.0",
       "released_at": "2026-04-20T18:39:33.583Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5617,7 +5639,7 @@
       "name": "Codex CLI",
       "version": "0.121.0",
       "released_at": "2026-04-15T20:46:45.517Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5649,7 +5671,7 @@
       "name": "Codex CLI",
       "version": "0.120.0",
       "released_at": "2026-04-11T02:54:37.375Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5676,7 +5698,7 @@
       "name": "Codex CLI",
       "version": "0.119.0",
       "released_at": "2026-04-10T22:45:06.804Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5710,7 +5732,7 @@
       "name": "Codex CLI",
       "version": "0.118.0",
       "released_at": "2026-03-31T17:03:18.49Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5741,7 +5763,7 @@
       "name": "Codex CLI",
       "version": "0.117.0",
       "released_at": "2026-03-26T22:28:43.427Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5776,7 +5798,7 @@
       "name": "Codex CLI",
       "version": "0.116.0",
       "released_at": "2026-03-19T17:52:17.991Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5809,7 +5831,7 @@
       "name": "Codex CLI",
       "version": "0.115.0",
       "released_at": "2026-03-16T19:38:16.363Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5844,7 +5866,7 @@
       "name": "Codex CLI",
       "version": "0.114.0",
       "released_at": "2026-03-11T00:29:28.692Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5874,7 +5896,7 @@
       "name": "Codex CLI",
       "version": "0.113.0",
       "released_at": "2026-03-10T05:25:37.995Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5909,7 +5931,7 @@
       "name": "Codex CLI",
       "version": "0.112.0",
       "released_at": "2026-03-08T20:44:58.047Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5942,7 +5964,7 @@
       "name": "Codex CLI",
       "version": "0.111.0",
       "released_at": "2026-03-05T19:13:00.697Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -5974,7 +5996,7 @@
       "name": "Codex CLI",
       "version": "0.110.0",
       "released_at": "2026-03-05T02:23:39.861Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -6006,7 +6028,7 @@
       "name": "Codex CLI",
       "version": "0.107.0",
       "released_at": "2026-03-02T18:00:55.212Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -6036,7 +6058,7 @@
       "name": "Codex CLI",
       "version": "0.106.0",
       "released_at": "2026-02-26T23:12:45.073Z",
-      "captured_at": "2026-11-04T16:16:16.239171Z",
+      "captured_at": "2026-11-05T02:11:01.502194Z",
       "platforms": [
         "darwin/arm64"
       ],

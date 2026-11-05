@@ -3,22 +3,23 @@
   "harness": "claude",
   "from": "2.1.209",
   "to": "2.1.210",
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Added a live elapsed-time counter to the collapsed tool summary line so long-running tool calls visibly tick instead of looking stuck\n- Added a startup warning for `Write(path)`, `NotebookEdit(path)`, and `Glob(path)` permission rules — use `Edit(path)` or `Read(path)` instead\n- Fixed `isolation: 'worktree'` subagents being able to run git-mutating commands against the main repo checkout instead of their own isolated worktree\n- Fixed the `ultracode` keyword opt-in firing on non-human-originated input such as webhook payloads and relayed PR comments\n- Fixed a rendered text fragment leaking into crash telemetry when a UI component returned content outside a styled text element\n- Fixed paste markers leaking into external editors opened from Claude Code, which could appear as stray È/É characters around pasted text\n- Fixed `claude attach` sometimes failing with \"job not found\" or \"agent is still starting\" errors during session transitions — attach now waits for the daemon to settle, and terminal resizes during a slow attach are applied once it completes\n- Fixed a session crash when a tool's result renderer returned a numeric bigint value or plain text instead of a UI element\n- Fixed a hook callback timeout being misreported to the model as a user rejection, which made unattended sessions stop and wait\n- Fixed Claude assuming a `cd` took effect after its command was moved to the background; the tool result now states the working directory is unchanged\n- Fixed plugin-provided MCP servers being torn down when MCP servers are re-synced mid-session\n- Fixed plan approvals without edits being labeled \"(edited by user)\" and overwriting the plan file with a stale snapshot\n- Fixed `/doctor` skipping its auto-mode-default proposal on Bedrock, Vertex, and Foundry, where auto mode no longer needs an opt-in\n- Fixed Grep content mode claiming \"No matches found\" when paginating past the end of results\n- Fixed unmatched `$1`/`$2` positional placeholders in skills and commands being silently stripped; they are now preserved verbatim\n- Fixed plugin cache writes leaving temp files behind on failure and failing on locked-file renames on Windows and network filesystems\n- Fixed background workers crash-looping when a client resets its connection to the background service\n- Fixed `claude agents --effort ultracode` not reaching dispatched sessions; the value was silently dropped\n- Fixed pressing ← to open the agents view dropping the task tracker when returning to the session\n- Fixed the agents dashboard retaining pasted images from abandoned reply drafts after their session was deleted\n- Fixed killed background sessions leaving a permanent `git worktree lock` behind; the periodic sweep now releases locks whose owning process is gone\n- Fixed SDK MCP servers registered via an `initialize` control request waiting until the next turn to start connecting\n- Fixed returning to the agents view from a session leaving overlapping ghost frames with `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1`\n- Fixed late-appearing `.claude/*` symlinks not being reconciled into the sandbox deny-write list\n- Hardened the Agent tool against indirect prompt injection via content a subagent read\n- Improved the Bash/PowerShell tool message when a command hits its timeout and is auto-backgrounded, so the model can distinguish a hang from an explicit background request\n- Improved auto mode: the permission classifier now defaults to Sonnet 5 for external sessions, validated on the session's first request and pinned for the session\n- Improved the bundled dataviz skill's chart color validation with perceptual OKLab color difference and recalibrated color-blindness thresholds\n- Memory writes that leave a MEMORY.md index over its read limit now produce an explicit error instead of silent truncation\n- Screen reader mode now announces permission mode changes aloud when cycling modes with Shift+Tab\n- The agents footer hint now shows how many background agents are waiting on your input, with a brief color emphasis when the count changes\n- Agent view: the session you pressed ← from stays visibly marked even after mouse hover or arrow keys move the selection\n- Fable temporarily shows as unavailable in the advisor picker while a server-side issue causing Fable advisor failures is fixed"
   },
   "summary": {
-    "changes": 4,
+    "changes": 6,
     "categories": {
-      "config": 4
+      "config": 4,
+      "network": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 4,
-      "notable": 0
+      "notable": 2
     },
     "undocumented": 4
   },
@@ -97,6 +98,126 @@
       "terma": null,
       "source": null,
       "documented": false
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_headless_latency"
+      ],
+      "title": "New vendor telemetry event: tengu_headless_latency",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "count": 2,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_retention_sweep",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_retention_sweep"
+      ],
+      "title": "New vendor telemetry event: tengu_retention_sweep",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "count": 1,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
     }
   ]
 }

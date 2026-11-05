@@ -3,22 +3,85 @@
   "harness": "claude",
   "from": "2.1.271",
   "to": "2.1.272",
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Bug fixes and reliability improvements"
   },
   "summary": {
-    "changes": 0,
-    "categories": {},
+    "changes": 1,
+    "categories": {
+      "network": 1
+    },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 0,
-      "notable": 0
+      "notable": 1
     },
-    "undocumented": 0
+    "undocumented": 1
   },
-  "changes": []
+  "changes": [
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_config_lock_contention",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_config_lock_contention"
+      ],
+      "title": "New vendor telemetry event: tengu_config_lock_contention",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "count": 1,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
 }

@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.63.0",
   "to": "0.64.0",
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.63.0...v0.64.0"
   },

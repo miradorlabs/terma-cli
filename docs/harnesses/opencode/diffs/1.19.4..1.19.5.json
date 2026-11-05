@@ -3,7 +3,7 @@
   "harness": "opencode",
   "from": "1.19.4",
   "to": "1.19.5",
-  "generated_at": "2026-11-04T16:16:16.239171Z",
+  "generated_at": "2026-11-05T02:11:01.502194Z",
   "source": {
     "compare": "https://github.com/anomalyco/opencode/compare/v1.19.4...v1.19.5"
   },

@@ -965,6 +965,14 @@
           "title": "New environment variable: CLAUDE_CODE_UPFRONT_TOOLS",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_bad",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_feature_bad",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -1083,22 +1091,6 @@
           "documented": false
         },
         {
-          "id": "network.egress.CONNECT api.anthropic.com",
-          "category": "network",
-          "op": "removed",
-          "title": "Network request no longer made: CONNECT api.anthropic.com",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "network.egress.POST api.anthropic.com/api/event_logging/v2/batch",
-          "category": "network",
-          "op": "added",
-          "title": "New network request: POST api.anthropic.com/api/event_logging/v2/batch",
-          "impact": "notable",
-          "documented": false
-        },
-        {
           "id": "storage.plugins",
           "category": "storage",
           "op": "added",
@@ -1198,22 +1190,6 @@
           "op": "removed",
           "title": "Environment variable no longer read: BUN_ENV",
           "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "network.egress.POST api.anthropic.com/api/event_logging/v2/batch",
-          "category": "network",
-          "op": "removed",
-          "title": "Network request no longer made: POST api.anthropic.com/api/event_logging/v2/batch",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "network.egress.CONNECT api.anthropic.com",
-          "category": "network",
-          "op": "added",
-          "title": "New network request: CONNECT api.anthropic.com",
-          "impact": "notable",
           "documented": false
         }
       ]
@@ -1715,6 +1691,14 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_SETTLE_TOUCHED_FILES",
           "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_config_lock_contention",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_config_lock_contention",
+          "impact": "notable",
           "documented": false
         }
       ]
@@ -2466,6 +2450,22 @@
           "title": "Environment variable no longer read: NODE_ENVContent",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_deferred_tools_pool_change",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_deferred_tools_pool_change",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -2597,6 +2597,22 @@
           "title": "New environment variable: props",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_auto_mode_git_state_probe",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_auto_mode_git_state_probe",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_fork_subagent_enabled",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_fork_subagent_enabled",
+          "impact": "notable",
+          "documented": true
         },
         {
           "id": "binary.runtime",
@@ -2777,6 +2793,14 @@
           "title": "New environment variable: CLAUDE_CODE_MESSAGES_PROMPT_CACHE_TTL",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_auto_compact_window_in_force",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_auto_compact_window_in_force",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -3095,6 +3119,14 @@
           "title": "Network request no longer made: GET api.anthropic.com/api/claude_code_penguin_mode",
           "impact": "notable",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_client_data_cache_key",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_client_data_cache_key",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -3662,6 +3694,14 @@
           "title": "New environment variable: MCP_TRANSPORT_POLICY_ONLY",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_org_config_gate_shadow",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_org_config_gate_shadow",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -3774,14 +3814,6 @@
           "op": "added",
           "title": "WebFetch tool parameter offset added",
           "impact": "notable",
-          "documented": true
-        },
-        {
-          "id": "cli.commands.claude attach.description",
-          "category": "cli",
-          "op": "changed",
-          "title": "Description of `claude attach` changed",
-          "impact": "informational",
           "documented": true
         },
         {
@@ -4479,6 +4511,14 @@
           "title": "New network request: POST api.anthropic.com/api/event_logging/v2/batch",
           "impact": "notable",
           "documented": false
+        },
+        {
+          "id": "network.telemetry",
+          "category": "network",
+          "op": "added",
+          "title": "Now sends its own telemetry to its vendor",
+          "impact": "notable",
+          "documented": false
         }
       ]
     },
@@ -4903,6 +4943,14 @@
           "documented": false
         },
         {
+          "id": "network.telemetry",
+          "category": "network",
+          "op": "removed",
+          "title": "No longer sends its own telemetry to its vendor",
+          "impact": "notable",
+          "documented": true
+        },
+        {
           "id": "binary.heuristic.sdk",
           "category": "binary",
           "op": "added",
@@ -5115,6 +5163,14 @@
           "title": "Environment variable no longer read: CLAUDE_CODE_ENABLE_NARRATION",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_mcp_first_turn_join",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_headless_mcp_first_turn_join",
+          "impact": "notable",
+          "documented": true
         },
         {
           "id": "binary.heuristic.settings_keys",
@@ -5415,6 +5471,30 @@
           "title": "Environment variable no longer read: CLAUDE_CODE_OCHRE_KITE",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_rendering_recorded",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_context_rendering_recorded",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_shape_recorded",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_wire_shape_recorded",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_tool_input_echo_recorded",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_wire_tool_input_echo_recorded",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -5581,6 +5661,22 @@
           "title": "Environment variable no longer read: CLAUDE_CODE_REPL",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_announcement",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_context_announcement",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_reminder_fold_recorded",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_reminder_fold_recorded",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -5883,6 +5979,22 @@
           "title": "Environment variable no longer read: CLAUDE_CODE_LUMINOUS_WHISTLE",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_enabled_for_session",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_plugin_enabled_for_session",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_subagent_steer_applied",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_subagent_steer_applied",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -6006,6 +6118,14 @@
           "op": "removed",
           "title": "Environment variable no longer read: TASK_MAX_OUTPUT_LENGTH",
           "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_session_title_generated",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_session_title_generated",
+          "impact": "notable",
           "documented": true
         },
         {
@@ -6381,7 +6501,16 @@
     {
       "version": "2.1.272",
       "previous": "2.1.271",
-      "changes": []
+      "changes": [
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_config_lock_contention",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_config_lock_contention",
+          "impact": "notable",
+          "documented": false
+        }
+      ]
     },
     {
       "version": "2.1.271",
@@ -7000,6 +7129,14 @@
           "documented": false
         },
         {
+          "id": "network.telemetry",
+          "category": "network",
+          "op": "added",
+          "title": "Now sends its own telemetry to its vendor",
+          "impact": "notable",
+          "documented": true
+        },
+        {
           "id": "binary.runtime",
           "category": "binary",
           "op": "changed",
@@ -7292,6 +7429,14 @@
           "title": "Network request no longer made: POST api.anthropic.com/api/event_logging/v2/batch",
           "impact": "notable",
           "documented": false
+        },
+        {
+          "id": "network.telemetry",
+          "category": "network",
+          "op": "removed",
+          "title": "No longer sends its own telemetry to its vendor",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -7417,6 +7562,14 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_SENDMESSAGE_HANDBACK",
           "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_artifact_mcp_switch",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_artifact_mcp_switch",
+          "impact": "notable",
           "documented": false
         }
       ]
@@ -7621,6 +7774,14 @@
           "title": "Environment variable no longer read: MODIFIERS_NODE_PATH",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_artifact_mcp_switch",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_artifact_mcp_switch",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -7697,6 +7858,22 @@
           "title": "New environment variable: CLAUDE_CODE_NONBLOCKING_STDOUT",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_bad",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_feature_bad",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_sad",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_feature_sad",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -8177,6 +8354,38 @@
           "title": "Environment variable no longer read: npm_package_config_libvips",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_artifact_toolset",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_artifact_toolset",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_heron_brook_applied",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_heron_brook_applied",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_tool_schema_sizes",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_tool_schema_sizes",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_first_text",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_turn_first_text",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -9568,6 +9777,22 @@
           "title": "Environment variable no longer read: UV_THREADPOOL_SIZE",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_managed_settings_os_read",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_managed_settings_os_read",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_uds_startup_bind",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_uds_startup_bind",
+          "impact": "notable",
+          "documented": true
         },
         {
           "id": "binary.size_bytes",
@@ -11217,6 +11442,14 @@
           "title": "Environment variable no longer read: CLAUDE_CODE_FABLE_BRIDGE_DIALOG_TIMEOUT_MS",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shutdown_pending_state",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_shutdown_pending_state",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -12009,6 +12242,14 @@
           "title": "Environment variable no longer read: VOICE_STREAM_BASE_URL",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_end",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_turn_end",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
@@ -13359,6 +13600,22 @@
           "title": "New environment variable: CLAUDE_CODE_DISPATCH_V2S",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_heron_brook_applied",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_heron_brook_applied",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_subagent_steer_applied",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_subagent_steer_applied",
+          "impact": "notable",
+          "documented": false
         }
       ]
     },
@@ -14252,6 +14509,22 @@
           "title": "New environment variable: CLAUDE_CODE_SYNC_SESSION_REFS",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_headless_latency",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_retention_sweep",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_retention_sweep",
+          "impact": "notable",
+          "documented": true
         }
       ]
     },
