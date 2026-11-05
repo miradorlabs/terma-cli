@@ -272,7 +272,14 @@ type HooksProbe struct {
 	Events    map[string]*HookEventShape `json:"events"`
 	// NotFired says, for each event the build knows that no run fired, why.
 	NotFired map[string]string `json:"not_fired,omitempty"`
+	// Method is how the probe made events fire (HooksProbeMethod): builds probed differently
+	// fire different tools and terminals, so their payloads are not compared.
+	Method int `json:"method,omitempty"`
 }
+
+// HooksProbeMethod is the probe's current way of making events fire: 2 adds the task, MCP
+// and worktree runs and the interactive session, and publishes example payloads.
+const HooksProbeMethod = 2
 
 // HookEventShape is what the probe saw of one event.
 type HookEventShape struct {
@@ -334,7 +341,7 @@ func hooksProbeOf(supported []string, source string, calls []HookCall, started [
 		k, v, _ := strings.Cut(kv, "=")
 		base[k] = v
 	}
-	p := HooksProbe{Supported: sortedUnique(slices.Clone(supported)), Source: source, Events: map[string]*HookEventShape{}}
+	p := HooksProbe{Supported: sortedUnique(slices.Clone(supported)), Source: source, Events: map[string]*HookEventShape{}, Method: HooksProbeMethod}
 	if p.Supported == nil {
 		p.Supported = []string{}
 	}

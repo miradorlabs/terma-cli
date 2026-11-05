@@ -327,6 +327,11 @@ fired is degrading; a payload field or environment variable gone, and a control 
 changed, notable. A field's kind or a variable's path added or removed with it is not a change
 of its own, and neither is `not_fired`. `example` and `env_values` are the run's values and are
 never compared: what a build hands a hook is its keys, their kinds and the variables' names.
+`method` is how the probe made events fire (2: the task, MCP and worktree runs and the
+interactive session, the first to publish `example`; a snapshot without it is 2 where its events
+have examples, else 1). Two builds probed by different methods fired different tools in
+different terminals, so their `events` are not compared at all; `supported`, read from the
+build, still is.
 
 In `binary.signing`, the certificate is compared as one thing (a new certificate is one change),
 and `signed_at`, `checked_at`, `assessment`, `resigned` and `authority` are never read as

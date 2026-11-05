@@ -90,6 +90,12 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "network" && len(c.Path) == 6 && c.Path[1] == "telemetry" && c.Path[5] == "count" {
 			continue
 		}
+		// Two builds whose hooks were probed different ways fired different tools in different
+		// terminals: what their events were handed is the probe's difference, not the builds'.
+		// What each supports is read from the build, and compared.
+		if c.Path[0] == "hooks" && len(c.Path) >= 2 && (c.Path[1] == "events" && hookMethod(at) != hookMethod(bt) || c.Path[1] == "method") {
+			continue
+		}
 		// How many times an event fired, and where the session was when it did, are the run's.
 		if c.Path[0] == "hooks" && len(c.Path) == 4 && c.Path[1] == "events" && (c.Path[3] == "count" || c.Path[3] == "cwd") {
 			continue
@@ -1024,4 +1030,20 @@ func humanBytes(n float64) string {
 		return strconv.FormatFloat(n, 'f', 0, 64) + " bytes"
 	}
 	return strconv.FormatFloat(n, 'f', 1, 64) + " " + units[i]
+}
+
+// hookMethod is how a snapshot's hooks were probed: its method, else 2 where its events have
+// example payloads (the first probe to publish them), else 1.
+func hookMethod(sections map[string]any) int {
+	hooks, _ := sections["hooks"].(map[string]any)
+	if m, ok := hooks["method"].(float64); ok {
+		return int(m)
+	}
+	events, _ := hooks["events"].(map[string]any)
+	for _, ev := range events {
+		if e, _ := ev.(map[string]any); e != nil && e["example"] != nil {
+			return 2
+		}
+	}
+	return 1
 }

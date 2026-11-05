@@ -88,3 +88,24 @@ func ids(cs []Change) []string {
 	}
 	return out
 }
+
+// Builds probed different ways fired different tools in different terminals: what their events
+// were handed is not compared, and what each supports is.
+func TestHookMethodsNotCompared(t *testing.T) {
+	old := &Snapshot{Harness: "claude", Version: "1.0.0", Hooks: map[string]any{
+		"supported": []any{"PreToolUse"}, "source": "binary",
+		"events": map[string]any{"PreToolUse": map[string]any{"fired": true, "keys": []any{"tool_name"}, "env": []any{"CLAUDECODE"}}},
+	}}
+	probed := &Snapshot{Harness: "claude", Version: "1.0.1", Hooks: map[string]any{
+		"supported": []any{"PreToolUse", "TaskCreated"}, "source": "binary", "method": float64(2),
+		"events": map[string]any{"PreToolUse": map[string]any{"fired": true, "keys": []any{"tool_name", "tool_input.taskId"},
+			"env": []any{"CLAUDECODE", "COLUMNS"}, "example": map[string]any{"tool_name": "TaskCreate"}}},
+	}}
+	var ids []string
+	for _, c := range New(old, probed, nil, time.Now()).Changes {
+		ids = append(ids, c.ID)
+	}
+	if len(ids) != 1 || ids[0] != "hooks.supported.TaskCreated" {
+		t.Errorf("changes = %q, want only the newly supported event", ids)
+	}
+}
