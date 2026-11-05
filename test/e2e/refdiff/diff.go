@@ -49,6 +49,10 @@ func compare(a, b *Snapshot) []Change {
 		if sec == "network" && interceptFailed(at) != interceptFailed(bt) {
 			continue
 		}
+		if sec == "filesystem" {
+			diffFilesystem(at[sec], bt[sec], &out) // part by part (filesystem.go)
+			continue
+		}
 		if a, b, ok := configs(sec, at[sec], bt[sec]); ok {
 			diffConfig(a, b, &out) // option by option (config.go)
 			continue
@@ -399,6 +403,8 @@ func classify(c *Change, labels map[string]string) {
 		c.Impact = "notable" // a command or flag gone, a default moved, an allowed value added or dropped
 	case c.Category == "config":
 		c.Impact = configImpact(c)
+	case c.Category == "filesystem":
+		c.Impact = filesystemImpact(c)
 	case notableCategories[c.Category]:
 		c.Impact = "notable"
 	}
@@ -641,6 +647,8 @@ func title(c *Change, labels map[string]string) string {
 		return "Network " + strings.Join(p[1:], ".") + " " + verb
 	case "storage":
 		return "On-disk " + strings.Join(p[1:], " ") + " " + verb + valueNote(c)
+	case "filesystem":
+		return filesystemTitle(c)
 	case "binary":
 		if at(1) == "signing" {
 			switch at(2) {
@@ -850,6 +858,10 @@ func Highlights(d *Diff, n int) []string {
 	sort.SliceStable(cs, func(i, j int) bool {
 		if rank[cs[i].Impact] != rank[cs[j].Impact] {
 			return rank[cs[i].Impact] < rank[cs[j].Impact]
+		}
+		// A planted credential the build now touches is read before the rest of its kind.
+		if di, dj := isDecoy(cs[i]), isDecoy(cs[j]); di != dj {
+			return di
 		}
 		return order[cs[i].Category] < order[cs[j].Category]
 	})

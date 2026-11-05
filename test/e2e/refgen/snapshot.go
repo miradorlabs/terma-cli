@@ -86,7 +86,8 @@ func (n night) builds() []buildID {
 func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 	var ps []e2e.Profile
 	for _, p := range n.profiles {
-		if p.Harness == id.harness && p.Version == id.version {
+		// A files profile is its own platform's trace, never the first turn (filesystem.go).
+		if p.Harness == id.harness && p.Version == id.version && !isFilesScenario(p) {
 			ps = append(ps, normalize(p))
 		}
 	}
@@ -189,6 +190,7 @@ func (n night) tonight(id buildID) *Snapshot {
 		n.deriveSourceConfig(s)
 		deriveTelemetryProbe(s, p)
 	}
+	n.deriveFilesystem(s, id)
 	n.deriveTelemetry(s)
 	n.deriveSupport(s)
 	if len(present(s)) == 0 && slices.Contains(n.attempted, id) {
@@ -331,6 +333,9 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	}
 	keepWhole := tonight.Capture.Partial && !old.Capture.Partial
 	ot, tt := out.Tree(), tonight.Tree()
+	if tt["filesystem"] != nil {
+		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])
+	}
 	took := false
 	for _, sec := range present(tonight) {
 		if keepWhole && sec != "support" && sec != "telemetry" && ot[sec] != nil {
