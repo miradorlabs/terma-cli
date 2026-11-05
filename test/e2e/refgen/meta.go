@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/e2e"
 	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
@@ -25,17 +26,17 @@ type harnessMeta struct {
 	repo, language, tag    string // its public source, and a version's tag (%s)
 	changelog              string // a page a person reads
 	changelogRaw           string // a markdown changelog with a heading a version, where there is one
+	feed                   string // a desktop app's: the harness whose update feed its release dates are read from
 }
 
 var harnesses = map[string]harnessMeta{
 	"claude": {name: "Claude Code", vendor: "Anthropic", homepage: "https://claude.com/claude-code", npm: "@anthropic-ai/claude-code",
 		changelog:    "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
 		changelogRaw: "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"},
-	"claude-desktop": {name: "Claude Desktop (Code)", vendor: "Anthropic", homepage: "https://claude.ai/download",
-		changelog: "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md"},
+	"claude-desktop": {name: "Claude Desktop (Code)", vendor: "Anthropic", homepage: "https://claude.ai/download", feed: "claude-desktop"},
 	"codex": {name: "Codex CLI", vendor: "OpenAI", homepage: "https://github.com/openai/codex", npm: "@openai/codex",
 		repo: "openai/codex", language: "rust", tag: "rust-v%s", changelog: "https://github.com/openai/codex/releases"},
-	"codex-desktop": {name: "Codex app", vendor: "OpenAI", homepage: "https://openai.com/codex", repo: "openai/codex", language: "rust"},
+	"codex-desktop": {name: "Codex app", vendor: "OpenAI", homepage: "https://openai.com/codex", feed: "codex-desktop"},
 	"gemini": {name: "Gemini CLI", vendor: "Google", homepage: "https://github.com/google-gemini/gemini-cli", npm: "@google/gemini-cli",
 		repo: "google-gemini/gemini-cli", language: "typescript", tag: "v%s", changelog: "https://github.com/google-gemini/gemini-cli/releases"},
 	"opencode": {name: "OpenCode", vendor: "Anomaly", homepage: "https://opencode.ai", npm: "opencode-ai",
@@ -103,6 +104,9 @@ var fetcher = func(url string) ([]byte, error) {
 
 // releaseDates are when each version of a harness was published, from its registry.
 func releaseDates(m harnessMeta) map[string]time.Time {
+	if m.feed != "" {
+		return feedDates(m.feed)
+	}
 	if m.npm == "" {
 		return nil
 	}
@@ -117,6 +121,26 @@ func releaseDates(m harnessMeta) map[string]time.Time {
 		return nil
 	}
 	return doc.Time
+}
+
+// feedDates are when each release a desktop app's update feed lists was published: Claude
+// Desktop's lists its current release alone, so the others keep the date they had.
+func feedDates(harness string) map[string]time.Time {
+	data, err := fetcher(e2e.DesktopFeeds[harness])
+	if err != nil {
+		return nil
+	}
+	releases, err := e2e.ParseDesktopFeed(harness, data)
+	if err != nil {
+		return nil
+	}
+	out := map[string]time.Time{}
+	for _, r := range releases {
+		if !r.Released.IsZero() {
+			out[r.Version] = r.Released
+		}
+	}
+	return out
 }
 
 // changelogs reads what a harness's vendor says of its versions, once a harness a run.

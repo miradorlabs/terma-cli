@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"regexp"
 	"sort"
 	"strings"
@@ -356,6 +357,7 @@ func programOf(harness string, help map[string]string) string {
 // deriveCLI is the build's help texts, and its commands itemized from them.
 func deriveCLI(s *Snapshot, p e2e.Profile) {
 	if len(p.Help) == 0 {
+		cliProbes(s, p)
 		return
 	}
 	help := map[string]any{}
@@ -372,4 +374,25 @@ func deriveCLI(s *Snapshot, p e2e.Profile) {
 		commands[name] = jsonOf(c)
 	}
 	s.CLI = map[string]any{"help": help, "commands": commands}
+	cliProbes(s, p)
+}
+
+// cliProbes are what a desktop app's profile says of how it runs its agent: the agent's command
+// line and environment as the app started it (cli.launch), and the JSON-RPC methods of an
+// app-server the app drives (cli.app_server).
+func cliProbes(s *Snapshot, p e2e.Profile) {
+	for probe, key := range map[string]string{"launch": "launch", "app-server": "app_server"} {
+		raw, ok := p.Probes[probe]
+		if !ok {
+			continue
+		}
+		var v any
+		if json.Unmarshal(raw, &v) != nil {
+			continue
+		}
+		if s.CLI == nil {
+			s.CLI = map[string]any{}
+		}
+		s.CLI[key] = v
+	}
 }

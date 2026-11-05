@@ -625,7 +625,7 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 					s.Hooks = m
 				}
 			}
-		case "telemetry", "signing", "across-turns", "filesystem":
+		case "telemetry", "signing", "across-turns", "filesystem", "launch", "app-server":
 			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand; the
 			// caching's from the requests.
 		default:
@@ -1095,7 +1095,7 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 					delete(bin, k)
 				}
 			}
-			configFromBinary(s.Harness, cfg)
+			configFromBinary(agentOf(s.Harness), cfg)
 			if len(cfg) > 0 {
 				s.Config = cfg
 			}

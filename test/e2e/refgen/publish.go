@@ -149,7 +149,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			if changed[buildID{h, v}] {
 				continue
 			}
-			fresh := &Snapshot{Harness: h, Version: v}
+			fresh := &Snapshot{Harness: h, Version: v, Binary: s.Binary}
 			n.deriveSupport(fresh)
 			if fresh.Support != nil && !reflect.DeepEqual(jsonOf(fresh.Support), jsonOf(s.Support)) {
 				s.Support = fresh.Support

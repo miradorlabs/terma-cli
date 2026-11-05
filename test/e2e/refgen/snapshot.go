@@ -62,7 +62,9 @@ func (n night) builds() []buildID {
 		seen[buildID{f.Harness, f.Version}] = true
 	}
 	for _, h := range n.history {
-		if h.Result == "pass" || h.Result == "fail" {
+		// A desktop app's checks name the build of its agent they ran, not a release of the app
+		// (deriveSupport): they make no build of their own.
+		if (h.Result == "pass" || h.Result == "fail") && agentOf(h.Harness) == h.Harness {
 			seen[buildID{h.Harness, h.Version}] = true
 		}
 	}
@@ -164,6 +166,11 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 		if len(merged.Command) == 0 {
 			merged.Command = p.Command
 		}
+		for _, note := range p.Notes {
+			if !slices.Contains(merged.Notes, note) {
+				merged.Notes = append(merged.Notes, note)
+			}
+		}
 	}
 	preferBinaryScenario(&merged, ps)
 	// A probe that failed says nothing of the first turn: only the turn published is the
@@ -183,6 +190,9 @@ func (n night) tonight(id buildID) *Snapshot {
 			s.Capture.Notes = append(s.Capture.Notes, "The first turn ran behind a local proxy that answers every other request empty: "+
 				"the build used the feature flags it ships with. What live flags changed is under live.")
 		}
+		// How the scenario ran the harness where it could not run it as a user does (a desktop
+		// app, driven without a person at it).
+		s.Capture.Notes = append(s.Capture.Notes, p.Notes...)
 		deriveRequestSections(s, p)
 		deriveBehavior(s, p)
 		deriveCLI(s, p)
@@ -271,8 +281,18 @@ func (n night) deriveSupport(s *Snapshot) {
 	var caps []any
 	pass, fail := 0, 0
 	coreFailed := false
+	// A desktop app's capability checks run the agent build the app runs, launched as the app
+	// launches it (TestRelayClaudeDesktop runs the Claude Code Desktop pins): they are recorded by
+	// that build's version, and join each release of the app that runs it. A snapshot of an app
+	// that says no agent (published before the app's own profile) is the agent build's.
+	version := s.Version
+	if agentOf(s.Harness) != s.Harness {
+		if v := agentVersion(s); v != "" {
+			version = v
+		}
+	}
 	for _, h := range n.history {
-		if h.Harness != s.Harness || h.Version != s.Version {
+		if h.Harness != s.Harness || h.Version != version {
 			continue
 		}
 		c := map[string]any{"id": h.Capability, "result": h.Result, "platform": h.Platform}

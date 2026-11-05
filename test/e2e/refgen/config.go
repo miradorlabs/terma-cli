@@ -180,10 +180,15 @@ func cmp(a, b string) string {
 // section, over what its binary's strings said: the variables its code reads in place of the
 // names its strings hold.
 func (n night) deriveSourceConfig(s *Snapshot) {
-	if n.sources == nil || !sourcelink.Has(s.Harness) {
+	harness, version := s.Harness, s.Version
+	if agent := agentOf(harness); agent != harness {
+		// A desktop app's configuration is its agent's, at the build it runs.
+		harness, version = agent, agentVersion(s)
+	}
+	if n.sources == nil || !sourcelink.Has(harness) || version == "" {
 		return
 	}
-	cfg := n.sources.of(s.Harness, s.Version)
+	cfg := n.sources.of(harness, version)
 	if cfg == nil {
 		return
 	}
@@ -194,6 +199,23 @@ func (n night) deriveSourceConfig(s *Snapshot) {
 	for k, v := range cfg {
 		s.Config[k] = v
 	}
+}
+
+// agentOf is the harness whose agent a desktop app runs (claude-desktop runs Claude Code), else
+// harness itself.
+func agentOf(harness string) string {
+	if agent, ok := strings.CutSuffix(harness, "-desktop"); ok {
+		return agent
+	}
+	return harness
+}
+
+// agentVersion is the build of its agent a desktop app's snapshot says it ran
+// (binary.agent.version), "" where it says none.
+func agentVersion(s *Snapshot) string {
+	agent, _ := s.Binary["agent"].(map[string]any)
+	v, _ := agent["version"].(string)
+	return v
 }
 
 // configFromBinary shapes the config a build's binary facts hold: its settings schema's
