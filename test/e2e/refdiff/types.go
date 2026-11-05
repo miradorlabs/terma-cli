@@ -24,12 +24,14 @@ type Snapshot struct {
 	CapturedAt    time.Time `json:"captured_at"`
 	Capture       Capture   `json:"capture"`
 
-	Model        map[string]any `json:"model,omitempty"`
-	Prompt       map[string]any `json:"prompt,omitempty"`
-	Tools        []any          `json:"tools,omitempty"`
-	Caching      map[string]any `json:"caching,omitempty"`
-	Request      map[string]any `json:"request,omitempty"`
-	SideRequests []any          `json:"side_requests,omitempty"`
+	Model   map[string]any `json:"model,omitempty"`
+	Prompt  map[string]any `json:"prompt,omitempty"`
+	Tools   []any          `json:"tools,omitempty"`
+	Caching map[string]any `json:"caching,omitempty"`
+	Request map[string]any `json:"request,omitempty"`
+	// SideRequests are the first turn's other requests; an empty list is observed and empty
+	// (the build made none), null not observed (no first turn captured).
+	SideRequests []any          `json:"side_requests"`
 	Behavior     map[string]any `json:"behavior,omitempty"`
 	Telemetry    map[string]any `json:"telemetry,omitempty"`
 	Hooks        map[string]any `json:"hooks,omitempty"`

@@ -67,6 +67,11 @@ func load(dir string) (published, error) {
 			if err := readJSON(f, &s); err != nil {
 				return p, err
 			}
+			// A snapshot published while an empty side_requests was left out: its first turn
+			// was captured (it has a prompt), so its side requests were read, and there were none.
+			if s.Prompt != nil && s.SideRequests == nil {
+				s.SideRequests = []any{}
+			}
 			p.snapshots[h][s.Version] = &s
 		}
 		files, _ = filepath.Glob(filepath.Join(dir, h, "diffs", "*.json"))
