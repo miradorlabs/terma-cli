@@ -523,7 +523,7 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 	beh := map[string]any{}
 	probes := map[string]bool{}
 	for _, r := range p.Requests {
-		if r.Probe != "" && r.Probe != "first-turn" {
+		if r.Probe != "" && r.Probe != "first-turn" && r.Probe != "filesystem" {
 			probes[r.Probe] = true
 		}
 	}
@@ -625,7 +625,7 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 					s.Hooks = m
 				}
 			}
-		case "telemetry", "signing", "across-turns":
+		case "telemetry", "signing", "across-turns", "filesystem":
 			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand; the
 			// caching's from the requests.
 		default:

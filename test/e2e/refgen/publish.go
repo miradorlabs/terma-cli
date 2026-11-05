@@ -173,6 +173,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 
 		markUnobserved(versions, byVersion)
 		markUnobservedEvents(versions, byVersion)
+		markUnobservedFilesystem(versions, byVersion)
 
 		// The vendor's reference tonight goes with tonight's newest build that has its
 		// configuration captured; an older build keeps what it got when it was the newest.

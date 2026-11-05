@@ -37,8 +37,11 @@ type Snapshot struct {
 	Config       map[string]any `json:"config,omitempty"`
 	Network      map[string]any `json:"network,omitempty"`
 	Storage      map[string]any `json:"storage,omitempty"`
-	Binary       map[string]any `json:"binary,omitempty"`
-	Support      map[string]any `json:"support,omitempty"`
+	// Filesystem is what the build did on the file system and with sockets, traced, by
+	// platform ("linux/amd64"): each platform's files profile.
+	Filesystem map[string]any `json:"filesystem,omitempty"`
+	Binary     map[string]any `json:"binary,omitempty"`
+	Support    map[string]any `json:"support,omitempty"`
 
 	// Live is the first turn as it ran with the vendor's live feature flags, beside the
 	// published one, which ran with the flags the build ships with: its prompt, and whether
@@ -66,7 +69,7 @@ type Capture struct {
 // Sections are a snapshot's sections in the schema's order, which is also the order a diff's
 // categories are listed in.
 var Sections = []string{"model", "prompt", "tools", "caching", "request", "side_requests", "behavior",
-	"telemetry", "hooks", "cli", "config", "network", "storage", "binary", "support"}
+	"telemetry", "hooks", "cli", "config", "network", "storage", "filesystem", "binary", "support"}
 
 // Tree is s as generic JSON, by section.
 func (s *Snapshot) Tree() map[string]any {

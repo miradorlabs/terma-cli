@@ -142,7 +142,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
       # What each build sends its provider on a user's first turn, and its help: the evidence
-      # each build's published snapshot is normalized from (profile.go).
+      # each build's published snapshot is normalized from (profile.go). It holds each build's
+      # macOS files profile too: the hosted runner lets `sudo -n eslogger` create its Endpoint
+      # Security client, so the run above traces them (profile_files_test.go).
       - name: Upload this platform's harness profiles
         if: always()
         uses: actions/upload-artifact@v7
@@ -156,7 +158,8 @@ jobs:
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
 
   # The same night on a fresh Linux machine (test/e2e/machine/Dockerfile): global mode, the
-  # managed configuration and the core relay contracts with real Claude Code and Codex.
+  # managed configuration and the core relay contracts with real Claude Code and Codex, and
+  # their files profiles, traced with strace.
   machines:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -191,6 +194,17 @@ jobs:
             test/e2e/report/linux/notes.json
           if-no-files-found: ignore
           retention-days: 30
+      # The files profile of each build, traced with strace (profile_files_test.go): the Harness
+      # Reference's filesystem section for linux/amd64. The compat job's refgen takes it with
+      # macOS's profiles.
+      - name: Upload this platform's harness profiles
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: profiles-linux
+          path: test/e2e/report/linux/profiles.json
+          if-no-files-found: ignore
+          retention-days: 90
 
   # The matrix, the field catalog and the Harness Reference: this night's rows from both
   # platforms, and the field census and profiles macOS takes, merged into the history, catalog

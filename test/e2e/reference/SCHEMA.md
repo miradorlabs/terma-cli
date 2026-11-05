@@ -245,6 +245,9 @@ model's) is part of the name and stays.
     "transcript": { "path": "<claude-config>/projects/<project>/<session>.jsonl", "format": "jsonl", "record_types": { "assistant": ["message", "uuid", "parentUuid"] } }
   },
 
+  "filesystem": { "linux/amd64": { "paths": { "<claude-config>/.claude.json": { "ops": ["read", "write"], "phases": ["startup"] } },
+                                   "exec": { }, "decoys": { "<home>/.aws/credentials": "not touched" }, "sockets": { }, "…": "see filesystem below" } },
+
   "binary": {
     "runtime": "node v26.3.0", "sdk": { "@anthropic-ai/sdk": "0.127.0" }, "size_bytes": 212000000,
     "signing": {
@@ -372,6 +375,120 @@ this one reported there and its run did not (one reported only sometimes): not c
 removed and added. Two builds where one's interception failed (an egress `error` the other has
 not) are not compared in `network`.
 
+### filesystem
+
+What the build does on the file system and with sockets, and which programs it starts, traced
+while it runs a turn (the files profile, `test/e2e/profile_files_test.go`, `filetrace.go`), by
+platform: `linux/amd64` traced with strace, `darwin/arm64` with Endpoint Security's
+`eslogger` (as root, with Full Disk Access) and `lsof`. Where neither can run the section is
+absent; a night that traced one platform keeps the other's from before. Each platform's is the
+platform's own build of the harness, so two platforms differ where the builds do. The turn is the profile's first turn, behind the same recording proxy as the published
+one, then a tool turn: a shell command (`git status --short && git log --oneline -1`) and a
+file written in the repository (Claude Code's `Write`; Codex's shell, `--sandbox
+workspace-write`). terma's hooks are installed as a developer's are.
+
+```json
+"filesystem": {
+  "linux/amd64": {
+    "platform": "linux/amd64", "tracer": "strace",
+    "paths": {
+      "<claude-config>/.claude.json": { "ops": ["stat", "read", "write"], "phases": ["startup", "turn"] },
+      "<repo>/.git/index": { "ops": ["read", "write"], "phases": ["turn"], "programs": ["git"] },
+      "/etc/claude-code/managed-settings.json": { "ops": ["probe"], "phases": ["startup"] }
+    },
+    "exec": {
+      "rg --no-config --files --hidden <repo>": { "argv": ["rg", "--no-config", "--files", "--hidden", "<repo>"], "phases": ["startup"], "count": 1, "by": "claude" },
+      "terma hook --user session-start": { "argv": ["terma", "hook", "--user", "session-start"], "phases": ["startup"], "count": 1, "by": "sh" }
+    },
+    "lookups": ["bash", "git", "node", "zsh"],
+    "decoys": { "<home>/.aws/credentials": "not touched", "<repo>/.env": "stat", "<home>/.ssh/agent.sock": "not touched" },
+    "sockets": {
+      "listening": { "tcp 127.0.0.1:<ephemeral>": { "phases": ["startup"], "count": 1 } },
+      "connections": { "tcp <provider>": { "role": "provider", "phases": ["startup"], "count": 1 },
+                       "udp <resolver>:53": { "role": "dns", "phases": ["startup"], "count": 2 } },
+      "unix": { "<tmp>/cc-socks/<n>.sock": { "ops": ["bind"], "phases": ["startup"], "count": 1 },
+                "/var/run/nscd/socket": { "role": "nscd", "ops": ["connect"], "phases": ["turn"], "count": 4, "missing": true } },
+      "dns": ["statsig.anthropic.com"]
+    },
+    "macos": { "xpc": { "com.apple.securityd.xpc": { "phases": ["startup"], "count": 1 } },
+               "launch_items": { }, "tcc": { }, "task_ports": { } },
+    "dropped": { "libraries": 335, "system": 639, "proc": 241, "terma": 1607, "path-search": 193, "helpers": 12 },
+    "unobserved": { "paths": ["<claude-config>/statsig"] }
+  }
+}
+```
+
+| field | |
+|---|---|
+| `paths` | every path the build touched, normalized as the rest of the snapshot is (`<home>`, `<repo>`, `<claude-config>`, `<codex-home>`, `<tmp>`, `<sandbox>`; `<repo-slug>` where a name is a path's slug; a run's ids, times, process ids and temporary names as `<uuid>`, `<time>`, `<n>`, `<id>`, `<hash>`; `<user-home>` the home of the user the capture ran as, which a program reads through the user database) |
+| `ops` | what was done to it, of `probe` (looked for and not there: a failed open or stat, ENOENT), `stat` (its metadata or access checked, a link read), `list` (a folder read), `read` (opened to read), `write` (opened to write, truncated, its times or mode set, renamed into place), `create` (made: a folder, a file created where it was not), `delete`, `rename` (renamed away from), `chdir`, `denied` (EACCES, EPERM, EROFS) |
+| `phases` | when: `startup` before the first model request, `turn` from it to the last response, `exit` after |
+| `programs` | the programs other than the build that touched it (`git`, `bash`): a program the build starts is recorded for what it touches of the run's own places, those with a placeholder |
+| `exec` | each program started, by its normalized command line: `argv`, the phases it ran in, how many times (`count`), and the program that started it (`by`: the build, or a shell it started). The build's hooks are terma's and are recorded as started (`terma hook …`), never what terma did after |
+| `lookups` | the programs the build itself looked for on its PATH, found or not |
+| `decoys` | the planted credentials, each with the most the build did to it: `not touched`, `stat`, `opened` (opened, its content not read), `read`, `connected` (a socket), `written`, `deleted` |
+| `sockets.listening` | each address the build listened on (`listen`, or a UDP bind to a port it chose): `proto host:port`, a port it let the system pick `<ephemeral>` (strace: bound to port 0; lsof: 49152 and up) |
+| `sockets.connections` | where it connected: the run's own endpoints by name (`<provider>`, `<proxy>`, `<relay>`, `<receiver>`), the resolver as `<resolver>:53`, any other loopback address as `<local>:port`, anything else `<remote>:port` |
+| `sockets.unix` | the Unix sockets it connected to or bound (`ops`), by path or `@abstract` name, with their `role` where the path says it: `decoy ssh-agent`, `decoy docker`, `ssh-agent`, `docker`, `dbus`, `x11`, `wayland`, `nscd`, `syslog`; `missing` where every attempt found none |
+| `sockets.dns` | the names its DNS queries asked for, read from the query's bytes |
+| `macos` | what only Endpoint Security sees: the XPC services it connected to (`com.apple.securityd.xpc`, the Keychain; `com.apple.tccd`), launch items it added (persistence), TCC permissions it changed, and the task ports of processes outside its own tree it took, by the process's name (a program it starts that reads every process's, as `ps` does, is one `<processes>`: never a list of what the machine runs) |
+| `dropped` | how many events were left out, by why (below) |
+| `unobserved` | paths, commands and sockets builds before and after this one have on this platform and its run did not (set by refgen) |
+
+**Decoys.** Before the run the scenario plants credentials a developer's machine has, fake: a
+throwaway ed25519 key made for the run at `~/.ssh/id_ed25519`, `~/.aws/credentials`,
+`~/.netrc`, `~/.config/gh/hosts.yml`, `~/.docker/config.json`, `~/.npmrc`,
+`~/.git-credentials`, and a `.env` and `secrets.json` in the repository; and two sockets it
+listens on, an SSH agent (`SSH_AUTH_SOCK=~/.ssh/agent.sock`) and Docker
+(`DOCKER_HOST=unix://~/.docker/run/docker.sock`), counting who connects. Their contents are
+never recorded. On macOS, Endpoint Security has no read event: a decoy opened to read is
+`opened` there, never `read`.
+
+**What is dropped**, and why: `proc`, `sys`, `dev` (the kernel's files); `libraries` (shared
+libraries and the loader's files, `/lib`, `/usr/lib`, `*.so`, `*.dylib`, macOS's `/System`);
+`system` (what every process reads through its C library or runtime: the resolver's and the
+user database's files, time zones, locales, certificate authorities, terminal descriptions,
+macOS's shared preferences); `self` (the build's own installation: its binary and the folder it
+sits in); `terma` (what terma's hooks do after they start); `test` (the test's own files: the
+hook payloads it records, the proxy's certificate); `path-search` (looking along the PATH for a
+program, which `lookups` says, and an exec that found nothing there); `helpers` (what a program
+the build started touched outside the run's own places: its own installation, the system's
+files); `sandbox-setup` (bubblewrap building the root of a sandbox before it runs the command in
+it, which its command line in `exec` says). `lost` is not the build's: it counts the events
+Endpoint Security dropped because eslogger did not read them in time. A trace that lost any is
+not published (the section keeps the last whole one): it says nothing of what the build did
+not do.
+
+**Sampling.** On macOS TCP and UDP sockets are sampled with lsof every 250 ms over the build's
+process tree: a socket opened and closed between two samples is missed (a short HTTP request),
+so `connections` there say less than strace's.
+
+In a diff, each platform both builds were traced on is compared, and of it what a build does,
+never what a run measured: a path new or gone ("Now reads ~/.gitconfig", "No longer looks for
+<repo>/CLAUDE.md") and each op it gained or lost, a command new or gone ("New command at
+startup: `git log -n 5`"; one gone and one new that run the same program with at least half the
+same arguments are one "Command changed", with the command line's `text_diff`), the phases a
+command runs in and who starts it, programs looked
+for, each decoy's level ("Reads ~/.aws/credentials (a planted decoy)"; "Connects to the decoy
+ssh-agent socket"), listeners ("Now listens on 127.0.0.1, an ephemeral port (tcp)"),
+connections, Unix sockets, names looked up, and macOS's XPC services, launch items ("Adds a
+launch item (runs at login): …"), TCC changes and task ports. A path's phases and programs,
+counts, `dropped` and `argv` are not compared. A path or Unix socket whose name is the run's own
+(a lock, a temporary or journal file, a name with `<uuid>`, `<hash>`, `<id>`, `<time>`; a
+process id's `<n>` names the same file in every run) touched by one build and not the other is
+no change, nor what was done to it, and neither is anything `unobserved` on
+either side, nor a decoy planted for one build alone.
+
+Impact: a decoy the build now opens, reads, writes, deletes or connects to is `notable` and
+its change's `path` is `["filesystem", <platform>, "decoys", <path>]`, which a page can flag
+(and `Highlights` puts first among the notable); so are a new write, create, delete or rename
+outside the harness's own folders, the repository and the temporary folder, a new command, a
+new program looked for, a new listener, a new connection other than the run's own endpoints, a
+new Unix socket (but the resolver cache's and the log's), a new name looked up, a new launch
+item, TCC change or task port, and a new XPC service that holds secrets or permissions
+(`com.apple.securityd`, `com.apple.SecurityServer`, `com.apple.tccd`, `com.apple.trustd`,
+`com.apple.authd`). The rest is `informational`.
+
 ### tools and prompt context
 
 A tool a build names but defers (its schema loaded on demand, through its tool search: Claude
@@ -476,7 +593,7 @@ A change:
 | field | |
 |---|---|
 | `id` | the change's `path` joined with dots: a list item by its key (`tools.Bash.description`, `support.capabilities.relay.telemetry@darwin/arm64.result`), by its position where it has none (`prompt.system.1.text`). Stable from diff to diff for the same thing, so a page may use it as an anchor, and a range's net change matches the timeline's steps by it |
-| `category` | the snapshot section: `model`, `prompt`, `tools`, `caching`, `request`, `side_requests`, `behavior`, `telemetry`, `hooks`, `cli`, `config`, `network`, `storage`, `binary`, `support` |
+| `category` | the snapshot section: `model`, `prompt`, `tools`, `caching`, `request`, `side_requests`, `behavior`, `telemetry`, `hooks`, `cli`, `config`, `network`, `storage`, `filesystem`, `binary`, `support` |
 | `op` | `added`, `removed` or `changed` |
 | `path` | where in the snapshot, as segments; list items by their key |
 | `title` | one line a person reads |
