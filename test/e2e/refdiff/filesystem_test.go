@@ -170,3 +170,25 @@ func TestFilesystemMacOSPathsNotComparedOffline(t *testing.T) {
 		t.Errorf("changes = %q, want only the new command", ids)
 	}
 }
+
+// A macOS build's exit reaches its trace or not: a command run only at exit, or a command's exit
+// phase, is no change there.
+func TestFilesystemMacOSExitNotComparedOffline(t *testing.T) {
+	probe := func(exec string) map[string]any {
+		return fsProbe(t, `{"platform": "darwin/arm64", "tracer": "eslogger", "paths": {}, "lookups": [], "decoys": {},
+		  "sockets": {"listening": {}, "connections": {}, "unix": {}, "dns": []}, "exec": `+exec+`}`)
+	}
+	before := probe(`{"git status": {"argv": ["git", "status"], "phases": ["startup", "exit"], "by": "codex"},
+	  "terma hook --user codex-session-end": {"argv": ["terma"], "phases": ["exit"], "by": "zsh"}}`)
+	after := probe(`{"git status": {"argv": ["git", "status"], "phases": ["startup"], "by": "codex"},
+	  "uname -s": {"argv": ["uname", "-s"], "phases": ["startup"], "by": "codex"}}`)
+	d := New(&Snapshot{Harness: "codex", Version: "1.0.0", Filesystem: map[string]any{"darwin/arm64": before}},
+		&Snapshot{Harness: "codex", Version: "1.0.1", Filesystem: map[string]any{"darwin/arm64": after}}, nil, time.Now())
+	var ids []string
+	for _, c := range d.Changes {
+		ids = append(ids, c.ID)
+	}
+	if len(ids) != 1 || ids[0] != "filesystem.darwin/arm64.exec.uname -s" {
+		t.Errorf("changes = %q, want only the new command", ids)
+	}
+}

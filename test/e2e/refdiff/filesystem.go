@@ -110,6 +110,22 @@ func diffFilesystem(a, b any, out *[]Change) {
 			}
 		}
 		*out = append(append((*out)[:before], inner...), pairCommands(commands)...)
+		// What a macOS build does after it exits (a session-end hook, a last git status) reaches
+		// the trace or not: eslogger's last events can still be on their way when the trace stops.
+		// A command that ran only at exit, or a command's exit phase, is not compared there.
+		if asString(x["tracer"]) == "eslogger" || asString(y["tracer"]) == "eslogger" {
+			atExit := func(v any) bool {
+				m, _ := v.(map[string]any)
+				ph := strs(m["phases"])
+				return len(ph) == 1 && ph[0] == "exit"
+			}
+			*out = append((*out)[:before], slices.DeleteFunc((*out)[before:], func(c Change) bool {
+				if len(c.Path) == 6 && c.Path[4] == "phases" {
+					return c.Path[5] == "exit"
+				}
+				return len(c.Path) == 4 && c.Op != "changed" && (atExit(c.Before) || atExit(c.After))
+			})...)
+		}
 		words(at("lookups"), strs(x["lookups"]), strs(y["lookups"]))
 		xd, yd := sub(x, "decoys"), sub(y, "decoys")
 		for _, k := range sortedKeys(keysOf(yd)) {

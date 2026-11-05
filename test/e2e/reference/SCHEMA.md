@@ -484,7 +484,9 @@ counts, `dropped` and `argv` are not compared. A macOS trace's paths are not com
 Endpoint Security logs every path a build resolves, and how far a build's background work (Claude
 Code's cleanup walk) got before it exited is a race, so one build traced twice lists different
 paths; they are each version's to read, and its programs, sockets, decoys and services are
-compared. The PATH the build ran with is `<path>` wherever a command line holds it (a shell's
+compared. Nor is what a macOS build does after it exits (a command run only at exit, a command's
+exit phase): eslogger's last events can still be on their way when the trace stops. Linux's
+trace compares both. The PATH the build ran with is `<path>` wherever a command line holds it (a shell's
 snapshot exports it). strace's cut of a long argument ends at its last whole line, marked `…`, and SQLite's
 `-wal`, `-shm` and `-journal` files keep no `delete` (removed when the database closes in time).
 A path or Unix socket whose name is the run's own
