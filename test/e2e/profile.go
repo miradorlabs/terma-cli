@@ -206,6 +206,31 @@ func PlaceSandbox(t *testing.T, b Binary, sb *Sandbox) {
 		sb.TermaConfig: "<terma-config>", sb.ClaudeConfig: "<claude-config>", sb.CodexHome: "<codex-home>", sb.WorkDir: "<workdir>"} {
 		Placeholder(t, b, literal, name)
 	}
+	if root := npmPackageRoot(b.Path); root != "" {
+		Placeholder(t, b, root, "<install>")
+	}
+}
+
+// npmPackageRoot is the folder of the npm package that holds the executable at path (through
+// its symlinks: node_modules/.bin/gemini is a link into the package), "" where it is none. A build
+// tells its model where its own files are (Gemini CLI its built-in skills, Pi its docs), and that
+// folder is where this machine installed it: a checkout's versions folder, a runner's tool cache,
+// a home.
+func npmPackageRoot(path string) string {
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return ""
+	}
+	for dir := filepath.Dir(real); dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+		parent := filepath.Dir(dir)
+		if filepath.Base(parent) == "node_modules" ||
+			strings.HasPrefix(filepath.Base(parent), "@") && filepath.Base(filepath.Dir(parent)) == "node_modules" {
+			if fileExists(filepath.Join(dir, "package.json")) {
+				return dir
+			}
+		}
+	}
+	return ""
 }
 
 // RecordProbe records what behaviour probe name found of b; v is marshalled as JSON.

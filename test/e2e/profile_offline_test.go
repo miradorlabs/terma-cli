@@ -129,3 +129,31 @@ func TestWriteProfilesOffline(t *testing.T) {
 		t.Errorf("claude row = %+v", rows[0])
 	}
 }
+
+// A build's npm package folder, found through its node_modules/.bin link, is its <install>; an
+// executable outside node_modules has none.
+func TestNpmPackageRootOffline(t *testing.T) {
+	dir := t.TempDir()
+	pkg := filepath.Join(dir, "node_modules", "@scope", "agent")
+	for _, p := range []string{filepath.Join(pkg, "dist"), filepath.Join(dir, "node_modules", ".bin")} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, data := range map[string]string{filepath.Join(pkg, "package.json"): "{}", filepath.Join(pkg, "dist", "cli.js"): "", filepath.Join(dir, "solo"): ""} {
+		if err := os.WriteFile(name, []byte(data), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bin := filepath.Join(dir, "node_modules", ".bin", "agent")
+	if err := os.Symlink("../@scope/agent/dist/cli.js", bin); err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(pkg)
+	if got := npmPackageRoot(bin); got != want {
+		t.Errorf("npmPackageRoot(.bin link) = %q, want %q", got, want)
+	}
+	if got := npmPackageRoot(filepath.Join(dir, "solo")); got != "" {
+		t.Errorf("npmPackageRoot(a lone executable) = %q, want none", got)
+	}
+}

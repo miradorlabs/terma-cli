@@ -1496,13 +1496,12 @@ func TestGeminiProbeHooks(t *testing.T) {
 
 // copilotHookReasons are why a Copilot CLI event does not fire in the probe's run.
 var copilotHookReasons = map[string]string{
-	"preCompact":        "fires before the conversation is compacted; the probe's one turn compacts nothing",
-	"preMcpToolCall":    "fires before an MCP server's tool runs; the probe configures no MCP server",
-	"permissionRequest": "fires when a tool asks for permission; the probe's run is -p --allow-all-tools",
-	"notification":      "fires for an interactive session's notifications; the probe's run is -p",
-	"prePRDescription":  "fires before Copilot writes a pull request's description; the probe opens none",
-	"subagentStart":     "fires when a subagent starts; the probe's turn starts none",
-	"subagentStop":      "fires when a subagent stops; the probe's turn starts none",
+	"preCompact":       "fires before the conversation is compacted; the probe's one turn compacts nothing",
+	"preMcpToolCall":   "fires before an MCP server's tool runs; the probe configures no MCP server",
+	"notification":     "fires for an interactive session's notifications; the probe's run is -p",
+	"prePRDescription": "fires before Copilot writes a pull request's description; the probe opens none",
+	"subagentStart":    "fires when a subagent starts; the probe's turn starts none",
+	"subagentStop":     "fires when a subagent stops; the probe's turn starts none",
 }
 
 // TestCopilotProbeHooks: every hook event each Copilot CLI build knows (CopilotHookEventsIn, from
