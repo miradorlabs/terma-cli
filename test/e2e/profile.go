@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -96,7 +97,11 @@ type Profile struct {
 	// Binary is what the build's executable says of itself: runtime, bundled SDKs, size, and
 	// the environment variables and settings keys it reads.
 	Binary json.RawMessage `json:"binary,omitempty"`
-	At     time.Time       `json:"at"`
+	// Notes say how the capture differed from the harness as a user runs it, where the
+	// scenario could not run it so (a desktop app driven without a person at it): they go into
+	// the snapshot's capture notes.
+	Notes []string  `json:"notes,omitempty"`
+	At    time.Time `json:"at"`
 }
 
 // maxProfileBody bounds the body kept of one request; a harness's system prompt and tools are
@@ -254,6 +259,17 @@ func RecordBinary(t *testing.T, b Binary, v any) {
 	profilesMu.Lock()
 	defer profilesMu.Unlock()
 	p.Binary = data
+}
+
+// RecordNote records how t's capture of b differed from b as a user runs it.
+func RecordNote(t *testing.T, b Binary, note string) {
+	t.Helper()
+	p := profileOf(t, b)
+	profilesMu.Lock()
+	defer profilesMu.Unlock()
+	if !slices.Contains(p.Notes, note) {
+		p.Notes = append(p.Notes, note)
+	}
 }
 
 // RecordEgress records a request b made to anything but its model provider.

@@ -79,7 +79,7 @@ func machO(path string) bool {
 
 // inspectSigning reads path's signature and asks Gatekeeper of it, running nothing of it.
 func inspectSigning(path string) (*Signing, error) {
-	if runtime.GOOS != "darwin" || !machO(path) {
+	if runtime.GOOS != "darwin" || !machO(path) && !isAppBundle(path) {
 		return nil, nil
 	}
 	if _, err := exec.LookPath("codesign"); err != nil {

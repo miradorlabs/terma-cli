@@ -57,6 +57,15 @@ type BinaryFacts struct {
 	Heuristic []string `json:"heuristic,omitempty"`
 }
 
+// agentOf is the harness whose agent harness runs: a desktop app's (claude-desktop runs Claude
+// Code, codex-desktop Codex), else harness itself.
+func agentOf(harness string) string {
+	if agent, ok := strings.CutSuffix(harness, "-desktop"); ok {
+		return agent
+	}
+	return harness
+}
+
 // envPrefixes are the environment variable prefixes each harness's own variables carry.
 var envPrefixes = map[string][]string{
 	"claude":   {"ANTHROPIC_", "CLAUDE_", "DISABLE_", "ENABLE_", "MCP_", "OTEL_", "BASH_"},
@@ -113,12 +122,13 @@ func BinaryFactsOf(b Binary) (BinaryFacts, error) {
 	} else {
 		facts.readExecutable(data)
 	}
-	facts.EnvVars, facts.EnvVarsUncertain = EnvVarsIn(corpus, envPrefixes[b.Harness])
-	facts.readSettings(b.Harness, path, corpus)
+	harness := agentOf(b.Harness)
+	facts.EnvVars, facts.EnvVarsUncertain = EnvVarsIn(corpus, envPrefixes[harness])
+	facts.readSettings(harness, path, corpus)
 	if len(facts.EnvVars) > 0 {
 		facts.Heuristic = append(facts.Heuristic, "env_vars")
 	}
-	if b.Harness == "claude" {
+	if harness == "claude" {
 		if keys := SettingsKeysIn(corpus, "cleanupPeriodDays"); len(keys) > 0 {
 			facts.SettingsKeys = keys
 			facts.Heuristic = append(facts.Heuristic, "settings_keys")

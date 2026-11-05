@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -45,6 +47,8 @@ type EgressProxy struct {
 	mu       sync.Mutex
 	leaves   map[string]*tls.Certificate
 	requests []ProviderRequest
+	// files are what the proxy answers a GET of host+path with, in place of `{}` (Serve).
+	files map[string][]byte
 	// calls are the model calls' windows, which place each request before, during or after them.
 	calls [][2]time.Time
 }
@@ -172,12 +176,35 @@ func (p *EgressProxy) serveProxy(w http.ResponseWriter, r *http.Request) {
 	p.answer(w, r, hostOf(host, "80"))
 }
 
-// answer records r, sent to host, and answers it the same whatever it asked.
+// Serve has the proxy answer a GET of host and path with body, a file the scenario fetched
+// itself from where the build would: a desktop app that downloads its agent on first use (Claude
+// Desktop) gets the same bytes it would have, and nothing is forwarded.
+func (p *EgressProxy) Serve(host, path string, body []byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.files == nil {
+		p.files = map[string][]byte{}
+	}
+	p.files[host+path] = body
+}
+
+// answer records r, sent to host, and answers it the same whatever it asked, but for a file
+// the scenario has it serve.
 func (p *EgressProxy) answer(w http.ResponseWriter, r *http.Request, host string) {
 	data, _ := io.ReadAll(io.LimitReader(r.Body, maxProfileBody))
 	req := ProviderRequest{Host: host, Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery,
 		Header: RedactHeader(r.Header), Status: http.StatusOK, At: time.Now().UTC()}
 	req.Body, req.Text = profileBody(r.Header.Get("Content-Encoding"), data)
+	p.mu.Lock()
+	file, served := p.files[host+r.URL.Path]
+	p.mu.Unlock()
+	if served && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		status := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		http.ServeContent(status, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(file))
+		req.Status = status.status
+		p.record(req)
+		return
+	}
 	p.record(req)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
