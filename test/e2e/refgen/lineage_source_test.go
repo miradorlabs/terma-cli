@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -186,4 +187,64 @@ func TestLineageSourceLookup(t *testing.T) {
 		t.Errorf("--json commit = %s", got)
 	}
 	_ = clone
+}
+
+// An option a new command inherits is added by the commit that adds the command, which
+// touches no line that names the option: the lookup finds it on the release's line of commits.
+func TestLineageSourceInheritedOption(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	origin := t.TempDir()
+	gitIn(t, origin, "init", "-q", "-b", "main")
+	write := func(main string) {
+		for p, data := range map[string]string{
+			"codex-rs/cli/Cargo.toml":    "[package]\nname = \"codex-cli\"\n",
+			"codex-rs/cli/src/shared.rs": "use clap::Args;\n\n#[derive(Args, Debug)]\npub struct Shared {\n    #[arg(long)]\n    pub model: Option<String>,\n}\n",
+			"codex-rs/cli/src/main.rs":   main,
+		} {
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(origin, p)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(origin, p), []byte(data), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		gitIn(t, origin, "add", "-A")
+		gitIn(t, origin, "commit", "-q", "-m", "change")
+	}
+	root := "use clap::Parser;\nuse crate::shared::Shared;\n\n#[derive(Debug, Parser)]\nstruct MultitoolCli {\n    #[clap(flatten)]\n    shared: Shared,\n%s}\n%s"
+	execCmd := "\n#[derive(Debug, clap::Subcommand)]\nenum Sub {\n    Exec(ExecCli),\n}\n\n#[derive(Debug, Parser)]\nstruct ExecCli {\n    #[clap(flatten)]\n    shared: Shared,\n}\n"
+	sub := "    #[clap(subcommand)]\n    sub: Option<Sub>,\n"
+	write(fmt.Sprintf(root, "", ""))
+	gitIn(t, origin, "tag", "rust-v0.1.0")
+	write(fmt.Sprintf(root, "", "// a comment\n"))
+	write(fmt.Sprintf(root, sub, execCmd))
+	added := gitIn(t, origin, "rev-parse", "HEAD")
+	write(fmt.Sprintf(root, sub, execCmd+"// more\n"))
+	gitIn(t, origin, "tag", "rust-v0.2.0")
+
+	clones := t.TempDir()
+	gitIn(t, clones, "clone", "-q", origin, clonePath(clones, "openai/codex"))
+	pick, err := lineageSourcers(clones, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss := pick("codex").(*sourceSourcer)
+	ss.lookups, ss.log = true, nil
+	snap := lineageSnap("0.2.0", map[string][]string{"codex": {"--model", "--help"}, "codex exec": {"--model", "--help"}}, nil, nil)
+	dir := t.TempDir()
+	if err := writeLineage(dir, "codex", []string{"0.2.0"}, map[string]*Snapshot{"0.2.0": snap}, ss); err != nil {
+		t.Fatal(err)
+	}
+	l, _ := readLineage(dir)
+	for _, id := range []string{"cli.commands.codex exec.options.--model", "cli.commands.codex exec.options.--help", "cli.commands.codex exec"} {
+		it := l.Items[id]
+		if it.Source == nil || it.Source.Tag != "rust-v0.2.0" || it.Source.Commit != added {
+			t.Errorf("%s = %s, want commit %s", id, jsonOf(it), added)
+		}
+	}
+	if it := l.Items["cli.commands.codex.options.--model"]; it.Source == nil || it.Source.Tag != "rust-v0.1.0" {
+		t.Errorf("--model = %s", jsonOf(it))
+	}
 }
