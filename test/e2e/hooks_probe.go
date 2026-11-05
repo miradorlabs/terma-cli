@@ -275,6 +275,11 @@ type HooksProbe struct {
 	// Method is how the probe made events fire (HooksProbeMethod): builds probed differently
 	// fire different tools and terminals, so their payloads are not compared.
 	Method int `json:"method,omitempty"`
+	// Trust is, for a build that runs a hook only once the developer trusts it (Codex 0.129
+	// on), whether the probe's hooks were: "trusted" (recorded as Codex records a developer's
+	// review, at the hash Codex gave each) or "untrusted" (they could not be). Absent for a
+	// build without hook trust.
+	Trust string `json:"trust,omitempty"`
 }
 
 // HooksProbeMethod is the probe's current way of making events fire: 2 adds the task, MCP

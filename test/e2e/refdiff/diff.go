@@ -162,10 +162,10 @@ func compare(a, b *Snapshot) []Change {
 
 // hookEcho reports whether a change in the hooks section only says again what another says: a
 // payload field's kind or an environment variable's path added or removed with the field or
-// variable itself, and why the probe did not fire an event (a note of the capture's, which the
-// event's own change says).
+// variable itself, why the probe did not fire an event, and whether it trusted its hooks (notes
+// of the capture's, which the events' own changes say).
 func hookEcho(c Change) bool {
-	if len(c.Path) > 1 && c.Path[1] == "not_fired" {
+	if len(c.Path) > 1 && (c.Path[1] == "not_fired" || c.Path[1] == "trust") {
 		return true
 	}
 	return len(c.Path) == 5 && c.Path[1] == "events" && (c.Path[3] == "kinds" || c.Path[3] == "env_paths") && c.Op != "changed"

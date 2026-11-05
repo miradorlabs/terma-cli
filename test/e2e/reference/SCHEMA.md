@@ -322,10 +322,19 @@ tried something the build did not answer. A build captured before the hooks prob
 only `events`, each with its `keys` and `count`: the payloads of the hooks its plain first turn
 ran; one captured before examples has no `example` or `env_values`.
 
+`trust` is there for a build that runs a hook only once the developer has trusted it (Codex
+from 0.129). The probe trusts its hooks the way Codex records a developer's review of them: the
+build's own app-server lists each hook's key and the hash it gives it (`hooks/list`), and each
+goes into the sandbox's `config.toml` as `[hooks.state."<key>"] trusted_hash`. `codex exec`
+before 0.141 does not carry `--dangerously-bypass-hook-trust` into its threads, so there the
+hooks run only trusted. `trusted` says every hook was; `untrusted` that the build would not
+trust them, and none of its events can fire. A Codex 0.129–0.140 snapshot captured before the
+probe trusted its hooks has no `trust`, and fired nothing.
+
 In a diff, a new event in `supported` is notable and one gone degrading; an event no longer
 fired is degrading; a payload field or environment variable gone, and a control point's result
 changed, notable. A field's kind or a variable's path added or removed with it is not a change
-of its own, and neither is `not_fired`. `example` and `env_values` are the run's values and are
+of its own, and neither is `not_fired` or `trust`. `example` and `env_values` are the run's values and are
 never compared: what a build hands a hook is its keys, their kinds and the variables' names.
 `method` is how the probe made events fire (2: the task, MCP and worktree runs and the
 interactive session, the first to publish `example`; a snapshot without it is 2 where its events

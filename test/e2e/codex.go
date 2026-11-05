@@ -18,7 +18,10 @@ import (
 // TUI, and prints its events as JSONL. Hook trust is a per-developer act made
 // inside the TUI, so automation passes --dangerously-bypass-hook-trust, the
 // flag Codex provides for exactly this; the interactive trust flow is a
-// separate contract for later.
+// separate contract for later. Hook trust came in 0.129 and the flag in 0.131,
+// but `codex exec` carries the flag into its threads only from 0.141: 0.129 to
+// 0.140 run no untrusted hook, so the hooks probe and the files profile trust
+// theirs as well (trustCodexHooks).
 //
 // Routes: the ChatGPT login is a file, $CODEX_HOME/auth.json, so the
 // subscription route copies the developer's own into the scratch home (with

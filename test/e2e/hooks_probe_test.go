@@ -1317,6 +1317,8 @@ func TestCodexProbeHooks(t *testing.T) {
 		config := append(serveCodex(t, b, fx), codexHookConfig(sb)...)
 		rec := filepath.Join(sb.Dir, "hook-recorder")
 		writeCodexRecorderHooks(t, sb, rec, events, true)
+		trust := trustCodexHooks(t, sb, config)
+		t.Logf("%s %s: %s", b.Harness, b.Version, trust)
 		Placeholder(t, b, hooksPrompt, "<prompt>")
 		env := sb.codexEnv(RouteAPIKey)
 
@@ -1355,6 +1357,7 @@ func TestCodexProbeHooks(t *testing.T) {
 		calls := HookCallsIn(rec)
 		t.Logf("hooks run: %s", hookSequence(calls))
 		probe := HooksProbeOf(supported, source, calls, env, sb.Dir)
+		probe.Trust = trust.Probe()
 		codexHookControls(t, sb, fx, config, &probe, lap)
 		notFired(&probe, codexHookReasons)
 		RecordProbe(t, b, "hooks", probe)
@@ -1412,6 +1415,9 @@ func codexHookControls(t *testing.T, sb *Sandbox, fx *codexHooksFixture, config 
 	hookControlPass(t, p, func(name string, controls hookControls) ([]string, bool, int32, bool) {
 		dir := filepath.Join(sb.Dir, "hook-control-"+name)
 		writeCodexRecorderHooks(t, sb, dir, controlEvents, false)
+		if trust := trustCodexHooks(t, sb, config); !trust.Trusted() {
+			t.Logf("control %s: %s", name, trust)
+		}
 		writeHookControls(t, dir, controls)
 		marker := filepath.Join(dir, "ran")
 		fx.reset(func(body []byte) []map[string]any {

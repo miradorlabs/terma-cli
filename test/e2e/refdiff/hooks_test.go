@@ -41,6 +41,8 @@ func TestHookChanges(t *testing.T) {
 				map[string]any{"exit_2": "does not block the tool; message to the model"}),
 		},
 		"not_fired": map[string]any{"PreCompact": "none of the probe's runs fired it", "Stop": "none of the probe's runs fired it"},
+		// Whether the probe trusted its hooks is a note of the capture's.
+		"trust": "trusted",
 	})
 	d := New(a, b, nil, time.Now())
 	byID := map[string]Change{}
@@ -74,7 +76,7 @@ func TestHookChanges(t *testing.T) {
 		}
 	}
 	for _, id := range []string{"hooks.events.PreToolUse.kinds.tool_input.command", "hooks.events.PreToolUse.kinds.tool_name", "hooks.not_fired.PreCompact",
-		"hooks.events.Notification"} {
+		"hooks.events.Notification", "hooks.trust"} {
 		if _, ok := byID[id]; ok {
 			t.Errorf("%s read as a change of its own", id)
 		}

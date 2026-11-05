@@ -2,13 +2,17 @@ package e2e
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,39 +56,57 @@ func (sb *Sandbox) StartAppServer(b Binary, client, providerURL string) *AppServ
 	// fixtureCodexArgs ends with the CLI's sandbox flag, which app-server does not take:
 	// each thread names its sandbox instead.
 	args = args[:len(args)-2]
-	a := &AppServer{t: t, results: map[int]map[string]any{}}
-	a.cond = sync.NewCond(&a.mu)
-	a.cmd = exec.Command(b.Path, args...)
-	a.cmd.Dir = sb.Repo
-	a.cmd.Env = sb.codexEnv(RouteAPIKey)
-	a.cmd.Stderr = &a.stderr
-	var err error
-	if a.stdin, err = a.cmd.StdinPipe(); err != nil {
-		t.Fatal(err)
-	}
-	stdout, err := a.cmd.StdoutPipe()
+	a, err := launchAppServer(t, b.Path, args, sb.Repo, sb.codexEnv(RouteAPIKey), client)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return a
+}
+
+// launchAppServer starts the app-server the Codex at path runs with args (app-server and its
+// options), in dir with env, and introduces itself as client. It closes with t.
+func launchAppServer(t *testing.T, path string, args []string, dir string, env []string, client string) (*AppServer, error) {
+	t.Helper()
+	a := &AppServer{t: t, results: map[int]map[string]any{}}
+	a.cond = sync.NewCond(&a.mu)
+	a.cmd = exec.Command(path, args...)
+	a.cmd.Dir = dir
+	a.cmd.Env = env
+	a.cmd.Stderr = &a.stderr
+	var err error
+	if a.stdin, err = a.cmd.StdinPipe(); err != nil {
+		return nil, err
+	}
+	stdout, err := a.cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
 	if err := a.cmd.Start(); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	go a.read(stdout)
 	t.Cleanup(a.Close)
-	a.call("initialize", map[string]any{"clientInfo": map[string]any{"name": client, "title": client, "version": "1.0.0"},
-		"capabilities": map[string]any{"experimentalApi": true}})
-	a.send(map[string]any{"jsonrpc": "2.0", "method": "initialized"})
-	return a
+	if _, err := a.tryCall("initialize", map[string]any{"clientInfo": map[string]any{"name": client, "title": client, "version": "1.0.0"},
+		"capabilities": map[string]any{"experimentalApi": true}}); err != nil {
+		a.Close()
+		return nil, err
+	}
+	if err := a.send(map[string]any{"jsonrpc": "2.0", "method": "initialized"}); err != nil {
+		a.Close()
+		return nil, err
+	}
+	return a, nil
 }
 
 // PID is the app-server's process: every thread's exporter and hook parent.
 func (a *AppServer) PID() int { return a.cmd.Process.Pid }
 
-func (a *AppServer) send(m map[string]any) {
+func (a *AppServer) send(m map[string]any) error {
 	data, _ := json.Marshal(m)
 	if _, err := a.stdin.Write(append(data, '\n')); err != nil {
-		a.t.Fatalf("app-server: %v\n%s", err, a.stderr.String())
+		return fmt.Errorf("app-server: %w\n%s", err, tail(a.stderr.String(), 2000))
 	}
+	return nil
 }
 
 func (a *AppServer) read(r io.Reader) {
@@ -101,7 +123,7 @@ func (a *AppServer) read(r io.Reader) {
 		case hasID && method != "":
 			// A request of the server's (an approval): these threads never ask, and a
 			// refusal is the safe answer if one does.
-			a.send(map[string]any{"jsonrpc": "2.0", "id": m["id"], "result": map[string]any{"decision": "decline"}})
+			_ = a.send(map[string]any{"jsonrpc": "2.0", "id": m["id"], "result": map[string]any{"decision": "decline"}})
 		case hasID:
 			a.mu.Lock()
 			a.results[int(id)] = m
@@ -142,20 +164,31 @@ func (a *AppServer) wait(timeout time.Duration, ok func() bool) bool {
 
 func (a *AppServer) call(method string, params any) map[string]any {
 	a.t.Helper()
+	r, err := a.tryCall(method, params)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return r
+}
+
+// tryCall is call, its failure returned.
+func (a *AppServer) tryCall(method string, params any) (map[string]any, error) {
 	a.mu.Lock()
 	a.nextID++
 	id := a.nextID
 	a.mu.Unlock()
-	a.send(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
+	if err := a.send(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}); err != nil {
+		return nil, err
+	}
 	var res map[string]any
 	if !a.wait(60*time.Second, func() bool { res = a.results[id]; return res != nil }) {
-		a.t.Fatalf("app-server %s: no response\n%s", method, a.stderr.String())
+		return nil, fmt.Errorf("app-server %s: no response\n%s", method, tail(a.stderr.String(), 2000))
 	}
 	if e, ok := res["error"]; ok {
-		a.t.Fatalf("app-server %s: %v", method, e)
+		return nil, fmt.Errorf("app-server %s: %v", method, e)
 	}
 	r, _ := res["result"].(map[string]any)
-	return r
+	return r, nil
 }
 
 // threadParams are what Desktop sends for a thread in cwd; trustHooks stands in for
@@ -272,8 +305,33 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 	cfg := filepath.Join(sb.CodexHome, "config.toml")
 	existing, _ := os.ReadFile(cfg)
 	approved := trustedHashes(string(existing))
-	listed := 0
+	hooks := listedHooks(res)
 	var entries []string
+	for _, h := range hooks {
+		switch have, ok := approved[h.Key]; {
+		case !ok:
+			entries = append(entries, "[hooks.state."+tomlQuote(h.Key)+"]\ntrusted_hash = "+tomlQuote(h.Hash)+"\n")
+		case have != h.Hash:
+			a.t.Fatalf("terma approved %s as %s, but Codex hashes it %s", h.Key, have, h.Hash)
+		}
+	}
+	if err := os.WriteFile(cfg, append(existing, []byte("\n"+strings.Join(entries, "\n"))...), 0o600); err != nil {
+		a.t.Fatal(err)
+	}
+	return len(hooks)
+}
+
+// codexListedHook is one hook a hooks/list response lists: its key, Codex's hash of it now,
+// and its trust status ("" where the build reports none).
+type codexListedHook struct {
+	Key, Hash, Status string
+	Managed           bool
+}
+
+// listedHooks are the hooks a hooks/list response lists, wherever they sit in it: an entry
+// with a key and a current hash (HookMetadata).
+func listedHooks(res any) []codexListedHook {
+	var out []codexListedHook
 	var walk func(v any)
 	walk = func(v any) {
 		switch x := v.(type) {
@@ -281,13 +339,10 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 			key, _ := x["key"].(string)
 			hash, _ := x["currentHash"].(string)
 			if key != "" && hash != "" {
-				listed++
-				switch have, ok := approved[key]; {
-				case !ok:
-					entries = append(entries, "[hooks.state."+tomlQuote(key)+"]\ntrusted_hash = "+tomlQuote(hash)+"\n")
-				case have != hash:
-					a.t.Fatalf("terma approved %s as %s, but Codex hashes it %s", key, have, hash)
-				}
+				h := codexListedHook{Key: key, Hash: hash}
+				h.Status, _ = x["trustStatus"].(string)
+				h.Managed, _ = x["isManaged"].(bool)
+				out = append(out, h)
 			}
 			for _, e := range x {
 				walk(e)
@@ -299,10 +354,224 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 		}
 	}
 	walk(res)
-	if err := os.WriteFile(cfg, append(existing, []byte("\n"+strings.Join(entries, "\n"))...), 0o600); err != nil {
-		a.t.Fatal(err)
+	slices.SortFunc(out, func(a, b codexListedHook) int { return strings.Compare(a.Key, b.Key) })
+	return out
+}
+
+// CodexHookTrust is what trustCodexHooks found and did. A build with hook trust (0.129 on)
+// runs a hook of the developer's only once they have trusted its current hash; `codex exec`
+// before 0.141 does not carry --dangerously-bypass-hook-trust into its threads, so there
+// the hooks have to be trusted indeed.
+type CodexHookTrust struct {
+	// Gated says the build has hook trust: its hooks/list reports each hook's trustStatus.
+	Gated bool
+	// Statuses counts the hooks Codex lists by trust status, once the trust is written.
+	Statuses map[string]int
+	// Err is why the hooks could not be trusted.
+	Err error
+}
+
+// Trusted reports whether every hook Codex lists runs: it is trusted or managed.
+func (h CodexHookTrust) Trusted() bool {
+	if h.Err != nil {
+		return false
 	}
-	return listed
+	for s, n := range h.Statuses {
+		if n > 0 && !strings.EqualFold(s, "trusted") && !strings.EqualFold(s, "managed") {
+			return false
+		}
+	}
+	return true
+}
+
+// Probe is the trust as the hooks probe publishes it: "" for a build without hook trust,
+// "trusted" where every hook was trusted, else "untrusted".
+func (h CodexHookTrust) Probe() string {
+	switch {
+	case !h.Gated:
+		return ""
+	case h.Trusted():
+		return "trusted"
+	}
+	return "untrusted"
+}
+
+func (h CodexHookTrust) String() string {
+	if !h.Gated {
+		return "no hook trust in this build"
+	}
+	var parts []string
+	for _, s := range slices.Sorted(maps.Keys(h.Statuses)) {
+		parts = append(parts, fmt.Sprintf("%d %s", h.Statuses[s], s))
+	}
+	out := "hook trust: " + strings.Join(parts, ", ")
+	if len(parts) == 0 {
+		out = "hook trust: no hooks listed"
+	}
+	if h.Err != nil {
+		out += " (not set: " + h.Err.Error() + ")"
+	}
+	return out
+}
+
+var (
+	codexTrustMu    sync.Mutex
+	codexTrustNamed = map[string]bool{}
+)
+
+// codexNamesHookTrust reports whether the Codex executable at path names trusted_hash, the
+// field a hook's trust is recorded in: a build without it has no hook trust, and no app-server
+// is started to ask.
+func codexNamesHookTrust(path string) bool {
+	codexTrustMu.Lock()
+	defer codexTrustMu.Unlock()
+	if named, ok := codexTrustNamed[path]; ok {
+		return named
+	}
+	data, err := os.ReadFile(path)
+	named := err == nil && bytes.Contains(data, []byte("trusted_hash"))
+	codexTrustNamed[path] = named
+	return named
+}
+
+// trustCodexHooks trusts every hook sb's Codex finds for its working directory, the way Codex
+// records a developer's review of them (/hooks in the TUI, Settings → Hooks in Desktop): it
+// asks the build's own app-server (hooks/list, with config's -c options, so the hooks feature
+// is on as for the run) for each hook's key and current hash, writes each into config.toml as
+// [hooks.state."<key>"] trusted_hash, and lists them again to see Codex now trusts them.
+// Codex computes the hash; a hook rewritten after this is untrusted again.
+func trustCodexHooks(t *testing.T, sb *Sandbox, config []string) CodexHookTrust {
+	t.Helper()
+	if !codexNamesHookTrust(sb.Codex.Path) {
+		return CodexHookTrust{}
+	}
+	args := []string{"app-server"}
+	for i := 0; i+1 < len(config); i++ {
+		if config[i] == "-c" {
+			args = append(args, config[i], config[i+1])
+			i++
+		}
+	}
+	// What the app-server makes of CODEX_HOME on its way (its databases, installation id,
+	// bundled skills) goes with it: the run finds the home as it would have, the trust aside.
+	before := pathsUnder(sb.CodexHome)
+	before[sb.CodexHome], before[filepath.Join(sb.CodexHome, "config.toml")] = true, true
+	a, err := launchAppServer(t, sb.Codex.Path, args, sb.workDir(), sb.codexEnv(RouteAPIKey), "terma-e2e")
+	if err != nil {
+		return CodexHookTrust{Gated: true, Err: err}
+	}
+	defer func() {
+		a.Close()
+		removeAddedPaths(sb.CodexHome, before)
+	}()
+	list := func() ([]codexListedHook, error) {
+		res, err := a.tryCall("hooks/list", map[string]any{"cwds": []string{sb.workDir()}})
+		return listedHooks(res), err
+	}
+	hooks, err := list()
+	if err != nil {
+		return CodexHookTrust{Gated: true, Err: err}
+	}
+	if len(hooks) == 0 {
+		return CodexHookTrust{Gated: true, Statuses: map[string]int{}, Err: fmt.Errorf("Codex listed no hooks for %s", sb.workDir())}
+	}
+	trust := CodexHookTrust{}
+	hashes := map[string]string{}
+	for _, h := range hooks {
+		trust.Gated = trust.Gated || h.Status != ""
+		if h.Status != "" && !h.Managed && !strings.EqualFold(h.Status, "trusted") {
+			hashes[h.Key] = h.Hash
+		}
+	}
+	if !trust.Gated {
+		return trust
+	}
+	if len(hashes) > 0 {
+		cfg := filepath.Join(sb.CodexHome, "config.toml")
+		existing, _ := os.ReadFile(cfg)
+		if err := os.WriteFile(cfg, []byte(withCodexHookTrust(string(existing), hashes)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if hooks, err = list(); err != nil {
+			trust.Err = err
+		}
+	}
+	trust.Statuses = map[string]int{}
+	for _, h := range hooks {
+		trust.Statuses[strings.ToLower(h.Status)]++
+	}
+	if trust.Err == nil && !trust.Trusted() {
+		trust.Err = fmt.Errorf("Codex does not trust the hooks its hooks/list hashed once their hashes are in %s", filepath.Join(sb.CodexHome, "config.toml"))
+	}
+	return trust
+}
+
+// pathsUnder is every path under root, root's own included.
+func pathsUnder(root string) map[string]bool {
+	out := map[string]bool{}
+	_ = filepath.WalkDir(root, func(p string, _ fs.DirEntry, err error) error {
+		if err == nil {
+			out[p] = true
+		}
+		return nil
+	})
+	return out
+}
+
+// removeAddedPaths removes from root whatever is not in before, a folder new since whole.
+func removeAddedPaths(root string, before map[string]bool) {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || before[p] {
+			return nil
+		}
+		_ = os.RemoveAll(p)
+		if d.IsDir() {
+			return fs.SkipDir
+		}
+		return nil
+	})
+}
+
+// withCodexHookTrust is config with each of hashes' keys trusted at its hash: its
+// [hooks.state."<key>"] table's trusted_hash replaced, the table's other settings (enabled)
+// kept, or a table of its own appended.
+func withCodexHookTrust(config string, hashes map[string]string) string {
+	var out []string
+	done := map[string]bool{}
+	key := ""
+	for line := range strings.Lines(config) {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") {
+			key = ""
+			if q, ok := strings.CutPrefix(trimmed, "[hooks.state."); ok {
+				if k, err := strconv.Unquote(strings.TrimSuffix(q, "]")); err == nil && hashes[k] != "" && !done[k] {
+					key = k
+				}
+			}
+			if !strings.HasSuffix(line, "\n") {
+				line += "\n"
+			}
+			out = append(out, line)
+			if key != "" {
+				out = append(out, "trusted_hash = "+tomlQuote(hashes[key])+"\n")
+				done[key] = true
+			}
+			continue
+		}
+		if f := strings.Fields(strings.ReplaceAll(trimmed, "=", " = ")); key != "" && len(f) > 1 && f[0] == "trusted_hash" && f[1] == "=" {
+			continue
+		}
+		out = append(out, line)
+	}
+	if len(out) > 0 && !strings.HasSuffix(out[len(out)-1], "\n") {
+		out[len(out)-1] += "\n"
+	}
+	for _, k := range slices.Sorted(maps.Keys(hashes)) {
+		if !done[k] {
+			out = append(out, "\n[hooks.state."+tomlQuote(k)+"]\ntrusted_hash = "+tomlQuote(hashes[k])+"\n")
+		}
+	}
+	return strings.Join(out, "")
 }
 
 // trustedHashes reads each [hooks.state."<key>"] table's trusted_hash from config text.

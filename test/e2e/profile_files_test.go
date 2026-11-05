@@ -310,8 +310,9 @@ func filesHookRecorder(t *testing.T, b Binary, sb *Sandbox, rec string) {
 }
 
 // checkHookRecorder fails t where the build knows hook events and the recorder saw none run:
-// the build did not run as it does with hooks configured.
-func checkHookRecorder(t *testing.T, b Binary, rec string) {
+// the build did not run as it does with hooks configured. trust is what the scenario did about
+// the build's hook trust (Codex's), which the failure names where the hooks are not trusted.
+func checkHookRecorder(t *testing.T, b Binary, rec string, trust CodexHookTrust) {
 	t.Helper()
 	events, _, _ := HookEventsOf(b)
 	calls := HookCallsIn(rec)
@@ -321,7 +322,11 @@ func checkHookRecorder(t *testing.T, b Binary, rec string) {
 	}
 	t.Logf("hooks run: %v", fired)
 	if len(events) > 0 && len(calls) == 0 {
-		t.Errorf("%s %s knows %d hook events and ran none of the recorder's", b.Harness, b.Version, len(events))
+		why := ""
+		if trust.Gated && !trust.Trusted() {
+			why = ", its " + trust.String()
+		}
+		t.Errorf("%s %s knows %d hook events and ran none of the recorder's%s", b.Harness, b.Version, len(events), why)
 	}
 }
 
@@ -372,7 +377,7 @@ func TestClaudeProfileFiles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("claude -p, traced: %v\n%s", err, out)
 		}
-		checkHookRecorder(t, b, rec)
+		checkHookRecorder(t, b, rec, CodexHookTrust{})
 		if calls.Load() == 0 {
 			t.Fatal("Claude Code sent its provider no message request")
 		}
@@ -404,6 +409,9 @@ func TestCodexProfileFiles(t *testing.T) {
 		Placeholder(t, b, profilePrompt, "<prompt>")
 		// A build that keeps hooks behind a feature has it turned on, as a developer with hooks does.
 		args := append(append(codexProfileArgs(b, sb, provider.URL), codexHookConfig(sb)...), "--sandbox", "workspace-write")
+		// A build with hook trust runs them once trusted, as the developer's review in Codex does.
+		trust := trustCodexHooks(t, sb, args)
+		t.Logf("%s %s: %s", b.Harness, b.Version, trust)
 		RecordCommand(t, b, args)
 		native := nativeBuild(b)
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
@@ -417,7 +425,7 @@ func TestCodexProfileFiles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("codex exec, traced: %v\n%s", err, out)
 		}
-		checkHookRecorder(t, b, rec)
+		checkHookRecorder(t, b, rec, trust)
 		if calls.Load() == 0 {
 			t.Fatal("Codex sent its provider no responses request")
 		}
