@@ -67,7 +67,7 @@ type CodexRun struct {
 }
 
 func (sb *Sandbox) codexEnv(route Route) []string {
-	env := append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig, "CODEX_HOME="+sb.CodexHome)
+	env := append(append(sb.baseEnv(), sb.termaConfigEnv()...), "CODEX_HOME="+sb.CodexHome)
 	if route == RouteAPIKey {
 		env = append(env, "OPENAI_API_KEY="+CodexCredentials().APIKey)
 	}
@@ -75,9 +75,9 @@ func (sb *Sandbox) codexEnv(route Route) []string {
 }
 
 // prepareCodex trusts the sandbox repository, points Codex at the receiver
-// and installs the route's login. Trust first: an untrusted project skips its
-// .codex/ layer, hooks included, and the record is what a developer's own
-// approval writes into config.toml.
+// (but in a clean room) and installs the route's login. Trust first: an
+// untrusted project skips its .codex/ layer, hooks included, and the record is
+// what a developer's own approval writes into config.toml.
 func (sb *Sandbox) prepareCodex(route Route) {
 	t := sb.T
 	t.Helper()
@@ -93,7 +93,9 @@ func (sb *Sandbox) prepareCodex(route Route) {
 			t.Fatal(err)
 		}
 	}
-	sb.directCodex()
+	if !sb.cleanRoom {
+		sb.directCodex() // a clean room has no exporter, nor a receiver to export to
+	}
 	if route == RouteAPIKey {
 		// Use Codex's login flow, scoped to the scratch CODEX_HOME. Keep the
 		// key off command arguments and force file storage to avoid Keychain.

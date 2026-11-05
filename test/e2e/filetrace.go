@@ -17,13 +17,17 @@ import (
 // with strace (filetrace_strace.go), macOS with Endpoint Security's eslogger and lsof
 // (filetrace_eslogger.go); each tracer's output becomes the same TraceEvents, and FilesOf
 // makes the published shape of them: every path the build read, wrote, created, deleted,
-// renamed or looked for, with its run's directories in placeholders; every program it started;
-// whether it touched the decoy credentials the scenario planted (decoys.go); the sockets it
-// listened on and connected to. What is not the build's is dropped and counted (dropReason):
-// the kernel's files, shared libraries and the system's own files every process reads, the
-// build's installation, terma's hooks past their start, the test's own files, the PATH
-// searched (Lookups says for what), what a program the build starts does outside the run's own
-// places, bubblewrap building a sandbox's root. reference/SCHEMA.md says the same for readers.
+// renamed or looked for, with its run's directories in placeholders; every program it started,
+// with the commands that started it, whether it was the build's own doing or the tool call's,
+// and what it is for where the command is a well-known one (execPurposes); whether it touched
+// the decoy credentials the scenario planted (decoys.go); the sockets it listened on and
+// connected to. What is not the build's is dropped and counted (dropReason): the kernel's
+// files, shared libraries and the system's own files every process reads, the build's
+// installation, the hook recorder the scenario registers (its shell, its process and its
+// files: the snapshot's hooks section says what the build hands a hook), the test's own files,
+// the PATH searched (Lookups says for what), what a program the build starts does outside the
+// run's own places, bubblewrap building a sandbox's root. reference/SCHEMA.md says the same for
+// readers.
 
 // TraceEvent is one thing a traced process did.
 type TraceEvent struct {
@@ -76,9 +80,16 @@ type TraceScope struct {
 	Replace map[string]string
 	// Self are the build's own installation: its binary and the folder it sits in.
 	Self []string
-	// Terma are terma's executables (the recording shim, the binary): a process that runs one
-	// is recorded as started, and nothing it does after.
-	Terma []string
+	// Hooks are the hook recorder the scenario registered for every hook event: its executable
+	// and its folder. A process that runs it, or a shell whose command line names it (the
+	// harness running the hook's command), and everything it starts are dropped ("hooks"), and
+	// so is every path under them.
+	Hooks []string
+	// Tools are the commands the scenario's fixture model told the build's tool calls to run: a
+	// process whose command line holds one, everything it starts and the commands on the way to
+	// it from the build (a sandbox and its helpers) are the tool's (role "tool"); the rest is the
+	// build's own ("harness").
+	Tools []string
 	// Test are folders and files that are the test's own (the hook payloads it records, the
 	// checkout the suite runs from, with the builds it downloads and the logs it writes).
 	Test []string
@@ -134,7 +145,32 @@ type ExecUse struct {
 	Count  int      `json:"count"`
 	// By is the program that started it: the build, or a shell it started.
 	By string `json:"by"`
+	// Parents are the exec keys of the commands that started it, sorted; empty where the build
+	// itself did. ExecBuild, first, stands for the build among them where a command started it
+	// too.
+	Parents []string `json:"parents"`
+	// Role is whose doing it was: RoleHarness, RoleTool, or RoleBoth where it ran as each.
+	Role string `json:"role"`
+	// Purpose is what it is for, where its command is a well-known one (execPurposes) or a
+	// command that started it is one whose programs share its purpose.
+	Purpose string `json:"purpose,omitempty"`
 }
+
+// The roles of a program the build started.
+const (
+	// RoleHarness is the build acting on its own: its startup, its context, its shell snapshot.
+	RoleHarness = "harness"
+	// RoleTool is the command the scenario's fixture model told a tool call to run, and
+	// everything around it: the shell, sandbox and helpers between the build and it, the
+	// programs it starts.
+	RoleTool = "tool"
+	// RoleBoth is a command line that ran as each.
+	RoleBoth = "both"
+)
+
+// ExecBuild stands for the build itself among a command's parents, where a command started it
+// as well: a command the build alone started has no parents.
+const ExecBuild = "<build>"
 
 // SocketUse is what the build did with sockets.
 type SocketUse struct {
@@ -203,9 +239,32 @@ type traceProc struct {
 	program string // the basename of what it runs
 	exe     string // the path it executed
 	own     bool   // it runs the build's own binary
-	terma   bool   // terma's, or started by terma's
+	hook    bool   // the hook recorder's, or started by it
+	tool    bool   // the tool call's command, or started by it
 	execs   int
 	argv    []string // the command line it was started with
+	// run is the recorded run of the command it runs: nil for the build's own process, which
+	// the exec list does not hold.
+	run *execRun
+}
+
+// execRun is one run of a recorded command: its exec key and normalized command line, the run
+// that started it (nil: the build), and whether it is the tool call's.
+type execRun struct {
+	key    string
+	argv   []string
+	parent *execRun
+	tool   bool
+	// context is the purpose a program it starts takes where it has none of its own.
+	context string
+}
+
+// parentKey is the exec key of the command that started r, "" for the build.
+func (r *execRun) parentKey() string {
+	if r.parent == nil {
+		return ""
+	}
+	return r.parent.key
 }
 
 // FilesOf is the files profile of events, as scope says to read them.
@@ -244,6 +303,8 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 	seenAbsent := map[string]bool{}
 	lookups := map[string]bool{}
 	dns := map[string]bool{}
+	// Every run of a recorded command, in the order they started: a run's parent comes first.
+	var runs []*execRun
 	for _, ev := range events {
 		if ev.Kind == "lost" {
 			out.Dropped["lost"] += ev.Count // not the build's to drop: the trace is short of them
@@ -260,8 +321,8 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 				out.Dropped["path-search"]++
 				continue
 			}
-			if p.terma {
-				out.Dropped["terma"]++
+			if p.hook {
+				out.Dropped["hooks"]++
 				continue
 			}
 			// The root's first exec is the scenario's own command.
@@ -281,24 +342,31 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 				p.exe = exe
 				continue
 			}
-			own := scope.isSelf(exe)
-			argv := scope.normalizeArgv(ev.Argv, ev.Path, own)
-			key := strings.Join(argv, " ")
-
-			e := out.Exec[key]
-			if e == nil {
-				e = &ExecUse{Argv: argv, By: by}
-				out.Exec[key] = e
+			np := &traceProc{program: programName(ev, exe), exe: exe, execs: p.execs + 1, argv: ev.Argv}
+			switch {
+			case scope.isHook(ev.Path, ev.Argv):
+				// The hook recorder, or the shell the build runs its command line in: neither is
+				// recorded, nor anything it does or starts.
+				np.hook = true
+				out.Dropped["hooks"]++
+			default:
+				np.own = scope.isSelf(exe)
+				argv := scope.normalizeArgv(ev.Argv, ev.Path, np.own)
+				key := strings.Join(argv, " ")
+				np.tool = p.tool || scope.isTool(ev.Argv)
+				np.run = &execRun{key: key, argv: argv, parent: p.run, tool: np.tool}
+				runs = append(runs, np.run)
+				e := out.Exec[key]
+				if e == nil {
+					e = &ExecUse{Argv: argv, By: by, Parents: []string{}}
+					out.Exec[key] = e
+				}
+				e.Count++
+				e.Phases = addWord(e.Phases, phase)
+				if np.own {
+					np.program = scope.harness()
+				}
 			}
-			e.Count++
-			e.Phases = addWord(e.Phases, phase)
-			np := &traceProc{program: programName(ev, exe), exe: exe, execs: p.execs + 1, own: own, argv: ev.Argv}
-			if np.own {
-				np.program = scope.harness()
-			}
-			// terma, or the recording shim as a shell script's argument (macOS logs a script's
-			// exec as its interpreter's).
-			np.terma = scope.isTerma(ev.Path) || len(ev.Argv) > 1 && scope.isTerma(ev.Argv[1]) && isShell(ev.Argv[0])
 			if tree.thread[ev.Pid] {
 				*p = *np
 			} else {
@@ -306,8 +374,8 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 			}
 			continue
 		}
-		if p.terma {
-			out.Dropped["terma"]++
+		if p.hook {
+			out.Dropped["hooks"]++
 			continue
 		}
 		// bubblewrap building a sandbox's root, before it runs the command in it: its mounts
@@ -460,8 +528,70 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 		sortWords(u.Phases, []string{PhaseStartup, PhaseTurn, PhaseExit})
 		slices.Sort(u.Programs)
 	}
-	for _, e := range out.Exec {
+	// The commands on the way from the build to a tool call's command are the tool's too: the
+	// sandbox and helpers that run it, whose own command lines name it where the tracer read
+	// them whole (eslogger) and not where it cut a long argument short (strace).
+	for _, r := range runs {
+		if r.tool {
+			for up := r.parent; up != nil && !up.tool; up = up.parent {
+				up.tool = true
+			}
+		}
+	}
+	// And so is everything those start (a second bubblewrap the helper runs).
+	for _, r := range runs {
+		if r.parent != nil && r.parent.tool {
+			r.tool = true
+		}
+	}
+	// Each command's parents ("" the build), roles and purpose, from its runs in order: a
+	// well-known command's purpose is its own, and its programs' where it is one whose programs
+	// share it; a program with none of its own takes its starter's.
+	parents := map[string]map[string]bool{}
+	roles := map[string]map[string]bool{}
+	for _, r := range runs {
+		context := ""
+		if r.parent != nil {
+			context = r.parent.context
+		}
+		purpose, inherit := execPurpose(r.argv, r.tool)
+		switch {
+		case purpose == "":
+			purpose, r.context = context, context
+		case inherit:
+			r.context = purpose
+		}
+		if e := out.Exec[r.key]; e.Purpose == "" {
+			e.Purpose = purpose
+		}
+		if parents[r.key] == nil {
+			parents[r.key], roles[r.key] = map[string]bool{}, map[string]bool{}
+		}
+		parents[r.key][r.parentKey()] = true
+		roles[r.key][map[bool]string{false: RoleHarness, true: RoleTool}[r.tool]] = true
+	}
+	for key, e := range out.Exec {
 		sortWords(e.Phases, []string{PhaseStartup, PhaseTurn, PhaseExit})
+		// Started by the build alone: no parents. Started by commands too: the build among them.
+		if ps := parents[key]; len(ps) > 1 || !ps[""] {
+			for p := range ps {
+				if p != "" {
+					e.Parents = append(e.Parents, p)
+				}
+			}
+			slices.Sort(e.Parents)
+			if ps[""] {
+				e.Parents = append([]string{ExecBuild}, e.Parents...)
+			}
+		}
+		switch r := roles[key]; {
+		case r[RoleHarness] && r[RoleTool]:
+			e.Role = RoleBoth
+		case r[RoleTool]:
+			e.Role = RoleTool
+		default:
+			e.Role = RoleHarness
+		}
 	}
 	sortSocks := func(m map[string]*SockUse) {
 		for _, s := range m {
@@ -600,8 +730,36 @@ func (s TraceScope) isSelf(path string) bool {
 	return false
 }
 
-func (s TraceScope) isTerma(path string) bool {
-	return slices.Contains(s.Terma, path)
+// isHook reports an exec of the hook recorder: its executable, or a command line that names it
+// or its folder (the shell a build runs a hook's command in).
+func (s TraceScope) isHook(exe string, argv []string) bool {
+	for _, h := range s.Hooks {
+		if h == "" {
+			continue
+		}
+		if exe == h || slices.ContainsFunc(argv, func(a string) bool { return strings.Contains(a, h) }) {
+			return true
+		}
+	}
+	return false
+}
+
+// isTool reports a command line that runs one of the tool calls' commands: as an argument of
+// its own (a shell's -c, a sandbox's command), or quoted in one for a shell (Claude Code's
+// `eval '…'`).
+func (s TraceScope) isTool(argv []string) bool {
+	for _, t := range s.Tools {
+		if t == "" {
+			continue
+		}
+		forms := []string{t, strings.ReplaceAll(t, "'", `'\''`), strings.ReplaceAll(t, "'", `'"'"'`)}
+		if slices.ContainsFunc(argv, func(a string) bool {
+			return slices.ContainsFunc(forms, func(f string) bool { return strings.Contains(a, f) })
+		}) {
+			return true
+		}
+	}
+	return false
 }
 
 // systemFiles are the files every process on the system reads through its C library or
@@ -638,6 +796,11 @@ func (s TraceScope) dropReason(path string) string {
 		return "sandbox-setup" // bubblewrap's new root and the old one, as it builds a sandbox
 	case s.isSelf(path):
 		return "self"
+	}
+	for _, h := range s.Hooks {
+		if h != "" && (path == h || strings.HasPrefix(path, strings.TrimSuffix(h, "/")+"/")) {
+			return "hooks"
+		}
 	}
 	for _, t := range s.Test {
 		if path == t || strings.HasPrefix(path, strings.TrimSuffix(t, "/")+"/") {
@@ -822,9 +985,9 @@ func mixedToken(tok string) bool {
 	return lower && upper || (lower || upper) && digit
 }
 
-// normalizeArgv is a command line with its paths and the run's values in placeholders, terma
-// by its name. The build's own helper processes take numbers (descriptors, process ids) the
-// run picks: those are <n>.
+// normalizeArgv is a command line with its paths and the run's values in placeholders. The
+// build's own helper processes take numbers (descriptors, process ids) the run picks: those
+// are <n>.
 func (s TraceScope) normalizeArgv(argv []string, exe string, own bool) []string {
 	if len(argv) == 0 {
 		argv = []string{exe}
@@ -837,12 +1000,6 @@ func (s TraceScope) normalizeArgv(argv []string, exe string, own bool) []string 
 			out[i] = "<n>"
 		}
 	}
-	if slices.ContainsFunc(s.Terma, func(p string) bool { return p == argv[0] || p == exe }) {
-		out[0] = "terma"
-	}
-	if len(argv) > 1 && isShell(argv[0]) && s.isTerma(argv[1]) {
-		out = append([]string{"terma"}, out[2:]...)
-	}
 	return out
 }
 
@@ -851,9 +1008,6 @@ func (s TraceScope) normalizeArgv(argv []string, exe string, own bool) []string 
 func (s TraceScope) normalizeText(text string) string {
 	if len(s.Path) > 1 {
 		text = strings.ReplaceAll(text, s.Path, "<path>")
-	}
-	for _, t := range s.Terma {
-		text = strings.ReplaceAll(text, t, "terma")
 	}
 	for _, lit := range s.literals() {
 		text = strings.ReplaceAll(text, lit, s.Replace[lit])
@@ -1077,4 +1231,156 @@ func isShell(argv0 string) bool {
 		return true
 	}
 	return false
+}
+
+// execPurposes say what the well-known programs a build starts are for: an exec entry's
+// purpose is the first rule's whose pattern its normalized command line matches. A rule that
+// inherits gives its purpose to the programs the command starts that match none of their own
+// (the cat a shell snapshot runs is the snapshot's); one that does not (a sandbox) says what the
+// command itself does. A rule for tools says the same of a tool call's command and what it
+// starts (a sandbox, a login shell's own startup files); the rest describe the build acting on
+// its own and are not read into a tool's (the model's `git status` is not the build reading the
+// repository for its context). A purpose is presentation, never compared between builds.
+var execPurposes = []struct {
+	pattern string // what it matches, for a reader
+	match   func(argv []string) bool
+	purpose string
+	inherit bool
+	tools   bool
+}{
+	{pattern: "a shell writing the shell snapshot: SNAPSHOT_FILE=… (Claude Code), print/echo '# Snapshot file' (Codex)",
+		match: func(a []string) bool {
+			s := shellScript(a)
+			return strings.Contains(s, "SNAPSHOT_FILE=") || strings.Contains(s, "'# Snapshot file'")
+		},
+		purpose: "the shell snapshot: captures the login shell's environment for the shell tool", inherit: true},
+	{pattern: "a shell loading a new snapshot: set -e; . …/shell_snapshots/… (Codex)",
+		match: func(a []string) bool {
+			s := shellScript(a)
+			return strings.HasPrefix(s, "set -e;") && strings.Contains(s, "shell_snapshots/")
+		},
+		purpose: "checks that a new shell snapshot loads", inherit: true},
+	{pattern: "a shell running env alone: sh -c env (Claude Code's spawn-env probe)",
+		match:   func(a []string) bool { return shellScript(a) == "env" },
+		purpose: "the spawn-env probe: reads the environment a shell the build starts has, beside the shell snapshot's", inherit: true},
+	{pattern: "sandbox-exec …", match: func(a []string) bool { return cmdName(a) == "sandbox-exec" },
+		purpose: "runs the tool command in a sandbox (macOS Seatbelt)", tools: true},
+	{pattern: "bwrap …", match: func(a []string) bool { return cmdName(a) == "bwrap" },
+		purpose: "runs the tool command in a sandbox (bubblewrap)", tools: true},
+	{pattern: "codex-linux-sandbox …", match: func(a []string) bool { return cmdName(a) == "codex-linux-sandbox" },
+		purpose: "runs the tool command in a sandbox (Codex's Linux sandbox helper, which starts bubblewrap)", tools: true},
+	{pattern: "… --codex-run-as-process-setup … (Codex itself, as its process-setup helper)",
+		match:   func(a []string) bool { return slices.Contains(a, "--codex-run-as-process-setup") },
+		purpose: "sets up the tool command's process, then starts Codex's Linux sandbox helper", tools: true},
+	{pattern: "path_helper …", match: func(a []string) bool { return cmdName(a) == "path_helper" },
+		purpose: "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell", tools: true},
+	{pattern: "id -u", match: func(a []string) bool { return slices.Equal(a, []string{"id", "-u"}) },
+		purpose: "reads the user's id: the system's /etc/profile runs it in every login shell", tools: true},
+	{pattern: "security find-generic-password …",
+		match: func(a []string) bool {
+			return cmdName(a) == "security" && len(a) > 1 && a[1] == "find-generic-password"
+		},
+		purpose: "looks up a stored credential in the macOS Keychain"},
+	{pattern: "ps -o lstart= …", match: func(a []string) bool { return cmdName(a) == "ps" && slices.Contains(a, "lstart=") },
+		purpose: "reads a process's start time"},
+	{pattern: "ps aux, alone or in a shell's pipeline",
+		match: func(a []string) bool {
+			return cmdName(a) == "ps" && slices.Contains(a, "aux") || strings.HasPrefix(shellScript(a), "ps aux")
+		},
+		purpose: "lists the running processes, to find an IDE to connect to", inherit: true},
+	{pattern: "ioreg … IOPlatformExpertDevice, alone or in a shell",
+		match: func(a []string) bool {
+			return (cmdName(a) == "ioreg" || isShell(a[0])) && strings.Contains(strings.Join(a, " "), "IOPlatformExpertDevice")
+		},
+		purpose: "reads the machine's hardware identifiers", inherit: true},
+	{pattern: "uname, or a shell's script of uname and command -v (the package-manager probe)",
+		match: func(a []string) bool {
+			s := shellScript(a)
+			return cmdName(a) == "uname" || strings.HasPrefix(s, "uname") || strings.Contains(s, "command -v")
+		},
+		purpose: "detects the platform and installed package managers", inherit: true},
+	{pattern: "getconf LONG_BIT", match: func(a []string) bool { return slices.Equal(a, []string{"getconf", "LONG_BIT"}) },
+		purpose: "reads the platform's word size"},
+	{pattern: "git … ls-files --error-unmatch … settings.local.json",
+		match: func(a []string) bool {
+			sub, rest := gitCommand(a)
+			return sub == "ls-files" && slices.ContainsFunc(rest, func(r string) bool { return strings.Contains(r, "settings.local.json") })
+		},
+		purpose: "checks whether the repository tracks the local settings file", inherit: true},
+	{pattern: "git … config user.name | user.email",
+		match: func(a []string) bool {
+			sub, rest := gitCommand(a)
+			return sub == "config" && (slices.Contains(rest, "user.name") || slices.Contains(rest, "user.email"))
+		},
+		purpose: "reads the user's git identity", inherit: true},
+	{pattern: "git … status | log | rev-parse | remote | branch | config | diff | show | describe | ls-files | for-each-ref | symbolic-ref | rev-list | merge-base",
+		match: func(a []string) bool {
+			sub, _ := gitCommand(a)
+			return slices.Contains([]string{"status", "log", "rev-parse", "remote", "branch", "config", "diff", "show", "describe",
+				"ls-files", "for-each-ref", "symbolic-ref", "rev-list", "merge-base"}, sub)
+		},
+		purpose: "reads the repository's state for the model's context", inherit: true},
+	{pattern: "rg --version", match: func(a []string) bool { return cmdName(a) == "rg" && slices.Contains(a, "--version") },
+		purpose: "checks that the bundled ripgrep runs"},
+	{pattern: "rg --files … plugins/cache",
+		match: func(a []string) bool {
+			return cmdName(a) == "rg" && slices.ContainsFunc(a, func(s string) bool { return strings.Contains(s, "plugins/cache") })
+		},
+		purpose: "looks for plugin caches marked orphaned, to remove them"},
+	{pattern: "rg --files …", match: func(a []string) bool { return cmdName(a) == "rg" && slices.Contains(a, "--files") },
+		purpose: "lists the repository's files"},
+}
+
+// execPurpose is the purpose execPurposes give a normalized command line, and whether the
+// programs it starts share it; tool says the command is a tool call's.
+func execPurpose(argv []string, tool bool) (string, bool) {
+	if len(argv) == 0 {
+		return "", false
+	}
+	for _, r := range execPurposes {
+		if (r.tools || !tool) && r.match(argv) {
+			return r.purpose, r.inherit
+		}
+	}
+	return "", false
+}
+
+// cmdName is a command line's program, by its base name.
+func cmdName(argv []string) string {
+	if len(argv) == 0 {
+		return ""
+	}
+	return filepath.Base(argv[0])
+}
+
+// shellScript is the script a shell's command line runs, its first argument that is no option
+// (`sh -c -l SCRIPT`, `zsh -lc SCRIPT`); "" for any other command line.
+func shellScript(argv []string) string {
+	if len(argv) < 2 || !isShell(argv[0]) {
+		return ""
+	}
+	for _, a := range argv[1:] {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return ""
+}
+
+// gitCommand is a git command line's subcommand past git's own options (`-c key=value`,
+// `-C dir`), and its arguments; "" for any other command line.
+func gitCommand(argv []string) (string, []string) {
+	if cmdName(argv) != "git" {
+		return "", nil
+	}
+	for i := 1; i < len(argv); i++ {
+		switch a := argv[i]; {
+		case a == "-c" || a == "-C" || a == "--git-dir" || a == "--work-tree" || a == "--namespace":
+			i++
+		case strings.HasPrefix(a, "-"):
+		default:
+			return a, argv[i+1:]
+		}
+	}
+	return "", nil
 }

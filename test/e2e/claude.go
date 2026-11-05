@@ -57,7 +57,7 @@ var (
 
 // claudeEnv is the environment the harness runs with for a route.
 func (sb *Sandbox) claudeEnv(route Route) []string {
-	env := append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig)
+	env := append(sb.baseEnv(), sb.termaConfigEnv()...)
 	creds := ClaudeCredentials()
 	if sb.Mode == Isolated {
 		env = append(env, "CLAUDE_CONFIG_DIR="+sb.ClaudeConfig)

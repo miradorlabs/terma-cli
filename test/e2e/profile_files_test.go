@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -25,6 +26,13 @@ import (
 // filesystem section by platform. Linux traces with strace; macOS with eslogger, where it can
 // run as root with Full Disk Access (TERMA_E2E_ESLOGGER_VIA); anywhere else the scenario is
 // skipped, and says why.
+//
+// The run is a clean room (CleanRoom): no terma in it, no setup, hooks, relay or exporter of
+// terma's, SHELL the OS's default login shell and HOME the sandbox's, so nothing of the
+// machine's own (terma, the developer's shell startup files) is traced as the build's. The
+// hooks probe's recorder (hooks_probe.go) is registered for every hook event the build knows,
+// so the build runs as it does with hooks configured; the trace drops the recorder ("hooks"),
+// and the snapshot's hooks section says what the build hands a hook.
 
 // filesTraceFile names the scenario's own file edit.
 const filesTraceFile = "notes.txt"
@@ -121,16 +129,18 @@ func (p *EgressProxy) modelWindow() (time.Time, time.Time) {
 }
 
 // filesScope is the trace scope of b's run in sb: its paths' placeholders, the build's own
-// installation, terma's executables, the run's endpoints and the decoys.
-func filesScope(b Binary, sb *Sandbox, tracer string, env []string, decoys *Decoys, proxy *EgressProxy, provider string) TraceScope {
-	s := TraceScope{Platform: runtime.GOOS + "/" + runtime.GOARCH, Tracer: tracer, Replace: map[string]string{}, Endpoints: map[string]string{}}
+// installation, the hook recorder in rec, the tool calls' commands, the run's endpoints and the
+// decoys.
+func filesScope(b Binary, sb *Sandbox, tracer string, env []string, decoys *Decoys, proxy *EgressProxy, provider, rec string, tools []string) TraceScope {
+	s := TraceScope{Platform: runtime.GOOS + "/" + runtime.GOARCH, Tracer: tracer, Replace: map[string]string{}, Endpoints: map[string]string{},
+		Tools: tools}
 	real := b.Path
 	if r, err := filepath.EvalSymlinks(b.Path); err == nil {
 		real = r
 	}
 	install := filepath.Dir(real)
 	tmp := strings.TrimSuffix(os.TempDir(), "/")
-	places := map[string]string{sb.Repo: "<repo>", sb.Home: "<home>", sb.Dir: "<sandbox>", sb.TermaConfig: "<terma-config>",
+	places := map[string]string{sb.Repo: "<repo>", sb.Home: "<home>", sb.Dir: "<sandbox>",
 		sb.ClaudeConfig: "<claude-config>", sb.CodexHome: "<codex-home>", install: "<install>", tmp: "<tmp>",
 		filepath.Dir(sb.Dir): "<sandbox>/..", "/tmp": "<tmp>", filepath.Dir(install): "<install>/.."}
 	// The temporary folder's own folders (macOS's per-user /var/folders/xx/…/T), and the home of
@@ -156,16 +166,21 @@ func filesScope(b Binary, sb *Sandbox, tracer string, env []string, decoys *Deco
 	if tmp != "/tmp" {
 		s.Replace[tmp] = "<tmp>"
 	}
-	shim := filepath.Join(sb.Dir, "path", "terma")
 	for _, p := range []string{b.Path, real, install, filepath.Join(sb.Dir, "path", b.Harness)} {
 		s.Self = append(s.Self, bothForms(p)...)
 	}
-	for _, p := range []string{shim, sb.Terma} {
-		s.Terma = append(s.Terma, bothForms(p)...)
+	// The recorder: the test binary, started as the hook, and the folder it saves each run in.
+	hooks := []string{rec}
+	if exe, err := os.Executable(); err == nil {
+		hooks = append(hooks, exe)
+		if r, err := filepath.EvalSymlinks(exe); err == nil && r != exe {
+			hooks = append(hooks, r)
+		}
 	}
-	for _, p := range []string{sb.payloadDir(), filepath.Dir(proxy.CAFile)} {
-		s.Test = append(s.Test, bothForms(p)...)
+	for _, p := range hooks {
+		s.Hooks = append(s.Hooks, bothForms(p)...)
 	}
+	s.Test = append(s.Test, bothForms(filepath.Dir(proxy.CAFile))...)
 	// The checkout the suite runs from (test/e2e's repository): the builds it downloads, the
 	// logs a backfill writes, which the build inherits as its output, are in it.
 	// The machine image mounts test/e2e alone (/work/e2e): there it is the checkout.
@@ -194,8 +209,7 @@ func filesScope(b Binary, sb *Sandbox, tracer string, env []string, decoys *Deco
 			}
 		}
 	}
-	for addr, name := range map[string]string{urlHost(provider): "<provider>", urlHost(proxy.URL): "<proxy>", sb.relayAddr: "<relay>",
-		urlHost(sb.Receiver.URL()): "<receiver>"} {
+	for addr, name := range map[string]string{urlHost(provider): "<provider>", urlHost(proxy.URL): "<proxy>"} {
 		if addr != "" {
 			s.Endpoints[addr] = name
 			if _, port, ok := strings.Cut(addr, ":"); ok {
@@ -263,6 +277,54 @@ func recordFiles(t *testing.T, b Binary, events []TraceEvent, root int, scope Tr
 	return probe
 }
 
+// filesHookRecorder registers the hooks probe's recorder in rec for every hook event b knows
+// (HookEventsOf), in the harness's own user settings in sb, as a developer's hooks are: Claude
+// Code's settings.json, Codex's hooks.json. One entry an event, whose matcher matches everything.
+func filesHookRecorder(t *testing.T, b Binary, sb *Sandbox, rec string) {
+	t.Helper()
+	events, source, err := HookEventsOf(b)
+	if err != nil {
+		t.Logf("hook events of %s %s: %v", b.Harness, b.Version, err)
+	}
+	t.Logf("%s %s: a recording hook for each of %d hook events (%s)", b.Harness, b.Version, len(events), source)
+	hooks := map[string]any{}
+	for _, e := range events {
+		cmd, err := HookRecorderCommand(rec, e, hookMatchAll)
+		if err != nil {
+			t.Fatal(err)
+		}
+		group := map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd, "timeout": 30}}}
+		if b.Harness == "claude" {
+			// FileChanged's matcher names the files the build watches: the repository's README.
+			group["matcher"] = map[bool]string{true: "README.md", false: "*"}[e == "FileChanged"]
+		}
+		hooks[e] = []any{group}
+	}
+	switch b.Harness {
+	case "claude":
+		editJSON(t, filepath.Join(sb.ClaudeConfig, "settings.json"), func(doc map[string]any) { doc["hooks"] = hooks })
+	case "codex":
+		data, _ := json.MarshalIndent(map[string]any{"hooks": hooks}, "", "  ")
+		sb.writeAbs(filepath.Join(sb.CodexHome, "hooks.json"), string(data)+"\n")
+	}
+}
+
+// checkHookRecorder fails t where the build knows hook events and the recorder saw none run:
+// the build did not run as it does with hooks configured.
+func checkHookRecorder(t *testing.T, b Binary, rec string) {
+	t.Helper()
+	events, _, _ := HookEventsOf(b)
+	calls := HookCallsIn(rec)
+	fired := map[string]int{}
+	for _, c := range calls {
+		fired[c.Event]++
+	}
+	t.Logf("hooks run: %v", fired)
+	if len(events) > 0 && len(calls) == 0 {
+		t.Errorf("%s %s knows %d hook events and ran none of the recorder's", b.Harness, b.Version, len(events))
+	}
+}
+
 func touchedDecoys(p *FilesProbe) int {
 	n := 0
 	for _, level := range p.Decoys {
@@ -280,13 +342,15 @@ func TestClaudeProfileFiles(t *testing.T) {
 		track(t)
 		tracer, run := traceRun(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
-		sb := New(t, Isolated, WithClaude(b))
-		sb.unproxyHooks()
+		sb := New(t, Isolated, WithClaude(b), CleanRoom())
+		rec := filepath.Join(sb.Dir, "hook-recorder")
+		filesHookRecorder(t, b, sb, rec)
 		decoys := PlantDecoys(t, sb)
 		proxy := StartEgressProxy(t)
 		var calls atomic.Int32
+		tools := []string{"git status --short && git log --oneline -1"}
 		steps := []claudeStep{
-			{bash("git status --short && git log --oneline -1")},
+			{bash(tools[0])},
 			{{"name": "Write", "input": map[string]any{"file_path": filepath.Join(sb.Repo, filesTraceFile), "content": "written by the files profile\n"}}},
 		}
 		provider := httptest.NewServer(proxy.Provider(isClaudeModelCall, CaptureProbe(t, b, "filesystem", claudeWorkloadProvider(&calls, steps, false))))
@@ -303,11 +367,12 @@ func TestClaudeProfileFiles(t *testing.T) {
 		cmd.Dir = sb.workDir()
 		cmd.Env = append(append(sb.claudeEnv(RouteAPIKey), proxy.Env()...), decoys.Env...)
 		out, events, root, err := run(cmd)
-		scope := filesScope(b, sb, tracer, cmd.Env, decoys, proxy, provider.URL)
+		scope := filesScope(b, sb, tracer, cmd.Env, decoys, proxy, provider.URL, rec, tools)
 		recordFiles(t, b, events, root, scope, decoys)
 		if err != nil {
 			t.Fatalf("claude -p, traced: %v\n%s", err, out)
 		}
+		checkHookRecorder(t, b, rec)
 		if calls.Load() == 0 {
 			t.Fatal("Claude Code sent its provider no message request")
 		}
@@ -324,9 +389,10 @@ func TestCodexProfileFiles(t *testing.T) {
 		track(t)
 		tracer, run := traceRun(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
-		sb := New(t, Isolated, WithCodex(b))
+		sb := New(t, Isolated, WithCodex(b), CleanRoom())
 		sb.prepareCodex(RouteAPIKey)
-		sb.unproxyHooks()
+		rec := filepath.Join(sb.Dir, "hook-recorder")
+		filesHookRecorder(t, b, sb, rec)
 		decoys := PlantDecoys(t, sb)
 		proxy := StartEgressProxy(t)
 		var calls atomic.Int32
@@ -336,7 +402,8 @@ func TestCodexProfileFiles(t *testing.T) {
 		PlaceSandbox(t, b, sb)
 		Placeholder(t, b, provider.URL, "<provider>")
 		Placeholder(t, b, profilePrompt, "<prompt>")
-		args := append(codexProfileArgs(b, sb, provider.URL), "--sandbox", "workspace-write")
+		// A build that keeps hooks behind a feature has it turned on, as a developer with hooks does.
+		args := append(append(codexProfileArgs(b, sb, provider.URL), codexHookConfig(sb)...), "--sandbox", "workspace-write")
 		RecordCommand(t, b, args)
 		native := nativeBuild(b)
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
@@ -345,11 +412,12 @@ func TestCodexProfileFiles(t *testing.T) {
 		cmd.Dir = sb.workDir()
 		cmd.Env = append(append(sb.codexEnv(RouteAPIKey), proxy.Env()...), decoys.Env...)
 		out, events, root, err := run(cmd)
-		scope := filesScope(native, sb, tracer, cmd.Env, decoys, proxy, provider.URL)
+		scope := filesScope(native, sb, tracer, cmd.Env, decoys, proxy, provider.URL, rec, cmds)
 		recordFiles(t, b, events, root, scope, decoys)
 		if err != nil {
 			t.Fatalf("codex exec, traced: %v\n%s", err, out)
 		}
+		checkHookRecorder(t, b, rec)
 		if calls.Load() == 0 {
 			t.Fatal("Codex sent its provider no responses request")
 		}

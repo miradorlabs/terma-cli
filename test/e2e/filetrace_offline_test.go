@@ -16,7 +16,7 @@ import (
 // interrupted by another process and resumed, it looks for a file that is not there, renames
 // its state into place, opens a decoy, reads a decoy, lists a decoy folder, connects to the
 // provider, the resolver, a decoy socket and a Unix socket that is not there, and listens on
-// an ephemeral port. terma's hook (103) runs, and reads what is its own.
+// an ephemeral port. The hook recorder (103) runs in a shell, and reads what is its own.
 const straceFixture = `100   1000.000100 execve("/opt/claude/2.1.318/claude", ["claude", "-p", "Say hello."], 0xffff /* 20 vars */) = 0
 100   1000.000200 openat(AT_FDCWD</sb/repo>, "/lib/aarch64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3</lib/aarch64-linux-gnu/libc.so.6>
 100   1000.000300 openat(AT_FDCWD</sb/repo>, "/proc/self/maps", O_RDONLY) = 3</proc/self/maps>
@@ -57,8 +57,9 @@ const straceFixture = `100   1000.000100 execve("/opt/claude/2.1.318/claude", ["
 100   2000.002200 bind(14<TCP:[3006]>, {sa_family=AF_INET, sin_port=htons(7777), sin_addr=inet_addr("0.0.0.0")}, 16) = 0
 100   2000.002300 listen(14<TCP:[0.0.0.0:7777]>, 511) = 0
 100   2000.002400 clone3({flags=CLONE_VM|CLONE_VFORK, exit_signal=SIGCHLD, stack=0xffff, stack_size=0x9000}, 88) = 103
-103   2000.002500 execve("/sb/path/terma", ["/sb/path/terma", "hook", "pre-tool-use"], 0xffff /* 20 vars */) = 0
-103   2000.002600 openat(AT_FDCWD</sb/repo>, "/sb/terma/config.json", O_RDONLY) = 3</sb/terma/config.json>
+103   2000.002500 execve("/bin/sh", ["/bin/sh", "-c", "'/opt/e2e/e2e.test' terma-hook-recorder '/sb/hook-recorder' PreToolUse all"], 0xffff /* 20 vars */) = 0
+103   2000.002550 execve("/opt/e2e/e2e.test", ["/opt/e2e/e2e.test", "terma-hook-recorder", "/sb/hook-recorder", "PreToolUse", "all"], 0xffff /* 20 vars */) = 0
+103   2000.002600 openat(AT_FDCWD</sb/repo>, "/sb/hook-recorder/control.json", O_RDONLY) = 3</sb/hook-recorder/control.json>
 103   2000.002700 openat(AT_FDCWD</sb/repo>, "/sb/home/.aws/credentials", O_RDONLY) = 3</sb/home/.aws/credentials>
 103   2000.002800 +++ exited with 0 +++
 100   3000.000100 unlinkat(AT_FDCWD</sb/repo>, "/sb/claude/session.lock", 0) = 0
@@ -71,9 +72,10 @@ func straceScope() TraceScope {
 	return TraceScope{
 		Platform: "linux/amd64", Tracer: "strace",
 		Replace: map[string]string{"/sb/repo": "<repo>", "/sb/home": "<home>", "/sb/claude": "<claude-config>", "/sb": "<sandbox>",
-			"/sb/terma": "<terma-config>", "/opt/claude/2.1.318": "<install>", "/tmp": "<tmp>"},
+			"/opt/claude/2.1.318": "<install>", "/tmp": "<tmp>"},
 		Self:      []string{"/opt/claude/2.1.318/claude", "/opt/claude/2.1.318", "/sb/path/claude"},
-		Terma:     []string{"/sb/path/terma", "/opt/terma"},
+		Hooks:     []string{"/sb/hook-recorder", "/opt/e2e/e2e.test"},
+		Tools:     []string{"git status --short"},
 		PathDirs:  []string{"/sb/path", "/usr/local/sbin", "/usr/local/bin", "/usr/bin", "/bin"},
 		TurnStart: time.Unix(1500, 0), TurnEnd: time.Unix(2500, 0),
 		Decoys:    []string{"/sb/home/.ssh/id_ed25519", "/sb/home/.aws/credentials", "/sb/home/.netrc", "/sb/home/.npmrc", "/sb/home/.ssh/agent.sock"},
@@ -113,7 +115,7 @@ func TestParseStraceOffline(t *testing.T) {
 			t.Errorf("relative path resolved to %q", ev.Path)
 		}
 	}
-	for kind, want := range map[string]int{"exec": 5, "fork": 4, "rename": 1, "read": 2, "list": 1, "dns": 2, "listen": 2, "connect": 4} {
+	for kind, want := range map[string]int{"exec": 6, "fork": 4, "rename": 1, "read": 2, "list": 1, "dns": 2, "listen": 2, "connect": 4} {
 		if byKind[kind] != want {
 			t.Errorf("%d %s events, want %d (%v)", byKind[kind], kind, want, byKind)
 		}
@@ -147,13 +149,14 @@ func TestFilesOfStraceOffline(t *testing.T) {
 		}
 	}
 	// What is not the build's is dropped and counted: its libraries, /proc, its own folder,
-	// the system's files, terma's hook past its start, the PATH searched.
-	for _, path := range []string{"/lib/aarch64-linux-gnu/libc.so.6", "<terma-config>/config.json", "/etc/passwd", "/proc/self/maps", "/usr/local/bin/rg"} {
+	// the system's files, the hook recorder (its shell, its process, what it reads), the PATH
+	// searched.
+	for _, path := range []string{"/lib/aarch64-linux-gnu/libc.so.6", "<sandbox>/hook-recorder/control.json", "/etc/passwd", "/proc/self/maps", "/usr/local/bin/rg"} {
 		if p.Paths[path] != nil {
 			t.Errorf("%s recorded: %+v", path, p.Paths[path])
 		}
 	}
-	for why, n := range map[string]int{"libraries": 1, "proc": 1, "terma": 2, "system": 1, "path-search": 2} {
+	for why, n := range map[string]int{"libraries": 1, "proc": 1, "hooks": 4, "system": 1, "path-search": 2} {
 		if p.Dropped[why] != n {
 			t.Errorf("dropped[%s] = %d, want %d (%v)", why, p.Dropped[why], n, p.Dropped)
 		}
@@ -161,28 +164,30 @@ func TestFilesOfStraceOffline(t *testing.T) {
 	if !reflect.DeepEqual(p.Lookups, []string{"rg"}) {
 		t.Errorf("lookups = %v, want rg alone (a shell's search for git is the shell's)", p.Lookups)
 	}
-	// The programs it started, by their command lines: the shell's temporary names in
-	// placeholders, the hook by terma's name; the scenario's own command is not one.
+	// The programs it started, by their command lines, the shell's temporary names in
+	// placeholders, each with the commands that started it and whose doing it was: the tool
+	// call's shell (the build started it) and the git it runs. The scenario's own command is
+	// not one, nor the hook recorder or its shell.
 	bashCmd := "/usr/bin/bash -c -l source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh && eval 'git status --short' && pwd -P >| <tmp>/claude-<id>-cwd"
 	for key, w := range map[string]ExecUse{
-		bashCmd:                   {Phases: []string{"turn"}, Count: 1, By: "claude"},
-		"git status --short":      {Phases: []string{"turn"}, Count: 1, By: "bash"},
-		"terma hook pre-tool-use": {Phases: []string{"turn"}, Count: 1, By: "claude"},
+		bashCmd:              {Phases: []string{"turn"}, Count: 1, By: "claude", Parents: []string{}, Role: RoleTool},
+		"git status --short": {Phases: []string{"turn"}, Count: 1, By: "bash", Parents: []string{bashCmd}, Role: RoleTool},
 	} {
 		got := p.Exec[key]
 		if got == nil {
 			t.Errorf("no exec %q in %v", key, mapsKeys(p.Exec))
 			continue
 		}
-		if !reflect.DeepEqual(got.Phases, w.Phases) || got.Count != w.Count || got.By != w.By {
+		if !reflect.DeepEqual(got.Phases, w.Phases) || got.Count != w.Count || got.By != w.By || !reflect.DeepEqual(got.Parents, w.Parents) ||
+			got.Role != w.Role || got.Purpose != "" {
 			t.Errorf("exec %q = %+v, want %+v", key, *got, w)
 		}
 	}
-	if len(p.Exec) != 3 {
+	if len(p.Exec) != 2 {
 		t.Errorf("exec = %v", mapsKeys(p.Exec))
 	}
-	// Decoys: looked at, opened, read, connected to, and one left alone. terma's own read of
-	// one is not the build's.
+	// Decoys: looked at, opened, read, connected to, and one left alone. The hook recorder's
+	// read of one is not the build's.
 	for path, level := range map[string]string{"<home>/.ssh/id_ed25519": "stat", "<home>/.aws/credentials": "opened",
 		"<home>/.netrc": "read", "<home>/.npmrc": "not touched", "<home>/.ssh/agent.sock": "connected"} {
 		if p.Decoys[path] != level {
@@ -540,5 +545,144 @@ func TestFilesOfMkdtempAndSQLiteOffline(t *testing.T) {
 	}
 	if u := files.Paths["<claude-config>/goals_1.sqlite-shm"]; u == nil || slices.Contains(u.Ops, "delete") {
 		t.Errorf("sqlite-shm = %+v, want no delete", u)
+	}
+}
+
+// Each program started says which commands started it, whose doing it was and, for a
+// well-known command, what it is for: the shell snapshot's cat is the snapshot's; the tool
+// call's sandbox, shell and git are the tool's, and the model's git status is not the build
+// reading the repository; a command line the build and the tool both ran is both.
+func TestFilesOfRolesOffline(t *testing.T) {
+	at := time.Unix(1000, 0)
+	snapshot := "SNAPSHOT_FILE=/sb/claude/shell-snapshots/snapshot-zsh-1793845316229-abcdef.sh\n  echo x | cat >> \"$SNAPSHOT_FILE\""
+	events := []TraceEvent{
+		{Pid: 100, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"claude", "-p", "hi"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 101},
+		{Pid: 101, At: at, Kind: "exec", Path: "/bin/zsh", Argv: []string{"/bin/zsh", "-c", "-l", snapshot}},
+		{Pid: 101, At: at, Kind: "fork", Child: 102},
+		{Pid: 102, At: at, Kind: "exec", Path: "/usr/libexec/path_helper", Argv: []string{"/usr/libexec/path_helper", "-s"}},
+		{Pid: 101, At: at, Kind: "fork", Child: 103},
+		{Pid: 103, At: at, Kind: "exec", Path: "/bin/cat", Argv: []string{"cat"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 104},
+		{Pid: 104, At: at, Kind: "exec", Path: "/usr/bin/git", Argv: []string{"git", "-c", "core.fsmonitor=", "status", "--porcelain"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 105},
+		{Pid: 105, At: at, Kind: "exec", Path: "/usr/bin/sandbox-exec", Argv: []string{"/usr/bin/sandbox-exec", "-p", "(version 1)", "--", "/bin/zsh", "-c", "git status --short"}},
+		{Pid: 105, At: at, Kind: "fork", Child: 106},
+		{Pid: 106, At: at, Kind: "exec", Path: "/bin/zsh", Argv: []string{"/bin/zsh", "-c", "git status --short"}},
+		{Pid: 106, At: at, Kind: "exec", Path: "/usr/bin/git", Argv: []string{"git", "status", "--short"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 107},
+		{Pid: 107, At: at, Kind: "exec", Path: "/usr/bin/git", Argv: []string{"git", "status", "--short"}},
+	}
+	scope := straceScope()
+	scope.Root = 100
+	exec := FilesOf(events, scope).Exec
+	snap := ""
+	for k := range exec {
+		if strings.HasPrefix(k, "/bin/zsh -c -l SNAPSHOT_FILE=") {
+			snap = k
+		}
+	}
+	sandbox := "/usr/bin/sandbox-exec -p (version 1) -- /bin/zsh -c git status --short"
+	snapshotPurpose := "the shell snapshot: captures the login shell's environment for the shell tool"
+	for key, w := range map[string]ExecUse{
+		snap:                          {Parents: []string{}, Role: RoleHarness, Purpose: snapshotPurpose},
+		"cat":                         {Parents: []string{snap}, Role: RoleHarness, Purpose: snapshotPurpose},
+		"/usr/libexec/path_helper -s": {Parents: []string{snap}, Role: RoleHarness, Purpose: "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell"},
+		"git -c core.fsmonitor= status --porcelain": {Parents: []string{}, Role: RoleHarness, Purpose: "reads the repository's state for the model's context"},
+		sandbox:                          {Parents: []string{}, Role: RoleTool, Purpose: "runs the tool command in a sandbox (macOS Seatbelt)"},
+		"/bin/zsh -c git status --short": {Parents: []string{sandbox}, Role: RoleTool},
+		"git status --short":             {Parents: []string{ExecBuild, "/bin/zsh -c git status --short"}, Role: RoleBoth, Purpose: "reads the repository's state for the model's context"},
+	} {
+		got := exec[key]
+		if got == nil {
+			t.Errorf("no exec %q in %q", key, mapsKeys(exec))
+			continue
+		}
+		if !reflect.DeepEqual(got.Parents, w.Parents) || got.Role != w.Role || got.Purpose != w.Purpose {
+			t.Errorf("exec %q: parents %q, role %q, purpose %q; want %q, %q, %q", key, got.Parents, got.Role, got.Purpose, w.Parents, w.Role, w.Purpose)
+		}
+	}
+	if len(exec) != 7 {
+		t.Errorf("exec = %q", mapsKeys(exec))
+	}
+	// Published, a command the build alone started has an empty list of parents, never null.
+	data, _ := json.Marshal(exec["git -c core.fsmonitor= status --porcelain"])
+	if !strings.Contains(string(data), `"parents":[]`) || !strings.Contains(string(data), `"role":"harness"`) {
+		t.Errorf("published = %s", data)
+	}
+}
+
+// strace cuts a long argument short, so a sandbox helper's command line may end before the
+// tool command it runs: the commands on the way from the build to a tool call's command are
+// the tool's all the same, and a command beside them is still the build's.
+func TestFilesOfToolChainOffline(t *testing.T) {
+	at := time.Unix(1000, 0)
+	cut := "{\"type\":\"workspace-write\"}\n…"
+	events := []TraceEvent{
+		{Pid: 100, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"claude", "-p", "hi"}},
+		{Pid: 100, At: at, Kind: "fork", Child: 101},
+		{Pid: 101, At: at, Kind: "exec", Path: "/proc/self/exe", Argv: []string{"/proc/self/exe", "--codex-run-as-process-setup", "3", "4", cut}},
+		{Pid: 101, At: at, Kind: "exec", Path: "/opt/claude/2.1.318/claude", Argv: []string{"codex-linux-sandbox", "--sandbox-policy", cut}},
+		{Pid: 101, At: at, Kind: "fork", Child: 102},
+		{Pid: 102, At: at, Kind: "exec", Path: "/usr/bin/bwrap", Argv: []string{"bwrap", "--new-session", "--", cut}},
+		{Pid: 102, At: at, Kind: "exec", Path: "/bin/bash", Argv: []string{"/bin/bash", "-c", "__CODEX_SNAPSHOT_OVERRIDE_0=x\n…"}},
+		{Pid: 102, At: at, Kind: "fork", Child: 103},
+		{Pid: 103, At: at, Kind: "exec", Path: "/bin/bash", Argv: []string{"/bin/bash", "-c", "git status --short"}},
+		{Pid: 101, At: at, Kind: "fork", Child: 105},
+		{Pid: 105, At: at, Kind: "exec", Path: "/usr/bin/bwrap", Argv: []string{"bwrap", "--tmpfs", "/", "--", cut}},
+		{Pid: 100, At: at, Kind: "fork", Child: 104},
+		{Pid: 104, At: at, Kind: "exec", Path: "/usr/bin/getconf", Argv: []string{"getconf", "LONG_BIT"}},
+	}
+	scope := straceScope()
+	scope.Root = 100
+	exec := FilesOf(events, scope).Exec
+	for key, e := range exec {
+		want := RoleTool
+		if key == "getconf LONG_BIT" {
+			want = RoleHarness
+		}
+		if e.Role != want {
+			t.Errorf("exec %q: role %q, want %q", key, e.Role, want)
+		}
+	}
+	if len(exec) != 7 {
+		t.Errorf("exec = %q", mapsKeys(exec))
+	}
+	if e := exec["bwrap --new-session -- "+cut]; e == nil || e.Purpose != "runs the tool command in a sandbox (bubblewrap)" || len(e.Parents) != 1 ||
+		!strings.HasPrefix(e.Parents[0], "codex-linux-sandbox") {
+		t.Errorf("bwrap = %+v (%q)", e, mapsKeys(exec))
+	}
+}
+
+// Every rule of the purpose table matches what it says it does, and a tool's command takes
+// only the rules for tools.
+func TestExecPurposesOffline(t *testing.T) {
+	for _, c := range []struct {
+		argv    []string
+		tool    bool
+		purpose string
+	}{
+		{[]string{"/bin/zsh", "-lc", "if [[ -n \"${ZDOTDIR-}\" ]]; then\nfi\nprint '# Snapshot file'"}, false, "the shell snapshot"},
+		{[]string{"/bin/bash", "-c", "set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\""}, false, "checks that a new shell snapshot loads"},
+		{[]string{"/bin/zsh", "-c", "env"}, false, "the spawn-env probe"},
+		{[]string{"security", "find-generic-password", "-a", "unknown", "-w", "-s", "Claude Code-<hash>"}, false, "macOS Keychain"},
+		{[]string{"ps", "-o", "lstart=", "-p", "<n>"}, false, "start time"},
+		{[]string{"sh", "-c", "uname -s\nuname -r\nfor c in npm yarn pnpm; do command -v \"$c\"; done"}, false, "package managers"},
+		{[]string{"/usr/bin/git", "-c", "core.alternateRefsCommand=f() { git for-each-ref; }; f", "remote", "get-url", "origin"}, false, "repository's state"},
+		{[]string{"git", "-c", "safe.bareRepository=explicit", "rev-parse", "HEAD"}, false, "repository's state"},
+		{[]string{"git", "-C", "<repo>", "ls-files", "--error-unmatch", "--", ":(icase).claude/settings.local.json"}, false, "local settings file"},
+		{[]string{"git", "config", "user.name"}, false, "git identity"},
+		{[]string{"rg", "--no-config", "--files", "--hidden", "<repo>"}, false, "lists the repository's files"},
+		{[]string{"bwrap", "--new-session", "--", "/bin/bash", "-c", "ls"}, true, "sandbox (bubblewrap)"},
+		{[]string{"codex-linux-sandbox", "--sandbox-policy-cwd", "<repo>"}, true, "Codex's Linux sandbox helper"},
+		{[]string{"id", "-u"}, true, "/etc/profile"},
+		{[]string{"git", "status", "--short"}, true, ""},
+		{[]string{"rg", "--files", "<repo>"}, true, ""},
+		{[]string{"cat"}, false, ""},
+	} {
+		got, _ := execPurpose(c.argv, c.tool)
+		if c.purpose == "" && got != "" || !strings.Contains(got, c.purpose) {
+			t.Errorf("execPurpose(%q, tool %v) = %q, want %q", c.argv, c.tool, got, c.purpose)
+		}
 	}
 }
