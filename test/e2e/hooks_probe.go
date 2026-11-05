@@ -11,23 +11,28 @@ import (
 	"io"
 	"maps"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // The hooks probe: every hook event a harness build knows, read from the build itself, and
 // what it hands a hook when one fires. The probe registers a recording hook for every event
 // the build knows (the test binary itself, started as one: RunHookRecorder), in place of
-// terma's, and runs turns that make as many of them fire as it cheaply can. The recorder
-// saves each run's event, stdin, arguments, working directory, environment and timing; the
-// probe records, per event, whether it fired, its payload's key paths and their kinds, the
-// environment variables the harness set for it, the directory it ran in and whether it takes
-// a matcher. A second pass has the recorder answer the main control points (exit 2 with a
-// message, a JSON decision, context to add) and records what the build did with each.
+// terma's, and runs what makes each of them fire. The recorder saves each run's event, stdin,
+// arguments, working directory, environment and timing; the probe records, per event, whether
+// it fired, its payload's key paths and their kinds, one payload whole with its values, the
+// environment variables the harness set for it and their values, the directory it ran in and
+// whether it takes a matcher. What it publishes of values is scrubbed (hookScrubber): no
+// secret, PATH, path or name of the machine's. A second pass has the recorder answer the main
+// control points (exit 2 with a message, a JSON decision, context to add) and records what the
+// build did with each.
 //
 // Whether an event takes a matcher is measured, not read: each event has two recording hooks,
 // one matching everything and one whose matcher matches nothing. An event that runs the
@@ -77,11 +82,98 @@ type HookControl struct {
 // argument hookRecorderArg, then the recorder's folder, the event and the variant): it saves
 // the run, answers as the folder's control.json says, and exits. It returns where the binary
 // was started as anything else.
+//
+// Started with hookMCPArg instead, it is the probe's MCP server (serveElicitingMCP).
 func RunHookRecorder() {
+	if len(os.Args) >= 2 && os.Args[1] == hookMCPArg {
+		os.Exit(serveElicitingMCP(os.Stdin, os.Stdout))
+	}
 	if len(os.Args) < 5 || os.Args[1] != hookRecorderArg {
 		return
 	}
 	os.Exit(recordHook(os.Args[2], os.Args[3], os.Args[4], os.Args[5:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// hookMCPArg is the first argument that starts the test binary as the hooks probe's MCP server.
+const hookMCPArg = "terma-hook-mcp"
+
+// hookMCPTool is the probe's MCP server's one tool, which asks the user a question.
+const hookMCPTool = "ask"
+
+// hookMCPElicitation is the id of the question the probe's MCP server asks.
+const hookMCPElicitation = "terma-elicit"
+
+// serveElicitingMCP is an MCP server on stdio (newline-delimited JSON-RPC) whose one tool asks
+// the user a question before it answers: an elicitation/create request to the client, the tool's
+// result saying how it was answered. It returns the status to exit with when its input closes.
+func serveElicitingMCP(in io.Reader, out io.Writer) int {
+	type message struct {
+		ID     json.RawMessage `json:"id,omitempty"`
+		Method string          `json:"method,omitempty"`
+		Params json.RawMessage `json:"params,omitempty"`
+		Result json.RawMessage `json:"result,omitempty"`
+		Error  json.RawMessage `json:"error,omitempty"`
+	}
+	enc := json.NewEncoder(out)
+	send := func(v map[string]any) {
+		v["jsonrpc"] = "2.0"
+		_ = enc.Encode(v)
+	}
+	// The tool call waiting for the answer to its question, by its request id.
+	var calling json.RawMessage
+	asked := 0
+	dec := json.NewDecoder(in)
+	for {
+		var m message
+		if err := dec.Decode(&m); err != nil {
+			return 0
+		}
+		switch {
+		case m.Method == "initialize":
+			var p struct {
+				ProtocolVersion string `json:"protocolVersion"`
+			}
+			_ = json.Unmarshal(m.Params, &p)
+			if p.ProtocolVersion == "" {
+				p.ProtocolVersion = "2025-06-18"
+			}
+			send(map[string]any{"id": m.ID, "result": map[string]any{"protocolVersion": p.ProtocolVersion,
+				"capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]any{"name": "terma-hooks-probe", "version": "1.0.0"}}})
+		case m.Method == "tools/list":
+			send(map[string]any{"id": m.ID, "result": map[string]any{"tools": []any{map[string]any{"name": hookMCPTool,
+				"description": "Asks the user one question and returns the answer.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{}}}}}})
+		case m.Method == "tools/call":
+			calling = m.ID
+			asked++
+			send(map[string]any{"id": fmt.Sprintf("%s-%d", hookMCPElicitation, asked), "method": "elicitation/create", "params": map[string]any{
+				"message": "TERMA hooks probe: which answer?",
+				"requestedSchema": map[string]any{"type": "object", "properties": map[string]any{
+					"answer": map[string]any{"type": "string", "title": "Answer", "description": "Any answer"}}, "required": []string{"answer"}}}})
+		case m.Method == "" && strings.Contains(string(m.ID), hookMCPElicitation) && calling != nil:
+			// The client's answer to the question: the tool's result says what it was.
+			var r struct {
+				Action string `json:"action"`
+			}
+			_ = json.Unmarshal(m.Result, &r)
+			if r.Action == "" {
+				r.Action = "error"
+			}
+			send(map[string]any{"id": calling, "result": map[string]any{"content": []any{map[string]any{"type": "text",
+				"text": "TERMA_ELICITATION_" + strings.ToUpper(r.Action)}}}})
+			calling = nil
+		case m.Method == "ping":
+			send(map[string]any{"id": m.ID, "result": map[string]any{}})
+		case m.Method != "" && len(m.ID) > 0:
+			send(map[string]any{"id": m.ID, "error": map[string]any{"code": -32601, "message": "method not found"}})
+		}
+	}
+}
+
+// HookMCPCommand is the command line of the hooks probe's MCP server, as an MCP configuration's
+// command and args: the test binary, started as the server.
+func HookMCPCommand() (string, []string, error) {
+	exe, err := os.Executable()
+	return exe, []string{hookMCPArg}, err
 }
 
 // recordHook saves one run of the recording hook in dir and answers it; it returns the status
@@ -209,6 +301,16 @@ type HookEventShape struct {
 	// Control is what the build did with the hook's answers, by control point ("exit_2",
 	// "json_decision", "additional_context"), where a control pass tried them.
 	Control map[string]string `json:"control,omitempty"`
+	// Example is one of the event's payloads whole, with its values: the one with the most key
+	// paths, the first of those. A secret's value is <redacted>, a path of the machine's outside
+	// the sandbox <machine-path>, and a text longer than hookTextLimit is cut; normalization
+	// then makes the sandbox's paths, ids and times placeholders. Text where the hook's standard
+	// input was not JSON, and absent where it was empty.
+	Example json.RawMessage `json:"example,omitempty"`
+	// EnvValues are the values of Env as the event's first run had them, scrubbed as Example's
+	// are: a variable whose name says it holds a secret <redacted>, a list of folders (PATH)
+	// <path>.
+	EnvValues map[string]string `json:"env_values,omitempty"`
 }
 
 // hookPayloadDepth is how deep a payload's key paths go.
@@ -221,6 +323,12 @@ var hookShellVariables = map[string]bool{"PWD": true, "OLDPWD": true, "SHLVL": t
 // HooksProbeOf shapes calls: started is the environment the harness was started with, and root
 // the sandbox folder a path value must be under to be kept.
 func HooksProbeOf(supported []string, source string, calls []HookCall, started []string, root string) HooksProbe {
+	return hooksProbeOf(supported, source, calls, started, newHookScrubber(root, started, calls, machineOf()))
+}
+
+// hooksProbeOf is HooksProbeOf with the scrubber its examples and values go through.
+func hooksProbeOf(supported []string, source string, calls []HookCall, started []string, scrub *hookScrubber) HooksProbe {
+	root := scrub.root
 	base := map[string]string{}
 	for _, kv := range started {
 		k, v, _ := strings.Cut(kv, "=")
@@ -232,10 +340,14 @@ func HooksProbeOf(supported []string, source string, calls []HookCall, started [
 	}
 	ignored := map[string]bool{}
 	type acc struct {
-		keys  map[string]map[string]bool
-		env   map[string]bool
-		paths map[string]string
-		stdin map[string]bool
+		keys   map[string]map[string]bool
+		env    map[string]bool
+		paths  map[string]string
+		values map[string]string
+		stdin  map[string]bool
+		// example is the payload with the most key paths so far, and how many it has.
+		example json.RawMessage
+		width   int
 	}
 	accs := map[string]*acc{}
 	for _, c := range calls {
@@ -248,7 +360,8 @@ func HooksProbeOf(supported []string, source string, calls []HookCall, started [
 		if s == nil {
 			s = &HookEventShape{Keys: []string{}, Kinds: map[string]string{}, Env: []string{}}
 			p.Events[c.Event] = s
-			a = &acc{keys: map[string]map[string]bool{}, env: map[string]bool{}, paths: map[string]string{}, stdin: map[string]bool{}}
+			a = &acc{keys: map[string]map[string]bool{}, env: map[string]bool{}, paths: map[string]string{}, values: map[string]string{},
+				stdin: map[string]bool{}, width: -1}
 			accs[c.Event] = a
 		}
 		s.Fired = true
@@ -261,8 +374,16 @@ func HooksProbeOf(supported []string, source string, calls []HookCall, started [
 		case json.Unmarshal([]byte(c.Stdin), &payload) == nil:
 			a.stdin["json"] = true
 			payloadKinds(payload, "", 0, a.keys)
+			own := map[string]map[string]bool{}
+			payloadKinds(payload, "", 0, own)
+			if len(own) > a.width {
+				a.example, a.width = marshalExample(scrub.value("", payload)), len(own)
+			}
 		default:
 			a.stdin["text"] = true
+			if a.width < 0 {
+				a.example, a.width = marshalExample(scrub.text(c.Stdin)), 0
+			}
 		}
 		for k, v := range c.Env {
 			if hookShellVariables[k] || strings.HasPrefix(k, "__CF") {
@@ -272,6 +393,9 @@ func HooksProbeOf(supported []string, source string, calls []HookCall, started [
 				continue
 			}
 			a.env[k] = true
+			if _, seen := a.values[k]; !seen {
+				a.values[k] = scrub.env(k, v)
+			}
 			// One path, not a list of them (a PATH the harness put its own folder first in), as
 			// the event's first run had it.
 			_, seen := a.paths[k]
@@ -297,8 +421,234 @@ func HooksProbeOf(supported []string, source string, calls []HookCall, started [
 		s.Stdin = strings.Join(slices.Sorted(maps.Keys(a.stdin)), "|")
 		takes := !ignored[event]
 		s.Matcher = &takes
+		s.Example = a.example
+		if len(a.values) > 0 {
+			s.EnvValues = a.values
+		}
 	}
 	return p
+}
+
+// marshalExample is v as JSON, its <, > and & as they are: placeholders read as written.
+func marshalExample(v any) json.RawMessage {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if enc.Encode(v) != nil {
+		return nil
+	}
+	return json.RawMessage(bytes.TrimRight(buf.Bytes(), "\n"))
+}
+
+// hookTextLimit is how long a text in a published example or variable may be: one longer is
+// cut there, with a marker saying how much was cut.
+const hookTextLimit = 2000
+
+// machine is what names the machine a probe runs on, which nothing published may hold: the
+// home folder the suite runs from, its user's name and the machine's name.
+type machine struct {
+	home, user, host string
+}
+
+// machineOf is the machine this process runs on.
+func machineOf() machine {
+	var m machine
+	m.home, _ = os.UserHomeDir()
+	if u, err := user.Current(); err == nil {
+		m.user = u.Username
+	}
+	if m.user == "" {
+		m.user = os.Getenv("USER")
+	}
+	m.host, _ = os.Hostname()
+	return m
+}
+
+// hookScrubber makes what a hook was handed fit to publish: a secret's value <redacted>, the
+// PATH <path>, a path of the machine's outside the sandbox <machine-path>, the machine's and
+// its user's names placeholders, and a long text cut. The sandbox's own paths stay, for
+// normalization to make placeholders of.
+type hookScrubber struct {
+	root    string
+	machine machine
+	// path is the PATH the harness was started with; secrets are the values of every variable,
+	// the harness's or a hook's, whose name says it holds a secret.
+	path    string
+	secrets []string
+}
+
+// newHookScrubber is the scrubber of a probe whose sandbox is root, whose harness was started
+// with started and whose hooks were handed calls, on m.
+func newHookScrubber(root string, started []string, calls []HookCall, m machine) *hookScrubber {
+	s := &hookScrubber{root: root, machine: m}
+	seen := map[string]bool{}
+	secret := func(k, v string) {
+		if secretName(k) && len(v) >= 6 && !seen[v] {
+			seen[v] = true
+			s.secrets = append(s.secrets, v)
+		}
+	}
+	for _, kv := range started {
+		k, v, _ := strings.Cut(kv, "=")
+		if k == "PATH" {
+			s.path = v
+		}
+		secret(k, v)
+	}
+	for _, c := range calls {
+		for k, v := range c.Env {
+			secret(k, v)
+		}
+	}
+	// Longest first, so a secret that holds another is replaced whole.
+	sort.Slice(s.secrets, func(i, j int) bool { return len(s.secrets[i]) > len(s.secrets[j]) })
+	return s
+}
+
+var (
+	// secretWords are the words of a name that say its value is a secret.
+	secretWords = map[string]bool{"token": true, "secret": true, "secrets": true, "password": true, "passwd": true, "key": true,
+		"apikey": true, "auth": true, "authorization": true, "credential": true, "credentials": true, "cookie": true, "cookies": true,
+		"signature": true, "bearer": true}
+	// secretValueRE are values that are credentials whatever they are called.
+	secretValueRE = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{16,}|(?i:\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bxox[abposr]-[A-Za-z0-9-]{10,}|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+|\bAKIA[0-9A-Z]{16}\b`)
+	// absPathRE is an absolute path in a text, up to the first character a path rarely holds.
+	absPathRE = regexp.MustCompile(`(?:^|[^\w.~-])(/[^\s"'<>:;,|()\[\]{}` + "`" + `]+)`)
+)
+
+// secretName reports whether a variable or a payload's key named name holds a secret by its
+// name: one of its words is token, secret, key, password and the like.
+func secretName(name string) bool {
+	return slices.ContainsFunc(nameWords(name), func(w string) bool { return secretWords[w] })
+}
+
+// nameWords are the words of a name, lower case: snake, kebab, dotted and camel case split.
+func nameWords(name string) []string {
+	var words []string
+	var cur []rune
+	flush := func() {
+		if len(cur) > 0 {
+			words = append(words, strings.ToLower(string(cur)))
+			cur = cur[:0]
+		}
+	}
+	rs := []rune(name)
+	for i, r := range rs {
+		switch {
+		case !unicode.IsLetter(r) && !unicode.IsDigit(r):
+			flush()
+			continue
+		case unicode.IsUpper(r) && len(cur) > 0:
+			// A capital starts a word after a lower-case letter (apiKey), or ends a run of
+			// capitals before a lower-case letter (HTTPServer).
+			prev := cur[len(cur)-1]
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) || i+1 < len(rs) && unicode.IsLower(rs[i+1]) && unicode.IsUpper(prev) {
+				flush()
+			}
+		}
+		cur = append(cur, r)
+	}
+	flush()
+	return words
+}
+
+// machineDirs are the machine's own folders: its users' homes, and where package managers
+// install programs. A path under one is no evidence of the build's, and says what the machine
+// has and who uses it.
+var machineDirs = []string{"/Users/", "/home/", "/root/", "/Volumes/", "/nix/", "/snap/", "/opt/homebrew/", "/usr/local/Cellar/",
+	"/usr/local/lib/node_modules/", "/usr/local/opt/", "/usr/local/bin/", "/home/linuxbrew/", "/opt/local/"}
+
+// value is v, the value of key, scrubbed.
+func (s *hookScrubber) value(key string, v any) any {
+	switch x := v.(type) {
+	case string:
+		if key != "" && secretName(key) && x != "" {
+			return "<redacted>"
+		}
+		return s.text(x)
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			out[i] = s.value(key, item)
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, item := range x {
+			out[k] = s.value(k, item)
+		}
+		return out
+	}
+	return v
+}
+
+// env is the value v of the variable named k, scrubbed.
+func (s *hookScrubber) env(k, v string) string {
+	switch {
+	case v == "":
+		return v
+	case secretName(k):
+		return "<redacted>"
+	case k == "PATH" || pathList(v):
+		return "<path>"
+	}
+	return s.text(v)
+}
+
+// pathList reports whether v is a list of folders: two or more absolute paths joined with the
+// list separator.
+func pathList(v string) bool {
+	parts := strings.Split(v, string(filepath.ListSeparator))
+	if len(parts) < 2 {
+		return false
+	}
+	for _, p := range parts {
+		if !strings.HasPrefix(p, "/") {
+			return false
+		}
+	}
+	return true
+}
+
+// text is t scrubbed: secrets, the PATH, the machine's paths and names, then cut.
+func (s *hookScrubber) text(t string) string {
+	for _, sec := range s.secrets {
+		t = strings.ReplaceAll(t, sec, "<redacted>")
+	}
+	t = secretValueRE.ReplaceAllString(t, "<redacted>")
+	if len(s.path) > 1 {
+		t = strings.ReplaceAll(t, s.path, "<path>")
+	}
+	t = absPathRE.ReplaceAllStringFunc(t, func(m string) string {
+		at := strings.IndexByte(m, '/')
+		p := m[at:]
+		if s.root != "" && (p == s.root || strings.HasPrefix(p, s.root+"/")) {
+			return m
+		}
+		// macOS spells a temporary folder both ways; normalization makes either a placeholder.
+		if strings.HasPrefix(p, "/private/var/") || strings.HasPrefix(p, "/var/") || strings.HasPrefix(p, "/tmp/") || strings.HasPrefix(p, "/private/tmp/") {
+			return m
+		}
+		mine := s.machine.home != "" && len(s.machine.home) > 1 && (p == s.machine.home || strings.HasPrefix(p, s.machine.home+"/"))
+		for _, d := range machineDirs {
+			mine = mine || strings.HasPrefix(p, d)
+		}
+		if !mine {
+			return m
+		}
+		return m[:at] + "<machine-path>"
+	})
+	for _, name := range []struct{ lit, with string }{{s.machine.host, "<host>"}, {s.machine.user, "<user>"}} {
+		// A short name (a user "dev") would match words that are not it.
+		if len(name.lit) >= 4 {
+			t = strings.ReplaceAll(t, name.lit, name.with)
+		}
+	}
+	if n := utf8.RuneCountInString(t); n > hookTextLimit {
+		r := []rune(t)
+		t = string(r[:hookTextLimit]) + fmt.Sprintf("…<cut: %d more characters>", n-hookTextLimit)
+	}
+	return t
 }
 
 // payloadKinds adds the key paths of v under prefix, depth keys deep so far, with each one's

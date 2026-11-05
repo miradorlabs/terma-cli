@@ -1,6 +1,8 @@
 package refdiff
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -16,8 +18,12 @@ func TestHookChanges(t *testing.T) {
 		for _, k := range keys {
 			kinds[k.(string)] = "text"
 		}
+		// The values an event was handed differ from run to run: never a change.
+		example := map[string]any{"hook_event_name": "PreToolUse", "prompt_id": fmt.Sprint(keys...)}
+		values := map[string]any{"CLAUDE_PROJECT_DIR": "<repo>", "CLAUDE_EFFORT": fmt.Sprint(env...)}
 		return map[string]any{"fired": true, "count": float64(1), "keys": keys, "kinds": kinds, "env": env,
-			"env_paths": map[string]any{"CLAUDE_PROJECT_DIR": "<repo>"}, "matcher": true, "control": control}
+			"env_paths": map[string]any{"CLAUDE_PROJECT_DIR": "<repo>"}, "matcher": true, "control": control,
+			"example": example, "env_values": values}
 	}
 	a := snap("1.0.0", map[string]any{
 		"supported": []any{"Notification", "PreToolUse", "Stop"}, "source": "binary",
@@ -62,6 +68,11 @@ func TestHookChanges(t *testing.T) {
 	}
 	// A field's kind and why an event did not fire say again what another change says.
 	// Whether an event fired is the run's: what is supported says what the build does.
+	for _, c := range d.Changes {
+		if strings.Contains(c.ID, ".example") || strings.Contains(c.ID, ".env_values") {
+			t.Errorf("an example's value read as a change: %s", c.ID)
+		}
+	}
 	for _, id := range []string{"hooks.events.PreToolUse.kinds.tool_input.command", "hooks.events.PreToolUse.kinds.tool_name", "hooks.not_fired.PreCompact",
 		"hooks.events.Notification"} {
 		if _, ok := byID[id]; ok {
