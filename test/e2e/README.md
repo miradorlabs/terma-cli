@@ -357,7 +357,9 @@ runs the scenarios on the image's builds, or on `MACHINE_CLAUDE_VERSIONS` /
 Full Disk Access: the suite runs exactly `sudo -n /usr/bin/eslogger …` (a sudoers rule for it and
 `/usr/sbin/lsof` alone), directly, or through `TERMA_E2E_ESLOGGER_VIA` (`ssh localhost`, where
 Remote Login grants its sessions Full Disk Access and the terminal has none), and samples
-sockets with lsof. Where neither tracer can run, the scenarios skip and say why.
+sockets with lsof. GitHub's hosted macOS runner lets eslogger run directly, so the macOS jobs
+trace there as they run everything else. Where neither tracer can run, the scenarios skip and
+say why.
 `TestFileTracerCheck` traces a shell script, to check a machine's tracer, and that no eslogger is
 left running. `TERMA_E2E_TRACE_DIR` keeps each raw trace (it holds the decoys' fake contents and
 the build's environment: never publish it).

@@ -37,6 +37,11 @@ func (n night) deriveFilesystem(s *Snapshot, id buildID) {
 		if json.Unmarshal(raw, &probe) != nil {
 			continue
 		}
+		// A trace its tracer lost events of (Endpoint Security drops what a slow client has not
+		// read) is no evidence of what the build did not do: the section keeps the last one.
+		if dropped, _ := probe["dropped"].(map[string]any); dropped["lost"] != nil {
+			continue
+		}
 		platform, _ := probe["platform"].(string)
 		if platform == "" {
 			platform = p.Platform

@@ -162,7 +162,12 @@ type esTrace struct {
 	// early are lines before the root was known; lines the tree's.
 	early, lines [][]byte
 	members      map[int]bool
-	exited       bool
+	// lastSeq is the last message's number, lost how many Endpoint Security dropped.
+	lastSeq, lost int64
+	// rootExited is whether the harness's own exit has arrived: what eslogger and the pipe
+	// still held of the run has, too.
+	rootExited bool
+	exited     bool
 }
 
 // start starts eslogger logging events.
@@ -221,11 +226,13 @@ func (tr *esTrace) read() {
 
 // esHead is what a line says of its process, for following the tree.
 type esHead struct {
-	Process esProcess `json:"process"`
-	Event   struct {
+	GlobalSeq int64     `json:"global_seq_num"`
+	Process   esProcess `json:"process"`
+	Event     struct {
 		Fork *struct {
 			Child esProcess `json:"child"`
 		} `json:"fork"`
+		Exit json.RawMessage `json:"exit"`
 	} `json:"event"`
 }
 
@@ -249,12 +256,23 @@ func (tr *esTrace) keep(root int, line []byte) {
 	if json.Unmarshal(line, &h) != nil {
 		return
 	}
+	// Endpoint Security numbers every message it sends a client: a gap is messages it dropped,
+	// a client too slow for the machine's events.
+	if tr.lastSeq > 0 && h.GlobalSeq > tr.lastSeq+1 {
+		tr.lost += h.GlobalSeq - tr.lastSeq - 1
+	}
+	if h.GlobalSeq > tr.lastSeq {
+		tr.lastSeq = h.GlobalSeq
+	}
 	pid := h.Process.AuditToken.Pid
 	if !tr.members[pid] {
 		if pid != root && !tr.members[h.Process.Ppid] && !tr.members[h.Process.OriginalPpid] {
 			return
 		}
 		tr.members[pid] = true
+	}
+	if h.Event.Exit != nil && pid == root {
+		tr.rootExited = true
 	}
 	if h.Event.Fork != nil {
 		tr.members[h.Event.Fork.Child.AuditToken.Pid] = true
@@ -320,10 +338,20 @@ func (tr *esTrace) stop() error {
 	return nil
 }
 
-// leftovers are eslogger processes still running, as pgrep lists them.
+// esloggerLeftovers are the eslogger processes still running, as pgrep lists them: eslogger,
+// or the sudo or ssh that started it, by what its command starts with; a shell whose command
+// line only names it is none.
 func esloggerLeftovers() string {
 	out, _ := exec.Command("pgrep", "-fl", "/usr/bin/eslogger").Output()
-	return strings.TrimSpace(string(out))
+	var left []string
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		_, command, _ := strings.Cut(line, " ")
+		if strings.HasPrefix(command, "/usr/bin/eslogger") || strings.HasPrefix(command, "sudo -n /usr/bin/eslogger") ||
+			strings.HasPrefix(command, "ssh ") && strings.Contains(command, "/usr/bin/eslogger") {
+			left = append(left, line)
+		}
+	}
+	return strings.Join(left, "\n")
 }
 
 // runESLogger runs cmd traced by eslogger and sampled by lsof, and returns what it printed and
@@ -361,6 +389,18 @@ func runESLogger(t *testing.T, l *esLauncher, cmd *exec.Cmd, settle time.Duratio
 	sampling, stopSampling := context.WithCancel(context.Background())
 	go func() { sampled <- sampleSockets(sampling, tr.pids) }()
 	err = cmd.Wait()
+	// eslogger's output and the pipe (an SSH session's) hold events a while: the trace waits for
+	// the build's own exit to come through before it settles. One that never does is short.
+	short := true
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		tr.mu.Lock()
+		exited := tr.rootExited
+		tr.mu.Unlock()
+		if exited {
+			short = false
+			break
+		}
+	}
 	time.Sleep(settle)
 	stopSampling()
 	socks := <-sampled
@@ -372,8 +412,11 @@ func runESLogger(t *testing.T, l *esLauncher, cmd *exec.Cmd, settle time.Duratio
 		t.Logf("eslogger processes still running after the trace: %s", left)
 	}
 	tr.mu.Lock()
-	lines := tr.lines
+	lines, lost := tr.lines, tr.lost
 	tr.mu.Unlock()
+	if lost > 0 {
+		t.Logf("Endpoint Security dropped %d of the machine's events while eslogger traced: the trace may lack the build's", lost)
+	}
 	if keep := os.Getenv("TERMA_E2E_TRACE_DIR"); keep != "" {
 		_ = os.MkdirAll(keep, 0o755)
 		name := strings.NewReplacer("/", "-", " ", "-").Replace(t.Name()) + ".eslogger.jsonl"
@@ -381,6 +424,13 @@ func runESLogger(t *testing.T, l *esLauncher, cmd *exec.Cmd, settle time.Duratio
 	}
 	events = ParseESLog(lines)
 	events = append(events, socks...)
+	if short {
+		t.Logf("eslogger never logged the build's own exit: the trace is short of the run's end")
+		lost++
+	}
+	if lost > 0 {
+		events = append(events, TraceEvent{Kind: "lost", Count: int(lost)})
+	}
 	slices.SortStableFunc(events, func(a, b TraceEvent) int { return a.At.Compare(b.At) })
 	return buf.Bytes(), events, root, err
 }

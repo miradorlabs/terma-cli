@@ -83,7 +83,9 @@ jobs:
           cd test/e2e
           go test -c -o bin/e2e.test .
       # No account: every model request goes to the scenarios' fixture providers. A build's
-      # scenario that fails still leaves its profile, partial, and refgen says so.
+      # scenario that fails still leaves its profile, partial, and refgen says so. The tests
+      # include Claude Code's and Codex's files profiles, traced with eslogger, which the hosted
+      # runner allows as root.
       - name: Capture the new builds
         working-directory: test/e2e
         env:

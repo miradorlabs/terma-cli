@@ -51,6 +51,9 @@ type TraceEvent struct {
 	// Name is what a macOS event names: an XPC service, a TCC service, a launch item's
 	// executable, a task port's process.
 	Name string
+	// Count is how many events the tracer lost (Kind "lost"): Endpoint Security drops what a
+	// client too slow for the machine's events has not read.
+	Count int
 }
 
 // TraceSocket is the socket a call used and the address it named.
@@ -234,6 +237,10 @@ func FilesOf(events []TraceEvent, scope TraceScope) *FilesProbe {
 	lookups := map[string]bool{}
 	dns := map[string]bool{}
 	for _, ev := range events {
+		if ev.Kind == "lost" {
+			out.Dropped["lost"] += ev.Count // not the build's to drop: the trace is short of them
+			continue
+		}
 		if !tree.in(ev.Pid) {
 			continue
 		}
@@ -745,7 +752,7 @@ func (s TraceScope) normalizeText(text string) string {
 	// configuration folder).
 	text = uuidRE.ReplaceAllString(text, "<uuid>")
 	return argHexRE.ReplaceAllStringFunc(text, func(tok string) string {
-		if strings.ContainsAny(tok, "0123456789") && strings.ContainsAny(tok, "abcdef") {
+		if strings.ContainsAny(tok, "0123456789") {
 			return "<hash>"
 		}
 		return tok

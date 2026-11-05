@@ -431,7 +431,7 @@ workspace-write`). terma's hooks are installed as a developer's are.
 | `sockets.connections` | where it connected: the run's own endpoints by name (`<provider>`, `<proxy>`, `<relay>`, `<receiver>`), the resolver as `<resolver>:53`, any other loopback address as `<local>:port`, anything else `<remote>:port` |
 | `sockets.unix` | the Unix sockets it connected to or bound (`ops`), by path or `@abstract` name, with their `role` where the path says it: `decoy ssh-agent`, `decoy docker`, `ssh-agent`, `docker`, `dbus`, `x11`, `wayland`, `nscd`, `syslog`; `missing` where every attempt found none |
 | `sockets.dns` | the names its DNS queries asked for, read from the query's bytes |
-| `macos` | what only Endpoint Security sees: the XPC services it connected to (`com.apple.securityd.xpc`, the Keychain; `com.apple.tccd`), launch items it added (persistence), TCC permissions it changed, and the task ports of processes outside its own tree it took |
+| `macos` | what only Endpoint Security sees: the XPC services it connected to (`com.apple.securityd.xpc`, the Keychain; `com.apple.tccd`), launch items it added (persistence), TCC permissions it changed, and the task ports of processes outside its own tree it took, by the process's name (a program it starts that reads every process's, as `ps` does, is one `<processes>`: never a list of what the machine runs) |
 | `dropped` | how many events were left out, by why (below) |
 | `unobserved` | paths, commands and sockets builds before and after this one have on this platform and its run did not (set by refgen) |
 
@@ -454,7 +454,10 @@ hook payloads it records, the proxy's certificate); `path-search` (looking along
 program, which `lookups` says, and an exec that found nothing there); `helpers` (what a program
 the build started touched outside the run's own places: its own installation, the system's
 files); `sandbox-setup` (bubblewrap building the root of a sandbox before it runs the command in
-it, which its command line in `exec` says).
+it, which its command line in `exec` says). `lost` is not the build's: it counts the events
+Endpoint Security dropped because eslogger did not read them in time. A trace that lost any is
+not published (the section keeps the last whole one): it says nothing of what the build did
+not do.
 
 **Sampling.** On macOS TCP and UDP sockets are sampled with lsof every 250 ms over the build's
 process tree: a socket opened and closed between two samples is missed (a short HTTP request),
