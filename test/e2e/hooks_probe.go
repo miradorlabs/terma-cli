@@ -591,8 +591,16 @@ func (s *hookScrubber) env(k, v string) string {
 		return "<redacted>"
 	case k == "PATH" || pathList(v):
 		return "<path>"
+	case RunPID(k, v):
+		return "<pid>"
 	}
 	return s.text(v)
+}
+
+// RunPID reports whether the variable named k holds a process id the run picked
+// (CLAUDE_PID=82807): its value changes every run, and says nothing of the build.
+func RunPID(k, v string) bool {
+	return (k == "PID" || strings.HasSuffix(k, "_PID")) && v != "" && strings.Trim(v, "0123456789") == ""
 }
 
 // pathList reports whether v is a list of folders: two or more absolute paths joined with the

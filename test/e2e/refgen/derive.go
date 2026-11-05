@@ -615,7 +615,7 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 			s.Model["prices"] = v
 		case "hooks":
 			if m, ok := v.(map[string]any); ok {
-				s.Hooks = m
+				s.Hooks = pidsPlaced(m)
 			}
 		case "hooks-first-turn":
 			// The payloads of the hooks the plain turn ran ({events: …}): the hooks section where
@@ -1151,4 +1151,19 @@ func deferredTools(b map[string]any) []string {
 	}
 	sort.Strings(out)
 	return slices.Compact(out)
+}
+
+// pidsPlaced is a hooks section with the process ids its events' variables held in
+// placeholders (CLAUDE_PID=<pid>): a capture taken before the probe placed them publishes none.
+func pidsPlaced(hooks map[string]any) map[string]any {
+	events, _ := hooks["events"].(map[string]any)
+	for _, ev := range events {
+		vals, _ := ev.(map[string]any)["env_values"].(map[string]any)
+		for k, v := range vals {
+			if str, ok := v.(string); ok && e2e.RunPID(k, str) {
+				vals[k] = "<pid>"
+			}
+		}
+	}
+	return hooks
 }

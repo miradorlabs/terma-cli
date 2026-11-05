@@ -77,3 +77,13 @@ func TestHooksNeedle(t *testing.T) {
 		}
 	}
 }
+
+// A process id a hook's variable held is the run's: <pid>.
+func TestHooksPIDsPlaced(t *testing.T) {
+	h := pidsPlaced(map[string]any{"events": map[string]any{"PreToolUse": map[string]any{
+		"env_values": map[string]any{"CLAUDE_PID": "82807", "CLAUDE_EFFORT": "medium", "PID_FILE": "/x"}}}})
+	vals := h["events"].(map[string]any)["PreToolUse"].(map[string]any)["env_values"].(map[string]any)
+	if vals["CLAUDE_PID"] != "<pid>" || vals["CLAUDE_EFFORT"] != "medium" || vals["PID_FILE"] != "/x" {
+		t.Errorf("env_values = %v", vals)
+	}
+}
