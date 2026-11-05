@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T10:06:58.796591Z",
+  "generated_at": "2026-11-05T11:12:22.390019Z",
   "harnesses": [
     {
       "id": "claude",
@@ -96,6 +96,19 @@
       }
     },
     {
+      "id": "copilot",
+      "name": "GitHub Copilot CLI",
+      "vendor": "GitHub",
+      "homepage": "https://github.com/github/copilot-cli",
+      "source": null,
+      "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+      "latest": "1.0.105",
+      "support": "untested",
+      "versions_tracked": 1,
+      "first_tracked": "2026-10-28",
+      "last_change": null
+    },
+    {
       "id": "dsh",
       "name": "DeepSeek Harness",
       "vendor": "DeepSeek",
@@ -113,7 +126,7 @@
       "last_change": {
         "from": "0.2.1-rc.2",
         "to": "0.2.1-rc.5",
-        "at": "2026-11-05T02:11:01.502194Z",
+        "at": "2026-11-05T11:12:22.390019Z",
         "released_at": "2026-10-29T14:15:23.355Z",
         "changes": 0,
         "categories": {}
@@ -137,11 +150,47 @@
       "last_change": {
         "from": "0.66.0",
         "to": "0.67.0",
-        "at": "2026-11-05T06:31:08.621178Z",
+        "at": "2026-11-05T11:12:22.390019Z",
         "released_at": "2026-11-04T20:32:45.08Z",
-        "changes": 0,
-        "categories": {}
+        "changes": 32,
+        "categories": {
+          "telemetry": 32
+        }
       }
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes Agent",
+      "vendor": "Nous Research",
+      "homepage": "https://github.com/NousResearch/hermes-agent",
+      "source": {
+        "repo": "NousResearch/hermes-agent",
+        "url": "https://github.com/NousResearch/hermes-agent",
+        "language": "python"
+      },
+      "changelog": "https://github.com/NousResearch/hermes-agent/releases",
+      "latest": "0.22.7",
+      "support": "untested",
+      "versions_tracked": 1,
+      "first_tracked": "2026-11-05",
+      "last_change": null
+    },
+    {
+      "id": "omp",
+      "name": "oh-my-pi",
+      "vendor": "can1357",
+      "homepage": "https://github.com/can1357/oh-my-pi",
+      "source": {
+        "repo": "can1357/oh-my-pi",
+        "url": "https://github.com/can1357/oh-my-pi",
+        "language": "typescript"
+      },
+      "changelog": "https://github.com/can1357/oh-my-pi/releases",
+      "latest": "18.16.0",
+      "support": "untested",
+      "versions_tracked": 1,
+      "first_tracked": "2026-11-02",
+      "last_change": null
     },
     {
       "id": "opencode",
@@ -161,7 +210,7 @@
       "last_change": {
         "from": "1.19.4",
         "to": "1.19.5",
-        "at": "2026-11-05T02:11:01.502194Z",
+        "at": "2026-11-05T11:12:22.390019Z",
         "released_at": "2026-10-28T06:17:11.1Z",
         "changes": 0,
         "categories": {}
@@ -185,7 +234,7 @@
       "last_change": {
         "from": "1.4.0",
         "to": "1.5.0",
-        "at": "2026-11-05T02:11:01.502194Z",
+        "at": "2026-11-05T11:12:22.390019Z",
         "released_at": "2026-11-02T11:05:09.564Z",
         "changes": 0,
         "categories": {}

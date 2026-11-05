@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "copilot",
+    "name": "GitHub Copilot CLI",
+    "vendor": "GitHub",
+    "homepage": "https://github.com/github/copilot-cli",
+    "source": null,
+    "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "latest": "1.0.105",
+    "support": "untested",
+    "versions_tracked": 1,
+    "first_tracked": "2026-10-28",
+    "last_change": null
+  },
+  "versions": [
+    {
+      "version": "1.0.105",
+      "released_at": "2026-10-28T00:44:26.688Z",
+      "captured_at": "2026-11-05T11:12:22.390019Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": "valid"
+    }
+  ]
+}

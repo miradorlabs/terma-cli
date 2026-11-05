@@ -6,5 +6,3295 @@
     "newest": "1.5.0",
     "builds": 4
   },
-  "items": {}
+  "items": {
+    "cli.commands.pi auth": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi config": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi config.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi config.options.--local": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi config.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi install": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi install.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi install.options.--local": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi install.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi list": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi list.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi list.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp Options": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp add": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp list": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp login": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp logout": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp remove": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--bearer-token-env-var": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--cwd": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--description": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--env": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--exposure": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--header": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--json": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--oauth-callback-port": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--oauth-client-id": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--oauth-client-name": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--oauth-client-registration": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--oauth-client-secret": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--timeout": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi mcp.options.--url": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi pi": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi remove": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi remove.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi remove.options.--local": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi remove.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi uninstall": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi uninstall.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi uninstall.options.--local": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi uninstall.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--all": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--extension": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--extensions": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--force": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--models": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi update.options.--self": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--api-key": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--append-system-prompt": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--continue": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--exclude-tools": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--export": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--extension": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--fork": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--list-models": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--mode": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--model": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--models": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--name": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-approve": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-builtin-tools": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-context-files": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-extensions": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-mcp": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-prompt-templates": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-session": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-skills": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-themes": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--no-tools": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--offline": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--print": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--prompt-template": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--provider": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--resume": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--session": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--session-dir": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--session-id": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--skill": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--system-prompt": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--theme": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--thinking": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--tools": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--tui-mode": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--use-theme": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--verbose": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.pi.options.--version": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AI_AGENT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTHROPIC_AUTH_TOKEN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTHROPIC_FEDERATION_RULE_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTHROPIC_IDENTITY_TOKEN_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTHROPIC_ORGANIZATION_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTHROPIC_SERVICE_ACCOUNT_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTHROPIC_WORKSPACE_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_ACCESS_KEY_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_BEARER_TOKEN_BEDROCK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_BEDROCK_FORCE_CACHE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_BEDROCK_FORCE_HTTP1": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_BEDROCK_SKIP_AUTH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_CONTAINER_CREDENTIALS_FULL_URI": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_DEFAULT_REGION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_PROFILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_REGION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_SECRET_ACCESS_KEY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_SESSION_TOKEN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AWS_WEB_IDENTITY_TOKEN_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AZURE_OPENAI_API_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AZURE_OPENAI_BASE_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AZURE_OPENAI_DEPLOYMENT_NAME_MAP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AZURE_OPENAI_RESOURCE_NAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CC": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CHORD2_LOCK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CI": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.COLORTERM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.COLUMNS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.DISPLAY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.EDITOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GCLOUD_PROJECT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GHOSTTY_RESOURCES_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GITHUB_ACTIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_APPLICATION_CREDENTIALS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_API_KEY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_LOCATION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_PROJECT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.HOME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.HTTPS_PROXY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.HTTP_PROXY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ITERM_SESSION_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.KIMI_CODE_OAUTH_HOST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.KIMI_OAUTH_HOST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.KITTY_WINDOW_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.LINES": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.LLAMA_API_KEY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.LLAMA_BASE_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ORCA_IMAGE_PROTOCOL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_CACHE_RETENTION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_CLEAR_ON_SHRINK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_CODEMODE_MAX_WORKERS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_CODING_AGENT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_EXPERIMENTAL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_HARDWARE_CURSOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_HYPERLINKS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_IMAGE_PROTOCOL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_INSTALLER_API_BASE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_MANAGED_INSTALL_ROOT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_OAUTH_CALLBACK_HOST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_OFFLINE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_PACKAGE_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_PROGRAM_STATUS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_RADIUS_GATEWAY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_SELF_UPDATE_COMMAND": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_SHARE_VIEWER_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_SKIP_VERSION_CHECK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_STARTUP_BENCHMARK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TELEMETRY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TIMING": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TRUE_COLOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TUI_DEBUG": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TUI_DEBUG_REDRAW": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TUI_WIN32_TOOLCHAIN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PI_TUI_WRITE_LOG": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PNPM_HOME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ProgramFiles": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SHELL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SSH_CLIENT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SSH_CONNECTION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SSH_TTY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.STY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SystemRoot": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERMINAL_EMULATOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERMUX_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM_PROGRAM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM_PROGRAM_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TMUX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.USERPROFILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VISUAL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WARP_SESSION_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WARP_TERMINAL_SESSION_UUID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WAYLAND_DISPLAY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WEZTERM_PANE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WSL_DISTRO_NAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WSL_INTEROP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WT_SESSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ZELLIJ": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.$schema": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autocompleteMaxVisible": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.branchSummary": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.branchSummary.reserveTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.branchSummary.skipPrompt": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.cacheWarming": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.codemode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.codemode.inlineBudget": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.codemode.mode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.collapseChangelog": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.keepRecentTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.modelOverrides": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.modelOverrides.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.modelOverrides.<name>.keepRecentTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.modelOverrides.<name>.reserveTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.compaction.reserveTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.defaultModel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.defaultProjectTrust": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.defaultProvider": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.defaultThinkingLevel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.defaultTools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deviceId": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.doubleEscapeAction": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.editorPaddingX": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enableAnalytics": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enableInstallTelemetry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enableSkillCommands": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enabledModels": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extensionChangelogVersions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extensionChangelogVersions.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extensions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.externalEditor": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.followUpMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fullscreenCopyOnSelect": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fullscreenExitOutput": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fullscreenScrollbar": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fullscreenWheelScrollLines": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hideThinkingBlock": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpIdleTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpProxy": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.images": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.images.autoResize": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.images.blockImages": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.lastChangelogVersion": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.markdown": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.markdown.codeBlockIndent": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.markdown.mermaid": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelThinkingLevels": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelThinkingLevels.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.npmCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.outputPad": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages[].autoload": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages[].extensions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages[].prompts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages[].skills": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages[].source": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.packages[].themes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.prompts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.queueMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.quietStartup": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.baseDelayMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.maxAgentDelayMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.maxDelayMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.maxRetries": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.provider": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.provider.maxRetries": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.provider.maxRetryDelayMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.retry.provider.timeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.selfUpdateCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sessionDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sessionShareDestination": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.shellCommandPrefix": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.shellPath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.showCacheMissNotices": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.showHardwareCursor": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.skills": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.skills.customDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.skills.enableSkillCommands": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.steeringMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.clearOnShrink": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.hyperlinks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.imageWidthCells": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.images": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.showImages": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.showTerminalProgress": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.terminal.trueColor": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.theme": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.themes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.thinkingBudgets": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.thinkingBudgets.high": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.thinkingBudgets.low": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.thinkingBudgets.medium": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.thinkingBudgets.minimal": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.trackingId": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.transport": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.treeFilterMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tuiMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.warnings": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.warnings.anthropicExtraUsage": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.websocketConnectTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.websockets": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.5.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    }
+  }
 }

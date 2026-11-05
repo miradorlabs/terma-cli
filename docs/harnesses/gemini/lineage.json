@@ -6,5 +6,7090 @@
     "newest": "0.67.0",
     "builds": 7
   },
-  "items": {}
+  "items": {
+    "cli.commands.gemini extensions": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini extensions gemini": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini extensions.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini extensions.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini gemini": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini gemma": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini gemma gemini": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini gemma.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini gemma.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini hooks": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini hooks gemini": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini hooks.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini hooks.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini mcp": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini mcp gemini": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini mcp.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini mcp.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini models": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini models.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini models.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini models.options.--output-format": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini skills": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini skills gemini": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini skills.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini skills.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--accept-raw-output-risk": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--acp": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--admin-policy": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--allowed-mcp-server-names": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--allowed-tools": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--approval-mode": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--debug": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--delete-session": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--experimental-acp": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--extensions": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--help": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--include-directories": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--list-extensions": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--list-models": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--list-sessions": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--model": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--output-format": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--policy": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--prompt": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--prompt-interactive": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--raw-output": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--resume": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--sandbox": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--screen-reader": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--session-file": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--session-id": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--skip-trust": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--version": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--worktree": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "cli.commands.gemini.options.--yolo": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ANTIGRAVITY_CLI_ALIAS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.APPDATA": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.AppData": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.BAZEL_TEST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.BROWSER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.BUILD_SANDBOX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CI": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CLI_TITLE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CLI_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CLOUD_SHELL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CLOUD_SHELL_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CODESPACES": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CODE_ASSIST_API_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CODE_ASSIST_ENDPOINT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.COLORTERM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.CURSOR_TRACE_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ComSpec": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.DEBIAN_FRONTEND": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.DEBUG": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.DEBUG_MODE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.DEBUG_PORT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.DEV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.EDITOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.EDITOR_IN_CLOUD_SHELL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.FORCE_GENERIC_KEYBINDING_HINTS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_API_KEY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_API_KEY_AUTH_MECHANISM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_ACTIVITY_LOG_TARGET": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_AUTH_OVERRIDE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_CUSTOM_HEADERS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_EXP_AGENT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_EXTENSION_REGISTRY_URI": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_HOME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IDE_AUTH_TOKEN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IDE_PID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IDE_SERVER_PORT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IDE_SERVER_STDIO_ARGS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IDE_SERVER_STDIO_COMMAND": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IDE_WORKSPACE_PATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_INTEGRATION_TEST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_NO_RELAUNCH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_SURFACE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_SYSTEM_DEFAULTS_PATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_SYSTEM_SETTINGS_PATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_TEST_VAR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_TRUSTED_FOLDERS_PATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_TRUST_WORKSPACE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_USE_COMPUTE_ADC": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_WORKTREE_HANDLED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CONTEXT_CALIBRATE_TOKEN_CALCULATIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CONTEXT_TRACE_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_DEBUG_LOG_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_DEFAULT_AUTH_TYPE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_EVENT_LOOP_MONITOR_ENABLED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_EXP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_FORCE_FILE_STORAGE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_MEMORY_MONITOR_INTERVAL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_MODEL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_PTY_INFO": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_RESTRICTED_MODE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_SANDBOX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_SANDBOX_IMAGE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_SANDBOX_IMAGE_DEFAULT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_SANDBOX_PROXY_COMMAND": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_STRICT_TELEMETRY_LIMITS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_SYSTEM_MD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GEMINI_WRITE_SYSTEM_MD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GH_CUSTOM_TRACKING_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GH_ISSUE_NUMBER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GH_PR_NUMBER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GH_WORKFLOW_NAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GITHUB_ACTIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GITHUB_EVENT_NAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GITHUB_REPOSITORY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GITHUB_SHA": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GITHUB_TOKEN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_API_KEY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_APPLICATION_CREDENTIALS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_ACCESS_TOKEN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_LOCATION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_PROJECT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_PROJECT_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_QUOTA_PROJECT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_CLOUD_WORKSTATIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_GEMINI_BASE_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_GENAI_API_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_GENAI_USE_GCA": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_GENAI_USE_VERTEXAI": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.GOOGLE_VERTEX_BASE_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.HOME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.HTTPS_PROXY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.HTTP_PROXY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.IS_BINARY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.LANG": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.LC_ALL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.LocalAppData": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.MONOSPACE_ENV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.NODE_ENV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.NODE_OPTIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.NO_BROWSER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.NO_COLOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.NO_PROXY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.OAUTH_CALLBACK_HOST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.OAUTH_CALLBACK_PORT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.OTLP_GOOGLE_CLOUD_PROJECT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PATHEXT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.POSITRON": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PREFIX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PSModulePath": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.PYTHONPATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ProgramFiles": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.REMOTE_CONTAINERS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.REPLIT_USER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.RUNFILES_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SANDBOX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SANDBOX_ENV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SANDBOX_FLAGS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SANDBOX_MOUNTS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SANDBOX_PORTS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SANDBOX_SET_UID_GID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SEATBELT_PROFILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SHPOOL_SESSION_NAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SSH_CLIENT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SSH_CONNECTION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SSH_TTY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.STY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SURFACE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.SystemRoot": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERMINAL_EMULATOR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM_PRODUCT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM_PROGRAM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TERM_PROGRAM_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TEST_SRCDIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TEST_WORKSPACE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.TMUX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.USERPROFILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VIRTUAL_ENV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VISUAL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VITEST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VSCODE_GIT_ASKPASS_MAIN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VSCODE_GIT_IPC_HANDLE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VSCODE_PID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.VSCODE_REMOTE_CONTAINERS_SESSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WEB_HOST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WSLENV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WSL_DISTRO_NAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WSL_INTEROP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.WT_SESSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.XCODE_VERSION_ACTUAL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.XDG_SESSION_TYPE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.ZED_SESSION_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.__COG_BASHRC_SOURCED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.http_proxy": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.https_proxy": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.env_vars.no_proxy": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.$schema": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.extensions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.extensions.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.mcp": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.mcp.config": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.mcp.config.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.mcp.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.mcp.requiredConfig": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.mcp.requiredConfig.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.secureModeEnabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.skills": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.admin.skills.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.adminPolicyPaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced.autoConfigureMemory": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced.bugCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced.bugCommand.urlTemplate": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced.dnsResolutionOrder": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced.excludedEnvVars": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.advanced.ignoreLocalEnv": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.allowedDomains": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.blockFileUploads": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.confirmSensitiveActions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.disableUserInput": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.headless": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.maxActionsPerTask": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.profilePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.sessionMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.browser.visualModel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.overrides": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.overrides.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.overrides.<name>.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.overrides.<name>.modelConfig": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.agents.overrides.<name>.runConfig": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.billing": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.billing.overageStrategy": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.billing.vertexAi": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.billing.vertexAi.requestType": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.billing.vertexAi.sharedRequestType": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.discoveryMaxDirs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering.customIgnoreFilePaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering.enableFileWatcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering.enableFuzzySearch": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering.enableRecursiveFileSearch": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering.respectGeminiIgnore": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileFiltering.respectGitIgnore": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.fileName": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.importFormat": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.includeDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.includeDirectoryTree": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.loadMemoryFromIncludeDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.context.memoryBoundaryMarkers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.historyWindow": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.historyWindow.maxTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.historyWindow.retainedTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.messageLimits": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.messageLimits.normalMaxTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.messageLimits.normalizationHeadRatio": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.messageLimits.retainedMaxTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.distillation": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.distillation.maxOutputTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.distillation.summarizationThresholdTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.outputMasking": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.outputMasking.minPrunableThresholdTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.outputMasking.protectLatestTurn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.contextManagement.tools.outputMasking.protectionThresholdTokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.adk": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.adk.agentSessionInteractiveEnabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.adk.agentSessionNoninteractiveEnabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.adk.agentSessionSubagentEnabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.autoMemory": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.contextManagement": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.directWebFetch": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.dynamicModelConfiguration": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.enableAgents": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.extensionConfig": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.extensionManagement": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.extensionRegistry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.extensionRegistryURI": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.extensionReloading": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemma": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter.autoStartServer": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter.binaryPath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter.classifier": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter.classifier.host": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter.classifier.model": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.gemmaModelRouter.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.generalistProfile": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.modelSteering": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.powerUserProfile": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.stressTestProfile": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.taskTracker": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.topicUpdateNarration": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.useOSC52Copy": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.useOSC52Paste": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.voice": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.voice.activationMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.voice.backend": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.voice.stopGracePeriodMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.voice.whisperModel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.voiceMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.experimental.worktrees": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extensions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extensions.disabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extensions.workspacesWithMigrationNudge": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.checkpointing": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.checkpointing.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.debugKeystrokeLogging": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.defaultApprovalMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.devtools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.enableAutoUpdate": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.enableAutoUpdateNotification": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.enableNotifications": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.logRagSnippets": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.maxAttempts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.notificationMethod": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.openEditorInNewWindow": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.plan": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.plan.directory": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.plan.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.plan.modelRouting": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.preferredEditor": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.retryFetchErrors": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.sessionRetention": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.sessionRetention.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.sessionRetention.maxAge": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.sessionRetention.maxCount": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.sessionRetention.minRetention": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.topicUpdateNarration": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.general.vimMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterAgent[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterModel[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.AfterTool[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeAgent[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeModel[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeToolSelection[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.BeforeTool[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.Notification[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.PreCompress[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionEnd[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].hooks[].command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].hooks[].description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].hooks[].name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].hooks[].timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].hooks[].type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooks.SessionStart[].matcher": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooksConfig": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooksConfig.disabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooksConfig.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.hooksConfig.notifications": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ide": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ide.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ide.hasSeenNudge": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcp": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcp.allowed": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcp.excluded": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcp.serverCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.args": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.authProviderType": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.cwd": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.description": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.env": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.env.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.excludeTools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.extension": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.extension.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.headers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.headers.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.httpUrl": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.includeTools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.oauth": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.oauth.allowPrivateNetwork": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.oauth.authorizationResponseIssParameterSupported": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.targetAudience": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.targetServiceAccount": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.tcp": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.timeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.trust": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.mcpServers.<name>.url": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.compressionThreshold": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.disableLoopDetection": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.maxSessionTurns": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.skipNextSpeakerCheck": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.summarizeToolOutput": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.summarizeToolOutput.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.model.summarizeToolOutput.<name>.tokenBudget": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.aliases": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.classifierIdResolutions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.classifierIdResolutions.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.classifierIdResolutions.<name>.contexts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.classifierIdResolutions.<name>.default": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.customAliases": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.customOverrides": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelChains": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelChains.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.dialogDescription": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.displayName": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.family": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.features": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.isPreview": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.isVisible": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelDefinitions.<name>.tier": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelIdResolutions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelIdResolutions.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelIdResolutions.<name>.contexts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.modelIdResolutions.<name>.default": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelConfigs.overrides": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.output": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.output.format": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.policyPaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.privacy": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.privacy.usageStatisticsEnabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.allowedExtensions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.auth": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.auth.enforcedType": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.auth.selectedType": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.auth.useExternal": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.autoAddToPolicyByDefault": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.blockGitExtensions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.disableAlwaysAllow": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.disableYoloMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.enableConseca": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.enablePermanentToolApproval": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.environmentVariableRedaction": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.environmentVariableRedaction.allowed": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.environmentVariableRedaction.blocked": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.environmentVariableRedaction.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.folderTrust": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.folderTrust.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.security.toolSandboxing": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.skills": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.skills.disabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.skills.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.logPrompts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.otlpEndpoint": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.otlpHeaders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.otlpHeaders.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.otlpProtocol": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.outfile": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.target": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.traces": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.useCliAuth": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.telemetry.useCollector": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.allowed": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.callCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.confirmationRequired": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.core": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.disableLLMCorrection": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.discoveryCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.exclude": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandbox": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandbox.allowedPaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandbox.command": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandbox.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandbox.image": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandbox.networkAccess": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandboxAllowedPaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.sandboxNetworkAccess": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell.backgroundCompletionBehavior": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell.enableInteractiveShell": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell.enableShellOutputEfficiency": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell.inactivityTimeout": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell.pager": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.shell.showColor": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.truncateToolOutputThreshold": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.tools.useRipgrep": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.accessibility": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.accessibility.enableLoadingPhrases": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.accessibility.screenReader": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.autoThemeSwitching": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.collapseDrawerDuringApproval": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.compactToolOutput": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.AccentBlue": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.AccentCyan": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.AccentGreen": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.AccentPurple": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.AccentRed": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.AccentYellow": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.Background": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.Comment": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.DarkGray": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.DiffAdded": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.DiffRemoved": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.Foreground": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.GradientColors": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.Gray": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.LightBlue": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.background": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.border": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.name": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.status": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.text": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.type": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customThemes.<name>.ui": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.customWittyPhrases": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.debugRainbow": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.dynamicWindowTitle": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.errorVerbosity": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.escapePastedAtSymbols": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer.hideCWD": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer.hideContextPercentage": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer.hideModelInfo": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer.hideSandboxStatus": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer.items": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.footer.showLabels": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.hideBanner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.hideContextSummary": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.hideFooter": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.hideTips": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.hideWindowTitle": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.incrementalRendering": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.inlineThinkingMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.loadingPhrases": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.renderProcess": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showCitations": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showCompatibilityWarnings": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showHomeDirectoryWarning": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showLineNumbers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showMemoryUsage": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showModelInfoInChat": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showShortcutsHint": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showSpinner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showStatusInTitle": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.showUserIdentity": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.terminalBackgroundPollingInterval": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.terminalBuffer": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.theme": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.useAlternateBuffer": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.ui.useBackgroundColor": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.useWriteTodos": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.67.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    }
+  }
 }

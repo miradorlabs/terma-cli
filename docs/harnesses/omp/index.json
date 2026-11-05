@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "harness": {
+    "id": "omp",
+    "name": "oh-my-pi",
+    "vendor": "can1357",
+    "homepage": "https://github.com/can1357/oh-my-pi",
+    "source": {
+      "repo": "can1357/oh-my-pi",
+      "url": "https://github.com/can1357/oh-my-pi",
+      "language": "typescript"
+    },
+    "changelog": "https://github.com/can1357/oh-my-pi/releases",
+    "latest": "18.16.0",
+    "support": "untested",
+    "versions_tracked": 1,
+    "first_tracked": "2026-11-02",
+    "last_change": null
+  },
+  "versions": [
+    {
+      "version": "18.16.0",
+      "released_at": "2026-11-02T20:03:14.34Z",
+      "captured_at": "2026-11-05T11:12:22.390019Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": null,
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    }
+  ]
+}
