@@ -78,7 +78,14 @@ one() {
 # BACKFILL_JOBS builds at once (default 3): each in its own sandboxes and download folder.
 # Workers outlive a stopped xargs, and two runs of one build remove each other's download:
 # stopping the run stops its workers.
-trap 'pkill -f -- "$bin/e2e.test" 2>/dev/null; pkill -P $$ 2>/dev/null' EXIT INT TERM
+# A trap that returns lets the script go on to its retry pass, which starts new workers: a
+# stop ends the script too.
+stop() {
+	pkill -P $$ 2>/dev/null
+	pkill -f -- "$bin/e2e.test" 2>/dev/null
+}
+trap stop EXIT
+trap 'stop; exit 143' INT TERM
 export harness out bin var name summary tests
 export -f one
 echo "$versions" | xargs -P "${BACKFILL_JOBS:-3}" -I{} bash -c 'one "$1"' _ {}
