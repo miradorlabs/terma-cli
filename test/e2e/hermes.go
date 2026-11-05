@@ -12,7 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // Hermes (Nous Research) has no usable OTLP export: terma's plugin
@@ -44,6 +46,7 @@ func (sb *Sandbox) hermesHome() string { return filepath.Join(sb.Home, ".hermes"
 // setup, Hermes and the hooks it starts agree on it.
 func (sb *Sandbox) UseHermes(url string) {
 	sb.ExtraEnv = append(sb.ExtraEnv, "HERMES_HOME="+sb.hermesHome())
+	sb.T.Cleanup(sb.stopHermesGateway)
 	sb.writeAbs(filepath.Join(sb.hermesHome(), "config.yaml"), fmt.Sprintf(`model:
   default: m
   provider: custom
@@ -79,6 +82,36 @@ func (sb *Sandbox) UseHermesPluginDirect() {
 	sb.writeAbs(filepath.Join(dir, "__init__.py"), strings.Replace(string(tmpl), marker, "CONFIG_JSON = "+string(quoted), 1))
 	sb.writeAbs(filepath.Join(dir, "plugin.yaml"), string(manifest))
 	sb.hermes("plugins", "enable", "terma")
+}
+
+// stopHermesGateway stops the gateway a Hermes run started in the sandbox's home and left
+// running (0.22 starts one for `hermes chat`, its pid in $HERMES_HOME/gateway.pid), before the
+// sandbox is removed: it goes on writing there, and outlives the test.
+func (sb *Sandbox) stopHermesGateway() {
+	data, err := os.ReadFile(filepath.Join(sb.hermesHome(), "gateway.pid"))
+	if err != nil {
+		return
+	}
+	var rec struct {
+		PID int `json:"pid"`
+	}
+	if json.Unmarshal(data, &rec) != nil || rec.PID <= 1 {
+		return
+	}
+	// The pid is still Hermes's (not one a gateway that already exited left to another process).
+	if out, err := exec.Command("ps", "-o", "command=", "-p", fmt.Sprint(rec.PID)).Output(); err != nil || !bytes.Contains(out, []byte("hermes")) {
+		return
+	}
+	p, err := os.FindProcess(rec.PID)
+	if err != nil || p.Signal(syscall.SIGTERM) != nil {
+		return
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if p.Signal(syscall.Signal(0)) != nil {
+			return
+		}
+	}
+	_ = p.Signal(syscall.SIGKILL)
 }
 
 // PrepareHermesHome has Hermes build the sandbox's HERMES_HOME its dependency environment
