@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.123.0",
   "to": "0.124.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.123.0...rust-v0.124.0"
   },
@@ -12,21 +12,21 @@
     "text": "## New Features\n- The TUI now has quick reasoning controls: `Alt+,` lowers reasoning, `Alt+.` raises it, and accepted model upgrades now reset reasoning to the new model’s default instead of carrying over stale settings. (#18866, #19085)\n- App-server sessions can now manage multiple environments and choose an environment and working directory per turn, which makes multi-workspace and remote setups easier to target precisely. (#18401, #18416)\n- Added first-class Amazon Bedrock support for OpenAI-compatible providers, including AWS SigV4 signing and AWS credential-based auth. (#17820)\n- Remote plugin marketplaces can now be listed and read directly, with more reliable detail lookups and larger result pages. (#18452, #19079)\n- Hooks are now stable, can be configured inline in `config.toml` and managed `requirements.toml`, and can observe MCP tools as well as `apply_patch` and long-running Bash sessions. (#18893, #18385, #18391, #18888, #19012)\n- Eligible ChatGPT plans now default to the Fast service tier unless you explicitly opt out. (#19053)\n\n## Bug Fixes\n- Preserved Cloudflare cookies across approved ChatGPT hosts, reducing auth breakage in HTTP-backed ChatGPT flows. (#17783)\n- Fixed remote app-server reliability issues so websocket events keep draining under load and shutdown no longer fails when the remote worker exits during cleanup. (#18932, #18936)\n- Fixed permission-mode drift so `/permissions` changes survive side conversations and updated Full Access state is correctly reflected in MCP approval handling. (#18924, #19033)\n- Fixed `wait_agent` so it returns promptly when mailbox work is already queued instead of waiting for a fresh notification or timing out. (#18968)\n- Fixed local stdio MCP launches for relative commands without an explicit `cwd`, bringing fallback path resolution in line with CLI behavior. (#19031)\n- Startup now fails less often on managed config edge cases: unknown feature requirements warn instead of aborting, and cloud-requirements errors are clearer about what failed. (#19038, #19078)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.123.0...rust-v0.124.0\n\n- #18870 Load app-server config through ConfigManager @pakrym-oai\n- #18866 feat(tui): shortcuts to change reasoning level temporarily @fcoury-oai\n- #18430 app-server: implement device key v2 methods @euroelessar\n- #18757 fix: fully revert agent identity runtime wiring @efrazer-oai\n- #17783 Preserve Cloudfare HTTP cookies in codex @shijie-oai\n- #18876 [rollout_trace] Add rollout trace crate @cassirer-openai\n- #18401 Support multiple managed environments @starr-openai\n- #18797 Allow guardian bare allow output @maja-openai\n- #18886 Normalize /statusline & /title items @canvrno-oai\n- #18768 [codex] Tighten external migration prompt tests @alexsong-oai\n- #18909 Update /statusline and /title snapshots @canvrno-oai\n- #18867 sandboxing: materialize cwd-relative permission globs @bolinfest\n- #18915 fix: windows snapshot for external_agent_config_migration::tests::prompt_snapshot did not match windows output @bolinfest\n- #18416 Add turn-scoped environment selections @starr-openai\n- #18391 fix(core): emit hooks for apply_patch edits @fcoury-oai\n- #18916 test(core): move prompt debug coverage to integration suite @bolinfest\n- #17820 feat: add AWS SigV4 auth for OpenAI-compatible model providers @celia-oai\n- #18913 bazel: run wrapped Rust unit test shards @bolinfest\n- #18452 feat: Support remote plugin list/read. @xl-openai\n- #18936 Fix remote app-server shutdown race @bolinfest\n- #18871 refactor: add agent identity crate @efrazer-oai\n- #18276 exec-server: carry filesystem sandbox profiles @bolinfest\n- #18926 ci: keep argument comment lint checks materialized @bolinfest\n- #18935 Keep TUI status surfaces in sync @etraut-openai\n- #18923 chore(tui) debug-config guardian_policy_config @dylan-hurd-oai\n- #18943 tests: serialize process-heavy Windows CI suites @bolinfest\n- #18934 [codex] Clean guardian instructions @dylan-hurd-oai\n- #18948 chore: remove unused Bedrock auth lazy loading @celia-oai\n- #18277 core: derive active permission profiles @bolinfest\n- #18785 feat: add explicit AgentIdentity auth mode @efrazer-oai\n- #18953 use long-lived sessions for codex sandbox windows @iceweasel-oai\n- #18278 app-server: expose thread permission profiles @bolinfest\n- #17693 [codex-analytics] guardian review analytics events emission @rhan-oai\n- #17695 [codex-analytics] guardian review truncation @rhan-oai\n- #17696 [codex-analytics] guardian review TTFT plumbing and emission @rhan-oai\n- #18962 nit: expose lib @jif-oai\n- #18502 Support multiple cwd filters for thread list @acrognale-oai\n- #18968 fix: wait_agent timeout for queued mailbox mail @jif-oai\n- #18971 fix: cargo deny @jif-oai\n- #18973 chore: prep memories for AB @jif-oai\n- #18852 [codex] Update imagegen system skill @vb-openai\n- #18865 Stage publishable Python runtime wheels @sdcoffey\n- #18932 TUI: Keep remote app-server events draining @etraut-openai\n- #18877 [rollout_trace] Record core session rollout traces @cassirer-openai\n- #18959 feat(auto-review) policy config @dylan-hurd-oai\n- #18955 Add plumbing to approve stored Auto-Review denials @won-openai\n- #18999 arg0: keep dispatch aliases alive during async main @bolinfest\n- #18925 feat: Fairly trim skill descriptions within context budget @xl-openai\n- #18890 feat(auto-review) short-circuit @dylan-hurd-oai\n- #18279 app-server: accept permission profile overrides @bolinfest\n- #18582 [2/4] Implement executor HTTP request runner @aibrahim-oai\n- #18197 feat: add guardian network approval trigger context @viyatb-oai\n- #19033 Fix MCP permission policy sync @leoshimo-oai\n- #19016 exec-server: expose arg0 alias root to fs sandbox @bolinfest\n- #19036 Overlay state DB git metadata for filtered thread lists @joeytrasatti-openai\n- #18956 [Codex] Register browser requirements feature keys @khoi-oai\n- #19043 Update bundled OpenAI Docs skill freshness check @kkahadze-oai\n- #18504 Rebrand approvals reviewer config to auto-review @won-openai\n- #19046 exec-server: require explicit filesystem sandbox cwd @bolinfest\n- #18280 clients: send permission profiles to app-server @bolinfest\n- #18281 rollout: persist turn permission profiles @bolinfest\n- #18888 hooks: emit Bash PostToolUse when exec_command completes via write_stdin @eternal-openai\n- #19056 Rename approvals reviewer variant to auto-review @won-openai\n- #18583 [3/4] Add executor-backed RMCP HTTP client @aibrahim-oai\n- #19059 core: box multi-agent wrapper futures @bolinfest\n- #19031 Fix relative stdio MCP cwd fallback @mzeng-openai\n- #19063 chore(auto-review) feature => stable @dylan-hurd-oai\n- #19050 feat(request-permissions) approve with strict review @dylan-hurd-oai\n- #19067 test: set Rust test thread stack size @bolinfest\n- #19072 tui: fix approvals popup disabled shortcut test @bolinfest\n- #18893 codex: support hooks in config.toml and requirements.toml @eternal-openai\n- #18282 protocol: report session permission profiles @bolinfest\n- #19053 Default Fast service tier for eligible ChatGPT plans @shijie-oai\n- #19055 Add safety check notification and error handling @etraut-openai\n- #18283 app-server: accept command permission profiles @bolinfest\n- #19012 Mark codex_hooks stable @abhinav-oai\n- #18924 TUI: preserve permission state after side conversations @etraut-openai\n- #19071 Add computer_use feature requirement key @leoshimo-oai\n- #19079 Use remote plugin IDs for detail reads and enlarge list pages @xl-openai\n- #19038 feat: Warn and continue on unknown feature requirements @xl-openai\n- #19078 Clarify cloud requirements error messages @gverma-openai\n- #19085 Persist target default reasoning on model upgrade @shijie-oai\n- #19086 app-server: include filesystem entries in permission requests @bolinfest\n- #18385 Support MCP tools in hooks @abhinav-oai\n- #19113 Fix auto-review config compatibility across protocol and SDK @won-openai"
   },
   "summary": {
-    "changes": 70,
+    "changes": 76,
     "categories": {
       "behavior": 1,
       "cli": 1,
       "config": 63,
-      "hooks": 4,
+      "filesystem": 10,
       "prompt": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 65,
+      "informational": 71,
       "notable": 5
     },
-    "undocumented": 50
+    "undocumented": 54
   },
   "changes": [
     {
@@ -81,151 +81,6 @@
       "terma": null,
       "source": null,
       "documented": true
-    },
-    {
-      "id": "hooks.events.PreToolUse.control",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "PreToolUse",
-        "control"
-      ],
-      "title": "Hook events.PreToolUse.control added",
-      "impact": "informational",
-      "before": null,
-      "after": {
-        "exit_2": "blocks the tool; message to the model",
-        "json_decision": "blocks the tool; message to the model"
-      },
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 671,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L671"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
-            "line": 966,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L966"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionStart.control",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionStart",
-        "control"
-      ],
-      "title": "Hook events.SessionStart.control added",
-      "impact": "informational",
-      "before": null,
-      "after": {
-        "additional_context": "reaches the model",
-        "exit_2": "message not shown to the model"
-      },
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 674,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L674"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
-            "line": 975,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L975"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.Stop.control",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "Stop",
-        "control"
-      ],
-      "title": "Hook events.Stop.control added",
-      "impact": "informational",
-      "before": null,
-      "after": {
-        "exit_2": "keeps the turn going; message to the model",
-        "json_decision": "keeps the turn going; message to the model"
-      },
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 676,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L676"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
-            "line": 981,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L981"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.UserPromptSubmit.control",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "UserPromptSubmit",
-        "control"
-      ],
-      "title": "Hook events.UserPromptSubmit.control added",
-      "impact": "informational",
-      "before": null,
-      "after": {
-        "additional_context": "reaches the model",
-        "exit_2": "blocks the prompt; message not shown to the model",
-        "json_decision": "blocks the prompt; message not shown to the model"
-      },
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 675,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/analytics/src/events.rs#L675"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2.rs",
-            "line": 978,
-            "url": "https://github.com/openai/codex/blob/rust-v0.124.0/codex-rs/app-server-protocol/src/protocol/v2.rs#L978"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
     },
     {
       "id": "cli.help.app -h",
@@ -2196,6 +2051,252 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/references/gpt-5p4-prompting-guide.md",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/references/gpt-5p4-prompting-guide.md"
+      ],
+      "title": "No longer writes <codex-home>/skills/.system/openai-docs/references/gpt-5p4-prompting-guide.md (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/references/prompting-guide.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/references/prompting-guide.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/openai-docs/references/prompting-guide.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/references/upgrade-guide.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/references/upgrade-guide.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/openai-docs/references/upgrade-guide.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/references/upgrading-to-gpt-5p4.md",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/references/upgrading-to-gpt-5p4.md"
+      ],
+      "title": "No longer writes <codex-home>/skills/.system/openai-docs/references/upgrading-to-gpt-5p4.md (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/scripts.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/scripts",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/openai-docs/scripts (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/scripts.ops.list",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/scripts",
+        "ops",
+        "list"
+      ],
+      "title": "Now lists <codex-home>/skills/.system/openai-docs/scripts (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "list",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/scripts.ops.create",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/scripts",
+        "ops",
+        "create"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/openai-docs/scripts (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "create",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/scripts.ops.probe",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/scripts",
+        "ops",
+        "probe"
+      ],
+      "title": "No longer looks for <codex-home>/skills/.system/openai-docs/scripts (linux/amd64)",
+      "impact": "informational",
+      "before": "probe",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/openai-docs/scripts/resolve-latest-model-info.js",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/openai-docs/scripts/resolve-latest-model-info.js"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/openai-docs/scripts/resolve-latest-model-info.js (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

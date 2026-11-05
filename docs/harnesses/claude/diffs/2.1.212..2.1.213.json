@@ -3,25 +3,46 @@
   "harness": "claude",
   "from": "2.1.212",
   "to": "2.1.213",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": null,
   "summary": {
-    "changes": 41,
+    "changes": 50,
     "categories": {
       "cli": 3,
       "config": 17,
-      "hooks": 21
+      "filesystem": 1,
+      "hooks": 29
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 40,
-      "notable": 1
+      "informational": 50,
+      "notable": 0
     },
     "undocumented": null
   },
   "changes": [
+    {
+      "id": "hooks.events.ConfigChange.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "ConfigChange",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "ConfigChange hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
     {
       "id": "hooks.events.CwdChanged.env.CLAUDE_PID",
       "category": "hooks",
@@ -34,6 +55,66 @@
         "CLAUDE_PID"
       ],
       "title": "CwdChanged hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Elicitation.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Elicitation",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "Elicitation hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.ElicitationResult.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "ElicitationResult",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "ElicitationResult hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.FileChanged.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "FileChanged",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "FileChanged hook environment variable CLAUDE_PID added",
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_PID",
@@ -83,6 +164,26 @@
       "documented": null
     },
     {
+      "id": "hooks.events.Notification.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Notification",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "Notification hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
       "id": "hooks.events.PermissionDenied.env.CLAUDE_PID",
       "category": "hooks",
       "op": "added",
@@ -94,6 +195,26 @@
         "CLAUDE_PID"
       ],
       "title": "PermissionDenied hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionRequest.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "PermissionRequest hook environment variable CLAUDE_PID added",
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_PID",
@@ -243,26 +364,6 @@
       "documented": null
     },
     {
-      "id": "hooks.events.SessionEnd.keys.prompt_id",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "keys",
-        "prompt_id"
-      ],
-      "title": "SessionEnd hook payload field prompt_id removed",
-      "impact": "notable",
-      "before": "prompt_id",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
       "id": "hooks.events.SessionStart.env.CLAUDE_PID",
       "category": "hooks",
       "op": "added",
@@ -354,6 +455,66 @@
         "CLAUDE_PID"
       ],
       "title": "SubagentStop hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.TaskCompleted.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TaskCompleted",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "TaskCompleted hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.TaskCreated.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TaskCreated",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "TaskCreated hook environment variable CLAUDE_PID added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_PID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.TeammateIdle.env.CLAUDE_PID",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TeammateIdle",
+        "env",
+        "CLAUDE_PID"
+      ],
+      "title": "TeammateIdle hook environment variable CLAUDE_PID added",
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_PID",
@@ -808,6 +969,29 @@
       "before": "CLAUDE_CODE_MORNING_BRIEF_PROMPT",
       "after": null,
       "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      # Check for rg availability\n      echo \"# Check for rg availability\" >> \"$SNAPSHOT_FILE\"\n      echo \"if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then\" >> \"$SNAPSHOT_FILE\"\n  \n      cat >> \"$SNAPSHOT_FILE\" << 'RIPGREP_FUNC_END'\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nRIPGREP_FUNC_END\n    \n      echo \"fi\" >> \"$SNAPSHOT_FILE\"\n  \n      # Shadow find/grep with embedded bfs/ugrep (ant-native only)\n      echo \"# Shadow find/grep with embedded bfs/ugrep\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'FIND_GREP_FUNC_END'\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\nFIND_GREP_FUNC_END\n    \n      echo \"# Shadow pkill to refuse patterns matching the CLI process\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'PKILL_FUNC_END'\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nPKILL_FUNC_END\n    \n\n      # Add PATH to the file\n      cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\nexport PATH=<path>\nPATH_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      # Check for rg availability\n      echo \"# Check for rg availability\" >> \"$SNAPSHOT_FILE\"\n      echo \"if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then\" >> \"$SNAPSHOT_FILE\"\n  \n      cat >> \"$SNAPSHOT_FILE\" << 'RIPGREP_FUNC_END'\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nRIPGREP_FUNC_END\n    \n      echo \"fi\" >> \"$SNAPSHOT_FILE\"\n  \n      # Shadow find/grep with embedded bfs/ugrep (ant-native only)\n      echo \"# Shadow find/grep with embedded bfs/ugrep\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'FIND_GREP_FUNC_END'\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\nFIND_GREP_FUNC_END\n    \n      echo \"# Shadow pkill to refuse patterns matching the CLI process\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'PKILL_FUNC_END'\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nPKILL_FUNC_END\n    \n\n      # Add PATH to the file\n      cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\nexport PATH=<path>\nPATH_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    "
+      ],
+      "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+1029 −0 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      # Check for rg availability\n      echo \"# Check for rg availability\" >> \"$SNAPSHOT_FILE\"\n      echo \"if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then\" >> \"$SNAPSHOT_FILE\"\n  \n      cat >> \"$SNAPSHOT_FILE\" << 'RIPGREP_FUNC_END'\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nRIPGREP_FUNC_END\n    \n      echo \"fi\" >> \"$SNAPSHOT_FILE\"\n  \n      # Shadow find/grep with embedded bfs/ugrep (ant-native only)\n      echo \"# Shadow find/grep with embedded bfs/ugrep\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'FIND_GREP_FUNC_END'\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\nFIND_GREP_FUNC_END\n    \n\n      # Add PATH to the file\n      cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\nexport PATH=<path>\nPATH_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "after": "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      # Check for rg availability\n      echo \"# Check for rg availability\" >> \"$SNAPSHOT_FILE\"\n      echo \"if ! (unalias rg 2>/dev/null; command -v rg) >/dev/null 2>&1; then\" >> \"$SNAPSHOT_FILE\"\n  \n      cat >> \"$SNAPSHOT_FILE\" << 'RIPGREP_FUNC_END'\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nRIPGREP_FUNC_END\n    \n      echo \"fi\" >> \"$SNAPSHOT_FILE\"\n  \n      # Shadow find/grep with embedded bfs/ugrep (ant-native only)\n      echo \"# Shadow find/grep with embedded bfs/ugrep\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'FIND_GREP_FUNC_END'\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\nFIND_GREP_FUNC_END\n    \n      echo \"# Shadow pkill to refuse patterns matching the CLI process\" >> \"$SNAPSHOT_FILE\"\n      cat >> \"$SNAPSHOT_FILE\" << 'PKILL_FUNC_END'\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nPKILL_FUNC_END\n    \n\n      # Add PATH to the file\n      cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\nexport PATH=<path>\nPATH_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "text_diff": "@@ -122,6 +122,44 @@\n }\n FIND_GREP_FUNC_END\n     \n+      echo \"# Shadow pkill to refuse patterns matching the CLI process\" >> \"$SNAPSHOT_FILE\"\n+      cat >> \"$SNAPSHOT_FILE\" << 'PKILL_FUNC_END'\n+unalias pkill 2>/dev/null || true\n+function pkill {\n+  if [\n+-n \"${CLAUDE_PID:-}\" ] && [\n+-r \"/proc/${CLAUDE_PID}/comm\" ]; then\n+    local _cc_skip=\"\" _cc_a\n+    local\n+-a _cc_probe=()\n+    for _cc_a in ${1+\"$@\"}; do\n+      if [\n+-n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n+      case \"$_cc_a\" in\n+       \n+--signal) _cc_skip=1 ;;\n+       \n+--signal=*|-e|--echo) ;;\n+       \n+-[0-9]*) ;;\n+       \n+-[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n+       \n+-[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n+        *) _cc_probe+=(\"$_cc_a\") ;;\n+      esac\n+    done\n+    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep\n+-qx \"${CLAUDE_PID}\"; then\n+      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill\n+-P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n+      return 1\n+    fi\n+  fi\n+  command pkill ${1+\"$@\"}\n+}\n+PKILL_FUNC_END\n+    \n \n       # Add PATH to the file\n       cat >> \"$SNAPSHOT_FILE\" << 'PATH_END_<id>'\n",
+      "stats": {
+        "added_chars": 1029,
+        "removed_chars": 0
+      },
       "terma": null,
       "source": null,
       "documented": null

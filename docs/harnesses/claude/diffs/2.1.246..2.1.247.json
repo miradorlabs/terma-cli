@@ -3,24 +3,25 @@
   "harness": "claude",
   "from": "2.1.246",
   "to": "2.1.247",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Added the `SendFeedback` tool: when something goes wrong in a session, Claude can draft a feedback report for you to review and send from `/feedback` (turn off with the `feedbackDrafts` setting)\n- Added `{id, text, cooldownSessions, priority}` entries, `tipsFile`, and `label` to `spinnerTipsOverride`, so organizations can rotate their own tips alongside the built-in ones\n- Added a tip on Bash permission prompts pointing to auto mode, with a one-keystroke \"Yes, and switch to auto mode\" option\n- Added `/claude-api cost-optimize` to profile an existing project's Claude API spend and work through cost levers (caching, token hygiene, batch, effort, model choice) one measured change at a time\n- Updated the `/claude-api` skill with Admin API coverage (organization members, invites, workspaces, API keys, rate limit reports, workload identity federation, CMEK)\n- Fixed fast arrow-key + Enter sequences acting on the row above the one you navigated to in history search, `/config`, `/mcp`, `/skills`, background tasks, and `/model`\n- Fixed sub-agents dying on a first-call model 404: they now use the session's fallback model chain, and the error returned to the parent includes the error type, status, request id, and model\n- Fixed a hook or background agent that printed megabytes of error output being able to overflow the conversation and wedge the session on \"Prompt is too long\"\n- Fixed Ctrl keyboard shortcuts not firing under non-Latin (e.g. Cyrillic) keyboard layouts in kitty-protocol terminals\n- Fixed text like `<35;150;7M` being inserted into the prompt when a mouse report arrived split across reads right after the escape prefix\n- Fixed the Bash sandbox's after-command cleanup deleting a dotfile-managed `~/.claude/settings.json` symlink (nix/home-manager, stow) when it is repointed outside the sandbox's writable area\n- Fixed `/terminal-setup` overwriting your entire Zed `keymap.json` instead of merging in its keybinding\n- Fixed `/rename` silently confirming when the session registry could not be updated; it now says other sessions may still show the old name\n- Fixed `/compact` and \"Summarize from here\" in sessions started with `--agent` summarizing under the default system prompt instead of the conversation's own\n- Fixed a background session showing \"opening…\" forever in `claude agents` after its terminal host process died; the row now fails within seconds with the reason, and Enter restarts it\n- Fixed unbounded memory growth when a hook's or background task's output file could not be written; the file now notes where output was lost\n- Fixed `/install-github-app` over SSH: the copy shortcut now says how the sign-in URL was copied instead of always claiming success, and the URL appears immediately when no browser can open\n- Fixed shell commands carried over from the foreground logging an internal error or showing a misleading `[exited with code -1]` line when they finish in background sessions\n- Fixed a version-less marketplace plugin's live cache directory being deleted and recreated on a second-scope install, which could disrupt a running session using it\n- Fixed Remote Control sessions started with `/remote-control` not reporting the working-tree diff to connected clients\n- Fixed self-hosted runner sessions reporting `running` before Claude Code had started, which could trigger a premature \"Claude is waiting for your input\" notification from the Claude desktop app\n- Fixed first-run setup exiting with \"Unable to connect to Anthropic services\" when managed settings configure Claude apps gateway sign-in and Anthropic endpoints are unreachable\n- Fixed cloud sessions (Claude Code on the web, desktop and mobile apps) sometimes showing the previous permission mode when you switch modes right after sending a message\n- Fixed cloud sessions going silent when the session's container restarts between turns while a background agent, shell, or monitor is still running — the resumed session now reports the lost work\n- Improved plugin marketplace hardening: names containing control or invisible characters are rejected, and marketplace-supplied text in `/plugin` and `claude plugin` output is escape-safe\n- Improved Bedrock, Vertex, and Foundry sessions (and any with telemetry disabled): Claude is now told when a configured MCP server failed to connect, instead of concluding its tools don't exist\n- Changed Sonnet 5's default auto-compact window to its full 1M context, so sessions on the 1M window now auto-compact at about 967K tokens instead of about 934K\n- Changed cross-session peer messages to collapse by default to a one-line `Message from @<sender>: <first line>` preview; Ctrl+O expands the full body\n- Changed terminal hyperlinks in rendered markdown: link targets that point at a network or automounter path, contain a control character, or lead with an invisible character now render as plain text\n- Changed the prompt-footer PR badge to skip its GitHub re-check on terminal refocus when the last check is under a minute old\n- Changed analytics to stay off from startup, not only after login, when managed settings force gateway login or a custom OAuth deployment is configured\n- Changed Claude apps gateway sign-in requests to identify Claude Code (a `surface=claude_code` device-authorization parameter and a `claude-code/<version>` User-Agent)\n- Changed organization sign-in enforcement to exit at start when the administrator's managed settings cannot be read, even if host-supplied or per-user Windows registry settings exist"
   },
   "summary": {
-    "changes": 12,
+    "changes": 26,
     "categories": {
-      "config": 12
+      "config": 12,
+      "filesystem": 14
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 11,
-      "notable": 1
+      "informational": 19,
+      "notable": 7
     },
-    "undocumented": 9
+    "undocumented": 23
   },
   "changes": [
     {
@@ -249,6 +250,536 @@
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_CODE_WILLOW_TERN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin"
+      ],
+      "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (+95 −0 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/opt/homebrew/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "after": "/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "text_diff": "@@ -1,3 +1,7 @@\n /opt/homebrew/bin/git\n+-c core.askPass=\n+-c protocol.ext.allow=never\n+-c submodule.recurse=false\n+-c log.showSignature=false\n -c core.hooksPath=/dev/null\n -c core.fsmonitor= remote get-url origin\n",
+      "stats": {
+        "added_chars": 95,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git --no-optional-locks log --oneline -n 5",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git --no-optional-locks log --oneline -n 5"
+      ],
+      "title": "Command no longer run: `/opt/homebrew/bin/git --no-optional-locks log --oneline -n 5` (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/opt/homebrew/bin/git",
+          "--no-optional-locks",
+          "log",
+          "--oneline",
+          "-n",
+          "5"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git --no-optional-locks status --short",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git --no-optional-locks status --short"
+      ],
+      "title": "Command no longer run: `/opt/homebrew/bin/git --no-optional-locks status --short` (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/opt/homebrew/bin/git",
+          "--no-optional-locks",
+          "status",
+          "--short"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5"
+      ],
+      "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/opt/homebrew/bin/git",
+          "-c",
+          "core.fsmonitor=",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "core.askPass=",
+          "-c",
+          "protocol.ext.allow=never",
+          "-c",
+          "submodule.recurse=false",
+          "-c",
+          "log.showSignature=false",
+          "--no-optional-locks",
+          "log",
+          "--oneline",
+          "-n",
+          "5"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short"
+      ],
+      "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/opt/homebrew/bin/git",
+          "-c",
+          "core.fsmonitor=",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "core.askPass=",
+          "-c",
+          "protocol.ext.allow=never",
+          "-c",
+          "submodule.recurse=false",
+          "-c",
+          "log.showSignature=false",
+          "--no-optional-locks",
+          "status",
+          "--short"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name"
+      ],
+      "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/opt/homebrew/bin/git",
+          "-c",
+          "core.fsmonitor=",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "core.askPass=",
+          "-c",
+          "protocol.ext.allow=never",
+          "-c",
+          "submodule.recurse=false",
+          "-c",
+          "log.showSignature=false",
+          "config",
+          "user.name"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the user's git identity",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git config user.name",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/opt/homebrew/bin/git config user.name"
+      ],
+      "title": "Command no longer run: `/opt/homebrew/bin/git config user.name` (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/opt/homebrew/bin/git",
+          "config",
+          "user.name"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the user's git identity",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin"
+      ],
+      "title": "Command changed: `/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSign …` (+95 −0 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "/usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "after": "/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "text_diff": "@@ -1,3 +1,7 @@\n /usr/bin/git\n+-c core.askPass=\n+-c protocol.ext.allow=never\n+-c submodule.recurse=false\n+-c log.showSignature=false\n -c core.hooksPath=/dev/null\n -c core.fsmonitor= remote get-url origin\n",
+      "stats": {
+        "added_chars": 95,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git --no-optional-locks log --oneline -n 5",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git --no-optional-locks log --oneline -n 5"
+      ],
+      "title": "Command no longer run: `/usr/bin/git --no-optional-locks log --oneline -n 5` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/usr/bin/git",
+          "--no-optional-locks",
+          "log",
+          "--oneline",
+          "-n",
+          "5"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git --no-optional-locks status --short",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git --no-optional-locks status --short"
+      ],
+      "title": "Command no longer run: `/usr/bin/git --no-optional-locks status --short` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/usr/bin/git",
+          "--no-optional-locks",
+          "status",
+          "--short"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5"
+      ],
+      "title": "New command at startup: `/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=n …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/usr/bin/git",
+          "-c",
+          "core.fsmonitor=",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "core.askPass=",
+          "-c",
+          "protocol.ext.allow=never",
+          "-c",
+          "submodule.recurse=false",
+          "-c",
+          "log.showSignature=false",
+          "--no-optional-locks",
+          "log",
+          "--oneline",
+          "-n",
+          "5"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short"
+      ],
+      "title": "New command at startup: `/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=n …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/usr/bin/git",
+          "-c",
+          "core.fsmonitor=",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "core.askPass=",
+          "-c",
+          "protocol.ext.allow=never",
+          "-c",
+          "submodule.recurse=false",
+          "-c",
+          "log.showSignature=false",
+          "--no-optional-locks",
+          "status",
+          "--short"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name"
+      ],
+      "title": "New command at startup: `/usr/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=n …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/usr/bin/git",
+          "-c",
+          "core.fsmonitor=",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "core.askPass=",
+          "-c",
+          "protocol.ext.allow=never",
+          "-c",
+          "submodule.recurse=false",
+          "-c",
+          "log.showSignature=false",
+          "config",
+          "user.name"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the user's git identity",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git config user.name",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git config user.name"
+      ],
+      "title": "Command no longer run: `/usr/bin/git config user.name` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/usr/bin/git",
+          "config",
+          "user.name"
+        ],
+        "by": "claude",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "reads the user's git identity",
+        "role": "harness"
+      },
+      "after": null,
       "text_diff": null,
       "terma": null,
       "source": null,

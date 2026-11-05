@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.144.3",
   "to": "0.144.4",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.144.3...rust-v0.144.4"
   },
@@ -12,18 +12,18 @@
     "text": "## Chores\n\n- No user-facing changes in this patch release.\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.144.3...rust-v0.144.4"
   },
   "summary": {
-    "changes": 7,
+    "changes": 4,
     "categories": {
       "behavior": 3,
-      "hooks": 4
+      "filesystem": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 4,
+      "informational": 1,
       "notable": 3
     },
-    "undocumented": 7
+    "undocumented": 4
   },
   "changes": [
     {
@@ -110,145 +110,24 @@
       "documented": false
     },
     {
-      "id": "hooks.events.PreToolUse.control",
-      "category": "hooks",
+      "id": "filesystem.linux/amd64.paths.<codex-home>/logs_2.sqlite.ops.write",
+      "category": "filesystem",
       "op": "added",
       "path": [
-        "hooks",
-        "events",
-        "PreToolUse",
-        "control"
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/logs_2.sqlite",
+        "ops",
+        "write"
       ],
-      "title": "Hook events.PreToolUse.control added",
+      "title": "Now writes <codex-home>/logs_2.sqlite (linux/amd64)",
       "impact": "informational",
       "before": null,
-      "after": {
-        "exit_2": "blocks the tool; message to the model",
-        "json_decision": "blocks the tool; message to the model"
-      },
+      "after": "write",
       "text_diff": null,
       "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1229,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1229"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 426,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L426"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionStart.control",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionStart",
-        "control"
-      ],
-      "title": "Hook events.SessionStart.control added",
-      "impact": "informational",
-      "before": null,
-      "after": {
-        "additional_context": "reaches the model",
-        "exit_2": "message not shown to the model"
-      },
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1234,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1234"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 441,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L441"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.Stop.control",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "Stop",
-        "control"
-      ],
-      "title": "Hook events.Stop.control added",
-      "impact": "informational",
-      "before": null,
-      "after": {
-        "exit_2": "keeps the turn going; message to the model",
-        "json_decision": "keeps the turn going; message to the model"
-      },
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1238,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1238"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 453,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L453"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.UserPromptSubmit.control.additional_context",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "UserPromptSubmit",
-        "control",
-        "additional_context"
-      ],
-      "title": "UserPromptSubmit hook control (additional_context) added",
-      "impact": "informational",
-      "before": null,
-      "after": "reaches the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1235,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/analytics/src/events.rs#L1235"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 444,
-            "url": "https://github.com/openai/codex/blob/rust-v0.144.4/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L444"
-          }
-        ],
-        "gone": false
-      },
+      "source": null,
       "documented": false
     }
   ]

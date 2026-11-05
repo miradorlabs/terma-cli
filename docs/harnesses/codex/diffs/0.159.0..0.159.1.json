@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.159.0",
   "to": "0.159.1",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.159.0...rust-v0.159.1"
   },
@@ -12,11 +12,11 @@
     "text": "## New Features\n- Added GPT-6.1 Sol as the default model in the bundled catalog and Amazon Bedrock Mantle and Runtime catalogs. (#49323, #49342)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.159.0...rust-v0.159.1\n\n- #49323 [0.159] Prepare 0.159.1 release backports @andrewgu-oai\n- #49342 [0.159] Backport GPT-6.1 Sol Bedrock catalogs @celia-oai"
   },
   "summary": {
-    "changes": 14,
+    "changes": 12,
     "categories": {
       "behavior": 6,
       "cli": 2,
-      "hooks": 3,
+      "filesystem": 1,
       "model": 1,
       "prompt": 1,
       "tools": 1
@@ -24,10 +24,10 @@
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 5,
-      "notable": 9
+      "informational": 2,
+      "notable": 10
     },
-    "undocumented": 9
+    "undocumented": 7
   },
   "changes": [
     {
@@ -223,108 +223,6 @@
       "documented": false
     },
     {
-      "id": "hooks.events.PreToolUse.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "PreToolUse",
-        "control",
-        "exit_2"
-      ],
-      "title": "PreToolUse hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "blocks the tool; message to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1474,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/analytics/src/events.rs#L1474"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 592,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L592"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionStart.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionStart",
-        "control",
-        "exit_2"
-      ],
-      "title": "SessionStart hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "message not shown to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1479,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/analytics/src/events.rs#L1479"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 607,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L607"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.Stop.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "Stop",
-        "control",
-        "exit_2"
-      ],
-      "title": "Stop hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "keeps the turn going; message to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1484,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/analytics/src/events.rs#L1484"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 622,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L622"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
       "id": "cli.commands.codex delete.description",
       "category": "cli",
       "op": "changed",
@@ -376,6 +274,134 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --bind <tmp> <tmp> --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --perms 555 --tmpfs <tmp>/.aws --remount-ro <tmp>/.aws --ro-bind <tmp>/codex-bwrap-synthetic-mount-targets-<id> <tmp>/codex-bwrap-synthetic-mount-targets-<id> --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --perms 555 --tmpfs <repo>/.aws --remount-ro <repo>/.aws --unshare-user --unshare-pid --unshare-ipc --unshare-net --cap-drop ALL --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"missing_path_behavior… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --bind <tmp> <tmp> --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --perms 555 --tmpfs <tmp>/.aws --remount-ro <tmp>/.aws --ro-bind <tmp>/codex-bwrap-synthetic-mount-targets-<id> <tmp>/codex-bwrap-synthetic-mount-targets-<id> --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --perms 555 --tmpfs <repo>/.aws --remount-ro <repo>/.aws --unshare-user --unshare-pid --unshare-ipc --unshare-net --cap-drop ALL --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"missing_path_behavior… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…"
+      ],
+      "title": "New command at turn: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "bwrap",
+          "--as-pid-1",
+          "--new-session",
+          "--die-with-parent",
+          "--ro-bind",
+          "/",
+          "/",
+          "--dev",
+          "/dev",
+          "--perms",
+          "000",
+          "--tmpfs",
+          "<tmp>/codex-daemon-<id>",
+          "--remount-ro",
+          "<tmp>/codex-daemon-<id>",
+          "--bind",
+          "<tmp>",
+          "<tmp>",
+          "--perms",
+          "000",
+          "--tmpfs",
+          "<tmp>/codex-daemon-<id>",
+          "--remount-ro",
+          "<tmp>/codex-daemon-<id>",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.git",
+          "--remount-ro",
+          "<tmp>/.git",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.agents",
+          "--remount-ro",
+          "<tmp>/.agents",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.codex",
+          "--remount-ro",
+          "<tmp>/.codex",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.aws",
+          "--remount-ro",
+          "<tmp>/.aws",
+          "--ro-bind",
+          "<tmp>/codex-bwrap-synthetic-mount-targets-<id>",
+          "<tmp>/codex-bwrap-synthetic-mount-targets-<id>",
+          "--bind",
+          "<repo>",
+          "<repo>",
+          "--ro-bind",
+          "<repo>/.git",
+          "<repo>/.git",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.agents",
+          "--remount-ro",
+          "<repo>/.agents",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.codex",
+          "--remount-ro",
+          "<repo>/.codex",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.aws",
+          "--remount-ro",
+          "<repo>/.aws",
+          "--unshare-user",
+          "--unshare-pid",
+          "--unshare-ipc",
+          "--unshare-net",
+          "--cap-drop",
+          "ALL",
+          "--argv0",
+          "codex-linux-sandbox",
+          "--",
+          "<install>/codex",
+          "--sandbox-policy-cwd",
+          "<repo>",
+          "--command-cwd",
+          "<repo>",
+          "--permission-profile",
+          "{\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"missing_path_behavior…",
+          "--apply-seccomp-then-exec",
+          "--",
+          "/bin/bash",
+          "-c",
+          "__CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…"
+        ],
+        "by": "codex",
+        "count": 2,
+        "parents": [
+          "codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"missing_path_behavior… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "runs the tool command in a sandbox (bubblewrap)",
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.103.0",
   "to": "0.104.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.103.0...rust-v0.104.0"
   },
@@ -12,17 +12,18 @@
     "text": "## New Features\n- Added `WS_PROXY`/`WSS_PROXY` environment support (including lowercase variants) for websocket proxying in the network proxy. (#11784)\n- App-server v2 now emits notifications when threads are archived or unarchived, enabling clients to react without polling. (#12030)\n- Protocol/core now carry distinct approval IDs for command approvals to support multiple approvals within a single shell command execution flow. (#12051)\n\n## Bug Fixes\n- `Ctrl+C`/`Ctrl+D` now cleanly exits the cwd-change prompt during resume/fork flows instead of implicitly selecting an option. (#12040)\n- Reduced false-positive safety-check downgrade behavior by relying on the response header model (and websocket top-level events) rather than the response body model slug. (#12061)\n\n## Documentation\n- Updated docs and schemas to cover websocket proxy configuration, new thread archive/unarchive notifications, and the command approval ID plumbing. (#11784, #12030, #12051)\n\n## Chores\n- Made the Rust release workflow resilient to `npm publish` attempts for an already-published version. (#12044)\n- Standardized remote compaction test mocking and refreshed related snapshots to align with the default production-shaped behavior. (#12050)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.103.0...rust-v0.104.0\n\n- #11784 feat(network-proxy): add websocket proxy env support @viyatb-oai\n- #12044 don't fail if an npm publish attempt is for an existing version. @iceweasel-oai\n- #12040 tui: exit session on Ctrl+C in cwd change prompt @charley-oai\n- #12030 app-server: Emit thread archive/unarchive notifications @euroelessar\n- #12061 Chore: remove response model check and rely on header model for downgrade @shijie-oai\n- #12051 feat(core): plumb distinct approval ids for command approvals @owenlin0\n- #12050 Unify remote compaction snapshot mocks around default endpoint behavior @charley-oai"
   },
   "summary": {
-    "changes": 3,
+    "changes": 8,
     "categories": {
-      "cli": 3
+      "cli": 3,
+      "filesystem": 5
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 8,
       "notable": 0
     },
-    "undocumented": 3
+    "undocumented": 8
   },
   "changes": [
     {
@@ -108,6 +109,111 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.sed /^$/d.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "sed /^$/d",
+        "phases",
+        "startup"
+      ],
+      "title": "`sed /^$/d` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.tr -d  .phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "tr -d  ",
+        "phases",
+        "startup"
+      ],
+      "title": "`tr -d  ` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.wc -l.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "wc -l",
+        "phases",
+        "startup"
+      ],
+      "title": "`wc -l` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.sed /^$/d.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "sed /^$/d",
+        "phases",
+        "turn"
+      ],
+      "title": "`sed /^$/d` now also runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.wc -l.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "wc -l",
+        "phases",
+        "turn"
+      ],
+      "title": "`wc -l` now also runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

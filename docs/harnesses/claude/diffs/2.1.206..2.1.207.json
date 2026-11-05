@@ -3,26 +3,26 @@
   "harness": "claude",
   "from": "2.1.206",
   "to": "2.1.207",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Auto mode is now available without `CLAUDE_CODE_ENABLE_AUTO_MODE` opt-in on Bedrock, Vertex AI, and Foundry; disable via `disableAutoMode` in settings\n- Fixed the terminal freezing and keystrokes lagging while streaming responses containing very long lists, tables, paragraphs, or code blocks\n- Fixed remote managed settings from a non-interactive run (`claude -p`, the SDK) being permanently recorded as consented without ever showing the security consent dialog\n- Fixed spurious prompt-injection warnings triggered by benign system-generated conversation updates\n- Fixed the auto-updater overwriting a custom launcher script or symlink at `~/.local/bin/claude` on every release; `/doctor` now reports an externally managed launcher\n- Fixed compound commands with `cd` prompting for permission when the only output redirect was to `/dev/null`\n- Fixed the transcript jumping above the start of the answer when a response finishes streaming\n- Fixed `extensions.worktreeConfig` being left in the repo's `.git/config` (breaking go-git tools like `tea`) after the last `worktree.sparsePaths` worktree was removed\n- Fixed malformed bracket patterns in rules globs, skill paths, `.ignore`, and `.worktreeinclude` breaking file reads, file suggestions, and worktree creation\n- Fixed a crash loop in agent teams where a malformed teammate mailbox message caused repeated errors every second until the mailbox file was manually deleted\n- Fixed background sessions auto-named by accepting a plan not showing that name on their agent-view row\n- Fixed background sessions that entered a git worktree resuming blank after a cold reopen from the agent list\n- Fixed Remote Control task status updates being lost when the connection recovered from a network interruption or credential refresh\n- Fixed Remote Control sessions hosted by the desktop app not showing background agent and workflow progress on mobile and web\n- Fixed Deep research runs labeling every Fetch-phase agent \"unknown\" — chips now show the source hostname\n- Fixed Bedrock repeatedly requesting fresh AWS SSO credentials from IAM Identity Center on every API request\n- Improved agent view: pasting the same text again now expands the collapsed `[Pasted text #N]` placeholder instead of adding a second one\n- Improved agent view: blocked session peeks now lead with the question and show a worded staleness clock (`waiting 3m`) instead of the same timestamp twice\n- Changed Bedrock, Vertex, and Claude Platform on AWS to default to Claude Opus 4.8\n- Changed auto mode to no longer read `autoMode` from `.claude/settings.local.json` (repo-resident); use `~/.claude/settings.json` instead\n- Fixed an indefinite hang on Windows when AWS credential resolution stalls (e.g. a stuck `credential_process`): the 60-second stall guard now fires instead of waiting forever.\n- Plugin hooks/monitors/MCP headersHelper: `${user_config.*}` in shell-form commands is now rejected (shell-injection fix). Hooks: use exec form (`args` array) or `$CLAUDE_PLUGIN_OPTION_<KEY>`; monitors and headersHelper: read the value inside the script (config file or the server's `env` block).\n- Plugin option values (`pluginConfigs`) are no longer read from project-level `.claude/settings.json`; only user, `--settings`, and managed settings are honored\n- Fixed `/usage-credits` amount inputs silently stripping malformed values (e.g. a pasted timestamp) to digits; malformed amounts are now rejected with an error, and amounts over $1,000 require a typed confirmation"
   },
   "summary": {
-    "changes": 12,
+    "changes": 13,
     "categories": {
       "config": 10,
-      "hooks": 1,
+      "filesystem": 2,
       "tools": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 10,
-      "notable": 2
+      "informational": 12,
+      "notable": 1
     },
-    "undocumented": 11
+    "undocumented": 12
   },
   "changes": [
     {
@@ -43,26 +43,6 @@
         "added_chars": 230,
         "removed_chars": 200
       },
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.keys.prompt_id",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "keys",
-        "prompt_id"
-      ],
-      "title": "SessionEnd hook payload field prompt_id removed",
-      "impact": "notable",
-      "before": "prompt_id",
-      "after": null,
-      "text_diff": null,
       "terma": null,
       "source": null,
       "documented": false
@@ -246,6 +226,58 @@
       "terma": null,
       "source": null,
       "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<repo>/.git/refs/remotes",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<repo>/.git/refs/remotes"
+      ],
+      "title": "Now looks for <repo>/.git/refs/remotes (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<repo>/.git/refs/remotes/origin",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<repo>/.git/refs/remotes/origin"
+      ],
+      "title": "Now looks for <repo>/.git/refs/remotes/origin (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
     }
   ]
 }

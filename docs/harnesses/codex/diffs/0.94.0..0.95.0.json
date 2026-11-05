@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.94.0",
   "to": "0.95.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.94.0...rust-v0.95.0"
   },
@@ -12,20 +12,21 @@
     "text": "## New Features\n- Added `codex app <path>` on macOS to launch Codex Desktop from the CLI, with automatic DMG download if it is missing. (#10418)\n- Added personal skill loading from `~/.agents/skills` (with `~/.codex/skills` compatibility), plus app-server APIs/events to list and download public remote skills. (#10437, #10448)\n- `/plan` now accepts inline prompt arguments and pasted images, and slash-command editing/highlighting in the TUI is more polished. (#10269)\n- Shell-related tools can now run in parallel, improving multi-command execution throughput. (#10505)\n- Shell executions now receive `CODEX_THREAD_ID`, so scripts and skills can detect the active thread/session. (#10096)\n- Added vendored Bubblewrap + FFI wiring in the Linux sandbox as groundwork for upcoming runtime integration. (#10413)\n\n## Bug Fixes\n- Hardened Git command safety so destructive or write-capable invocations no longer bypass approval checks. (#10258)\n- Improved resume/thread browsing reliability by correctly showing saved thread names and fixing thread listing behavior. (#10340, #10383)\n- Fixed first-run trust-mode handling so sandbox mode is reported consistently, and made `$PWD/.agents` read-only like `$PWD/.codex`. (#10415, #10524)\n- Fixed `codex exec` hanging after interrupt in websocket/streaming flows; interrupted turns now shut down cleanly. (#10519)\n- Fixed review-mode approval event wiring so `requestApproval` IDs align with the corresponding command execution items. (#10416)\n- Improved 401 error diagnostics by including server message/body details plus `cf-ray` and `requestId`. (#10508)\n\n## Documentation\n- Expanded TUI chat composer docs to cover slash-command arguments and attachment handling in plan/review flows. (#10269)\n- Refreshed issue templates and labeler prompts to better separate CLI/app bug reporting and feature requests. (#10411, #10453, #10548, #10552)\n\n## Chores\n- Completed migration off the deprecated `mcp-types` crate to `rmcp`-based protocol types/adapters, then removed the legacy crate. (#10356, #10349, #10357)\n- Updated the `bytes` dependency for a security advisory and cleaned up resolved advisory configuration. (#10525)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.94.0...rust-v0.95.0\n\n- #10340 Session picker shows thread_name if set @pap-openai\n- #10381 chore: collab experimental @jif-oai\n- #10231 feat: experimental flags @jif-oai\n- #10382 nit: shell snapshot retention to 3 days @jif-oai\n- #10383 fix: thread listing @jif-oai\n- #10386 fix: Rfc3339 casting @jif-oai\n- #10356 feat: add MCP protocol types and rmcp adapters @bolinfest\n- #10269 Nicer highlighting of slash commands, /plan accepts prompt args and pasted images @charley-oai\n- #10274 Add credits tooltip @pakrym-oai\n- #10394 chore: ignore synthetic messages @jif-oai\n- #10398 feat: drop sqlx logging @jif-oai\n- #10281 Select experimental features with space @pakrym-oai\n- #10402 feat: add `--experimental` to `generate-ts` @jif-oai\n- #10258 fix: unsafe auto-approval of git commands @viyatb-oai\n- #10411 Updated labeler workflow prompt to include \"app\" label @etraut-openai\n- #10399 emit a separate metric when the user cancels UAT during elevated setup @iceweasel-oai\n- #10377 chore(tui) /personalities tip @dylan-hurd-oai\n- #10252 [feat] persist thread_dynamic_tools in db @celia-oai\n- #10437 feat: Read personal skills from .agents/skills @gverma-openai\n- #10145 make codex better at git @pash-openai\n- #10418 Add `codex app` macOS launcher @aibrahim-oai\n- #10447 Fix plan implementation prompt reappearing after /agent thread switch @charley-oai\n- #10064 TUI: Render request_user_input results in history and simplify interrupt handling @charley-oai\n- #10349 feat: replace custom mcp-types crate with equivalents from rmcp @bolinfest\n- #10415 Fixed sandbox mode inconsistency if untrusted is selected @etraut-openai\n- #10452 Hide short worked-for label in final separator @aibrahim-oai\n- #10357 chore: remove deprecated mcp-types crate @bolinfest\n- #10454 app tool tip @aibrahim-oai\n- #10455 chore: add phase to message responseitem @sayan-oai\n- #10414 Require models refresh on cli version mismatch @aibrahim-oai\n- #10271 [Codex][CLI] Gate image inputs by model modalities @ccy-oai\n- #10374 Trim compaction input @pakrym-oai\n- #10453 Updated bug and feature templates @etraut-openai\n- #10465 Restore status after preamble @pakrym-oai\n- #10406 fix: clarify deprecation message for features.web_search @sayan-oai\n- #10474 Ignore remote_compact_trims_function_call_history_to_fit_context_window on windows @pakrym-oai\n- #10413 feat(linux-sandbox): vendor bubblewrap and wire it with FFI @viyatb-oai\n- #10142 feat(secrets): add codex-secrets crate @viyatb-oai\n- #10157 chore: nuke chat/completions API @jif-oai\n- #10498 feat: drop wire_api from clients @jif-oai\n- #10501 feat: clean codex-api part 1 @jif-oai\n- #10508 Add more detail to 401 error @gt-oai\n- #10521 Avoid redundant transactional check before inserting dynamic tools @jif-oai\n- #10525 chore: update bytes crate in response to security advisory @bolinfest\n- #10408 fix WebSearchAction type clash between v1 and v2 @sayan-oai\n- #10404 Cleanup collaboration mode variants @charley-oai\n- #10505 Enable parallel shell tools @jif-oai\n- #10532 feat: `find_thread_path_by_id_str_in_subdir` from DB @jif-oai\n- #10524 fix: make $PWD/.agents read-only like $PWD/.codex @bolinfest\n- #10096 Inject CODEX_THREAD_ID into the terminal environment @maxj-oai\n- #10536 Revert \"Load untrusted rules\" @viyatb-oai\n- #10412 fix(app-server): fix TS annotations for optional fields on requests @owenlin0\n- #10416 fix(app-server): fix approval events in review mode @owenlin0\n- #10545 Improve Default mode prompt (less confusion with Plan mode) @charley-oai\n- #10289 [apps] Gateway MCP should be blocking. @mzeng-openai\n- #10189 implement per-workspace capability SIDs for workspace specific ACLs @iceweasel-oai\n- #10548 Updated bug templates and added a new one for app @etraut-openai\n- #10531 [codex] Default values from requirements if unset @gt-oai\n- #10552 Fixed icon for CLI bug template @etraut-openai\n- #10039 chore(arg0): advisory-lock janitor for codex tmp paths @viyatb-oai\n- #10448 feat: add APIs to list and download public remote skills @xl-openai\n- #10519 Handle exec shutdown on Interrupt (fixes immortal `codex exec` with websockets) @rasmusrygaard\n- #10556 Feat: add upgrade to app server modelList @shijie-oai\n- #10461 feat(tui): pace catch-up stream chunking with hysteresis @joshka-oai\n- #10367 chore: add `codex debug app-server` tooling @celia-oai"
   },
   "summary": {
-    "changes": 34,
+    "changes": 45,
     "categories": {
       "binary": 5,
       "cli": 19,
       "config": 9,
+      "filesystem": 11,
       "tools": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 27,
-      "notable": 7
+      "informational": 36,
+      "notable": 9
     },
-    "undocumented": 21
+    "undocumented": 27
   },
   "changes": [
     {
@@ -772,6 +773,306 @@
         "added_chars": 84,
         "removed_chars": 89
       },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git rev-parse HEAD.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git rev-parse HEAD",
+        "phases",
+        "turn"
+      ],
+      "title": "`git rev-parse HEAD` now also runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git remote -v",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git remote -v"
+      ],
+      "title": "New command at turn: `git remote -v` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "git",
+          "remote",
+          "-v"
+        ],
+        "by": "codex",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.uname -m",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "uname -m"
+      ],
+      "title": "Command no longer run: `uname -m` (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "uname",
+          "-m"
+        ],
+        "by": "codex",
+        "count": 6,
+        "parents": [],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "detects the platform and installed package managers",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.lookups.uname",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "lookups",
+        "uname"
+      ],
+      "title": "No longer looks for the program uname on the PATH (darwin/arm64)",
+      "impact": "informational",
+      "before": "uname",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths./etc/rpi-issue",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "/etc/rpi-issue"
+      ],
+      "title": "Now looks for /etc/rpi-issue (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<home>/.agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<home>/.agents"
+      ],
+      "title": "Now looks for ~/.agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<repo>/.agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<repo>/.agents"
+      ],
+      "title": "Now looks for <repo>/.agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<tmp>/.agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<tmp>/.agents"
+      ],
+      "title": "Now looks for <tmp>/.agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git rev-parse HEAD.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git rev-parse HEAD",
+        "phases",
+        "turn"
+      ],
+      "title": "`git rev-parse HEAD` now also runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git remote -v",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git remote -v"
+      ],
+      "title": "New command at turn: `git remote -v` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "git",
+          "remote",
+          "-v"
+        ],
+        "by": "codex",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "reads the repository's state for the model's context",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.uname -m",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "uname -m"
+      ],
+      "title": "Command no longer run: `uname -m` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "uname",
+          "-m"
+        ],
+        "by": "codex",
+        "count": 6,
+        "parents": [],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "detects the platform and installed package managers",
+        "role": "harness"
+      },
+      "after": null,
+      "text_diff": null,
       "terma": null,
       "source": null,
       "documented": false

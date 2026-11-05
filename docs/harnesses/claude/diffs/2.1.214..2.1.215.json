@@ -3,26 +3,25 @@
   "harness": "claude",
   "from": "2.1.214",
   "to": "2.1.215",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Claude no longer runs the `/verify` and `/code-review` skills on its own; invoke them with `/verify` or `/code-review` when you want them"
   },
   "summary": {
-    "changes": 6,
+    "changes": 5,
     "categories": {
       "config": 3,
-      "hooks": 1,
       "prompt": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 4,
+      "informational": 3,
       "notable": 2
     },
-    "undocumented": 6
+    "undocumented": 5
   },
   "changes": [
     {
@@ -68,26 +67,6 @@
         "added_chars": 0,
         "removed_chars": 826
       },
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.keys.prompt_id",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "keys",
-        "prompt_id"
-      ],
-      "title": "SessionEnd hook payload field prompt_id added",
-      "impact": "informational",
-      "before": null,
-      "after": "prompt_id",
-      "text_diff": null,
       "terma": null,
       "source": null,
       "documented": false

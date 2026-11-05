@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.106.0",
   "to": "0.107.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.106.0...rust-v0.107.0"
   },
@@ -12,18 +12,19 @@
     "text": "## New Features\n- You can now fork a thread into sub-agents, making it easier to branch work without leaving the current conversation. (#12499)\n- Realtime voice sessions now let you pick microphone and speaker devices, persist those choices, and send audio in a format better aligned with transcription. (#12849, #12850, #13030)\n- Custom tools can now return multimodal output, including structured content like images, instead of being limited to plain text. (#12948)\n- The app server now exposes richer model availability and upgrade metadata, and the TUI uses it to explain plan-gated models with limited-run tooltips. (#12958, #12972, #13021)\n- Memories are now configurable, and there is a new `codex debug clear-memories` command to fully reset saved memory state when needed. (#12997, #12999, #13002, #13085)\n\n## Bug Fixes\n- Reconnecting with `thread/resume` now restores pending approval and input requests instead of leaving clients out of sync. (#12560)\n- `thread/start` no longer blocks unrelated app-server requests, reducing stalls during slow startup paths such as MCP auth checks. (#13033)\n- Interactive terminal sessions no longer print the final assistant response twice. (#13082)\n- Large pasted-content placeholders now survive file completion correctly, fixing a regression from `0.106.0`. (#13070)\n- ChatGPT accounts that arrive without plan info now handle account reads correctly instead of triggering repeated login issues. (#13072)\n- Diff rendering in the TUI now respects theme colors better and displays more cleanly in Windows Terminal and other low-color environments. (#13016, #13037)\n- MCP OAuth login flows now forward configured `oauth_resource` values correctly for servers that require a `resource` parameter. (#12866)\n\n## Documentation\n- Updated sandbox escalation guidance so dependency-install failures caused by sandboxed network access are more clearly treated as escalation candidates. (#13051)\n\n## Chores\n- Tightened sandbox filesystem behavior by improving restricted read-only handling on Linux and avoiding sensitive directories like `~/.ssh` on Windows. (#12369, #12835)\n- Escalated shell commands now keep their sandbox configuration when rerun, closing a gap where approvals could lose the intended restrictions. (#12839)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.106.0...rust-v0.107.0\n\n- #12925 chore: calm down awaiter @jif-oai\n- #12499 feat: fork thread multi agent @jif-oai\n- #12837 Log js_repl nested tool responses in rollout history @fjord-oai\n- #12774 feat: add post-compaction sub-agent infos @jif-oai\n- #12929 Remove noisy log @pakrym-oai\n- #12835 don't grant sandbox read access to ~/.ssh and a few other dirs. @iceweasel-oai\n- #12839 feat: include sandbox config with escalation request @bolinfest\n- #12940 feat: add git info to memories @jif-oai\n- #12727 tui: use thread_id for resume/fork cwd resolution @charley-oai\n- #12950 Allow clients not to send summary as an option @pakrym-oai\n- #12944 fix: sort codex features list alphabetically @bolinfest\n- #12849 Add realtime audio device config @aibrahim-oai\n- #12957 test: move unix_escalation tests into sibling file @bolinfest\n- #12947 feat: add local date/timezone to turn environment context @celia-oai\n- #12959 Make realtime audio test deterministic @aibrahim-oai\n- #12958 Feat: cxa-1833 update model/list @shijie-oai\n- #12850 Add realtime audio device picker @aibrahim-oai\n- #12948 Support multimodal custom tool outputs @fjord-oai\n- #12745 [apps] Improve app/list with force_fetch=true @mzeng-openai\n- #12866 Add oauth_resource handling for MCP login flows @etraut-openai\n- #12936 Add a background job to refresh the requirements local cache @alexsong-oai\n- #12972 Add model availability NUX metadata @aibrahim-oai\n- #12981 Add realtime websocket tracing @aibrahim-oai\n- #12968 notify: include client in legacy hook payload @bolinfest\n- #12997 feat: add use memories config @jif-oai\n- #12999 feat: gen memories config @jif-oai\n- #13002 feat: use the memory mode for phase 1 extraction @jif-oai\n- #13001 chore: tmp remove awaiter @jif-oai\n- #13011 fix: more stable notify script @jif-oai\n- #12970 fix: use AbsolutePathBuf for permission profile file roots @bolinfest\n- #13016 fix(tui): promote windows terminal diff ansi16 to truecolor @fcoury\n- #13030 Align TUI voice transcription audio with 4o ASR @nornagon-openai\n- #13047 app-server: deflake running thread resume tests @bolinfest\n- #12560 app-server: Replay pending item requests on `thread/resume` @euroelessar\n- #13055 fix: disable Bazel builds in CI on ubuntu-24.04-arm until we can stabilize them @bolinfest\n- #12964 execpolicy: add host_executable() path mappings @bolinfest\n- #13051 Clarify escalation guidance for sandbox-related network failures @daniel-oai\n- #12612 Unify rollout reconstruction with resume/fork TurnContext hydration @charley-oai\n- #13067 [apps] Stablize app list updated event. @mzeng-openai\n- #12369 feat(linux-sandbox): support restricted ReadOnlyAccess in bwrap @viyatb-oai\n- #13037 fix(tui): theme-aware diff backgrounds with fallback behavior @fcoury\n- #13070 Keep large-paste placeholders intact during file completion @etraut-openai\n- #13072 Handle missing plan info for ChatGPT accounts @etraut-openai\n- #13021 Add model availability NUX tooltips @aibrahim-oai\n- #13080 app-server: Add an ability to watch events in the test client @euroelessar\n- #13082 Suppress duplicate assistant output on stdout in interactive sessions @etraut-openai\n- #13033 fix(app-server): make thread/start non-blocking @owenlin0\n- #13046 core: adopt host_executable() rules in zsh-fork @bolinfest\n- #13084 app-server: Add `ephemeral` field to `Thread` object @euroelessar\n- #13085 feat: add debug clear-memories command to hard-wipe memories state @sayan-oai"
   },
   "summary": {
-    "changes": 10,
+    "changes": 23,
     "categories": {
       "config": 9,
+      "filesystem": 13,
       "prompt": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 8,
-      "notable": 2
+      "informational": 18,
+      "notable": 5
     },
-    "undocumented": 4
+    "undocumented": 9
   },
   "changes": [
     {
@@ -323,6 +324,311 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\".phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"",
+        "phases",
+        "startup"
+      ],
+      "title": "`/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\".phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"",
+        "phases",
+        "turn"
+      ],
+      "title": "`/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./usr/libexec/path_helper -s.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/usr/libexec/path_helper -s",
+        "phases",
+        "turn"
+      ],
+      "title": "`/usr/libexec/path_helper -s` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./usr/libexec/path_helper -s.role",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/usr/libexec/path_helper -s",
+        "role"
+      ],
+      "title": "`/usr/libexec/path_helper -s` now runs as the build's own doing (was both the build's own and the tool call's) (darwin/arm64)",
+      "impact": "notable",
+      "before": "both",
+      "after": "harness",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}",
+        "phases",
+        "startup"
+      ],
+      "title": "`awk …` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}",
+        "phases",
+        "turn"
+      ],
+      "title": "`awk …` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.sed /^$/d.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "sed /^$/d",
+        "phases",
+        "turn"
+      ],
+      "title": "`sed /^$/d` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.tr -d  .phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "tr -d  ",
+        "phases",
+        "turn"
+      ],
+      "title": "`tr -d  ` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.wc -l.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "wc -l",
+        "phases",
+        "turn"
+      ],
+      "title": "`wc -l` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.model\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.logicalcpu\")\n  (sysctl-name \"hw.cpufrequency\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"machdep.cpu.brand_string\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n\n; macOS permission profile extensions\n(allow ipc-posix-shm-read* (ipc-posix-name-prefix \"apple.cfprefs.\"))\n(allow mach-lookup\n    (global-name \"com.apple.cfprefsd.daemon\")\n    (global-name \"com.apple.cfprefsd.agent\")\n    (local-name \"com.apple.cfprefsd.agent\"))\n(allow user-preference-read)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.model\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.logicalcpu\")\n  (sysctl-name \"hw.cpufrequency\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"machdep.cpu.brand_string\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n\n; macOS permission profile extensions\n(allow ipc-posix-shm-read* (ipc-posix-name-prefix \"apple.cfprefs.\"))\n(allow mach-lookup\n    (global-name \"com.apple.cfprefsd.daemon\")\n    (global-name \"com.apple.cfprefsd.agent\")\n    (local-name \"com.apple.cfprefsd.agent\"))\n(allow user-preference-read)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+      ],
+      "title": "Command changed: `/usr/bin/sandbox-exec -p (version 1) …` (+109 −16 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.model\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.logicalcpu\")\n  (sysctl-name \"hw.cpufrequency\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"machdep.cpu.brand_string\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n\n; macOS permission profile extensions\n(allow ipc-posix-shm-read* (ipc-posix-name-prefix \"apple.cfprefs.\"))\n(allow mach-lookup\n    (global-name \"com.apple.cfprefsd.daemon\")\n    (global-name \"com.apple.cfprefsd.agent\")\n    (local-name \"com.apple.cfprefsd.agent\"))\n(allow user-preference-read)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -lc git status --short && git log --oneline -1",
+      "after": "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.model\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.logicalcpu\")\n  (sysctl-name \"hw.cpufrequency\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"machdep.cpu.brand_string\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n\n; macOS permission profile extensions\n(allow ipc-posix-shm-read* (ipc-posix-name-prefix \"apple.cfprefs.\"))\n(allow mach-lookup\n    (global-name \"com.apple.cfprefsd.daemon\")\n    (global-name \"com.apple.cfprefsd.agent\")\n    (local-name \"com.apple.cfprefsd.agent\"))\n(allow user-preference-read)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'",
+      "text_diff": "@@ -128,7 +128,10 @@\n -DWRITABLE_ROOT_2=<tmp>\n -DDARWIN_USER_CACHE_DIR=<tmp>/../C\n -- /bin/bash\n--lc git status\n+-c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n+\n+exec '/bin/bash'\n+-c 'git status\n --short && git log\n --oneline\n--1\n+-1'\n",
+      "stats": {
+        "added_chars": 109,
+        "removed_chars": 16
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c git status --short && git log --oneline -1",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c git status --short && git log --oneline -1"
+      ],
+      "title": "New command at turn: `/bin/bash -c git status --short && git log --oneline -1` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "git status --short && git log --oneline -1"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+      ],
+      "title": "New command at turn: `/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi …` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+        ],
+        "by": "sandbox-exec",
+        "count": 1,
+        "parents": [
+          "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.model\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.logicalcpu\")\n  (sysctl-name \"hw.cpufrequency\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"machdep.cpu.brand_string\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n\n; macOS permission profile extensions\n(allow ipc-posix-shm-read* (ipc-posix-name-prefix \"apple.cfprefs.\"))\n(allow mach-lookup\n    (global-name \"com.apple.cfprefsd.daemon\")\n    (global-name \"com.apple.cfprefsd.agent\")\n    (local-name \"com.apple.cfprefsd.agent\"))\n(allow user-preference-read)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/memories/memory_summary.md",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/memories/memory_summary.md"
+      ],
+      "title": "No longer looks for <codex-home>/memories/memory_summary.md (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

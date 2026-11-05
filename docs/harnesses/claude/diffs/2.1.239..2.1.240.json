@@ -3,67 +3,26 @@
   "harness": "claude",
   "from": "2.1.239",
   "to": "2.1.240",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Bug fixes and reliability improvements"
   },
   "summary": {
-    "changes": 4,
+    "changes": 2,
     "categories": {
-      "config": 2,
-      "hooks": 2
+      "config": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 4,
+      "informational": 2,
       "notable": 0
     },
-    "undocumented": 4
+    "undocumented": 2
   },
   "changes": [
-    {
-      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
     {
       "id": "config.env_vars.CLAUDE_CODE_SABLE_THRUSH",
       "category": "config",

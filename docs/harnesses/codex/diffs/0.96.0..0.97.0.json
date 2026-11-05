@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.96.0",
   "to": "0.97.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.96.0...rust-v0.97.0"
   },
@@ -12,14 +12,15 @@
     "text": "## New Features\n- Added a session-scoped “Allow and remember” option for MCP/App tool approvals, so repeated calls to the same tool can be auto-approved during the session. (#10584)\n- Added live skill update detection, so skill file changes are picked up without restarting. (#10478)\n- Added support for mixed text and image content in dynamic tool outputs for app-server integrations. (#10567)\n- Added a new `/debug-config` slash command in the TUI to inspect effective configuration. (#10642)\n- Introduced initial memory plumbing (API client + local persistence) to support thread memory summaries. (#10629, #10634)\n- Added configurable `log_dir` so logs can be redirected (including via `-c` overrides) more easily. (#10678)\n\n## Bug Fixes\n- Fixed jitter in the TUI apps/connectors picker by stabilizing description-column rendering. (#10593)\n- Restored and stabilized the TUI “working” status indicator/shimmer during preamble and early exec flows. (#10700, #10701)\n- Improved cloud requirements reliability with higher timeouts, retries, and corrected precedence over MDM settings. (#10631, #10633, #10659)\n- Persisted pending-input user events more consistently for mid-turn injected input handling. (#10656)\n\n## Documentation\n- Documented how to opt in to the experimental app-server API. (#10667)\n- Updated docs/schema coverage for new `log_dir` configuration behavior. (#10678)\n\n## Chores\n- Added a gated Bubblewrap (`bwrap`) Linux sandbox path to improve filesystem isolation options. (#9938)\n- Refactored model client lifecycle to be session-scoped and reduced implicit client state. (#10595, #10664)\n- Added caching for MCP actions from apps to reduce repeated load latency for users with many installed apps. (#10662)\n- Added a `none` personality option in protocol/config surfaces. (#10688)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.96.0...rust-v0.97.0\n\n- #10595 Stop client from being state carrier @pakrym-oai\n- #10584 Add option to approve and remember MCP/Apps tool usage @canvrno-oai\n- #10644 fix: flaky test @jif-oai\n- #10629 feat: add phase 1 mem client @jif-oai\n- #10633 Cloud Requirements: take precedence over MDM @gt-oai\n- #10659 Increase cloud req timeout @gt-oai\n- #9938 feat(linux-sandbox): add bwrap support @viyatb-oai\n- #10656 Persist pending input user events @aibrahim-oai\n- #10634 feat: add phase 1 mem db @jif-oai\n- #10593 Fix jitter in TUI apps/connectors picker  @canvrno-oai\n- #10662 [apps] Cache MCP actions from apps. @mzeng-openai\n- #10649 Fix test_shell_command_interruption flake @gt-oai\n- #10642 Add /debug-config slash command @gt-oai\n- #10478 Added support for live updates to skills @etraut-openai\n- #10688 add none personality option @aibrahim-oai\n- #10567 feat(app-server, core): allow text + image content items for dynamic tool outputs @owenlin0\n- #10667 chore(app-server): document experimental API opt-in @owenlin0\n- #10664 Session-level model client @pakrym-oai\n- #10678 feat(core): add configurable log_dir @joshka-oai\n- #10631 Cloud Requirements: increase timeout and retries @gt-oai\n- #10650 chore(core) personality migration tests @dylan-hurd-oai\n- #10701 fix(tui): restore working shimmer after preamble output @joshka-oai\n- #10700 fix: ensure status indicator present earlier in exec path @sayan-oai"
   },
   "summary": {
-    "changes": 3,
+    "changes": 20,
     "categories": {
-      "config": 3
+      "config": 3,
+      "filesystem": 17
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 2,
+      "informational": 19,
       "notable": 1
     },
     "undocumented": 1
@@ -112,6 +113,368 @@
         ],
         "gone": false
       },
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/.codex-system-skills.marker.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/.codex-system-skills.marker",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/.codex-system-skills.marker (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/SKILL.md.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/SKILL.md",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/SKILL.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/assets/skill-creator-small.svg.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/assets/skill-creator-small.svg",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/assets/skill-creator-small.svg (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/assets/skill-creator.png.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/assets/skill-creator.png",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/assets/skill-creator.png (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/license.txt.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/license.txt",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/license.txt (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/references/openai_yaml.md.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/references/openai_yaml.md",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/references/openai_yaml.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/scripts/generate_openai_yaml.py.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/scripts/generate_openai_yaml.py",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/scripts/generate_openai_yaml.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/scripts/init_skill.py.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/scripts/init_skill.py",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/scripts/init_skill.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/scripts/quick_validate.py.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/scripts/quick_validate.py",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/scripts/quick_validate.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/LICENSE.txt.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/LICENSE.txt",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/LICENSE.txt (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/SKILL.md.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/SKILL.md",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/SKILL.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/assets/skill-installer-small.svg.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/assets/skill-installer-small.svg",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/assets/skill-installer-small.svg (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/assets/skill-installer.png.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/assets/skill-installer.png",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/assets/skill-installer.png (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/scripts/github_utils.py.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/scripts/github_utils.py",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/scripts/github_utils.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/scripts/install-skill-from-github.py.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/scripts/install-skill-from-github.py",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/scripts/install-skill-from-github.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/scripts/list-skills.py.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/scripts/list-skills.py",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/scripts/list-skills.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<home>/.agents/skills",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<home>/.agents/skills"
+      ],
+      "title": "Now looks for ~/.agents/skills (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": true
     }
   ]

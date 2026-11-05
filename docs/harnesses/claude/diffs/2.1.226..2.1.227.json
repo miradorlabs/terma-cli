@@ -3,7 +3,7 @@
   "harness": "claude",
   "from": "2.1.226",
   "to": "2.1.227",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
@@ -14,15 +14,15 @@
     "categories": {
       "cli": 3,
       "config": 10,
-      "hooks": 1,
+      "filesystem": 1,
       "prompt": 2,
       "tools": 3
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 13,
-      "notable": 6
+      "informational": 14,
+      "notable": 5
     },
     "undocumented": 19
   },
@@ -142,26 +142,6 @@
         "added_chars": 181,
         "removed_chars": 199
       },
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.keys.prompt_id",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "keys",
-        "prompt_id"
-      ],
-      "title": "SessionEnd hook payload field prompt_id removed",
-      "impact": "notable",
-      "before": "prompt_id",
-      "after": null,
-      "text_diff": null,
       "terma": null,
       "source": null,
       "documented": false
@@ -425,6 +405,32 @@
       "impact": "informational",
       "before": "DEBUG_SDK",
       "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/skills/synced",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/skills/synced"
+      ],
+      "title": "Now looks for <claude-config>/skills/synced (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
       "text_diff": null,
       "terma": null,
       "source": null,

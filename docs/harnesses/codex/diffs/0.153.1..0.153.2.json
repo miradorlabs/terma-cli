@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.153.1",
   "to": "0.153.2",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.153.1...rust-v0.153.2"
   },
@@ -12,17 +12,18 @@
     "text": "## Bug Fixes\n\n- Corrected the GPT-6-Astra Fast tier description to say “2x speed, increased usage” instead of “1.5x.” This changes only the displayed text, not how requests run. (#42632)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.153.1...rust-v0.153.2\n\n- #42632 Fix GPT-6-Astra Fast tier description for 0.153.2 @anp-oai"
   },
   "summary": {
-    "changes": 4,
+    "changes": 6,
     "categories": {
-      "caching": 4
+      "caching": 4,
+      "filesystem": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
+      "informational": 2,
       "notable": 4
     },
-    "undocumented": 4
+    "undocumented": 6
   },
   "changes": [
     {
@@ -96,6 +97,76 @@
       "impact": "notable",
       "before": 0,
       "after": 3,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git"
+      ],
+      "title": "Command no longer run: `/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app …` (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
+          "-sdk",
+          "/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+          "-find",
+          "git"
+        ],
+        "by": "sh",
+        "count": 1,
+        "parents": [
+          "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+      ],
+      "title": "Command no longer run: `sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26 …` (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "sh",
+          "-c",
+          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+        ],
+        "by": "git",
+        "count": 1,
+        "parents": [
+          "git status --short"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "after": null,
       "text_diff": null,
       "terma": null,
       "source": null,

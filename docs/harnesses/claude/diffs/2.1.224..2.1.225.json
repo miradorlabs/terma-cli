@@ -3,47 +3,26 @@
   "harness": "claude",
   "from": "2.1.224",
   "to": "2.1.225",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Added gateway spend-limit support to Claude Code's usage warning; the limit-reached message now names the cap, its reset time, and the operator's message (requires the gateway on 2.1.225)\n- Added a workspace trust prompt to `claude agents` for untrusted directories, matching the behavior of `claude`\n- Fixed a transient 401 replacing a long-lived `CLAUDE_CODE_OAUTH_TOKEN` with a stored login's short-lived token, breaking headless sessions until restart\n- Fixed MCP OAuth servers on macOS intermittently failing with a burst of 401 errors, as if never authenticated, after a keychain read timed out\n- Fixed auto mode counting a safety-filter refusal of its own permission check toward the consecutive-block limit; the action is still denied, but the model is now told to move on rather than retry\n- Fixed cross-session messages staying parked without a notice or expiry in headless sessions and during startup\n- Fixed conversation history breaking on Remote Control session resume after very large conversations were compacted\n- Fixed hovering over a session in another project in the agents list changing the directory the next agent starts in\n- Fixed `claude self-hosted-runner` registering and then failing every session when `--base-dir` cannot be created or written; it now exits at startup with a clear error\n- Fixed Claude Code on the web sessions being misreported as stuck, re-sending a growing event backlog on every reconnect\n- Improved Remote Control: photos attached from the Claude app are now shown to Claude directly instead of being read from disk with a separate tool call\n- [VSCode] Fixed Focus view folding away the latest to-do list, a pending question's context, and settled answers; thinking-only folds show \"Thought for Ns\" and re-collapse when their turn completes\n- SendMessage can now start a conversation with your Remote Control sessions on other machines by name (`ListAgents` shows them as `name [ref]`), instead of only replying after they message you first\n- SendMessage: a Remote Control recipient you already confirmed is never swapped for a same-named session on this machine when its own list couldn't be checked"
   },
   "summary": {
-    "changes": 3,
+    "changes": 2,
     "categories": {
-      "config": 2,
-      "hooks": 1
+      "config": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 2,
       "notable": 0
     },
-    "undocumented": 3
+    "undocumented": 2
   },
   "changes": [
-    {
-      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
     {
       "id": "config.env_vars.CLAUDE_REMOTE_TOOLS_BRIDGE_URL",
       "category": "config",

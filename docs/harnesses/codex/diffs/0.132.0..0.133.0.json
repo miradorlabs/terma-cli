@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.132.0",
   "to": "0.133.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.132.0...rust-v0.133.0"
   },
@@ -17,7 +17,8 @@
       "behavior": 8,
       "cli": 11,
       "config": 22,
-      "hooks": 6,
+      "filesystem": 4,
+      "hooks": 2,
       "prompt": 1,
       "storage": 1,
       "tools": 9
@@ -25,10 +26,10 @@
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 33,
-      "notable": 25
+      "informational": 37,
+      "notable": 21
     },
-    "undocumented": 27
+    "undocumented": 29
   },
   "changes": [
     {
@@ -727,142 +728,6 @@
       "terma": null,
       "source": null,
       "documented": true
-    },
-    {
-      "id": "hooks.events.PreToolUse.control.json_decision",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PreToolUse",
-        "control",
-        "json_decision"
-      ],
-      "title": "PreToolUse hook control (json_decision) removed",
-      "impact": "notable",
-      "before": "does not block the tool; message not shown to the model",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 986,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L986"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 403,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L403"
-          }
-        ],
-        "gone": true
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionStart.control.additional_context",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "SessionStart",
-        "control",
-        "additional_context"
-      ],
-      "title": "SessionStart hook control (additional_context) removed",
-      "impact": "notable",
-      "before": "ignored",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 991,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L991"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 418,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L418"
-          }
-        ],
-        "gone": true
-      },
-      "documented": true
-    },
-    {
-      "id": "hooks.events.Stop.control.json_decision",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "Stop",
-        "control",
-        "json_decision"
-      ],
-      "title": "Stop hook control (json_decision) removed",
-      "impact": "notable",
-      "before": "lets the turn stop; message not shown to the model",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 993,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L993"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 424,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L424"
-          }
-        ],
-        "gone": true
-      },
-      "documented": true
-    },
-    {
-      "id": "hooks.events.UserPromptSubmit.control.additional_context",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "UserPromptSubmit",
-        "control",
-        "additional_context"
-      ],
-      "title": "UserPromptSubmit hook control (additional_context) removed",
-      "impact": "notable",
-      "before": "ignored",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 992,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/analytics/src/events.rs#L992"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 421,
-            "url": "https://github.com/openai/codex/blob/rust-v0.132.0/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L421"
-          }
-        ],
-        "gone": true
-      },
-      "documented": false
     },
     {
       "id": "hooks.supported.SubagentStart",
@@ -2037,6 +1902,116 @@
       "terma": null,
       "source": null,
       "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/goals_1.sqlite",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/goals_1.sqlite"
+      ],
+      "title": "Now creates <codex-home>/goals_1.sqlite (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "read",
+          "create"
+        ],
+        "phases": [
+          "startup",
+          "exit"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/plugin-creator/references/installing-and-updating.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/plugin-creator/references/installing-and-updating.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/plugin-creator/references/installing-and-updating.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/plugin-creator/scripts/read_marketplace_name.py",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/plugin-creator/scripts/read_marketplace_name.py"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/plugin-creator/scripts/read_marketplace_name.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
     }
   ]
 }

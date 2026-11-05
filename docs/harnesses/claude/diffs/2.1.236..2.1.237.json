@@ -3,27 +3,26 @@
   "harness": "claude",
   "from": "2.1.236",
   "to": "2.1.237",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Fixed prompt caching for sessions using an LLM gateway or custom base URL\n- Added a built-in \"Concise\" output style: Claude leads with results and skips preamble and narration, while doing the work just as thoroughly. Select it under Output style in /config."
   },
   "summary": {
-    "changes": 9,
+    "changes": 7,
     "categories": {
       "caching": 4,
       "config": 1,
-      "hooks": 2,
       "prompt": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 1,
       "notable": 6
     },
-    "undocumented": 9
+    "undocumented": 7
   },
   "changes": [
     {
@@ -182,46 +181,6 @@
         "ttl": "5m",
         "type": "ephemeral"
       },
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
       "text_diff": null,
       "terma": null,
       "source": null,

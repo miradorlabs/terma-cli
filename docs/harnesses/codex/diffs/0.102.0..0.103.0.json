@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.102.0",
   "to": "0.103.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.102.0...rust-v0.103.0"
   },
@@ -12,18 +12,19 @@
     "text": "## New Features\n- App listing responses now include richer app details (`app_metadata`, branding, and labels), so clients can render more complete app cards without extra requests. (#11706)\n- Commit co-author attribution now uses a Codex-managed `prepare-commit-msg` hook, with `command_attribution` override support (default label, custom label, or disable). (#11617)\n\n## Bug Fixes\n- Removed the `remote_models` feature flag to prevent fallback model metadata when it was disabled, improving model selection reliability and performance. (#11699)\n\n## Chores\n- Updated Rust dependencies (`clap`, `env_logger`, `arc-swap`) and refreshed Bazel lock state as routine maintenance. (#11888, #11889, #11890, #12032)\n- Reverted the Rust toolchain bump to `1.93.1` after CI breakage. (#11886, #12035)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.102.0...rust-v0.103.0\n\n- #11699 chore: rm remote models fflag @sayan-oai\n- #11706 [apps] Expose more fields from apps listing endpoints. @mzeng-openai\n- #11890 chore(deps): bump arc-swap from 1.8.0 to 1.8.2 in /codex-rs @dependabot\n- #11886 chore(deps): bump rust-toolchain from 1.93.0 to 1.93.1 in /codex-rs @dependabot\n- #12032 chore: just bazel-lock-update @bolinfest\n- #11888 chore(deps): bump clap from 4.5.56 to 4.5.58 in /codex-rs @dependabot\n- #11889 chore(deps): bump env_logger from 0.11.8 to 0.11.9 in /codex-rs @dependabot\n- #11617 Use prompt-based co-author attribution with config override @gabec-openai\n- #12035 Revert \"chore(deps): bump rust-toolchain from 1.93.0 to 1.93.1 in /co…dex-rs (#11886)\" @etraut-openai"
   },
   "summary": {
-    "changes": 3,
+    "changes": 8,
     "categories": {
       "cli": 1,
-      "config": 2
+      "config": 2,
+      "filesystem": 5
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 8,
       "notable": 0
     },
-    "undocumented": 3
+    "undocumented": 8
   },
   "changes": [
     {
@@ -105,6 +106,111 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.sed /^$/d.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "sed /^$/d",
+        "phases",
+        "startup"
+      ],
+      "title": "`sed /^$/d` no longer runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.tr -d  .phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "tr -d  ",
+        "phases",
+        "startup"
+      ],
+      "title": "`tr -d  ` no longer runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.wc -l.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "wc -l",
+        "phases",
+        "startup"
+      ],
+      "title": "`wc -l` no longer runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.sed /^$/d.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "sed /^$/d",
+        "phases",
+        "turn"
+      ],
+      "title": "`sed /^$/d` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.wc -l.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "wc -l",
+        "phases",
+        "turn"
+      ],
+      "title": "`wc -l` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

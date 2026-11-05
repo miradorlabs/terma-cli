@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.155.0",
   "to": "0.155.1",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.155.0...rust-v0.155.1"
   },
@@ -12,19 +12,18 @@
     "text": "## Bug Fixes\n\n- New local TUI sessions now leave reasoning summaries disabled by default, fixing request rejection by providers that do not support them. Explicit reasoning-summary settings remain respected. (#46467)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.155.0...rust-v0.155.1\n\n- #46467 Restore none as the TUI reasoning summary default (@celia-oai)"
   },
   "summary": {
-    "changes": 13,
+    "changes": 10,
     "categories": {
       "behavior": 9,
-      "cli": 1,
-      "hooks": 3
+      "cli": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 4,
+      "informational": 1,
       "notable": 9
     },
-    "undocumented": 10
+    "undocumented": 7
   },
   "changes": [
     {
@@ -192,108 +191,6 @@
       "text_diff": null,
       "terma": null,
       "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.PreToolUse.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "PreToolUse",
-        "control",
-        "exit_2"
-      ],
-      "title": "PreToolUse hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "blocks the tool; message to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1436,
-            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/analytics/src/events.rs#L1436"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 583,
-            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L583"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionStart.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionStart",
-        "control",
-        "exit_2"
-      ],
-      "title": "SessionStart hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "message not shown to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1441,
-            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/analytics/src/events.rs#L1441"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 598,
-            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L598"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
-    {
-      "id": "hooks.events.Stop.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "Stop",
-        "control",
-        "exit_2"
-      ],
-      "title": "Stop hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "keeps the turn going; message to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1446,
-            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/analytics/src/events.rs#L1446"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 613,
-            "url": "https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L613"
-          }
-        ],
-        "gone": false
-      },
       "documented": false
     },
     {

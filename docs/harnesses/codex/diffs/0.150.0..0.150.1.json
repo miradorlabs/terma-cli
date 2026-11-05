@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.150.0",
   "to": "0.150.1",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.150.0...rust-v0.150.1"
   },
@@ -12,15 +12,43 @@
     "text": "## Bug Fixes\n- Remote compaction now counts retained images toward its token budget by default, trimming older images as needed. (#41003)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.150.0...rust-v0.150.1\n\n- #41003 Backport retained-image compaction budgeting to 0.150 @rhan-oai"
   },
   "summary": {
-    "changes": 0,
-    "categories": {},
+    "changes": 1,
+    "categories": {
+      "filesystem": 1
+    },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
+      "informational": 1,
       "notable": 0
     },
-    "undocumented": 0
+    "undocumented": 1
   },
-  "changes": []
+  "changes": [
+    {
+      "id": "filesystem.darwin/arm64.macos.xpc.com.apple.analyticsd.messagetracer",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "macos",
+        "xpc",
+        "com.apple.analyticsd.messagetracer"
+      ],
+      "title": "Now connects to the XPC service com.apple.analyticsd.messagetracer (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "count": 1,
+        "phases": [
+          "exit"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
 }

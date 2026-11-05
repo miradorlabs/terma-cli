@@ -3,7 +3,7 @@
   "harness": "claude",
   "from": "2.1.260",
   "to": "2.1.261",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
@@ -13,7 +13,7 @@
     "changes": 9,
     "categories": {
       "config": 6,
-      "hooks": 1,
+      "filesystem": 1,
       "network": 2
     },
     "impact": {
@@ -25,26 +25,6 @@
     "undocumented": 4
   },
   "changes": [
-    {
-      "id": "hooks.events.PostModelSwitch.keys.prompt_id",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "PostModelSwitch",
-        "keys",
-        "prompt_id"
-      ],
-      "title": "PostModelSwitch hook payload field prompt_id added",
-      "impact": "informational",
-      "before": null,
-      "after": "prompt_id",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
     {
       "id": "config.options.bashOutputMaxChars",
       "category": "config",
@@ -284,6 +264,32 @@
       "terma": null,
       "source": null,
       "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/known_marketplaces_claudeai.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/plugins/known_marketplaces_claudeai.json"
+      ],
+      "title": "Now looks for <claude-config>/plugins/known_marketplaces_claudeai.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
     }
   ]
 }

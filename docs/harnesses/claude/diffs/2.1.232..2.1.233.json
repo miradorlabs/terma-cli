@@ -3,29 +3,29 @@
   "harness": "claude",
   "from": "2.1.232",
   "to": "2.1.233",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Added GitLab merge request URL support to the `--worktree` flag and the `claude agents` view (where MRs display as `!N`)\n- Added an opt-in `forward_user_identity` apps gateway setting on Anthropic upstreams that sends the signed-in user's identity as headers, so a proxy behind the gateway can attribute spend per user\n- Added opt-in memory cgroup support for Bash tool commands on Linux (`CLAUDE_CODE_TOOL_MEMORY_LIMIT`) so a runaway build can't stall the session\n- Added `CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS` environment variable to configure the WebFetch session URL cache TTL (default unchanged: 15 minutes)\n- Fixed cloud sessions occasionally being marked as lost when the environment shut down while Claude was waiting on a permission prompt\n- Fixed MCP v2 connections endlessly reopening the subscriptions/listen stream against servers that terminate long-held streams on a fixed timeout (e.g. serverless hosts)\n- Fixed Notification hooks not firing for permission prompts when running under Claude Desktop or VS Code\n- Fixed idle sessions on Linux sometimes keeping one CPU core at 100% when sandboxing is enabled\n- Fixed bundled skill aliases like `/checkup` and `/review` reporting \"Unknown command\" in `-p` mode or with plugins/MCP loaded when a user or project skill shadows the bundled skill\n- Fixed skill/command argument substitution to prevent argument values from being re-expanded as template markers\n- Fixed Windows paths spelled with the NT `\\??\\` device prefix bypassing UNC path validation, closing an NTLM credential-leak vector\n- Improved `claude self-hosted-runner` session start time: the session branch is now created without rewriting the working tree, and two server round trips no longer block the agent's launch\n- Improved apps gateway error forwarding: 400/413 errors from Vertex, Foundry, and Claude Platform on AWS upstreams now carry the upstream's own message; fixes a bug with auto-compact on apps gateway\n- Improved `claude plugin validate` to check a bare `.claude/skills` directory, reporting SKILL.md files whose frontmatter fails to parse\n- Improved screen reader mode: the `/effort` selector renders as a numbered list with a typed-number prompt, and hint and dialog text is no longer clipped\n- Improved print mode diagnostics: a `[claude-code:unrecognized_model]` line is written to stderr when a request goes out for a model ID Claude Code doesn't recognize; map it with `modelOverrides` to silence\n- Changed the GitHub app setup tip to no longer appear in repositories whose origin remote is on gitlab.com or bitbucket.org; the enterprise marketplace tip now covers non-GitHub internal git hosts\n- Todo/task-tracking tools (TaskCreate/Get/Update/List, TodoWrite) are no longer available on Opus 4.8, Sonnet 5, Fable 5, Mythos 5, and newer models; set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` to bring them back\n- Windows: fixed auto mode repeatedly stopping for manual approval on ordinary `cd <dir> && <command> > file` Bash commands (a 2.1.232 regression)\n- Reverted the 2.1.232 Bash permission changes for Cygwin-style symlinks on Windows and for input redirections (`< file`); a narrower version will return in a later release"
   },
   "summary": {
-    "changes": 41,
+    "changes": 26,
     "categories": {
       "behavior": 1,
       "cli": 2,
       "config": 9,
-      "hooks": 17,
+      "hooks": 2,
       "prompt": 8,
       "tools": 4
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 12,
-      "notable": 29
+      "informational": 11,
+      "notable": 15
     },
-    "undocumented": 34
+    "undocumented": 20
   },
   "changes": [
     {
@@ -421,166 +421,6 @@
       "documented": true
     },
     {
-      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "CwdChanged",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "CwdChanged",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.message",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolBatch",
-        "keys",
-        "tool_calls[].tool_input.message"
-      ],
-      "title": "PostToolBatch hook payload field tool_calls[].tool_input.message removed",
-      "impact": "notable",
-      "before": "tool_calls[].tool_input.message",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": true
-    },
-    {
-      "id": "hooks.events.PostToolBatch.keys.tool_calls[].tool_input.status",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolBatch",
-        "keys",
-        "tool_calls[].tool_input.status"
-      ],
-      "title": "PostToolBatch hook payload field tool_calls[].tool_input.status removed",
-      "impact": "notable",
-      "before": "tool_calls[].tool_input.status",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolUse",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolUse",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolUseFailure",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolUseFailure",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
       "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
       "category": "hooks",
       "op": "removed",
@@ -612,146 +452,6 @@
         "CLAUDE_CODE_MESSAGING_TOKEN"
       ],
       "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SessionEnd.keys.prompt_id",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SessionEnd",
-        "keys",
-        "prompt_id"
-      ],
-      "title": "SessionEnd hook payload field prompt_id added",
-      "impact": "informational",
-      "before": null,
-      "after": "prompt_id",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "SubagentStart",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "SubagentStart",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "WorktreeCreate",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "WorktreeCreate",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_TOKEN",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "WorktreeRemove",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-      "impact": "notable",
-      "before": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_MESSAGING_TOKEN",
-      "category": "hooks",
-      "op": "removed",
-      "path": [
-        "hooks",
-        "events",
-        "WorktreeRemove",
-        "env",
-        "CLAUDE_CODE_MESSAGING_TOKEN"
-      ],
-      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed",
       "impact": "notable",
       "before": "CLAUDE_CODE_MESSAGING_TOKEN",
       "after": null,

@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.160.0",
   "to": "0.160.1",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.160.0...rust-v0.160.1"
   },
@@ -12,17 +12,18 @@
     "text": "## Bug Fixes\n\n- Preserve `SYSTEMROOT`, `TEMP`, and `TMP` when launching remote stdio MCP servers with explicitly configured remote environment variables, allowing Unix hosts to retain the Windows executor's startup environment.\n\n## Changelog\n\n- [#51121](https://github.com/openai/codex/pull/51121): Backport Windows remote MCP environment preservation to 0.160."
   },
   "summary": {
-    "changes": 3,
+    "changes": 4,
     "categories": {
-      "cli": 3
+      "cli": 3,
+      "filesystem": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 4,
       "notable": 0
     },
-    "undocumented": 3
+    "undocumented": 4
   },
   "changes": [
     {
@@ -108,6 +109,32 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.sockets.connections.tcp <proxy>",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "sockets",
+        "connections",
+        "tcp <proxy>"
+      ],
+      "title": "No longer connects to <proxy> (tcp) (darwin/arm64)",
+      "impact": "informational",
+      "before": {
+        "count": 1,
+        "phases": [
+          "exit"
+        ],
+        "role": "proxy"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

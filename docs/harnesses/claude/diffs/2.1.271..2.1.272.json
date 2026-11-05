@@ -3,24 +3,25 @@
   "harness": "claude",
   "from": "2.1.271",
   "to": "2.1.272",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Bug fixes and reliability improvements"
   },
   "summary": {
-    "changes": 1,
+    "changes": 2,
     "categories": {
+      "filesystem": 1,
       "network": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
+      "informational": 1,
       "notable": 1
     },
-    "undocumented": 1
+    "undocumented": 2
   },
   "changes": [
     {
@@ -78,6 +79,27 @@
           "user_type"
         ]
       },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git -c core.hooksPath=/dev/null -c core.fsmonitor= -C <repo> ls-files --error-unmatch -- :(icase).claude/settings.local.json.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git -c core.hooksPath=/dev/null -c core.fsmonitor= -C <repo> ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+        "phases",
+        "turn"
+      ],
+      "title": "`git -c core.hooksPath=/dev/null -c core.fsmonitor= -C <repo> ls-files --error-unmatch -- :(icase).cl …` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
       "text_diff": null,
       "terma": null,
       "source": null,

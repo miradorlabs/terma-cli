@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.110.0",
   "to": "0.111.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.110.0...rust-v0.111.0"
   },
@@ -12,20 +12,21 @@
     "text": "## New Features\n- Fast mode is now enabled by default, and the TUI header shows whether the session is running in Fast or Standard mode. (#13450, #13446)\n- `js_repl` can now dynamically import local `.js` and `.mjs` files, making it easier to reuse workspace scripts from the REPL. (#13437)\n- Codex now tells the model which plugins are enabled at session start, improving discovery of installed MCPs, apps, and skills. (#13433)\n- App-server v2 now exposes MCP elicitation as a structured request/response flow instead of raw events, which simplifies client integrations. (#13425)\n- Expanded image workflow support for clients, including client-side handling of image-generation events and model metadata for image-capable web search. (#13512, #13538)\n\n## Bug Fixes\n- Resuming a thread now preserves its stored git context and keeps apps enabled, avoiding broken state after `codex resume`. (#13504, #13533)\n\n## Documentation\n- Added sample skill documentation for artifact workflows, including slide deck and spreadsheet examples. (#13525)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.110.0...rust-v0.111.0\n\n- #13516 Log non-audio realtime events @aibrahim-oai\n- #13208 chore(deps): bump actions/download-artifact from 7 to 8 @dependabot\n- #13512 image-gen-event/client_processing @won-openai\n- #13210 chore(deps): bump strum_macros from 0.27.2 to 0.28.0 in /codex-rs @dependabot\n- #13209 chore(deps): bump serde_with from 3.16.1 to 3.17.0 in /codex-rs @dependabot\n- #13504 Preserve persisted thread git info in resume @joeytrasatti-openai\n- #13207 chore(deps): bump actions/upload-artifact from 6 to 7 @dependabot\n- #13433 feat: track plugins mcps/apps and add plugin info to user_instructions @sayan-oai\n- #13450 [core] Enable fast mode by default @pash-openai\n- #13438 [tui] rotate paid promo tips to include fast mode @pash-openai\n- #13515 [tui] Update fast mode plan usage copy @pash-openai\n- #13533 [apps] Fix the issue where apps is not enabled after codex resume. @mzeng-openai\n- #13437 [js_repl] Support local ESM file imports @aaronl-openai\n- #13539 Reduce realtime audio submission log noise @aibrahim-oai\n- #13538 chore: add web_search_tool_type for image support @sayan-oai\n- #13446 [tui] Show speed in session header @pash-openai\n- #13392 refactor: prepare unified exec for zsh-fork backend @bolinfest\n- #13571 feat: bind package manager @jif-oai\n- #13525 feat: skills for artifacts @jif-oai\n- #13573 feat: ultra polish package manager @jif-oai\n- #13577 chore: ultra-clean artifacts @jif-oai\n- #13425 feat(app-server): support mcp elicitations in v2 api @owenlin0"
   },
   "summary": {
-    "changes": 6,
+    "changes": 27,
     "categories": {
       "behavior": 2,
       "caching": 1,
       "config": 2,
+      "filesystem": 21,
       "prompt": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 2,
+      "informational": 23,
       "notable": 4
     },
-    "undocumented": 6
+    "undocumented": 25
   },
   "changes": [
     {
@@ -195,6 +196,576 @@
         "gone": false
       },
       "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.sockets.connections.tcp <proxy>",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "sockets",
+        "connections",
+        "tcp <proxy>"
+      ],
+      "title": "Now connects to <proxy> (tcp) (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "count": 1,
+        "phases": [
+          "exit"
+        ],
+        "role": "proxy"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/slides (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/.codex-plugin/plugin.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/.codex-plugin/plugin.json"
+      ],
+      "title": "Now looks for <codex-home>/skills/.system/slides/.codex-plugin/plugin.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/SKILL.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/SKILL.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/slides/SKILL.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "read",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/SKILL.md/.codex-plugin/plugin.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/SKILL.md/.codex-plugin/plugin.json"
+      ],
+      "title": "Now looks for <codex-home>/skills/.system/slides/SKILL.md/.codex-plugin/plugin.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/agents"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/slides/agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/agents/openai.yaml",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/agents/openai.yaml"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/slides/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "read",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/references",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/references"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/slides/references (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/references/auto-layout.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/references/auto-layout.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/slides/references/auto-layout.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/references/presentation.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/references/presentation.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/slides/references/presentation.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/slides/scripts",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/slides/scripts"
+      ],
+      "title": "Now looks for <codex-home>/skills/.system/slides/scripts (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/spreadsheets (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/.codex-plugin/plugin.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/.codex-plugin/plugin.json"
+      ],
+      "title": "Now looks for <codex-home>/skills/.system/spreadsheets/.codex-plugin/plugin.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/SKILL.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/SKILL.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/spreadsheets/SKILL.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "read",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/SKILL.md/.codex-plugin/plugin.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/SKILL.md/.codex-plugin/plugin.json"
+      ],
+      "title": "Now looks for <codex-home>/skills/.system/spreadsheets/SKILL.md/.codex-plugin/plugin.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/agents"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/spreadsheets/agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/agents/openai.yaml",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/agents/openai.yaml"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/spreadsheets/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "read",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/references",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/references"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/spreadsheets/references (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/references/ranges.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/references/ranges.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/spreadsheets/references/ranges.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/references/workbook.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/references/workbook.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/spreadsheets/references/workbook.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/spreadsheets/scripts",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/spreadsheets/scripts"
+      ],
+      "title": "Now looks for <codex-home>/skills/.system/spreadsheets/scripts (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
     }
   ]
 }

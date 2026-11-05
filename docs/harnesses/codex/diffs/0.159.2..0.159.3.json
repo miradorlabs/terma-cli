@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.159.2",
   "to": "0.159.3",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.159.2...rust-v0.159.3"
   },
@@ -12,18 +12,17 @@
     "text": "## New Features\n\n- Eligible local sessions signed in with ChatGPT can now show optional reminders to complete account security setup. (#49744)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.159.2...rust-v0.159.3\n\n- #49744 [0.159] Backport account security setup reminders for 0.159.3 @andrewgu-oai"
   },
   "summary": {
-    "changes": 2,
+    "changes": 1,
     "categories": {
-      "behavior": 1,
-      "hooks": 1
+      "behavior": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 1,
+      "informational": 0,
       "notable": 1
     },
-    "undocumented": 2
+    "undocumented": 1
   },
   "changes": [
     {
@@ -87,40 +86,6 @@
       "text_diff": null,
       "terma": null,
       "source": null,
-      "documented": false
-    },
-    {
-      "id": "hooks.events.UserPromptSubmit.control.exit_2",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "UserPromptSubmit",
-        "control",
-        "exit_2"
-      ],
-      "title": "UserPromptSubmit hook control (exit_2) added",
-      "impact": "informational",
-      "before": null,
-      "after": "blocks the prompt; message not shown to the model",
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "codex-rs/analytics/src/events.rs",
-            "line": 1481,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/analytics/src/events.rs#L1481"
-          },
-          {
-            "path": "codex-rs/app-server-protocol/src/protocol/v2/config.rs",
-            "line": 613,
-            "url": "https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/app-server-protocol/src/protocol/v2/config.rs#L613"
-          }
-        ],
-        "gone": false
-      },
       "documented": false
     }
   ]

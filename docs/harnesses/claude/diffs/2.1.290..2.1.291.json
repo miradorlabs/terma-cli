@@ -3,22 +3,45 @@
   "harness": "claude",
   "from": "2.1.290",
   "to": "2.1.291",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Fixed a regression in 2.1.290 where cloud sessions could drop answers to permission prompts\n- Fixed a regression in 2.1.288 where the last messages of a session could be lost when quitting"
   },
   "summary": {
-    "changes": 0,
-    "categories": {},
+    "changes": 1,
+    "categories": {
+      "hooks": 1
+    },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
+      "informational": 1,
       "notable": 0
     },
-    "undocumented": 0
+    "undocumented": 1
   },
-  "changes": []
+  "changes": [
+    {
+      "id": "hooks.events.FileChanged.env_paths.CLAUDE_ENV_FILE",
+      "category": "hooks",
+      "op": "changed",
+      "path": [
+        "hooks",
+        "events",
+        "FileChanged",
+        "env_paths",
+        "CLAUDE_ENV_FILE"
+      ],
+      "title": "FileChanged hook environment variable CLAUDE_ENV_FILE: <claude-config>/session-env/<uuid>/filechanged-hook-0.sh → <claude-config>/session-env/<session>/filechanged-hook-0.sh",
+      "impact": "informational",
+      "before": "<claude-config>/session-env/<uuid>/filechanged-hook-0.sh",
+      "after": "<claude-config>/session-env/<session>/filechanged-hook-0.sh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
 }

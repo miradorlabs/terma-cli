@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.98.0",
   "to": "0.99.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.98.0...rust-v0.99.0"
   },
@@ -12,22 +12,23 @@
     "text": "## New Features\r\n\r\n- Running direct shell commands no longer interrupts an in-flight turn; commands can execute concurrently when a turn is active. (#10513)\r\n- Added `/statusline` to configure which metadata appears in the TUI footer interactively. (#10546)\r\n- The TUI resume picker can now toggle sort order between creation time and last-updated time with an in-picker mode indicator. (#10752)\r\n- App-server clients now get dedicated APIs for steering active turns, listing experimental features, resuming agents, and opting out of specific notifications. (#10721, #10821, #10903, #11319)\r\n- Enterprise/admin requirements can now restrict web search modes and define network constraints through `requirements.toml`. (#10964, #10958)\r\n- Image attachments now accept GIF and WebP inputs in addition to existing formats. (#11237)\r\n- Enable snapshotting of the shell environment and `rc` files (#11172)\r\n\r\n## Bug Fixes\r\n\r\n- Fixed a Windows startup issue where buffered keypresses could cause the TUI sign-in flow to exit immediately. (#10729)\r\n- Required MCP servers now fail fast during start/resume flows instead of continuing in a broken state. (#10902)\r\n- Fixed a file-watcher bug that emitted spurious skills reload events and could generate very large log files. (#11217)\r\n- Improved TUI input reliability: long option labels wrap correctly, Tab submits in steer mode when idle, history recall keeps cursor placement consistent, and stashed drafts restore image placeholders correctly. (#11123, #10035, #11295, #9040)\r\n- Fixed model-modality edge cases by surfacing clearer `view_image` errors on text-only models and stripping unsupported image history during model switches. (#11336, #11349)\r\n- Reduced false approval mismatches for wrapped/heredoc shell commands and guarded against empty command lists in exec policy evaluation. (#10941, #11397)\r\n\r\n## Documentation\r\n\r\n- Expanded app-server docs and protocol references for `turn/steer`, experimental-feature discovery, `resume_agent`, notification opt-outs, and null `developer_instructions` normalization. (#10721, #10821, #10903, #10983, #11319)\r\n- Updated TUI composer docs to reflect draft/image restoration, steer-mode Tab submit behavior, and history-navigation cursor semantics. (#9040, #10035, #11295)\r\n\r\n## Chores\r\n\r\n- Reworked npm release packaging so platform-specific binaries are distributed via `@openai/codex` dist-tags, reducing package-size pressure while preserving platform-specific installs (including `@alpha`). (#11318, #11339)\r\n- Pulled in a security-driven dependency update for `time` (RUSTSEC-2026-0009). (#10876)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.98.0...rust-v0.99.0\r\n\r\n- #10729 fix(tui): flush input buffer on init to prevent early exit on Windows @Ashutosh0x\r\n- #10689 fix: flaky landlock @jif-oai\r\n- #10513 Allow user shell commands to run alongside active turns @jif-oai\r\n- #10738 nit: backfill stronger @jif-oai\r\n- #10246 adding fork information (UI) when forking @pap-openai\r\n- #10748 Update explorer role default model @jif-oai\r\n- #10425 Include real OS info in metrics. @iceweasel-oai\r\n- #10745 feat: resumable backfill @jif-oai\r\n- #10758 feat: wire ephemeral in `codex exec` @jif-oai\r\n- #10756 chore: handle shutdown correctly in tui @jif-oai\r\n- #10637 feat: add memory tool @jif-oai\r\n- #10751 feat: repair DB in case of missing lines @jif-oai\r\n- #10762 nit: add DB version in discrepancy recording @jif-oai\r\n- #10621 Leverage state DB metadata for thread summaries @jif-oai\r\n- #9691 Add hooks implementation and wire up to `notify` @gt-oai\r\n- #10546 feat(tui): add /statusline command for interactive status line configuration @fcoury\r\n- #10752 feat(tui): add sortable resume picker with created/updated timestamp toggle @fcoury\r\n- #10769 fix(tui): fix resume_picker_orders_by_updated_at test @owenlin0\r\n- #10423 fix(auth): isolate chatgptAuthTokens concept to auth manager and app-server @owenlin0\r\n- #10775 nit: gpt-5.3-codex announcement @jif-oai\r\n- #10782 nit: gpt-5.3-codex announcement 2 @jif-oai\r\n- #10711 add sandbox policy and sandbox name to codex.tool.call metrics @iceweasel-oai\r\n- #10660 chore: rm web-search-eligible header @sayan-oai\r\n- #10783 fix: announcement in prio @jif-oai\r\n- #10721 [app-server] Add a method to list experimental features. @mzeng-openai\r\n- #10787 chore: limit update to 0.98.0 NUX to < 0.98.0 ver @sayan-oai\r\n- #10655 Add analytics for /rename and /fork @pap-openai\r\n- #10790 feat: wait for backfill to be ready @jif-oai\r\n- #10693 Add app-server transport layer with websocket support @maxj-oai\r\n- #10818 other announcement @jif-oai\r\n- #10815 Sync app-server requirements API with refreshed cloud loader @xl-openai\r\n- #10820 go back to auto-enabling web_search for azure @sayan-oai\r\n- #10727 Send beta header with websocket connects @pakrym-oai\r\n- #10809 updates: use brew api for version check @magus\r\n- #10793 Add stage field for experimental flags. @mzeng-openai\r\n- #10821 feat(app-server): turn/steer API @owenlin0\r\n- #10792 Print warning when config does not meet requirements @gt-oai\r\n- #10699 feat: expose detailed metrics to runtime metrics @apanasenko-oai\r\n- #10784 Gate app tooltips to macOS @aibrahim-oai\r\n- #10843 Log an event (info only) when we receive a file watcher event @etraut-openai\r\n- #10852 Personality setting is no longer available in experimental menu @etraut-openai\r\n- #10840 Removed the \"remote_compaction\" feature flag @etraut-openai\r\n- #10876 sec: fix version of `time` to prevent vulnerability @jif-oai\r\n- #10892 nit: test an @jif-oai\r\n- #10894 feat: backfill async again @jif-oai\r\n- #10902 Handle required MCP startup failures across components @jif-oai\r\n- #10851 Removed \"exec_policy\" feature flag @etraut-openai\r\n- #10457 Queue nudges while plan generating @charley-oai\r\n- #10822 Add app configs to config.toml @canvrno-oai\r\n- #10420 feat(network-proxy): add structured policy decision to blocked errors @viyatb-oai\r\n- #10814 fix(linux-sandbox): block io_uring syscalls in no-network seccomp policy @viyatb-oai\r\n- #10698 core: preconnect Responses websocket for first turn @joshka-oai\r\n- #10574 core: refresh developer instructions after compaction replacement history @charley-oai\r\n- #10914 chore(app-server): update AGENTS.md for config + optional collection guidance @owenlin0\r\n- #10928 chore(app-server): add experimental annotation to relevant fields @owenlin0\r\n- #10927 Treat compaction failure as failure state @aibrahim-oai\r\n- #10861 Support alternative websocket API @by-openai\r\n- #10826 add originator to otel @alexsong-oai\r\n- #10855 TUI/Core: preserve duplicate skill/app mention selection across submit + resume @daniel-oai\r\n- #10943 app-server: print help message to console when starting websockets server @JaviSoto\r\n- #10938 Mark Config.apps as experimental, correct schema generation issue @canvrno-oai\r\n- #10947 fix(tui): conditionally restore status indicator using message phase @sayan-oai\r\n- #10965 refactor(network-proxy): flatten network config under [network] @viyatb-oai\r\n- #10970 Fixed a flaky test @etraut-openai\r\n- #10710 Process-group cleanup for stdio MCP servers to prevent orphan process storms @etraut-openai\r\n- #10964 feat: add support for allowed_web_search_modes in requirements.toml @bolinfest\r\n- #10977 fix: use expected line ending in codex-rs/core/config.schema.json @bolinfest\r\n- #10973 Do not poll for usage when using API Key auth @etraut-openai\r\n- #10921 Show left/right arrows to navigate in tui request_user_input @charley-oai\r\n- #10988 fix: normalize line endings when reading file on Windows @bolinfest\r\n- #10903 Add resume_agent collab tool @jif-oai\r\n- #10909 Bootstrap shell commands via user shell snapshot @jif-oai\r\n- #10993 Fix flaky windows CI test @etraut-openai\r\n- #10987 Fixed a flaky Windows test that is consistently causing a CI failure @etraut-openai\r\n- #10958 feat(core): add network constraints schema to requirements.toml @viyatb-oai\r\n- #10983 app-server: treat null mode developer instructions as built-in defaults @charley-oai\r\n- #11039 feat: include state of [experimental_network] in /debug-config output @bolinfest\r\n- #11040 Simplify pre-connect @pakrym-oai\r\n- #10966 feat: enable premessage-deflate for websockets @apanasenko-oai\r\n- #9040 fix(tui): rehydrate drafts and restore image placeholders @Chriss4123\r\n- #10824 Fallback to HTTP on UPGRADE_REQUIRED @pakrym-oai\r\n- #11028 Defer persistence of rollout file @etraut-openai\r\n- #10980 fix: remove config.schema.json from tag check @bolinfest\r\n- #11051 Gate view_image tool by model input_modalities @wiltzius-openai\r\n- #11109 [bazel] Upgrade some rulesets in preparation for enabling windows @zbarsky-openai\r\n- #11114 chore: refactor network-proxy so that ConfigReloader is injectable behavior @bolinfest\r\n- #10718 Upgrade rmcp to 0.14 @mzeng-openai\r\n- #11044 feat: include [experimental_network] in <environment_context> @bolinfest\r\n- #10994 [apps] Improve app loading. @mzeng-openai\r\n- #11121 chore: reverse the codex-network-proxy -> codex-core dependency @bolinfest\r\n- #11105 feat: include NetworkConfig through ExecParams @bolinfest\r\n- #11155 tui: avoid no-op status-line redraws @rakan-oai\r\n- #10799 feat: do not close unified exec processes across turns @jif-oai\r\n- #11172 chore: enable shell snapshot @jif-oai\r\n- #11175 fix: do not show closed agents in `/agent` @jif-oai\r\n- #11173 chore: enable sub agents @jif-oai\r\n- #11193 Deflake mixed parallel tools timing test @gt-oai\r\n- #10770 Load requirements on windows @gt-oai\r\n- #11132 core: account for all post-response items in auto-compact token checks @charley-oai\r\n- #11198 tools: remove get_memory tool and tests @jif-oai\r\n- #10937 Translate websocket errors @rasmusrygaard\r\n- #11217 Fixed bug in file watcher that results in spurious skills update events and large log files @etraut-openai\r\n- #11216 Move warmup to the task level @pakrym-oai\r\n- #11203 Try to stop small helper methods @pakrym-oai\r\n- #11197 [bazel] Upgrade some rulesets in preparation for enabling windows, part 2 @zbarsky-openai\r\n- #11158 chore: remove network-proxy-cli crate @viyatb-oai\r\n- #11230 Revert \"chore: enable sub agents\" @jif-oai\r\n- #11123 TUI: fix request_user_input wrapping for long option labels @charley-oai\r\n- #11133 core: add focused diagnostics for remote compaction overflows @charley-oai\r\n- #10657 feat: search_tool @apanasenko-oai\r\n- #11199 state: add memory consolidation lock primitives @jif-oai\r\n- #10835 feat: extend skills/list to support additional roots. @xl-openai\r\n- #10960 skill-creator: Remove invalid reference. @xl-openai\r\n- #11219 feat: use a notify instead of grace to close ue process @jif-oai\r\n- #11231 feat: tie shell snapshot to cwd @jif-oai\r\n- #10962 fix(tui): keep unified exec summary on working line @joshka-oai\r\n- #11232 Add originator to otel metadata tags @alexsong-oai\r\n- #11237 adding image support for gif and webp @natea-oai\r\n- #10924 [apps] Add gated instructions for Apps. @mzeng-openai\r\n- #11228 Use longest remote model prefix matching @aibrahim-oai\r\n- #11242 fix(feature) UnderDevelopment feature must be off @dylan-hurd-oai\r\n- #11185 fix: nix build by adding missing dependencies and fix outputHashes @Philipp-M\r\n- #10035 fix(tui): tab submits when no task running in steer mode @joshka-oai\r\n- #11238 Remove offline fallback for models @aibrahim-oai\r\n- #9739 Update models.json @github-actions\r\n- #11255 Revert \"Update models.json\" @aibrahim-oai\r\n- #11245 deflake linux-sandbox NoNewPrivs timeout @joshka-oai\r\n- #11256 Revert \"Revert \"Update models.json\"\" @aibrahim-oai\r\n- #11262 chore: change ConfigState so it no longer depends on a single config.toml file for reloading @bolinfest\r\n- #11263 test: deflake nextest child-process leak in MCP harnesses @joshka-oai\r\n- #11247 Adjust shell command timeouts for Windows @dylan-hurd-oai\r\n- #11240 fix(app-server): for external auth, replace id_token with chatgpt_acc… @owenlin0\r\n- #11140 chore(deps): bump insta from 1.46.2 to 1.46.3 in /codex-rs @dependabot\r\n- #11139 chore(deps): bump anyhow from 1.0.100 to 1.0.101 in /codex-rs @dependabot\r\n- #11138 chore(deps): bump regex from 1.12.2 to 1.12.3 in /codex-rs @dependabot\r\n- #11239 Disable dynamic model refresh for custom model providers @etraut-openai\r\n- #11269 feat: reserve loopback ephemeral listeners for managed proxy @bolinfest\r\n- #11279 [apps] Add thread_id param to optionally load thread config for apps feature check. @mzeng-openai\r\n- #11244 feat: add SkillPolicy to skill metadata and support allow_implicit_invocation @alexsong-oai\r\n- #10215 chore(tui) cleanup /approvals @dylan-hurd-oai\r\n- #11113 feat(sandbox): enforce proxy-aware network routing in sandbox @viyatb-oai\r\n- #10940 feat: support configurable metric_exporter @alexsong-oai\r\n- #11294 chore: put crypto provider logic in a shared crate @bolinfest\r\n- #11207 feat: retain NetworkProxy, when appropriate @bolinfest\r\n- #11200 memories: add extraction and prompt module foundation @jif-oai\r\n- #11191 feat: add connector capabilities to sub-agents @jif-oai\r\n- #11304 Fix spawn_agent input type @jif-oai\r\n- #11300 feat: align memory phase 1 and make it stronger @jif-oai\r\n- #11311 Extract hooks into dedicated crate @jif-oai\r\n- #11306 feat: phase 2 consolidation @jif-oai\r\n- #11318 chore: split NPM packages @jif-oai\r\n- #11322 Fix pending input test waiting logic @jif-oai\r\n- #11265 Remove ApiPrompt @pakrym-oai\r\n- #11295 tui: keep history recall cursor at line end @joshka-oai\r\n- #11288 fix(protocol): approval policy never prompt @fouad-openai\r\n- #11323 Revert \"Add app-server transport layer with websocket support (#10693)\" @maxj-oai\r\n- #11162 Fix: update parallel tool call exec approval to approve on request id @shijie-oai\r\n- #11249 [apps] Improve app installation flow. @mzeng-openai\r\n- #11319 feat: opt-out of events in the app-server @jif-oai\r\n- #11241 Treat first rollout session_meta as canonical thread identity @guinness-oai\r\n- #11339 # Use `@openai/codex` dist-tags for platform binaries instead of separate package names @bolinfest\r\n- #11330 test(core): stabilize ARM bazel remote-model and parallelism tests @dylan-hurd-oai\r\n- #11345 core: remove stale apply_patch SandboxPolicy TODO in seatbelt @bolinfest\r\n- #11343 Compare full request for websockets incrementality @pakrym-oai\r\n- #11344 fix: reduce usage of `open_if_present`  @jif-oai\r\n- #11336 Always expose view_image and return unsupported image-input error @aibrahim-oai\r\n- #11346 Sanitize MCP image output for text-only models @aibrahim-oai\r\n- #11337 Extract tool building @pakrym-oai\r\n- #10941 fix(core): canonicalize wrapper approvals and support heredoc prefix … @viyatb-oai\r\n- #10946 include sandbox (seatbelt, elevated, etc.) as in turn metadata header @iceweasel-oai\r\n- #11349 Strip unsupported images from prompt history to guard against model switch @aibrahim-oai\r\n- #11348 Use thin LTO for alpha Rust release builds @bolinfest\r\n- #11334 chore: unify memory job flow @jif-oai\r\n- #11364 feat: mem v2 - PR1 @jif-oai\r\n- #11365 feat: mem v2 - PR2 @jif-oai\r\n- #11366 feat: mem v2 - PR3 @jif-oai\r\n- #11274 Update models.json @github-actions\r\n- #11361 # Split command parsing/safety out of `codex-core` into new `codex-command` @bolinfest\r\n- #11369 feat: mem v2 - PR4 @jif-oai\r\n- #11362 Enable SOCKS defaults for common local network proxy use cases @viyatb-oai\r\n- #11359 ci: fall back to local Bazel on forks without BuildBuddy key @joshka-oai\r\n- #11372 feat: mem v2 - PR5 @jif-oai\r\n- #11374 feat: mem v2 - PR6 (consolidation) @jif-oai\r\n- #11377 feat: prevent double backfill @jif-oai\r\n- #11378 chore: rename codex-command to codex-shell-command @bolinfest\r\n- #11376 Update models.json @github-actions\r\n- #11394 Disable very flaky tests @pakrym-oai\r\n- #11386 Prefer websocket transport when model opts in @pakrym-oai\r\n- #11373 tui: queue non-pending rollback trims in app-event order @charley-oai\r\n- #11393 Remove `deterministic_process_ids` feature to avoid duplicate `codex-core` builds @bolinfest\r\n- #11397 fix(exec-policy) No empty command lists @dylan-hurd-oai"
   },
   "summary": {
-    "changes": 31,
+    "changes": 62,
     "categories": {
       "binary": 2,
       "caching": 1,
       "cli": 4,
       "config": 21,
+      "filesystem": 31,
       "prompt": 2,
       "request": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 26,
-      "notable": 5
+      "informational": 37,
+      "notable": 25
     },
-    "undocumented": 17
+    "undocumented": 43
   },
   "changes": [
     {
@@ -861,6 +862,953 @@
       "documented": true
     },
     {
+      "id": "filesystem.darwin/arm64.exec./usr/libexec/path_helper -s.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/usr/libexec/path_helper -s",
+        "phases",
+        "startup"
+      ],
+      "title": "`/usr/libexec/path_helper -s` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./usr/libexec/path_helper -s.role",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/usr/libexec/path_helper -s",
+        "role"
+      ],
+      "title": "`/usr/libexec/path_helper -s` now runs as both the build's own and the tool call's (was part of the tool call) (darwin/arm64)",
+      "impact": "notable",
+      "before": "tool",
+      "after": "both",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n"
+      ],
+      "title": "Command changed: `/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then …` (+956 −55 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/bash -lc printf 'written by the files profile\\n' > notes.txt",
+      "after": "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n",
+      "text_diff": "@@ -1,2 +1,61 @@\n /bin/bash\n--lc printf 'written by the files profile\\n' > notes.txt\n+-lc if [\n+-z \"$BASH_ENV\" ] && [\n+-r \"$HOME/.bashrc\" ]; then\n+  . \"$HOME/.bashrc\"\n+fi\n+echo '# Snapshot file'\n+echo '# Unset all aliases to avoid conflicts with functions'\n+unalias\n+-a 2>/dev/null || true\n+echo '# Functions'\n+declare\n+-f\n+echo ''\n+bash_opts=$(set\n+-o | awk '$2==\"on\"{print $1}')\n+bash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc\n+-l | tr\n+-d ' ')\n+echo \"# setopts $bash_opt_count\"\n+if [\n+-n \"$bash_opts\" ]; then\n+  printf 'set\n+-o %s\\n' $bash_opts\n+fi\n+echo ''\n+alias_count=$(alias\n+-p | wc\n+-l | tr\n+-d ' ')\n+echo \"# aliases $alias_count\"\n+alias\n+-p\n+echo ''\n+export_lines=$(export\n+-p | awk '\n+/^(export|declare\n+-x|typeset\n+-x) / {\n+  line=$0\n+  name=line\n+  sub(/^(export|declare\n+-x|typeset\n+-x) /, \"\", name)\n+  sub(/=.*/, \"\", name)\n+  if (name ~ /^(PWD|OLDPWD)$/) {\n+    next\n+  }\n+  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n+    print line\n+  }\n+}')\n+export_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc\n+-l | tr\n+-d ' ')\n+echo \"# exports $export_count\"\n+if [\n+-n \"$export_lines\" ]; then\n+  printf '%s\\n' \"$export_lines\"\n+fi\n+\n",
+      "stats": {
+        "added_chars": 956,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 321,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/shell_snapshot.rs#L321-L345"
+          },
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 297,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/shell_snapshot.rs#L297-L301"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+      ],
+      "title": "Command changed: `/usr/bin/sandbox-exec -p (version 1) …` (+158 −55 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -lc printf 'written by the files profile\\n' > notes.txt",
+      "after": "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'",
+      "text_diff": "@@ -119,4 +119,5 @@\n -DWRITABLE_ROOT_2=<tmp>\n -DDARWIN_USER_CACHE_DIR=<tmp>/../C\n -- /bin/bash\n--lc printf 'written by the files profile\\n' > notes.txt\n+-c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash'\n+-c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'\n",
+      "stats": {
+        "added_chars": 158,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+      ],
+      "title": "New command at turn: `/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/b …` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+        ],
+        "by": "sandbox-exec",
+        "count": 1,
+        "parents": [
+          "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c printf 'written by the files profile\\n' > notes.txt",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c printf 'written by the files profile\\n' > notes.txt"
+      ],
+      "title": "New command at turn: `/bin/bash -c printf 'written by the files profile\\n' > notes.txt` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "printf 'written by the files profile\\n' > notes.txt"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\""
+      ],
+      "title": "New command at turn: `/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\""
+        ],
+        "by": "codex",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "checks that a new shell snapshot loads",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}"
+      ],
+      "title": "New command at turn: `awk …` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "awk",
+          "\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.awk $2==\"on\"{print $1}",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "awk $2==\"on\"{print $1}"
+      ],
+      "title": "New command at startup: `awk $2==\"on\"{print $1}` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "awk",
+          "$2==\"on\"{print $1}"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n"
+        ],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.sed /^$/d",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "sed /^$/d"
+      ],
+      "title": "New command at startup and turn: `sed /^$/d` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "sed",
+          "/^$/d"
+        ],
+        "by": "bash",
+        "count": 2,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.tr -d  ",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "tr -d  "
+      ],
+      "title": "New command at startup and turn: `tr -d  ` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "tr",
+          "-d",
+          " "
+        ],
+        "by": "bash",
+        "count": 3,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.wc -l",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "wc -l"
+      ],
+      "title": "New command at startup and turn: `wc -l` (darwin/arm64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "wc",
+          "-l"
+        ],
+        "by": "bash",
+        "count": 3,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\necho \"# aliases $alias_count\"\nalias -p\necho ''\nexport_lines=$(export -p | awk '\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}')\nexport_count=$(printf '%s\\n' \"$export_lines\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# exports $export_count\"\nif [ -n \"$export_lines\" ]; then\n  printf '%s\\n' \"$export_lines\"\nfi\n"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/models_cache.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/models_cache.json"
+      ],
+      "title": "Now looks for <codex-home>/models_cache.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/shell_snapshots",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/shell_snapshots"
+      ],
+      "title": "Now creates <codex-home>/shell_snapshots (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "create"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<home>/.bashrc",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<home>/.bashrc"
+      ],
+      "title": "Now looks for ~/.bashrc (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "programs": [
+          "bash"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.id -u.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "id -u",
+        "phases",
+        "startup"
+      ],
+      "title": "`id -u` now also runs at startup (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.id -u.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "id -u",
+        "phases",
+        "turn"
+      ],
+      "title": "`id -u` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.id -u.role",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "id -u",
+        "role"
+      ],
+      "title": "`id -u` now runs as the build's own doing (was part of the tool call) (linux/amd64)",
+      "impact": "notable",
+      "before": "tool",
+      "after": "harness",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…"
+      ],
+      "title": "Command changed: `/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then …` (+485 −55 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "/bin/bash -lc printf 'written by the files profile\\n' > notes.txt",
+      "after": "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…",
+      "text_diff": "@@ -1,2 +1,31 @@\n /bin/bash\n--lc printf 'written by the files profile\\n' > notes.txt\n+-lc if [\n+-z \"$BASH_ENV\" ] && [\n+-r \"$HOME/.bashrc\" ]; then\n+  . \"$HOME/.bashrc\"\n+fi\n+echo '# Snapshot file'\n+echo '# Unset all aliases to avoid conflicts with functions'\n+unalias\n+-a 2>/dev/null || true\n+echo '# Functions'\n+declare\n+-f\n+echo ''\n+bash_opts=$(set\n+-o | awk '$2==\"on\"{print $1}')\n+bash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc\n+-l | tr\n+-d ' ')\n+echo \"# setopts $bash_opt_count\"\n+if [\n+-n \"$bash_opts\" ]; then\n+  printf 'set\n+-o %s\\n' $bash_opts\n+fi\n+echo ''\n+alias_count=$(alias\n+-p | wc\n+-l | tr\n+-d ' ')\n+…\n",
+      "stats": {
+        "added_chars": 485,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 321,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/shell_snapshot.rs#L321-L337"
+          },
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 368,
+            "url": "https://github.com/openai/codex/blob/rust-v0.99.0/codex-rs/core/src/shell_snapshot.rs#L368-L370"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+      ],
+      "title": "Command changed: `codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_ …` (+158 −43 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -lc git status --short && git log --oneline -1",
+      "after": "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'",
+      "text_diff": "@@ -2,7 +2,5 @@\n --sandbox-policy-cwd <repo>\n --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false}\n -- /bin/bash\n--lc git status\n---short && git log\n---oneline\n--1\n+-c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash'\n+-c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'\n",
+      "stats": {
+        "added_chars": 158,
+        "removed_chars": 43
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+      ],
+      "title": "Command changed: `codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_ …` (+138 −55 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -lc printf 'written by the files profile\\n' > notes.txt",
+      "after": "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'",
+      "text_diff": "@@ -2,4 +2,8 @@\n --sandbox-policy-cwd <repo>\n --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false}\n -- /bin/bash\n--lc printf 'written by the files profile\\n' > notes.txt\n+-c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash'\n+-c 'git status\n+--short && git log\n+--oneline\n+-1'\n",
+      "stats": {
+        "added_chars": 138,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c git status --short && git log --oneline -1",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c git status --short && git log --oneline -1"
+      ],
+      "title": "New command at turn: `/bin/bash -c git status --short && git log --oneline -1` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "git status --short && git log --oneline -1"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+      ],
+      "title": "New command at turn: `/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/b …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+        ],
+        "by": "codex",
+        "count": 1,
+        "parents": [
+          "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'git status --short && git log --oneline -1'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+      ],
+      "title": "New command at turn: `/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/b …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+        ],
+        "by": "codex",
+        "count": 1,
+        "parents": [
+          "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c printf 'written by the files profile\\n' > notes.txt",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c printf 'written by the files profile\\n' > notes.txt"
+      ],
+      "title": "New command at turn: `/bin/bash -c printf 'written by the files profile\\n' > notes.txt` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "printf 'written by the files profile\\n' > notes.txt"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi; exec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "role": "tool"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\""
+      ],
+      "title": "New command at turn: `/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "/bin/bash",
+          "-c",
+          "set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\""
+        ],
+        "by": "codex",
+        "count": 1,
+        "parents": [],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "checks that a new shell snapshot loads",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}"
+      ],
+      "title": "New command at startup: `awk …` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "awk",
+          "\n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…"
+        ],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.awk $2==\"on\"{print $1}",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "awk $2==\"on\"{print $1}"
+      ],
+      "title": "New command at startup: `awk $2==\"on\"{print $1}` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "awk",
+          "$2==\"on\"{print $1}"
+        ],
+        "by": "bash",
+        "count": 1,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…"
+        ],
+        "phases": [
+          "startup"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.sed /^$/d",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "sed /^$/d"
+      ],
+      "title": "New command at startup and turn: `sed /^$/d` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "sed",
+          "/^$/d"
+        ],
+        "by": "bash",
+        "count": 2,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.tr -d  ",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "tr -d  "
+      ],
+      "title": "New command at startup and turn: `tr -d  ` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "tr",
+          "-d",
+          " "
+        ],
+        "by": "bash",
+        "count": 3,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.wc -l",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "wc -l"
+      ],
+      "title": "New command at startup and turn: `wc -l` (linux/amd64)",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "argv": [
+          "wc",
+          "-l"
+        ],
+        "by": "bash",
+        "count": 3,
+        "parents": [
+          "/bin/bash -lc if [ -z \"$BASH_ENV\" ] && [ -r \"$HOME/.bashrc\" ]; then\n  . \"$HOME/.bashrc\"\nfi\necho '# Snapshot file'\necho '# Unset all aliases to avoid conflicts with functions'\nunalias -a 2>/dev/null || true\necho '# Functions'\ndeclare -f\necho ''\nbash_opts=$(set -o | awk '$2==\"on\"{print $1}')\nbash_opt_count=$(printf '%s\\n' \"$bash_opts\" | sed '/^$/d' | wc -l | tr -d ' ')\necho \"# setopts $bash_opt_count\"\nif [ -n \"$bash_opts\" ]; then\n  printf 'set -o %s\\n' $bash_opts\nfi\necho ''\nalias_count=$(alias -p | wc -l | tr -d ' ')\n…"
+        ],
+        "phases": [
+          "startup",
+          "turn"
+        ],
+        "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
+        "role": "harness"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
       "id": "binary.sdk.rmcp",
       "category": "binary",
       "op": "changed",
@@ -886,7 +1834,7 @@
         "binary",
         "size_bytes"
       ],
-      "title": "Binary size_bytes: 54013488 → 63836976",
+      "title": "Binary size: 54,013,488 → 63,836,976 bytes (54.0 MB → 63.8 MB)",
       "impact": "informational",
       "before": 54013488,
       "after": 63836976,

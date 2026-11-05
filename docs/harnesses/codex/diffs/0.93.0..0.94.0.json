@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.93.0",
   "to": "0.94.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.93.0...rust-v0.94.0"
   },
@@ -12,19 +12,20 @@
     "text": "## New Features\n- Plan mode is now enabled by default with updated interaction guidance in the plan prompt. (#10313, #10308, #10329)\n- Personality configuration is now stable: default is friendly, the config key is `personality`, and existing settings migrate forward. (#10305, #10314, #10310, #10307)\n- Skills can be loaded from `.agents/skills`, with clearer relative-path instructions and nested-folder markers supported. (#10317, #10282, #10350)\n- Console output now includes runtime metrics for easier diagnostics. (#10278)\n\n## Bug Fixes\n- Unarchiving a thread updates its timestamp so sidebar ordering refreshes. (#10280)\n- Conversation rules output is capped and prefix rules are deduped to avoid repeated rules. (#10351, #10309)\n- Override turn context no longer appends extra items. (#10354)\n\n## Documentation\n- Fixed a broken image link in the npm README. (#10303)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.93.0...rust-v0.94.0\n\n- #10278 feat: show runtime metrics in console @apanasenko-oai\n- #10285 display promo message in usage error @willwang-openai\n- #10302 fix(nix): update flake for newer Rust toolchain requirements @douglaz\n- #10296 chore(features) remove Experimental tag from UTF8 @dylan-hurd-oai\n- #10303 Fix npm README image link @fouad-openai\n- #10306 chore(app-server) add personality update test @dylan-hurd-oai\n- #10308 plan mode prompt @aibrahim-oai\n- #10305 chore(core) Default to friendly personality @dylan-hurd-oai\n- #10307 feat(core,tui,app-server) personality migration @dylan-hurd-oai\n- #10313 enable plan mode @aibrahim-oai\n- #10120 feat: fire tracking events for skill invocation @alexsong-oai\n- #10317 feat: Support loading skills from .agents/skills @gverma-openai\n- #10282 Make skills prompt explicit about relative-path lookup @xl-openai\n- #10316 Add websocket telemetry metrics and labels @apanasenko-oai\n- #10314 chore(config) Rename config setting to personality @dylan-hurd-oai\n- #10310 chore(features) Personality => Stable @dylan-hurd-oai\n- #10320 Sync system skills from public repo @gverma-openai\n- #10322 Sync system skills from public repo for openai yaml changes @gverma-openai\n- #10323 fix(config) config schema newline @dylan-hurd-oai\n- #10329 Improve plan mode interaction rules @charley-oai\n- #10280 Bump thread updated_at on unarchive to refresh sidebar ordering @charley-oai\n- #10350 fix: System skills marker includes nested folders recursively @gverma-openai\n- #10351 fix(rules) Limit rules listed in conversation @dylan-hurd-oai\n- #10354 Do not append items on override turn context @pakrym-oai\n- #10309 fix(core) Deduplicate prefix_rules before appending @dylan-hurd-oai\n- #10373 chore(core) gpt-5.2-codex personality template @dylan-hurd-oai\n- #10375 fix(personality) prompt patch @dylan-hurd-oai\n- #10371 feat: vendor app-server protocol schema fixtures @bolinfest"
   },
   "summary": {
-    "changes": 7,
+    "changes": 30,
     "categories": {
       "config": 5,
+      "filesystem": 23,
       "prompt": 1,
       "tools": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 26,
       "notable": 4
     },
-    "undocumented": 4
+    "undocumented": 22
   },
   "changes": [
     {
@@ -324,6 +325,574 @@
         ],
         "gone": false
       },
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/agents"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/skill-creator/agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/agents/openai.yaml.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/agents/openai.yaml",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-creator/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/agents/openai.yaml.ops.read",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/agents/openai.yaml",
+        "ops",
+        "read"
+      ],
+      "title": "Now reads <codex-home>/skills/.system/skill-creator/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "read",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/agents/openai.yaml.ops.write",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/agents/openai.yaml",
+        "ops",
+        "write"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-creator/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "write",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/agents/openai.yaml.ops.probe",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/agents/openai.yaml",
+        "ops",
+        "probe"
+      ],
+      "title": "No longer looks for <codex-home>/skills/.system/skill-creator/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": "probe",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/assets",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/assets"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/skill-creator/assets (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/assets/skill-creator-small.svg",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/assets/skill-creator-small.svg"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-creator/assets/skill-creator-small.svg (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/assets/skill-creator.png",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/assets/skill-creator.png"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-creator/assets/skill-creator.png (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/references",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/references"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/skill-creator/references (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/references/openai_yaml.md",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/references/openai_yaml.md"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-creator/references/openai_yaml.md (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/scripts/generate_openai_yaml.py",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/scripts/generate_openai_yaml.py"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-creator/scripts/generate_openai_yaml.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-creator/scripts/package_skill.py",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-creator/scripts/package_skill.py"
+      ],
+      "title": "No longer writes <codex-home>/skills/.system/skill-creator/scripts/package_skill.py (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/agents",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/agents"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/skill-installer/agents (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/agents/openai.yaml.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/agents/openai.yaml",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks <codex-home>/skills/.system/skill-installer/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/agents/openai.yaml.ops.read",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/agents/openai.yaml",
+        "ops",
+        "read"
+      ],
+      "title": "Now reads <codex-home>/skills/.system/skill-installer/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "read",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/agents/openai.yaml.ops.write",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/agents/openai.yaml",
+        "ops",
+        "write"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-installer/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "write",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/agents/openai.yaml.ops.probe",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/agents/openai.yaml",
+        "ops",
+        "probe"
+      ],
+      "title": "No longer looks for <codex-home>/skills/.system/skill-installer/agents/openai.yaml (linux/amd64)",
+      "impact": "informational",
+      "before": "probe",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/assets",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/assets"
+      ],
+      "title": "Now creates <codex-home>/skills/.system/skill-installer/assets (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "list",
+          "create"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/assets/skill-installer-small.svg",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/assets/skill-installer-small.svg"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-installer/assets/skill-installer-small.svg (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/assets/skill-installer.png",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/assets/skill-installer.png"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-installer/assets/skill-installer.png (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/scripts/list-curated-skills.py",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/scripts/list-curated-skills.py"
+      ],
+      "title": "No longer writes <codex-home>/skills/.system/skill-installer/scripts/list-curated-skills.py (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/skill-installer/scripts/list-skills.py",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/skills/.system/skill-installer/scripts/list-skills.py"
+      ],
+      "title": "Now writes <codex-home>/skills/.system/skill-installer/scripts/list-skills.py (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "write"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<repo>/.agents/skills",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<repo>/.agents/skills"
+      ],
+      "title": "Now looks for <repo>/.agents/skills (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": true
     }
   ]

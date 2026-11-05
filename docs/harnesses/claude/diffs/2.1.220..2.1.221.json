@@ -3,7 +3,7 @@
   "harness": "claude",
   "from": "2.1.220",
   "to": "2.1.221",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
@@ -465,7 +465,7 @@
         "binary",
         "size_bytes"
       ],
-      "title": "Binary size_bytes: 256908272 → 270518240",
+      "title": "Binary size: 256,908,272 → 270,518,240 bytes (256.9 MB → 270.5 MB)",
       "impact": "informational",
       "before": 256908272,
       "after": 270518240,

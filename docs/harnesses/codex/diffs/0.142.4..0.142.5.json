@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.142.4",
   "to": "0.142.5",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.142.4...rust-v0.142.5"
   },
@@ -12,17 +12,18 @@
     "text": "## Bug Fixes\n\n- Prevented full Responses WebSocket request payloads from being written to trace logs. (#30771)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.142.4...rust-v0.142.5\n\n- #30771 [codex] Backport websocket trace fix to release/0.142 @dylan-hurd-oai"
   },
   "summary": {
-    "changes": 2,
+    "changes": 5,
     "categories": {
-      "behavior": 2
+      "behavior": 2,
+      "filesystem": 3
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
+      "informational": 3,
       "notable": 2
     },
-    "undocumented": 2
+    "undocumented": 5
   },
   "changes": [
     {
@@ -71,6 +72,203 @@
         "lines": 25000,
         "marker": "Warning: truncated output (original token count: 112500)",
         "truncation": "middle"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --unshare-user --unshare-pid --unshare-net --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --unshare-user --unshare-pid --unshare-net --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+      ],
+      "title": "Command no longer run: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "bwrap",
+          "--new-session",
+          "--die-with-parent",
+          "--ro-bind",
+          "/",
+          "/",
+          "--dev",
+          "/dev",
+          "--bind",
+          "<tmp>",
+          "<tmp>",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.git",
+          "--remount-ro",
+          "<tmp>/.git",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.agents",
+          "--remount-ro",
+          "<tmp>/.agents",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<tmp>/.codex",
+          "--remount-ro",
+          "<tmp>/.codex",
+          "--ro-bind",
+          "<repo>/.git",
+          "<repo>/.git",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.agents",
+          "--remount-ro",
+          "<repo>/.agents",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.codex",
+          "--remount-ro",
+          "<repo>/.codex",
+          "--bind",
+          "<repo>",
+          "<repo>",
+          "--ro-bind",
+          "<repo>/.git",
+          "<repo>/.git",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.agents",
+          "--remount-ro",
+          "<repo>/.agents",
+          "--perms",
+          "555",
+          "--tmpfs",
+          "<repo>/.codex",
+          "--remount-ro",
+          "<repo>/.codex",
+          "--unshare-user",
+          "--unshare-pid",
+          "--unshare-net",
+          "--argv0",
+          "codex-linux-sandbox",
+          "--",
+          "<install>/codex",
+          "--sandbox-policy-cwd",
+          "<repo>",
+          "--command-cwd",
+          "<repo>",
+          "--permission-profile",
+          "{\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",…",
+          "--apply-seccomp-then-exec",
+          "--",
+          "/bin/bash",
+          "-c",
+          "__CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+        ],
+        "by": "codex",
+        "count": 2,
+        "parents": [
+          "codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "runs the tool command in a sandbox (bubblewrap)",
+        "role": "tool"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+      ],
+      "title": "Command no longer run: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "codex-linux-sandbox",
+          "--sandbox-policy-cwd",
+          "<repo>",
+          "--command-cwd",
+          "<repo>",
+          "--permission-profile",
+          "{\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",…",
+          "--",
+          "/bin/bash",
+          "-c",
+          "__CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+        ],
+        "by": "codex",
+        "count": 2,
+        "parents": [],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "runs the tool command in a sandbox (Codex's Linux sandbox helper, which starts bubblewrap)",
+        "role": "tool"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+      ],
+      "title": "Command no longer run: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
+      "impact": "informational",
+      "before": {
+        "argv": [
+          "codex-linux-sandbox",
+          "--sandbox-policy-cwd",
+          "<repo>",
+          "--command-cwd",
+          "<repo>",
+          "--permission-profile",
+          "{\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",…",
+          "--apply-seccomp-then-exec",
+          "--",
+          "/bin/bash",
+          "-c",
+          "__CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+        ],
+        "by": "bwrap",
+        "count": 2,
+        "parents": [
+          "bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --unshare-user --unshare-pid --unshare-net --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\"},{\"path\":{\"type\":\"path\",… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_THREAD_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_THREAD_ID-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_0=\"${ALL_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_0=\"${ALL_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_1=\"${BUNDLE_HTTPS_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_1=\"${BUNDLE_HTTPS_PROXY-}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_SET_2=\"${BUNDLE_HTTP_PROXY+x}\"\n__CODEX_SNAPSHOT_PROXY_OVERRIDE_2=\"${BUNDLE_HTTP_PROXY-}\"\n…"
+        ],
+        "phases": [
+          "turn"
+        ],
+        "purpose": "runs the tool command in a sandbox (Codex's Linux sandbox helper, which starts bubblewrap)",
+        "role": "tool"
       },
       "after": null,
       "text_diff": null,

@@ -3,7 +3,7 @@
   "harness": "codex",
   "version": "0.91.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-05T02:11:01.502194Z",
+  "captured_at": "2026-11-05T09:54:28.532441Z",
   "capture": {
     "command": [
       "codex",
@@ -40,6 +40,7 @@
       "caching": "2026-11-05T02:11:01.502194Z",
       "cli": "2026-11-05T02:11:01.502194Z",
       "config": "2026-11-05T02:11:01.502194Z",
+      "filesystem": "2026-11-05T09:54:28.532441Z",
       "hooks": "2026-11-05T02:11:01.502194Z",
       "model": "2026-11-05T02:11:01.502194Z",
       "prompt": "2026-11-05T02:11:01.502194Z",
@@ -2744,6 +2745,3202 @@
           "type"
         ]
       }
+    }
+  },
+  "filesystem": {
+    "darwin/arm64": {
+      "decoys": {
+        "<home>/.aws/credentials": "not touched",
+        "<home>/.config/gh/hosts.yml": "not touched",
+        "<home>/.docker/config.json": "not touched",
+        "<home>/.docker/run/docker.sock": "not touched",
+        "<home>/.git-credentials": "not touched",
+        "<home>/.netrc": "not touched",
+        "<home>/.npmrc": "not touched",
+        "<home>/.ssh/agent.sock": "not touched",
+        "<home>/.ssh/id_ed25519": "not touched",
+        "<repo>/.env": "not touched",
+        "<repo>/secrets.json": "not touched"
+      },
+      "dropped": {
+        "dev": 88,
+        "helpers": 1163,
+        "libraries": 11092,
+        "machine": 320,
+        "path-search": 135,
+        "self": 35,
+        "system": 178
+      },
+      "exec": {
+        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -license check": {
+          "argv": [
+            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
+            "-license",
+            "check"
+          ],
+          "by": "git",
+          "count": 1,
+          "parents": [
+            "git status --short"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "/bin/bash -lc git status --short && git log --oneline -1": {
+          "argv": [
+            "/bin/bash",
+            "-lc",
+            "git status --short && git log --oneline -1"
+          ],
+          "by": "sandbox-exec",
+          "count": 1,
+          "parents": [
+            "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -lc git status --short && git log --oneline -1"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "/bin/bash -lc printf 'written by the files profile\\n' > notes.txt": {
+          "argv": [
+            "/bin/bash",
+            "-lc",
+            "printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "by": "sandbox-exec",
+          "count": 1,
+          "parents": [
+            "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -lc printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -lc git status --short && git log --oneline -1": {
+          "argv": [
+            "/usr/bin/sandbox-exec",
+            "-p",
+            "(version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n",
+            "-DWRITABLE_ROOT_0=<repo>",
+            "-DWRITABLE_ROOT_0_RO_0=<repo>/.git",
+            "-DWRITABLE_ROOT_1=<tmp>",
+            "-DWRITABLE_ROOT_2=<tmp>",
+            "-DDARWIN_USER_CACHE_DIR=<tmp>/../C",
+            "--",
+            "/bin/bash",
+            "-lc",
+            "git status --short && git log --oneline -1"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "turn"
+          ],
+          "purpose": "runs the tool command in a sandbox (macOS Seatbelt)",
+          "role": "tool"
+        },
+        "/usr/bin/sandbox-exec -p (version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n -DWRITABLE_ROOT_0=<repo> -DWRITABLE_ROOT_0_RO_0=<repo>/.git -DWRITABLE_ROOT_1=<tmp> -DWRITABLE_ROOT_2=<tmp> -DDARWIN_USER_CACHE_DIR=<tmp>/../C -- /bin/bash -lc printf 'written by the files profile\\n' > notes.txt": {
+          "argv": [
+            "/usr/bin/sandbox-exec",
+            "-p",
+            "(version 1)\n\n; inspired by Chrome's sandbox policy:\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/common.sb;l=273-319;drc=<hash>\n; https://source.chromium.org/chromium/chromium/src/+/main:sandbox/policy/mac/renderer.sb;l=64;drc=<hash>\n\n; start with closed-by-default\n(deny default)\n\n; child processes inherit the policy of their parent\n(allow process-exec)\n(allow process-fork)\n(allow signal (target same-sandbox))\n\n; Allow cf prefs to work.\n(allow user-preference-read)\n\n; process-info\n(allow process-info* (target same-sandbox))\n\n(allow file-write-data\n  (require-all\n    (path \"/dev/null\")\n    (vnode-type CHARACTER-DEVICE)))\n\n; sysctls permitted.\n(allow sysctl-read\n  (sysctl-name \"hw.activecpu\")\n  (sysctl-name \"hw.busfrequency_compat\")\n  (sysctl-name \"hw.byteorder\")\n  (sysctl-name \"hw.cacheconfig\")\n  (sysctl-name \"hw.cachelinesize_compat\")\n  (sysctl-name \"hw.cpufamily\")\n  (sysctl-name \"hw.cpufrequency_compat\")\n  (sysctl-name \"hw.cputype\")\n  (sysctl-name \"hw.l1dcachesize_compat\")\n  (sysctl-name \"hw.l1icachesize_compat\")\n  (sysctl-name \"hw.l2cachesize_compat\")\n  (sysctl-name \"hw.l3cachesize_compat\")\n  (sysctl-name \"hw.logicalcpu_max\")\n  (sysctl-name \"hw.machine\")\n  (sysctl-name \"hw.memsize\")\n  (sysctl-name \"hw.ncpu\")\n  (sysctl-name \"hw.nperflevels\")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn't an issue for codex.\n  (sysctl-name-prefix \"hw.optional.arm.\")\n  (sysctl-name-prefix \"hw.optional.armv8_\")\n  (sysctl-name \"hw.packages\")\n  (sysctl-name \"hw.pagesize_compat\")\n  (sysctl-name \"hw.pagesize\")\n  (sysctl-name \"hw.physicalcpu\")\n  (sysctl-name \"hw.physicalcpu_max\")\n  (sysctl-name \"hw.tbfrequency_compat\")\n  (sysctl-name \"hw.vectorunit\")\n  (sysctl-name \"kern.argmax\")\n  (sysctl-name \"kern.hostname\")\n  (sysctl-name \"kern.maxfilesperproc\")\n  (sysctl-name \"kern.maxproc\")\n  (sysctl-name \"kern.osproductversion\")\n  (sysctl-name \"kern.osrelease\")\n  (sysctl-name \"kern.ostype\")\n  (sysctl-name \"kern.osvariant_status\")\n  (sysctl-name \"kern.osversion\")\n  (sysctl-name \"kern.secure_kernel\")\n  (sysctl-name \"kern.usrstack64\")\n  (sysctl-name \"kern.version\")\n  (sysctl-name \"sysctl.proc_cputype\")\n  (sysctl-name \"vm.loadavg\")\n  (sysctl-name-prefix \"hw.perflevel\")\n  (sysctl-name-prefix \"kern.proc.pgrp.\")\n  (sysctl-name-prefix \"kern.proc.pid.\")\n  (sysctl-name-prefix \"net.routetable.\")\n)\n\n; Allow Java to read some CPU info. This is misclassified as a \"write\" because\n; userspace passes a memory buffer to the sysctl, but conceptually it is a read.\n(allow sysctl-write\n  (sysctl-name \"kern.grade_cputype\"))\n\n; IOKit\n(allow iokit-open\n  (iokit-registry-entry-class \"RootDomainUserClient\")\n)\n\n; needed to look up user info, see https://crbug.com/<n>\n(allow mach-lookup\n  (global-name \"com.apple.system.opendirectoryd.libinfo\")\n)\n\n; Needed for python multiprocessing on MacOS for the SemLock\n(allow ipc-posix-sem)\n\n(allow mach-lookup\n  (global-name \"com.apple.PowerManagement.control\")\n)\n\n; allow openpty()\n(allow pseudo-tty)\n(allow file-read* file-write* file-ioctl (literal \"/dev/ptmx\"))\n(allow file-read* file-write*\n  (require-all\n    (regex #\"^/dev/ttys[0-9]+\")\n    (extension \"com.apple.sandbox.pty\")))\n; PTYs created before entering seatbelt may lack the extension; allow ioctl\n; on those slave ttys so interactive shells detect a TTY and remain functional.\n(allow file-ioctl (regex #\"^/dev/ttys[0-9]+\"))\n\n; allow read-only file operations\n(allow file-read*)\n(allow file-write*\n(require-all (subpath (param \"WRITABLE_ROOT_0\")) (require-not (subpath (param \"WRITABLE_ROOT_0_RO_0\"))) ) (subpath (param \"WRITABLE_ROOT_1\")) (subpath (param \"WRITABLE_ROOT_2\"))\n)\n",
+            "-DWRITABLE_ROOT_0=<repo>",
+            "-DWRITABLE_ROOT_0_RO_0=<repo>/.git",
+            "-DWRITABLE_ROOT_1=<tmp>",
+            "-DWRITABLE_ROOT_2=<tmp>",
+            "-DDARWIN_USER_CACHE_DIR=<tmp>/../C",
+            "--",
+            "/bin/bash",
+            "-lc",
+            "printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "turn"
+          ],
+          "purpose": "runs the tool command in a sandbox (macOS Seatbelt)",
+          "role": "tool"
+        },
+        "/usr/libexec/path_helper -s": {
+          "argv": [
+            "/usr/libexec/path_helper",
+            "-s"
+          ],
+          "by": "bash",
+          "count": 2,
+          "parents": [
+            "/bin/bash -lc git status --short && git log --oneline -1",
+            "/bin/bash -lc printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "purpose": "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell",
+          "role": "tool"
+        },
+        "git log --oneline -1": {
+          "argv": [
+            "git",
+            "log",
+            "--oneline",
+            "-1"
+          ],
+          "by": "bash",
+          "count": 1,
+          "parents": [
+            "/bin/bash -lc git status --short && git log --oneline -1"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "git remote get-url origin": {
+          "argv": [
+            "git",
+            "remote",
+            "get-url",
+            "origin"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse --abbrev-ref HEAD": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "--abbrev-ref",
+            "HEAD"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse --git-common-dir": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "--git-common-dir"
+          ],
+          "by": "codex",
+          "count": 2,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse --git-dir": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "--git-dir"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse HEAD": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git status --short": {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "by": "bash",
+          "count": 1,
+          "parents": [
+            "/bin/bash -lc git status --short && git log --oneline -1"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "uname -m": {
+          "argv": [
+            "uname",
+            "-m"
+          ],
+          "by": "codex",
+          "count": 5,
+          "parents": [],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "purpose": "detects the platform and installed package managers",
+          "role": "harness"
+        }
+      },
+      "lookups": [
+        "git",
+        "sandbox-exec",
+        "uname"
+      ],
+      "macos": {
+        "launch_items": {},
+        "task_ports": {},
+        "tcc": {},
+        "xpc": {
+          "com.apple.cfprefsd.agent": {
+            "count": 1,
+            "phases": [
+              "startup"
+            ]
+          },
+          "com.apple.cfprefsd.daemon": {
+            "count": 1,
+            "phases": [
+              "startup"
+            ]
+          },
+          "com.apple.system.opendirectoryd.libinfo": {
+            "count": 2,
+            "phases": [
+              "startup",
+              "turn"
+            ],
+            "programs": [
+              "xcodebuild"
+            ]
+          },
+          "com.apple.system.opendirectoryd.membership": {
+            "count": 1,
+            "phases": [
+              "turn"
+            ]
+          }
+        }
+      },
+      "paths": {
+        "/": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/Library/Preferences/Logging/com.apple.diagnosticd.filter.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/config.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/managed_config.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/requirements.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/opt/hca/start_hca.sh": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/private": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/private/etc": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/etc/codex": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/etc/codex/config.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/etc/codex/managed_config.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/etc/codex/requirements.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/etc/codex/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/private/var": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/private/var/folders": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/var": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "<codex-home>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/.env": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/AGENTS.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/AGENTS.override.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/auth.json": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/config.toml": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/history.jsonl": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>/<n>": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>/<n>/<n>": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>/<n>/<n>/rollout-<time>-<uuid>.jsonl": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup",
+            "turn",
+            "exit"
+          ],
+          "programs": [
+            "sandbox-exec"
+          ]
+        },
+        "<codex-home>/skills": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/.codex-system-skills.marker": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/SKILL.md": {
+          "ops": [
+            "read",
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/SKILL.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/license.txt": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts/init_skill.py": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts/package_skill.py": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts/quick_validate.py": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/LICENSE.txt": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/SKILL.md": {
+          "ops": [
+            "read",
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/SKILL.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts/github_utils.py": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts/install-skill-from-github.py": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts/list-curated-skills.py": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/tmp/path": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/tmp/path/codex-<id>": {
+          "ops": [
+            "stat",
+            "list",
+            "create",
+            "delete"
+          ],
+          "phases": [
+            "startup",
+            "exit"
+          ]
+        },
+        "<codex-home>/tmp/path/codex-<id>/apply_patch": {
+          "ops": [
+            "create",
+            "delete"
+          ],
+          "phases": [
+            "startup",
+            "exit"
+          ]
+        },
+        "<codex-home>/tmp/path/codex-<id>/applypatch": {
+          "ops": [
+            "create",
+            "delete"
+          ],
+          "phases": [
+            "startup",
+            "exit"
+          ]
+        },
+        "<codex-home>/tmp/path/codex-<id>/git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/tmp/path/codex-<id>/uname": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<home>/.bash_login": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<home>/.bash_profile": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<home>/.config/git/attributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/.config/git/ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/.profile": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<home>/Library/Developer/Toolchains": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>": {
+          "ops": [
+            "stat",
+            "list",
+            "read",
+            "chdir"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "bash",
+            "git",
+            "path_helper"
+          ]
+        },
+        "<repo>/.codex": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<repo>/.git": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/BISECT_LOG": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/CHERRY_PICK_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/HEAD": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/MERGE_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/REVERT_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/commondir": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/config": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/hooks/post-index-change": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/index": {
+          "ops": [
+            "read",
+            "write"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/index.lock": {
+          "ops": [
+            "stat",
+            "write",
+            "create",
+            "rename"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/attributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/exclude": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/grafts": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/<id>": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/<id>/<hash>": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/alternates": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/commit-graph": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/commit-graphs/commit-graph-chain": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack/multi-pack-index": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack/multi-pack-index.d/multi-pack-index-chain": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/packed-refs": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/rebase-apply": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/rebase-merge": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads/main": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/HEAD/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/main/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/tags/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/tags/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/sequencer/todo": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/shallow": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.gitattributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.mailmap": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/@rpath/DVTSystemPrerequisites.framework/Versions/A": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<repo>/@rpath/DVTSystemPrerequisites.framework/Versions/A/DVTSystemPrerequisites": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<repo>/@rpath/ManagedBackgroundAssetsXPC.framework/Versions/A/ManagedBackgroundAssetsXPC": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<repo>/AGENTS.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/AGENTS.override.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/README.md": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/notes.txt": {
+          "ops": [
+            "write",
+            "create"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<sandbox>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<sandbox>/..": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<sandbox>/gitconfig": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<tmp>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<tmp>/.codex": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<tmp>/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<tmp>/xcrun_db": {
+          "ops": [
+            "read",
+            "write"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<tmp>/xcrun_db-<id>": {
+          "ops": [
+            "stat",
+            "write",
+            "rename"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<user-home>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/.CFUserTextEncoding": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<user-home>/Library/Preferences/.GlobalPreferences.plist": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/.GlobalPreferences_m.plist": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/ByHost/.GlobalPreferences.<uuid>.plist": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/ByHost/com.apple.dt.Xcode.<uuid>.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/ByHost/com.apple.dt.xcodebuild.<uuid>.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/ByHost/xcodebuild.<uuid>.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/com.apple.dt.Xcode.plist": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/com.apple.dt.xcodebuild.plist": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        },
+        "<user-home>/Library/Preferences/xcodebuild.plist": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "xcodebuild"
+          ]
+        }
+      },
+      "platform": "darwin/arm64",
+      "sockets": {
+        "connections": {},
+        "dns": [],
+        "listening": {},
+        "unix": {}
+      },
+      "tracer": "eslogger",
+      "unobserved": {
+        "exec": [
+          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
+          "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+        ],
+        "paths": [
+          "<repo>/@rpath",
+          "<repo>/@rpath/AppStoreService.framework/Versions/A",
+          "<repo>/@rpath/AppStoreService.framework/Versions/A/AppStoreService",
+          "<repo>/@rpath/AppThinning.framework/Versions/A",
+          "<repo>/@rpath/AppThinning.framework/Versions/A/AppThinning",
+          "<repo>/@rpath/BuildServerProtocol.framework/Versions/A",
+          "<repo>/@rpath/BuildServerProtocol.framework/Versions/A/BuildServerProtocol",
+          "<repo>/@rpath/CodeCompletionFoundation.framework/Versions/A",
+          "<repo>/@rpath/CodeCompletionFoundation.framework/Versions/A/CodeCompletionFoundation",
+          "<repo>/@rpath/ContentDelivery.framework/Versions/A",
+          "<repo>/@rpath/ContentDelivery.framework/Versions/A/ContentDelivery",
+          "<repo>/@rpath/ContentDeliveryServices.framework/Versions/A",
+          "<repo>/@rpath/ContentDeliveryServices.framework/Versions/A/ContentDeliveryServices",
+          "<repo>/@rpath/CoreDocumentation.framework/Versions/A",
+          "<repo>/@rpath/CoreDocumentation.framework/Versions/A/CoreDocumentation",
+          "<repo>/@rpath/CoreSymbolicationDT.framework/Versions/A",
+          "<repo>/@rpath/CoreSymbolicationDT.framework/Versions/A/CoreSymbolicationDT",
+          "<repo>/@rpath/DNTDocumentationModel.framework/Versions/A",
+          "<repo>/@rpath/DNTDocumentationModel.framework/Versions/A/DNTDocumentationModel",
+          "<repo>/@rpath/DNTDocumentationSupport.framework/Versions/A",
+          "<repo>/@rpath/DNTDocumentationSupport.framework/Versions/A/DNTDocumentationSupport",
+          "<repo>/@rpath/DNTSourceKitSupport.framework/Versions/A",
+          "<repo>/@rpath/DNTSourceKitSupport.framework/Versions/A/DNTSourceKitSupport",
+          "<repo>/@rpath/DNTTransformer.framework/Versions/A",
+          "<repo>/@rpath/DNTTransformer.framework/Versions/A/DNTTransformer",
+          "<repo>/@rpath/DTDeviceServices.framework/Versions/A",
+          "<repo>/@rpath/DTDeviceServices.framework/Versions/A/DTDeviceServices",
+          "<repo>/@rpath/DTXConnectionServices.framework/Versions/A",
+          "<repo>/@rpath/DTXConnectionServices.framework/Versions/A/DTXConnectionServices",
+          "<repo>/@rpath/DVTDarwinup.framework/Versions/A",
+          "<repo>/@rpath/DVTDarwinup.framework/Versions/A/DVTDarwinup",
+          "<repo>/@rpath/DVTDeviceFoundation.framework/Versions/A",
+          "<repo>/@rpath/DVTDeviceFoundation.framework/Versions/A/DVTDeviceFoundation",
+          "<repo>/@rpath/DVTDocumentation.framework/Versions/A",
+          "<repo>/@rpath/DVTDocumentation.framework/Versions/A/DVTDocumentation",
+          "<repo>/@rpath/DVTFoundation.framework/Versions/A",
+          "<repo>/@rpath/DVTFoundation.framework/Versions/A/DVTFoundation",
+          "<repo>/@rpath/DVTITunesSoftware.framework/Versions/A",
+          "<repo>/@rpath/DVTITunesSoftware.framework/Versions/A/DVTITunesSoftware",
+          "<repo>/@rpath/DVTITunesSoftwareServiceFoundation.framework/Versions/A",
+          "<repo>/@rpath/DVTITunesSoftwareServiceFoundation.framework/Versions/A/DVTITunesSoftwareServiceFoundation",
+          "<repo>/@rpath/DVTInstrumentsFoundation.framework/Versions/A",
+          "<repo>/@rpath/DVTInstrumentsFoundation.framework/Versions/A/DVTInstrumentsFoundation",
+          "<repo>/@rpath/DVTInstrumentsUtilities.framework/Versions/A",
+          "<repo>/@rpath/DVTInstrumentsUtilities.framework/Versions/A/DVTInstrumentsUtilities",
+          "<repo>/@rpath/DVTInternalCanary.framework/Versions/A",
+          "<repo>/@rpath/DVTInternalCanary.framework/Versions/A/DVTInternalCanary",
+          "<repo>/@rpath/DVTMacroFoundation.framework/Versions/A",
+          "<repo>/@rpath/DVTMacroFoundation.framework/Versions/A/DVTMacroFoundation",
+          "<repo>/@rpath/DVTNFASupport.framework/Versions/A",
+          "<repo>/@rpath/DVTNFASupport.framework/Versions/A/DVTNFASupport",
+          "<repo>/@rpath/DVTPortal.framework/Versions/A",
+          "<repo>/@rpath/DVTPortal.framework/Versions/A/DVTPortal",
+          "<repo>/@rpath/DVTServices.framework/Versions/A",
+          "<repo>/@rpath/DVTServices.framework/Versions/A/DVTServices",
+          "<repo>/@rpath/DebugSymbolsDT.framework/Versions/A",
+          "<repo>/@rpath/DebugSymbolsDT.framework/Versions/A/DebugSymbolsDT",
+          "<repo>/@rpath/DevToolsCore.framework/Versions/A",
+          "<repo>/@rpath/DevToolsCore.framework/Versions/A/DevToolsCore",
+          "<repo>/@rpath/DevToolsSupport.framework/Versions/A",
+          "<repo>/@rpath/DevToolsSupport.framework/Versions/A/DevToolsSupport",
+          "<repo>/@rpath/IDEFoundation.framework/Versions/A",
+          "<repo>/@rpath/IDEFoundation.framework/Versions/A/IDEFoundation",
+          "<repo>/@rpath/IDENoticesFoundation.framework/Versions/A",
+          "<repo>/@rpath/IDENoticesFoundation.framework/Versions/A/IDENoticesFoundation",
+          "<repo>/@rpath/IDEResultKit.framework/Versions/A",
+          "<repo>/@rpath/IDEResultKit.framework/Versions/A/IDEResultKit",
+          "<repo>/@rpath/ITunesConnectFoundation.framework/Versions/A",
+          "<repo>/@rpath/ITunesConnectFoundation.framework/Versions/A/ITunesConnectFoundation",
+          "<repo>/@rpath/ITunesContentDelivery.framework/Versions/A",
+          "<repo>/@rpath/ITunesContentDelivery.framework/Versions/A/ITunesContentDelivery",
+          "<repo>/@rpath/ITunesPackage.framework/Versions/A",
+          "<repo>/@rpath/ITunesPackage.framework/Versions/A/ITunesPackage",
+          "<repo>/@rpath/IndexStoreDB_LLVMSupport.framework/Versions/A",
+          "<repo>/@rpath/IndexStoreDB_LLVMSupport.framework/Versions/A/IndexStoreDB_LLVMSupport",
+          "<repo>/@rpath/IndexStoreDB_Support.framework/Versions/A",
+          "<repo>/@rpath/IndexStoreDB_Support.framework/Versions/A/IndexStoreDB_Support",
+          "<repo>/@rpath/LanguageServerProtocol.framework/Versions/A",
+          "<repo>/@rpath/LanguageServerProtocol.framework/Versions/A/LanguageServerProtocol",
+          "<repo>/@rpath/Localization.framework/Versions/A",
+          "<repo>/@rpath/Localization.framework/Versions/A/Localization",
+          "<repo>/@rpath/MZXMLMarshalling.framework/Versions/A",
+          "<repo>/@rpath/MZXMLMarshalling.framework/Versions/A/MZXMLMarshalling",
+          "<repo>/@rpath/MallocStackLoggingDT.framework/Versions/A",
+          "<repo>/@rpath/MallocStackLoggingDT.framework/Versions/A/MallocStackLoggingDT",
+          "<repo>/@rpath/Notarization.framework/Versions/A",
+          "<repo>/@rpath/Notarization.framework/Versions/A/Notarization",
+          "<repo>/@rpath/PackedPaths.framework/Versions/A",
+          "<repo>/@rpath/PackedPaths.framework/Versions/A/PackedPaths",
+          "<repo>/@rpath/RecountDT.framework/Versions/A",
+          "<repo>/@rpath/RecountDT.framework/Versions/A/RecountDT",
+          "<repo>/@rpath/ResultDataPublisher.framework/Versions/A",
+          "<repo>/@rpath/ResultDataPublisher.framework/Versions/A/ResultDataPublisher",
+          "<repo>/@rpath/SharedFrameworks/DVTAppStoreConnect.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/DVTAppStoreConnect.framework/Versions/A/DVTAppStoreConnect",
+          "<repo>/@rpath/SharedFrameworks/DVTKeychain.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/DVTKeychain.framework/Versions/A/DVTKeychain",
+          "<repo>/@rpath/SharedFrameworks/DVTKeychainService.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/DVTKeychainService.framework/Versions/A/DVTKeychainService",
+          "<repo>/@rpath/SharedFrameworks/DVTKeychainUtilities.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/DVTKeychainUtilities.framework/Versions/A/DVTKeychainUtilities",
+          "<repo>/@rpath/SharedFrameworks/DVTSourceControl.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/DVTSourceControl.framework/Versions/A/DVTSourceControl",
+          "<repo>/@rpath/SharedFrameworks/IDEDistribution.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/IDEDistribution.framework/Versions/A/IDEDistribution",
+          "<repo>/@rpath/SharedFrameworks/XCServices.framework/Versions/A",
+          "<repo>/@rpath/SharedFrameworks/XCServices.framework/Versions/A/XCServices",
+          "<repo>/@rpath/SourceKit.framework/Versions/A",
+          "<repo>/@rpath/SourceKit.framework/Versions/A/SourceKit",
+          "<repo>/@rpath/SwiftParser.framework/Versions/A",
+          "<repo>/@rpath/SwiftParser.framework/Versions/A/SwiftParser",
+          "<repo>/@rpath/SwiftSyntax.framework/Versions/A",
+          "<repo>/@rpath/SwiftSyntax.framework/Versions/A/SwiftSyntax",
+          "<repo>/@rpath/SwiftSyntaxCShims.framework/Versions/A",
+          "<repo>/@rpath/SwiftSyntaxCShims.framework/Versions/A/SwiftSyntaxCShims",
+          "<repo>/@rpath/SymbolicationDT.framework/Versions/A",
+          "<repo>/@rpath/SymbolicationDT.framework/Versions/A/SymbolicationDT",
+          "<repo>/@rpath/Testing.framework/Versions/A",
+          "<repo>/@rpath/Testing.framework/Versions/A/Testing",
+          "<repo>/@rpath/VoiceBoxClient.framework/Versions/A",
+          "<repo>/@rpath/VoiceBoxClient.framework/Versions/A/VoiceBoxClient",
+          "<repo>/@rpath/XCResultKit.framework/Versions/A",
+          "<repo>/@rpath/XCResultKit.framework/Versions/A/XCResultKit",
+          "<repo>/@rpath/XCSourceControl.framework/Versions/A",
+          "<repo>/@rpath/XCSourceControl.framework/Versions/A/XCSourceControl",
+          "<repo>/@rpath/XCStringsParser.framework/Versions/A",
+          "<repo>/@rpath/XCStringsParser.framework/Versions/A/XCStringsParser",
+          "<repo>/@rpath/XCTAutomationSupport.framework/Versions/A",
+          "<repo>/@rpath/XCTAutomationSupport.framework/Versions/A/XCTAutomationSupport",
+          "<repo>/@rpath/XCTDaemonControl.framework/Versions/A",
+          "<repo>/@rpath/XCTDaemonControl.framework/Versions/A/XCTDaemonControl",
+          "<repo>/@rpath/XCTHarness.framework/Versions/A",
+          "<repo>/@rpath/XCTHarness.framework/Versions/A/XCTHarness",
+          "<repo>/@rpath/XCTest.framework/Versions/A",
+          "<repo>/@rpath/XCTest.framework/Versions/A/XCTest",
+          "<repo>/@rpath/XCTestCore.framework/Versions/A",
+          "<repo>/@rpath/XCTestCore.framework/Versions/A/XCTestCore",
+          "<repo>/@rpath/XCTestSupport.framework/Versions/A",
+          "<repo>/@rpath/XCTestSupport.framework/Versions/A/XCTestSupport",
+          "<repo>/@rpath/XCUIAutomation.framework/Versions/A",
+          "<repo>/@rpath/XCUIAutomation.framework/Versions/A/XCUIAutomation",
+          "<repo>/@rpath/Xcode3Core.framework/Versions/A",
+          "<repo>/@rpath/Xcode3Core.framework/Versions/A/Xcode3Core",
+          "<repo>/@rpath/XcodeKit.framework/Versions/A",
+          "<repo>/@rpath/XcodeKit.framework/Versions/A/XcodeKit",
+          "<repo>/@rpath/_Testing_Foundation.framework/Versions/A",
+          "<repo>/@rpath/_Testing_Foundation.framework/Versions/A/_Testing_Foundation",
+          "<repo>/@rpath/kperfdataDT.framework/Versions/A",
+          "<repo>/@rpath/kperfdataDT.framework/Versions/A/kperfdataDT",
+          "<repo>/@rpath/ktraceDT.framework/Versions/A",
+          "<repo>/@rpath/ktraceDT.framework/Versions/A/ktraceDT",
+          "<user-home>/Library/Caches/com.apple.DeveloperTools",
+          "<user-home>/Library/Caches/com.apple.DeveloperTools/26.6-17F113",
+          "<user-home>/Library/Caches/com.apple.DeveloperTools/26.6-17F113/Xcode",
+          "<user-home>/Library/Caches/com.apple.DeveloperTools/26.6-17F113/Xcode/CachedSpecifications-xcodebuild",
+          "<user-home>/Library/Caches/com.apple.DeveloperTools/26.6-17F113/Xcode/PlugInCache-xcodebuild.xcplugincache",
+          "<user-home>/Library/Developer/Toolchains",
+          "<user-home>/Library/Developer/Xcode/Plug-ins",
+          "<user-home>/Library/Developer/Xcode/PrivateFrameworks",
+          "<user-home>/Library/Developer/Xcode/PrivatePlugIns",
+          "<user-home>/Library/Preferences/com.apple.LaunchServices/com.apple.LaunchServices.plist",
+          "<user-home>/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+        ]
+      }
+    },
+    "linux/amd64": {
+      "decoys": {
+        "<home>/.aws/credentials": "not touched",
+        "<home>/.config/gh/hosts.yml": "not touched",
+        "<home>/.docker/config.json": "not touched",
+        "<home>/.docker/run/docker.sock": "not touched",
+        "<home>/.git-credentials": "not touched",
+        "<home>/.netrc": "not touched",
+        "<home>/.npmrc": "not touched",
+        "<home>/.ssh/agent.sock": "not touched",
+        "<home>/.ssh/id_ed25519": "not touched",
+        "<repo>/.env": "not touched",
+        "<repo>/secrets.json": "not touched"
+      },
+      "dropped": {
+        "dev": 31,
+        "helpers": 13,
+        "libraries": 463,
+        "machine": 2,
+        "path-search": 108,
+        "proc": 7,
+        "sys": 5,
+        "system": 40,
+        "test": 21
+      },
+      "exec": {
+        "/bin/bash -lc git status --short && git log --oneline -1": {
+          "argv": [
+            "/bin/bash",
+            "-lc",
+            "git status --short && git log --oneline -1"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [
+            "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -lc git status --short && git log --oneline -1"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "/bin/bash -lc printf 'written by the files profile\\n' > notes.txt": {
+          "argv": [
+            "/bin/bash",
+            "-lc",
+            "printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [
+            "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -lc printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -lc git status --short && git log --oneline -1": {
+          "argv": [
+            "codex-linux-sandbox",
+            "--sandbox-policy-cwd",
+            "<repo>",
+            "--sandbox-policy",
+            "{\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false}",
+            "--",
+            "/bin/bash",
+            "-lc",
+            "git status --short && git log --oneline -1"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "turn"
+          ],
+          "purpose": "runs the tool command in a sandbox (Codex's Linux sandbox helper, which starts bubblewrap)",
+          "role": "tool"
+        },
+        "codex-linux-sandbox --sandbox-policy-cwd <repo> --sandbox-policy {\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false} -- /bin/bash -lc printf 'written by the files profile\\n' > notes.txt": {
+          "argv": [
+            "codex-linux-sandbox",
+            "--sandbox-policy-cwd",
+            "<repo>",
+            "--sandbox-policy",
+            "{\"type\":\"workspace-write\",\"network_access\":false,\"exclude_tmpdir_env_var\":false,\"exclude_slash_tmp\":false}",
+            "--",
+            "/bin/bash",
+            "-lc",
+            "printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "turn"
+          ],
+          "purpose": "runs the tool command in a sandbox (Codex's Linux sandbox helper, which starts bubblewrap)",
+          "role": "tool"
+        },
+        "getconf LONG_BIT": {
+          "argv": [
+            "getconf",
+            "LONG_BIT"
+          ],
+          "by": "codex",
+          "count": 5,
+          "parents": [],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "purpose": "reads the platform's word size",
+          "role": "harness"
+        },
+        "git log --oneline -1": {
+          "argv": [
+            "git",
+            "log",
+            "--oneline",
+            "-1"
+          ],
+          "by": "bash",
+          "count": 1,
+          "parents": [
+            "/bin/bash -lc git status --short && git log --oneline -1"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "git remote get-url origin": {
+          "argv": [
+            "git",
+            "remote",
+            "get-url",
+            "origin"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse --abbrev-ref HEAD": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "--abbrev-ref",
+            "HEAD"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse --git-common-dir": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "--git-common-dir"
+          ],
+          "by": "codex",
+          "count": 2,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse --git-dir": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "--git-dir"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git rev-parse HEAD": {
+          "argv": [
+            "git",
+            "rev-parse",
+            "HEAD"
+          ],
+          "by": "codex",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git status --short": {
+          "argv": [
+            "git",
+            "status",
+            "--short"
+          ],
+          "by": "bash",
+          "count": 1,
+          "parents": [
+            "/bin/bash -lc git status --short && git log --oneline -1"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "id -u": {
+          "argv": [
+            "id",
+            "-u"
+          ],
+          "by": "bash",
+          "count": 2,
+          "parents": [
+            "/bin/bash -lc git status --short && git log --oneline -1",
+            "/bin/bash -lc printf 'written by the files profile\\n' > notes.txt"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "purpose": "reads the user's id: the system's /etc/profile runs it in every login shell",
+          "role": "tool"
+        },
+        "uname -m": {
+          "argv": [
+            "uname",
+            "-m"
+          ],
+          "by": "codex",
+          "count": 5,
+          "parents": [],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "purpose": "detects the platform and installed package managers",
+          "role": "harness"
+        }
+      },
+      "lookups": [],
+      "paths": {
+        "/": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ]
+        },
+        "/etc/codex/config.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/managed_config.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/requirements.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/codex/skills": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/etc/os-release": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "/usr/local/etc/openssl": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/local/openssl": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/local/share": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/local/share/certs": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/local/ssl": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/usr/local/ssl/openssl.cnf": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "/var/ssl": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/.env": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/AGENTS.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/AGENTS.override.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/auth.json": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/config.toml": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/history.jsonl": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/rules": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>/<n>": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>/<n>/<n>": {
+          "ops": [
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/sessions/<n>/<n>/<n>/rollout-<time>-<uuid>.jsonl": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/.codex-system-skills.marker": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/SKILL.md": {
+          "ops": [
+            "read",
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/SKILL.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/license.txt": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts/init_skill.py": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts/package_skill.py": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-creator/scripts/quick_validate.py": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/LICENSE.txt": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/SKILL.md": {
+          "ops": [
+            "read",
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/SKILL.toml": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts": {
+          "ops": [
+            "stat",
+            "list",
+            "create"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts/github_utils.py": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts/install-skill-from-github.py": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<codex-home>/skills/.system/skill-installer/scripts/list-curated-skills.py": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<home>/.bash_login": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<home>/.bash_profile": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<home>/.config/git/attributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/.config/git/ignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<home>/.profile": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<repo>": {
+          "ops": [
+            "stat",
+            "list",
+            "read",
+            "chdir"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "bash",
+            "git"
+          ]
+        },
+        "<repo>/.codex": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<repo>/.git": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/BISECT_LOG": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/CHERRY_PICK_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/HEAD": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/MERGE_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/REVERT_HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/commondir": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/config": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/hooks/post-index-change": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/index": {
+          "ops": [
+            "read",
+            "write"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/index.lock": {
+          "ops": [
+            "stat",
+            "write",
+            "rename"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/attributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/exclude": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/info/grafts": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/<id>": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/<id>/<hash>": {
+          "ops": [
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/alternates": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/commit-graph": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/info/commit-graphs/commit-graph-chain": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack": {
+          "ops": [
+            "list"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/objects/pack/multi-pack-index": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/packed-refs": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/rebase-apply": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/rebase-merge": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs": {
+          "ops": [
+            "stat",
+            "list"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/heads/main": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/HEAD/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/remotes/main/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/tags": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/tags/HEAD": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/refs/tags/main": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/sequencer/todo": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.git/shallow": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.gitattributes": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.gitignore": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/.mailmap": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/AGENTS.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/AGENTS.override.md": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup"
+          ]
+        },
+        "<repo>/README.md": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<repo>/notes.txt": {
+          "ops": [
+            "write"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "programs": [
+            "bash"
+          ]
+        },
+        "<sandbox>": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<sandbox>/..": {
+          "ops": [
+            "stat"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<sandbox>/gitconfig": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<tmp>": {
+          "ops": [
+            "stat",
+            "read"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ],
+          "programs": [
+            "git"
+          ]
+        },
+        "<tmp>/.codex": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        },
+        "<tmp>/.git": {
+          "ops": [
+            "probe"
+          ],
+          "phases": [
+            "startup",
+            "turn"
+          ]
+        }
+      },
+      "platform": "linux/amd64",
+      "sockets": {
+        "connections": {
+          "tcp <provider>": {
+            "count": 3,
+            "phases": [
+              "startup",
+              "turn"
+            ],
+            "role": "provider"
+          }
+        },
+        "dns": [],
+        "listening": {},
+        "unix": {}
+      },
+      "tracer": "strace"
     }
   },
   "binary": {

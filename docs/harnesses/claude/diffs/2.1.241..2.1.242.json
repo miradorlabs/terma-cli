@@ -3,20 +3,21 @@
   "harness": "claude",
   "from": "2.1.241",
   "to": "2.1.242",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": null,
   "summary": {
-    "changes": 102,
+    "changes": 105,
     "categories": {
       "binary": 1,
       "config": 99,
+      "hooks": 3,
       "tools": 2
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 11,
+      "informational": 14,
       "notable": 91
     },
     "undocumented": null
@@ -62,6 +63,66 @@
         "description": "true = nothing changed (you checked and there is nothing to report). false = something happened worth keeping (edited a file, posted a message, advanced state, surfaced a finding). Consecutive noop:true ticks are collapsed in the user's terminal view and tracked as a streak. Required unless `stop` is true.",
         "type": "boolean"
       },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.harnessNoteCount",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.harnessNoteCount"
+      ],
+      "title": "PostToolUse hook payload field tool_response.harnessNoteCount added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_response.harnessNoteCount",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.harnessSectionHash",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.harnessSectionHash"
+      ],
+      "title": "PostToolUse hook payload field tool_response.harnessSectionHash added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_response.harnessSectionHash",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.harnessTailCount",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.harnessTailCount"
+      ],
+      "title": "PostToolUse hook payload field tool_response.harnessTailCount added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_response.harnessTailCount",
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -2082,7 +2143,7 @@
         "binary",
         "size_bytes"
       ],
-      "title": "Binary size_bytes: 325055632 → 361529696",
+      "title": "Binary size: 325,055,632 → 361,529,696 bytes (325.1 MB → 361.5 MB)",
       "impact": "informational",
       "before": 325055632,
       "after": 361529696,

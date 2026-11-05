@@ -3,26 +3,26 @@
   "harness": "claude",
   "from": "2.1.227",
   "to": "2.1.228",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Fixed interactive sessions that could stop redrawing entirely, while the process kept running, after a rare internal layout error\n- Fixed `git` / Git Bash not being found on Windows when Claude Code is launched from a parent folder of the git installation\n- Fixed `/tui` reverting the session to an earlier model when `/model` had been changed since the last response\n- Fixed cross-session messaging sometimes starting without an inbox in the first session after install or upgrade\n- Fixed Remote Control `/resume` while connected leaking the resumed conversation's title or history into the connected session\n- Fixed `claude self-hosted-runner` sessions failing on every fresh runner when the `checkout` hook fails for a repository the session doesn't push to; that repository is now skipped with a warning\n- Fixed self-hosted runners ending sessions in the gap between a background task finishing and the follow-up turn starting\n- Fixed session cleanup deleting contents inside a project's memory folder\n- Fixed background plugin-cache cleanup deleting a plugin's cache when its only version is a symlinked development checkout\n- Fixed a settings-merge issue where a marketplace entry redefined in a higher-precedence settings tier could inherit another tier's custom headers; marketplace entries now merge as whole entries\n- Fixed the deferred-tools reminder occasionally being sent to the model twice after a skill invocation\n- Hardened skills synced from claude.ai: they no longer shadow local commands or MCP prompts, their descriptions are sanitized and labeled, and on your machine their bodies don't run `!` commands or expand `@` files\n- Improved cross-session messages: the sender and body now display inline instead of a collapsed line, and messages to Remote Control sessions on other machines show your Remote Control session name as the sender\n- Improved Vertex AI credential handling: expired or missing Google Cloud credentials now fail within seconds instead of retrying for minutes\n- Improved compaction progress: the retry countdown and stall hint now appear during compaction instead of only a progress bar\n- Updated terminal title busy-spinner glyphs to reduce tab-bar jitter on some terminals\n- Changed the Write tool so newer models can overwrite an existing file they haven't read this session, matching the Edit tool's rules; older models still require the read first\n- Removed the outdated note about auto mode sessions costing slightly more from the first-use notice for Pro, Max, and Team plans"
   },
   "summary": {
-    "changes": 41,
+    "changes": 53,
     "categories": {
       "config": 15,
-      "hooks": 25,
+      "hooks": 37,
       "request": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 40,
+      "informational": 52,
       "notable": 1
     },
-    "undocumented": 40
+    "undocumented": 52
   },
   "changes": [
     {
@@ -38,6 +38,26 @@
       "impact": "informational",
       "before": "0.94.0",
       "after": "0.112.1",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.ConfigChange.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "ConfigChange",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "ConfigChange hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -75,6 +95,86 @@
         "CLAUDE_CODE_MESSAGING_TOKEN"
       ],
       "title": "CwdChanged hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.DirectoryAdded.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "DirectoryAdded",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "DirectoryAdded hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.Elicitation.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Elicitation",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "Elicitation hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.ElicitationResult.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "ElicitationResult",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "ElicitationResult hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.FileChanged.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "FileChanged",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "FileChanged hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_CODE_MESSAGING_TOKEN",
@@ -124,6 +224,26 @@
       "documented": false
     },
     {
+      "id": "hooks.events.Notification.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Notification",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "Notification hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
       "id": "hooks.events.PermissionDenied.env.CLAUDE_CODE_MESSAGING_TOKEN",
       "category": "hooks",
       "op": "added",
@@ -135,6 +255,26 @@
         "CLAUDE_CODE_MESSAGING_TOKEN"
       ],
       "title": "PermissionDenied hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PermissionRequest.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "PermissionRequest hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_CODE_MESSAGING_TOKEN",
@@ -184,26 +324,6 @@
       "documented": false
     },
     {
-      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "PostToolUse",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "PostToolUse hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
       "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_MESSAGING_TOKEN",
       "category": "hooks",
       "op": "added",
@@ -218,6 +338,46 @@
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.usage.output_tokens_details",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.usage.output_tokens_details"
+      ],
+      "title": "PostToolUse hook payload field tool_response.usage.output_tokens_details added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_response.usage.output_tokens_details",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.PostToolUse.keys.tool_response.usage.output_tokens_details.thinking_tokens",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "keys",
+        "tool_response.usage.output_tokens_details.thinking_tokens"
+      ],
+      "title": "PostToolUse hook payload field tool_response.usage.output_tokens_details.thinking_tokens added",
+      "impact": "informational",
+      "before": null,
+      "after": "tool_response.usage.output_tokens_details.thinking_tokens",
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -304,6 +464,46 @@
       "documented": false
     },
     {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_SOCKET",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_SOCKET"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
       "id": "hooks.events.SessionStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
       "category": "hooks",
       "op": "added",
@@ -364,26 +564,6 @@
       "documented": true
     },
     {
-      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_SOCKET",
-      "category": "hooks",
-      "op": "added",
-      "path": [
-        "hooks",
-        "events",
-        "SubagentStart",
-        "env",
-        "CLAUDE_CODE_MESSAGING_SOCKET"
-      ],
-      "title": "SubagentStart hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
-      "impact": "informational",
-      "before": null,
-      "after": "CLAUDE_CODE_MESSAGING_SOCKET",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
       "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_MESSAGING_TOKEN",
       "category": "hooks",
       "op": "added",
@@ -415,6 +595,66 @@
         "CLAUDE_CODE_MESSAGING_TOKEN"
       ],
       "title": "SubagentStop hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.TaskCompleted.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TaskCompleted",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "TaskCompleted hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.TaskCreated.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TaskCreated",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "TaskCreated hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MESSAGING_TOKEN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "hooks.events.TeammateIdle.env.CLAUDE_CODE_MESSAGING_TOKEN",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TeammateIdle",
+        "env",
+        "CLAUDE_CODE_MESSAGING_TOKEN"
+      ],
+      "title": "TeammateIdle hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added",
       "impact": "informational",
       "before": null,
       "after": "CLAUDE_CODE_MESSAGING_TOKEN",

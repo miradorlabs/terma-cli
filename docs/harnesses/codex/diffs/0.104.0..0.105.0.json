@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.104.0",
   "to": "0.105.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.104.0...rust-v0.105.0"
   },
@@ -12,20 +12,21 @@
     "text": "## New Features\r\n- The TUI now syntax-highlights fenced code blocks and diffs, adds a `/theme` picker with live preview, and uses better theme-aware diff colors for light and dark terminals. (#11447, #12581)\r\n- You can now dictate prompts by holding the spacebar to record and transcribe voice input directly in the TUI. This feature is still under development; to enable it set features.voice_transcription = true in your config. (#3381)\r\n- Multi-agent workflows are easier to run and track: `spawn_agents_on_csv` can fan out work from a CSV with built-in progress/ETA, and sub-agents are easier to follow with nicknames, a cleaner picker, and visible child-thread approval prompts. (#10935, #12320, #12327, #12332, #12570, #12767)\r\n- The TUI picked up new convenience commands: `/copy` copies the latest complete assistant reply, while `/clear` and `Ctrl-L` clear the screen without losing thread context, with `/clear` also able to start a fresh chat. (#12444, #12520, #12613, #12628)\r\n- Approval controls are more flexible: Codex can now ask for extra sandbox permissions for a command, and you can auto-reject specific approval prompt types without turning approvals off entirely. (#11871, #12087)\r\n- App-server clients can do more with threads: `thread/list` can search by title, thread status is exposed in read/list responses and notifications, and `thread/resume` returns the latest turn inline so reconnects are less lossy. (#11776, #11786, #12578)\r\n\r\n## Bug Fixes\r\n- Long links in the TUI stay clickable when wrapped, which also fixes related clipping and layout issues in several views. (#12067)\r\n- Several TUI interaction edge cases were fixed: queued-message editing now works in more terminals, follow-up prompts no longer get stuck if you press Enter while a final answer is still streaming, and approval dialogs now respond with the correct request id. (#12240, #12569, #12746)\r\n- `@` parsing in the chat composer is more reliable, so commands like `npx -y @scope/pkg@latest` no longer accidentally open the file picker or block submission. (#12643)\r\n- App-server websocket handling is more robust: thread listeners survive disconnects, Ctrl-C waits for in-flight turns before restarting, and websocket clients that send `permessage-deflate` can connect successfully. (#12373, #12517, #12629)\r\n- Linux sandboxed commands now get a minimal `/dev`, fixing failures in tools that need entropy or other standard device nodes. (#12081)\r\n- `js_repl` now reports uncaught kernel failures more clearly, recovers cleanly afterward, and correctly attaches `view_image` results from nested tool calls. (#12636, #12725)\r\n\r\n## Documentation\r\n- Added a public security policy with Bugcrowd reporting guidance. (#12193)\r\n- Updated install and local workflow docs to use `cargo install --locked cargo-nextest` and to avoid routine `--all-features` builds unless you specifically need full feature coverage. (#12377, #12429)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.104.0...rust-v0.105.0\r\n\r\n- #12071 Use V2 websockets if feature enabled @pakrym-oai\r\n- #12052 feat(core): zsh exec bridge @owenlin0\r\n- #12072 Add message phase to agent message thread item @mousseau-oai\r\n- #12077 got rid of experimental_mode for configtoml @won-openai\r\n- #12036 codex-api: realtime websocket session.create + typed inbound events @aibrahim-oai\r\n- #12073 Add model-visible context layout snapshot tests @charley-oai\r\n- #12096 Updated issue labeler script to include safety-check label @etraut-openai\r\n- #11944 [js_repl] paths for node module resolution can be specified for js_repl @aaronl-openai\r\n- #11798 fix: Restricted Read: /System is too permissive for macOS platform de… @leoshimo-oai\r\n- #12015 Enable default status line indicators in TUI config @jif-oai\r\n- #12124 feat: phase 1 and phase 2 e2e latencies @jif-oai\r\n- #12121 feat: phase 2 usage @jif-oai\r\n- #12120 feat: memory usage metrics @jif-oai\r\n- #12133 feat: validate agent config file paths @jif-oai\r\n- #12137 nit: change model for phase 1 @jif-oai\r\n- #12069 Stop filtering model tools in js_repl_tools_only mode @fjord-oai\r\n- #12135 feat: better slug for rollout summaries @jif-oai\r\n- #12157 Disable collab tools during review delegation @jif-oai\r\n- #11802 Fixed a hole in token refresh logic for app server @etraut-openai\r\n- #12105 fix: file watcher @jif-oai\r\n- #12167 memories: bump rollout summary slug cap to 60 @zuxin-oai\r\n- #12177 js_repl: canonicalize paths for node_modules boundary checks @fjord-oai\r\n- #12025 app-server support for Windows sandbox setup. @iceweasel-oai\r\n- #12187 fix: Remove citation @zuxin-oai\r\n- #12180 [apps] Temporary app block. @mzeng-openai\r\n- #11786 app-server: expose loaded thread status via read/list and notifications @euroelessar\r\n- #12038 state: enforce 10 MiB log caps for thread and threadless process logs @charley-oai\r\n- #12203 Stabilize app-server detached review and running-resume tests @charley-oai\r\n- #12211 [apps] Update apps allowlist. @mzeng-openai\r\n- #12081 fix(linux-sandbox): mount /dev in bwrap sandbox @viyatb-oai\r\n- #12164 Update docs links for feature flag notice @etraut-openai\r\n- #12231 Adjust memories rollout defaults @jif-oai\r\n- #12152 feat: sub-agent injection @jif-oai\r\n- #12233 feat: add shell snapshot failure reason @jif-oai\r\n- #12193 docs: add codex security policy @viyatb-oai\r\n- #12228 feat: add configurable write_stdin timeout @jif-oai\r\n- #11787 Adjust MCP tool approval handling for custom servers @colby-oai\r\n- #12179 Move previous turn context tracking into ContextManager history @charley-oai\r\n- #12244 Restore phase when loading from history @mousseau-oai\r\n- #12101 client side modelinfo overrides @sayan-oai\r\n- #12251 Add configurable agent spawn depth @jif-oai\r\n- #12254 chore: increase stack size for everyone @jif-oai\r\n- #12250 feat: no timeout mode on ue @jif-oai\r\n- #12255 chore: consolidate new() and initialize() for McpConnectionManager @bolinfest\r\n- #12256 Revert \"feat: no timeout mode on ue\" @jif-oai\r\n- #12258 Undo stack size Bazel test hack @charley-oai\r\n- #12264 Fix flaky test @jif-oai\r\n- #12087 feat: add Reject approval policy with granular prompt rejection controls @bolinfest\r\n- #12253 Skip removed features during metrics emission @jif-oai\r\n- #12265 Clarify cumulative proposed_plan behavior in Plan mode @charley-oai\r\n- #12266 app-server tests: reduce intermittent nextest LEAK via graceful child shutdown @bolinfest\r\n- #11953 ws turn metadata via client_metadata @pash-openai\r\n- #11778 fix(bazel): replace askama templates with include_str! in memories @rupurt\r\n- #11382 Add configurable MCP OAuth callback URL for MCP login @dkumar-oai\r\n- #12274 [bazel] Fix proc_macro_dep libs @zbarsky-openai\r\n- #12054 feat(config): add permissions.network proxy config wiring @viyatb-oai\r\n- #12269 tests(thread_resume): interrupt running turns in resume error-path tests @bolinfest\r\n- #12009 Update pnpm versions to fix cve-2026-24842 @mjr-openai\r\n- #12080 skill-creator: lazy-load PyYAML in frontmatter parsing @xl-openai\r\n- #12271 tests: centralize in-flight turn cleanup helper @bolinfest\r\n- #12286 app-server: fix flaky list_apps_returns_connectors_with_accessible_flags test @bolinfest\r\n- #11776 app-server: improve thread resume rejoin flow @maxj-oai\r\n- #11822 [apps] Store apps tool cache in disk to reduce startup time. @mzeng-openai\r\n- #12221 memories: add rollout_summary_file header to raw memories and tune prompts @zuxin-oai\r\n- #12309 Set memories phase reasoning effort constants @jif-oai\r\n- #12315 chore: nit explorer @jif-oai\r\n- #12320 feat: add nick name to sub-agents @jif-oai\r\n- #12328 chore: better agent names @jif-oai\r\n- #12326 disable collab for phase 2 @jif-oai\r\n- #12267 Add MCP server context to otel tool_result logs @colby-oai\r\n- #12327 feat: cleaner TUI for sub-agents @jif-oai\r\n- #12332 feat: better agent picker in TUI @jif-oai\r\n- #12344 feat: do not enqueue phase 2 if not necessary @jif-oai\r\n- #12340 fix: simplify macOS sleep inhibitor FFI @yvolovich-cyber\r\n- #12347 fix: nick name at thread/read @jif-oai\r\n- #12294 Reuse connection between turns @pakrym-oai\r\n- #12287 app-server: add JSON tracing logs @maxj-oai\r\n- #12140 Refactor network approvals to host/protocol/port scope @viyatb-oai\r\n- #12300 js_repl: block wrapped payload prefixes in grammar @fjord-oai\r\n- #11368 fix(network-proxy): add unix socket allow-all and update seatbelt rules @viyatb-oai\r\n- #12275 js_repl: remove codex.state helper references @fjord-oai\r\n- #12289 CODEX-4927: Surface local login entitlement denials in browser @daniel-oai\r\n- #12205 ci(bazel): install Node from node-version.txt in remote image @fjord-oai\r\n- #12312 feat: add config `allow_login_shell` @jif-oai\r\n- #12086 [apps] Implement apps configs. @mzeng-openai\r\n- #12353 fix(core): require approval for destructive MCP tool calls @colby-oai\r\n- #12218 app-server: harden disconnect cleanup paths @maxj-oai\r\n- #12291 core tests: use hermetic mock server in review suite @viyatb-oai\r\n- #12374 [apps] Enforce simple logo url format. @mzeng-openai\r\n- #12377 docs: use --locked when installing cargo-nextest @derekf-oai\r\n- #12370 Add ability to attach extra files to feedback @pakrym-oai\r\n- #12306 Move sanitizer into codex-secrets @viyatb-oai\r\n- #12379 clarify model_catalog_json only applied on startup @sayan-oai\r\n- #12307 Show model/reasoning hint when switching modes @charley-oai\r\n- #12403 [apps] Fix gateway url. @mzeng-openai\r\n- #12240 fix(tui): queued-message edit shortcut unreachable in some terminals @fcoury\r\n- #12405 [apps] Bump MCP tool call timeout. @mzeng-openai\r\n- #12406 fix: explicitly list name collisions in JSON schema generation @bolinfest\r\n- #12301 Add field to Thread object for the latest rename set for a given thread @natea-oai\r\n- #12268 Wire realtime api to core @aibrahim-oai\r\n- #12415 fix(nix): include libcap dependency on linux builds @rgodha24\r\n- #12416 Add experimental realtime websocket URL override @aibrahim-oai\r\n- #12303 Improve Plan mode reasoning selection flow @charley-oai\r\n- #12418 Add experimental realtime websocket overrides and text mirroring @aibrahim-oai\r\n- #12381 fix: address flakiness in thread_resume_rejoins_running_thread_even_with_override_mismatch @bolinfest\r\n- #12422 feat: use OAI Responses API MessagePhase type directly in App Server v2 @bolinfest\r\n- #12376 test(app-server): wait for turn/completed in turn_start tests @yvolovich-cyber\r\n- #12408 ignore v1 in JSON schema codegen @bolinfest\r\n- #12314 fix(core) Filter non-matching prefix rules @dylan-hurd-oai\r\n- #12429 feat: discourage the use of the --all-features flag @bolinfest\r\n- #12252 Fix compaction context reinjection and model baselines @charley-oai\r\n- #12427 chore: move config diagnostics out of codex-core @bolinfest\r\n- #12430 Collapse waited message @pakrym-oai\r\n- #12432 chore: remove codex-core public protocol/shell re-exports @bolinfest\r\n- #12434 fix: codex-arg0 no longer depends on codex-core @bolinfest\r\n- #12435 refactor(core): move embedded system skills into codex-skills crate @bolinfest\r\n- #12440 chore: delete empty codex-rs/code file @bolinfest\r\n- #12441 Delete AggregatedStream @pakrym-oai\r\n- #11293 feat(linux-sandbox): implement proxy-only egress via TCP-UDS-TCP bridge @viyatb-oai\r\n- #12410 profile-level model_catalog_json overrie @sayan-oai\r\n- #12420 Prevent replayed runtime events from forcing active status @etraut-openai\r\n- #12428 Prefer v2 websockets if available @pakrym-oai\r\n- #12419 Improve token usage estimate for images @etraut-openai\r\n- #12474 fix: make skills loader tests hermetic with ~/.agents skills @bolinfest\r\n- #12473 core: preserve constrained approval/sandbox policies in TurnContext @bolinfest\r\n- #12067 fix(tui): preserve URL clickability across all TUI views @fcoury\r\n- #12469 Route inbound realtime text into turn start or steer @aibrahim-oai\r\n- #12479 Revert \"Route inbound realtime text into turn start or steer\" @aibrahim-oai\r\n- #12475 fix: make realtime conversation flake test order-insensitive @bolinfest\r\n- #12476 Make shell detection tests\r\n     robust to Nix shell paths @rupurt\r\n- #11447 feat(tui): syntax highlighting via syntect with theme picker @fcoury\r\n- #12373 app-server: retain thread listener across disconnects @maxj-oai\r\n- #12444 feat(tui) /clear @won-openai\r\n- #12485 fix(core) exec policy parsing 3 @dylan-hurd-oai\r\n- #12423 Send events to realtime api @aibrahim-oai\r\n- #12364 feat: monitor role @jif-oai\r\n- #12313 Handle orphan exec ends without clobbering active exploring cell @jif-oai\r\n- #12455 feat(tui): support Alt-d delete-forward-word @dougEfresh\r\n- #12480 Revert \"Revert \"Route inbound realtime text into turn start or steer\"\" @aibrahim-oai\r\n- #12509 Sort themes case-insensitively in picker @etraut-openai\r\n- #12511 Add C# syntax option to highlight selections @etraut-openai\r\n- #12513 Add PR babysitting skill for this repo @etraut-openai\r\n- #12518 test: vendor zsh fork via DotSlash and stabilize zsh-fork tests @bolinfest\r\n- #12553 Return image content from view_image @pakrym-oai\r\n- #12555 refactor: decouple MCP policy construction from escalate server @bolinfest\r\n- #12559 chore: nit name @jif-oai\r\n- #12562 chore: awaiter @jif-oai\r\n- #12565 chore: add doc to memories @jif-oai\r\n- #12568 chore: phase 2 name @jif-oai\r\n- #12571 fix: TUI constraint @jif-oai\r\n- #12570 feat: keep dead agents in the agent picker @jif-oai\r\n- #12575 feat: agent nick names to model @jif-oai\r\n- #12500 feat: add uuid helper @jif-oai\r\n- #12580 chore: rename memory feature flag @jif-oai\r\n- #12541 Allow exec resume to parse output-last-message flag after command @etraut-openai\r\n- #12579 feat: role metrics multi-agent @jif-oai\r\n- #12141 feat: land sqlite @jif-oai\r\n- #12576 chore: better bazel test logs @jif-oai\r\n- #12028 remove feature flag collaboration modes @aibrahim-oai\r\n- #12520 tweaked /clear to support clear + new chat, also fix minor bug for macos terminal @won-openai\r\n- #12556 refactor: normalize unix module layout for exec-server and shell-escalation @bolinfest\r\n- #12421 app-server: box request dispatch future to reduce stack pressure @charley-oai\r\n- #12528 chore(deps): bump libc from 0.2.180 to 0.2.182 in /codex-rs @dependabot\r\n- #12529 chore(deps): bump syn from 2.0.114 to 2.0.117 in /codex-rs @dependabot\r\n- #12583 Use Arc-based ToolCtx in tool runtimes @bolinfest\r\n- #12540 fix: add ellipsis for truncated status indicator @sayan-oai\r\n- #12609 fix(tui): recover on owned wrap mapping mismatch @fcoury\r\n- #12569 fix(tui): queue steer Enter while final answer is still streaming to prevent dead state @guidedways\r\n- #12530 chore(deps): bump owo-colors from 4.2.3 to 4.3.0 in /codex-rs @dependabot\r\n- #12549 fix: show command running in background terminal in details under status indicator @sayan-oai\r\n- #3381 voice transcription @nornagon-openai\r\n- #12619 Handle realtime spawn_transcript delegation @aibrahim-oai\r\n- #11408 Update models.json @github-actions\r\n- #12629 app-server: fix connecting via websockets with `Sec-WebSocket-Extensions: permessage-deflate` @JaviSoto\r\n- #12632 refactor: delete exec-server and move execve wrapper into shell-escalation @bolinfest\r\n- #12638 refactor: decouple shell-escalation from codex-core @bolinfest\r\n- #12357 feat(core): persist network approvals in execpolicy @viyatb-oai\r\n- #12648 fix(exec) Patch resume test race condition @dylan-hurd-oai\r\n- #12049 Support implicit skill invocation analytics events @alexsong-oai\r\n- #12647 Avoid `AbsolutePathBuf::parent()` panic under `EMFILE` by skipping re-absolutization @etraut-openai\r\n- #12633 Add skill approval event/response @pakrym-oai\r\n- #12650 chore: rm hardcoded PRESETS list @sayan-oai\r\n- #12652 Simplify skill tracking @pakrym-oai\r\n- #12653 memories: tighten consolidation prompt schema and indexing guidance @zuxin-oai\r\n- #12667 feat: mutli agents persist config overrides @jif-oai\r\n- #12635 memories: tighten memory lookup guidance and citation requirements @zuxin-oai\r\n- #12663 fix: replay after `/agent` @jif-oai\r\n- #11258 Send warmup request @pakrym-oai\r\n- #12688 feat: use process group to kill the PTY @jif-oai\r\n- #11871 feat(core) Introduce Feature::RequestPermissions @dylan-hurd-oai\r\n- #12628 ctrl-L (clears terminal but does not start a new chat)  @won-openai\r\n- #9859 feat(network-proxy): add MITM support and gate limited-mode CONNECT @viyatb-oai\r\n- #12649 feat: run zsh fork shell tool via shell-escalation @bolinfest\r\n- #12643 Fix @mention token parsing in chat composer @etraut-openai\r\n- #12658 fix: also try matching namespaced prefix for modelinfo candidate @sayan-oai\r\n- #11766 feat(sleep-inhibitor): add Linux and Windows idle-sleep prevention @yvolovich-cyber\r\n- #12581 feat(tui): add theme-aware diff backgrounds with capability-graded palettes @fcoury\r\n- #12697 Ensure shell command skills trigger approval @pakrym-oai\r\n- #12707 refactor: remove unused seatbelt unix socket arg @bolinfest\r\n- #12687 Add TUI realtime conversation mode @aibrahim-oai\r\n- #12639 Honor `project_root_markers` when discovering `AGENTS.md` @etraut-openai\r\n- #10935 Agent jobs (spawn_agents_on_csv) + progress UI @daveaitel-openai\r\n- #12700 revert audio scope @nornagon-openai\r\n- #12711 fix: temp remove citation @zuxin-oai\r\n- #12613 feat(tui) - /copy @won-openai\r\n- #12695 Add app-server event tracing @pakrym-oai\r\n- #12717 Raise image byte estimate for compaction token accounting @etraut-openai\r\n- #12724 fix: make EscalateServer public and remove shell escalation wrappers @bolinfest\r\n- #12517 codex-rs/app-server: graceful websocket restart on Ctrl-C @maxj-oai\r\n- #12636 fix(js_repl): surface uncaught kernel errors and reset cleanly @fjord-oai\r\n- #12729 fix: clarify the value of SkillMetadata.path @bolinfest\r\n- #12719 feat: pass helper executable paths via Arg0DispatchPaths @bolinfest\r\n- #12720 add AWS_LC_SYS_NO_JITTER_ENTROPY=1 to release musl build step to unblock releases @sayan-oai\r\n- #12725 Fix js_repl view_image attachments in nested tool calls @fjord-oai\r\n- #12656 chore: change catalog mode to enum @sayan-oai\r\n- #12731 chore: migrate additional permissions to PermissionProfile @celia-oai\r\n- #12407 tests(js_repl): stabilize CI runtime test execution @fjord-oai\r\n- #12737 feat:  add experimental additionalPermissions to v2 command execution approval requests @celia-oai\r\n- #12372 feat: update Docker image digest to reflect #12205 @fjord-oai\r\n- #12746 fix: chatwidget was not honoring approval_id for an ExecApprovalRequestEvent @bolinfest\r\n- #12185 tests(js_repl): remove node-related skip paths from js_repl tests @fjord-oai\r\n- #12358 feat(ui): add network approval persistence plumbing @viyatb-oai\r\n- #12730 feat: zsh-fork forces scripts/**/* for skills to trigger a prompt @bolinfest\r\n- #12750 fix: keep shell escalation exec paths absolute @bolinfest\r\n- #12753 Surface skill permission profiles in zsh-fork exec approvals @celia-oai\r\n- #12319 feat: add service name to app-server @jif-oai\r\n- #12692 fix: flaky test due to second-resolution for thread ordering @jif-oai\r\n- #12578 feat: add search term to thread list @jif-oai\r\n- #12660 Support external agent config detect and import @alexsong-oai\r\n- #12756 feat: record whether a skill script is approved for the session @bolinfest\r\n- #12767 Display pending child-thread approvals in TUI @jif-oai\r\n- #12768 feat: add large stack test macro @jif-oai\r\n- #12666 feat: adding stream parser @jif-oai\r\n- #12761 feat: record memory usage @jif-oai\r\n- #12772 nit: migration @jif-oai\r\n- #12352 otel: add host.name resource attribute to logs/traces via gethostname @mcgrew-oai\r\n- #12770 chore: unify max depth parameter @jif-oai\r\n- #12787 feat: fix sqlite home @jif-oai"
   },
   "summary": {
-    "changes": 68,
+    "changes": 78,
     "categories": {
       "binary": 2,
       "cli": 7,
       "config": 58,
+      "filesystem": 10,
       "tools": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 47,
+      "informational": 57,
       "notable": 21
     },
-    "undocumented": 44
+    "undocumented": 48
   },
   "changes": [
     {
@@ -1725,6 +1726,239 @@
       "documented": false
     },
     {
+      "id": "filesystem.darwin/arm64.exec./bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\""
+      ],
+      "title": "Command changed: `/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"` (+54 −46 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"",
+      "after": "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"",
+      "text_diff": "@@ -1,3 +1,3 @@\n /bin/bash\n -c set\n--e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"\n+-e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"\n",
+      "stats": {
+        "added_chars": 54,
+        "removed_chars": 46
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths./etc/security/certificates",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "/etc/security/certificates"
+      ],
+      "title": "Now looks for /etc/security/certificates (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>.ops.list",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>",
+        "ops",
+        "list"
+      ],
+      "title": "Now lists <codex-home> (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "list",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>.ops.read",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>",
+        "ops",
+        "read"
+      ],
+      "title": "Now reads <codex-home> (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "read",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/archived_sessions",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/archived_sessions"
+      ],
+      "title": "Now looks for <codex-home>/archived_sessions (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<codex-home>/state_5.sqlite",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<codex-home>/state_5.sqlite"
+      ],
+      "title": "Now writes <codex-home>/state_5.sqlite (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat",
+          "read",
+          "write",
+          "create"
+        ],
+        "phases": [
+          "startup",
+          "exit"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.sed /^$/d.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "sed /^$/d",
+        "phases",
+        "turn"
+      ],
+      "title": "`sed /^$/d` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.tr -d  .phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "tr -d  ",
+        "phases",
+        "turn"
+      ],
+      "title": "`tr -d  ` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.wc -l.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "wc -l",
+        "phases",
+        "turn"
+      ],
+      "title": "`wc -l` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\""
+      ],
+      "title": "Command changed: `/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"` (+54 −46 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"",
+      "after": "/bin/bash -c set -e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"",
+      "text_diff": "@@ -1,3 +1,3 @@\n /bin/bash\n -c set\n--e; . \"<codex-home>/shell_snapshots/<uuid>.sh\"\n+-e; . \"<codex-home>/shell_snapshots/<uuid>.tmp-<hash>\"\n",
+      "stats": {
+        "added_chars": 54,
+        "removed_chars": 46
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
       "id": "binary.sdk.tonic",
       "category": "binary",
       "op": "changed",
@@ -1750,7 +1984,7 @@
         "binary",
         "size_bytes"
       ],
-      "title": "Binary size_bytes: 66797120 → 75828576",
+      "title": "Binary size: 66,797,120 → 75,828,576 bytes (66.8 MB → 75.8 MB)",
       "impact": "informational",
       "before": 66797120,
       "after": 75828576,

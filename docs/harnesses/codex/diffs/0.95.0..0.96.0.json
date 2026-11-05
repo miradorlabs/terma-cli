@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.95.0",
   "to": "0.96.0",
-  "generated_at": "2026-11-05T02:11:01.502194Z",
+  "generated_at": "2026-11-05T09:54:28.532441Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.95.0...rust-v0.96.0"
   },
@@ -12,18 +12,19 @@
     "text": "## New Features\n- Added `thread/compact` to the v2 app-server API as an async trigger RPC, so clients can start compaction immediately and track completion separately. (#10445)\n- Added websocket-side rate limit signaling via a new `codex.rate_limits` event, with websocket parity for ETag/reasoning metadata handling. (#10324)\n- Enabled `unified_exec` on all non-Windows platforms. (#10641)\n- Constrained requirement values now include source provenance, enabling source-aware config debugging in UI flows like `/debug-config`. (#10568)\n\n## Bug Fixes\n- Fixed `Esc` handling in the TUI `request_user_input` overlay: when notes are open, `Esc` now exits notes mode instead of interrupting the session. (#10569)\n- Thread listing now queries the state DB first (including archived threads) and falls back to filesystem traversal only when needed, improving listing correctness and resilience. (#10544)\n- Fixed thread path lookup to require that the resolved file actually exists, preventing invalid thread-id resolutions. (#10618)\n- Dynamic tool injection now runs in a single transaction to avoid partial state updates. (#10614)\n- Refined `request_rule` guidance used in approval-policy prompting to correct rule behavior. (#10379, #10598)\n\n## Documentation\n- Updated app-server docs for `thread/compact` to clarify its asynchronous behavior and thread-busy lifecycle. (#10445)\n- Updated TUI docs to match the mode-specific `Esc` behavior in `request_user_input`. (#10569)\n\n## Chores\n- Migrated state DB helpers to a versioned SQLite filename scheme and cleaned up legacy state files during runtime initialization. (#10623)\n- Expanded runtime telemetry with websocket timing metrics and simplified internal metadata flow in core client plumbing. (#10577, #10589)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.95.0...rust-v0.96.0\n\n- #10569 tui: make Esc clear request_user_input notes while notes are shown @charley-oai\n- #10577 feat: log webscocket timing into runtime metrics @apanasenko-oai\n- #10445 Add thread/compact v2  @aibrahim-oai\n- #10589 Move metadata calculation out of client @pakrym-oai\n- #10379 fix(core) updated request_rule guidance @dylan-hurd-oai\n- #10598 fix(core) Request Rule guidance tweak @dylan-hurd-oai\n- #10544 Prefer state DB thread listings before filesystem @jif-oai\n- #10614 fix: single transaction for dyn tools injection @jif-oai\n- #10568 Requirements: add source to constrained requirement values @gt-oai\n- #10611 chore: simplify user message detection @jif-oai\n- #10618 fix: make sure file exist in `find_thread_path_by_id_str_in_subdir` @jif-oai\n- #10619 nit: cleaning @jif-oai\n- #10324 Add a codex.rate_limits event for websockets @rasmusrygaard\n- #10623 Migrate state DB path helpers to versioned filename @jif-oai\n- #10638 Update tests to stop using sse_completed fixture @pakrym-oai\n- #10641 feat: land unified_exec @jif-oai"
   },
   "summary": {
-    "changes": 4,
+    "changes": 10,
     "categories": {
+      "filesystem": 6,
       "request": 1,
       "tools": 3
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
+      "informational": 6,
       "notable": 4
     },
-    "undocumented": 4
+    "undocumented": 10
   },
   "changes": [
     {
@@ -278,6 +279,132 @@
         ],
         "gone": false
       },
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git remote -v.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git remote -v",
+        "phases",
+        "startup"
+      ],
+      "title": "`git remote -v` now also runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git remote -v.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git remote -v",
+        "phases",
+        "turn"
+      ],
+      "title": "`git remote -v` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git rev-parse HEAD.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git rev-parse HEAD",
+        "phases",
+        "turn"
+      ],
+      "title": "`git rev-parse HEAD` no longer runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git remote -v.phases.startup",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git remote -v",
+        "phases",
+        "startup"
+      ],
+      "title": "`git remote -v` now also runs at startup (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "startup",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git remote -v.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git remote -v",
+        "phases",
+        "turn"
+      ],
+      "title": "`git remote -v` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git rev-parse HEAD.phases.turn",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git rev-parse HEAD",
+        "phases",
+        "turn"
+      ],
+      "title": "`git rev-parse HEAD` no longer runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": "turn",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
       "documented": false
     }
   ]

@@ -18,7 +18,7 @@
     "last_change": {
       "from": "0.165.0",
       "to": "0.166.0",
-      "at": "2026-11-05T06:31:08.621178Z",
+      "at": "2026-11-05T09:54:28.532441Z",
       "released_at": "2026-10-29T19:56:19.746Z",
       "changes": 63,
       "categories": {
@@ -32,7 +32,7 @@
     {
       "version": "0.166.0",
       "released_at": "2026-10-29T19:56:19.746Z",
-      "captured_at": "2026-11-05T06:31:08.621178Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -62,7 +62,7 @@
     {
       "version": "0.165.0",
       "released_at": "2026-10-27T20:14:25.378Z",
-      "captured_at": "2026-11-05T06:31:08.621178Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -91,28 +91,29 @@
     {
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-05T06:31:08.621178Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.163.0",
-      "changes": 89,
+      "changes": 93,
       "categories": {
         "behavior": 7,
         "binary": 1,
         "cli": 18,
         "config": 59,
+        "filesystem": 4,
         "telemetry": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 1,
-        "informational": 75,
+        "informational": 79,
         "notable": 13
       },
-      "undocumented": 52,
+      "undocumented": 56,
       "highlights": [
         "Telemetry surface no longer sent: traces/list_skills",
         "Behaviour: compaction tools changed: 0 → 11",
@@ -123,28 +124,29 @@
     {
       "version": "0.163.0",
       "released_at": "2026-10-15T21:37:11.083Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.162.1",
-      "changes": 69,
+      "changes": 73,
       "categories": {
         "binary": 1,
         "caching": 1,
         "cli": 9,
         "config": 53,
+        "filesystem": 4,
         "telemetry": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 62,
+        "informational": 66,
         "notable": 7
       },
-      "undocumented": 48,
+      "undocumented": 52,
       "highlights": [
         "Caching across_turns.stable_prefix_chars: 996 → 552",
         "New setting: features.credential_masking",
@@ -155,7 +157,7 @@
     {
       "version": "0.162.1",
       "released_at": "2026-10-09T19:50:30.512Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -184,7 +186,7 @@
     {
       "version": "0.162.0",
       "released_at": "2026-10-08T19:01:18.07Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -216,7 +218,7 @@
     {
       "version": "0.161.0",
       "released_at": "2026-10-07T16:04:02.844Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -246,24 +248,25 @@
     {
       "version": "0.160.1",
       "released_at": "2026-10-05T18:33:51.98Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "unsupported",
       "previous": "0.160.0",
-      "changes": 3,
+      "changes": 4,
       "categories": {
-        "cli": 3
+        "cli": 3,
+        "filesystem": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 4,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 4,
       "highlights": [
         "Description of `codex cloud` changed",
         "Full help text of `cloud --help` changed (+0 −88 chars)",
@@ -274,7 +277,7 @@
     {
       "version": "0.160.0",
       "released_at": "2026-10-01T20:26:19.286Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -304,42 +307,15 @@
     {
       "version": "0.159.3",
       "released_at": "2026-09-30T23:02:02.182Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.159.2",
-      "changes": 2,
-      "categories": {
-        "behavior": 1,
-        "hooks": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 1
-      },
-      "undocumented": 2,
-      "highlights": [
-        "Behaviour: subagents removed",
-        "UserPromptSubmit hook control (exit_2) added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "version": "0.159.2",
-      "released_at": "2026-09-30T00:03:49.293Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
-      "platforms": [
-        "darwin/arm64"
-      ],
-      "support": "untested",
-      "previous": "0.159.1",
       "changes": 1,
       "categories": {
-        "hooks": 1
+        "behavior": 1
       },
       "impact": {
         "breaking": 0,
@@ -349,110 +325,19 @@
       },
       "undocumented": 1,
       "highlights": [
-        "UserPromptSubmit hook control (exit_2) removed"
+        "Behaviour: subagents removed"
       ],
       "signing": "valid"
     },
     {
-      "version": "0.159.1",
-      "released_at": "2026-09-29T20:36:58.049Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "version": "0.159.2",
+      "released_at": "2026-09-30T00:03:49.293Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
-      "previous": "0.159.0",
-      "changes": 14,
-      "categories": {
-        "behavior": 6,
-        "cli": 2,
-        "hooks": 3,
-        "model": 1,
-        "prompt": 1,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 5,
-        "notable": 9
-      },
-      "undocumented": 9,
-      "highlights": [
-        "Default model: gpt-6-astra → gpt-6.1-sol",
-        "System prompt changed (+451 −105 chars)",
-        "collaboration/spawn_agent tool description changed (+446 −454 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "version": "0.159.0",
-      "released_at": "2026-09-29T08:10:59.17Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
-      "platforms": [
-        "darwin/arm64"
-      ],
-      "support": "untested",
-      "previous": "0.158.0",
-      "changes": 13,
-      "categories": {
-        "behavior": 1,
-        "cli": 5,
-        "config": 2,
-        "hooks": 3,
-        "prompt": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 7,
-        "notable": 6
-      },
-      "undocumented": 6,
-      "highlights": [
-        "Injected context changed (+616 −563 chars)",
-        "System prompt changed (+0 −522 chars)",
-        "Behaviour: subagents system 1 text changed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "version": "0.158.0",
-      "released_at": "2026-09-28T05:12:20.266Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
-      "platforms": [
-        "darwin/arm64"
-      ],
-      "support": "untested",
-      "previous": "0.157.1",
-      "changes": 27,
-      "categories": {
-        "cli": 13,
-        "config": 14
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 25,
-        "notable": 2
-      },
-      "undocumented": 8,
-      "highlights": [
-        "Setting features.guardianv2.thread_context deprecated",
-        "New setting: mcp_servers.<name>.oauth.client_secret",
-        "`codex app-server --ws-auth`: description changed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "version": "0.157.1",
-      "released_at": "2026-09-26T01:06:57.149Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
-      "platforms": [
-        "darwin/arm64"
-      ],
-      "support": "untested",
-      "previous": "0.157.0",
+      "previous": "0.159.1",
       "changes": 0,
       "categories": {},
       "impact": {
@@ -466,29 +351,146 @@
       "signing": "valid"
     },
     {
+      "version": "0.159.1",
+      "released_at": "2026-09-29T20:36:58.049Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.159.0",
+      "changes": 12,
+      "categories": {
+        "behavior": 6,
+        "cli": 2,
+        "filesystem": 1,
+        "model": 1,
+        "prompt": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 10
+      },
+      "undocumented": 7,
+      "highlights": [
+        "Default model: gpt-6-astra → gpt-6.1-sol",
+        "System prompt changed (+451 −105 chars)",
+        "collaboration/spawn_agent tool description changed (+446 −454 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "0.159.0",
+      "released_at": "2026-09-29T08:10:59.17Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.158.0",
+      "changes": 34,
+      "categories": {
+        "behavior": 1,
+        "cli": 5,
+        "config": 2,
+        "filesystem": 24,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 30,
+        "notable": 4
+      },
+      "undocumented": 27,
+      "highlights": [
+        "Injected context changed (+616 −563 chars)",
+        "System prompt changed (+0 −522 chars)",
+        "Behaviour: subagents system 1 text changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "0.158.0",
+      "released_at": "2026-09-28T05:12:20.266Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.157.1",
+      "changes": 32,
+      "categories": {
+        "cli": 13,
+        "config": 14,
+        "filesystem": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 29,
+        "notable": 3
+      },
+      "undocumented": 13,
+      "highlights": [
+        "Setting features.guardianv2.thread_context deprecated",
+        "New setting: mcp_servers.<name>.oauth.client_secret",
+        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "0.157.1",
+      "released_at": "2026-09-26T01:06:57.149Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.157.0",
+      "changes": 1,
+      "categories": {
+        "filesystem": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Command changed: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (+442 −444 chars) (linux/amd64)"
+      ],
+      "signing": "valid"
+    },
+    {
       "version": "0.157.0",
       "released_at": "2026-09-25T02:35:19.752Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.156.1",
-      "changes": 18,
+      "changes": 25,
       "categories": {
         "behavior": 2,
         "config": 12,
-        "hooks": 1,
+        "filesystem": 8,
         "prompt": 2,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 10,
+        "informational": 17,
         "notable": 8
       },
-      "undocumented": 12,
+      "undocumented": 19,
       "highlights": [
         "System prompt changed (+283 −124 chars)",
         "System prompt changed (+21 −426 chars)",
@@ -499,7 +501,7 @@
     {
       "version": "0.156.1",
       "released_at": "2026-09-23T02:45:25.21Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -524,28 +526,28 @@
     {
       "version": "0.156.0",
       "released_at": "2026-09-22T19:55:37.255Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.155.1",
-      "changes": 88,
+      "changes": 93,
       "categories": {
         "behavior": 9,
         "binary": 1,
         "cli": 13,
         "config": 63,
-        "hooks": 1,
+        "filesystem": 6,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 63,
-        "notable": 25
+        "informational": 69,
+        "notable": 24
       },
-      "undocumented": 44,
+      "undocumented": 48,
       "highlights": [
         "collaboration/spawn_agent tool description changed (+0 −135 chars)",
         "Behaviour: compaction added",
@@ -556,25 +558,24 @@
     {
       "version": "0.155.1",
       "released_at": "2026-09-18T20:09:23.628Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.155.0",
-      "changes": 13,
+      "changes": 10,
       "categories": {
         "behavior": 9,
-        "cli": 1,
-        "hooks": 3
+        "cli": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
+        "informational": 1,
         "notable": 9
       },
-      "undocumented": 10,
+      "undocumented": 7,
       "highlights": [
         "Behaviour: compaction removed",
         "Behaviour: sandbox approval removed",
@@ -585,26 +586,27 @@
     {
       "version": "0.155.0",
       "released_at": "2026-09-17T23:19:02.781Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.154.0",
-      "changes": 16,
+      "changes": 24,
       "categories": {
         "binary": 1,
         "cli": 1,
         "config": 13,
+        "filesystem": 8,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 9,
+        "informational": 17,
         "notable": 7
       },
-      "undocumented": 7,
+      "undocumented": 15,
       "highlights": [
         "exec tool description changed (+470 −237 chars)",
         "New setting: features.api_key_model_discovery",
@@ -615,38 +617,38 @@
     {
       "version": "0.154.0",
       "released_at": "2026-09-09T22:40:10.746Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.153.4",
-      "changes": 62,
+      "changes": 67,
       "categories": {
         "behavior": 1,
         "binary": 1,
         "cli": 34,
         "config": 23,
-        "hooks": 3
+        "filesystem": 8
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 51,
-        "notable": 11
+        "informational": 59,
+        "notable": 8
       },
-      "undocumented": 22,
+      "undocumented": 27,
       "highlights": [
         "Behaviour: compaction added",
-        "PreToolUse hook control (exit_2) removed",
-        "SessionStart hook control (exit_2) removed"
+        "Command removed: `codex mcp-server`",
+        "New setting: allow_symlinked_codex_home"
       ],
       "signing": "valid"
     },
     {
       "version": "0.153.4",
       "released_at": "2026-09-04T23:31:18.513Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -677,7 +679,7 @@
     {
       "version": "0.153.3",
       "released_at": "2026-09-04T19:07:16.079Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -703,23 +705,24 @@
     {
       "version": "0.153.2",
       "released_at": "2026-09-03T23:57:21.074Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.153.1",
-      "changes": 4,
+      "changes": 6,
       "categories": {
-        "caching": 4
+        "caching": 4,
+        "filesystem": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
+        "informational": 2,
         "notable": 4
       },
-      "undocumented": 4,
+      "undocumented": 6,
       "highlights": [
         "Caching across_turns.breakpoints: none → [[],[],[]]",
         "Caching across_turns.stable_cache_key: none → true",
@@ -730,24 +733,24 @@
     {
       "version": "0.153.1",
       "released_at": "2026-09-03T21:09:57.109Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.153.0",
-      "changes": 8,
+      "changes": 7,
       "categories": {
         "caching": 4,
-        "hooks": 4
+        "filesystem": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
-        "notable": 4
+        "informational": 0,
+        "notable": 7
       },
-      "undocumented": 8,
+      "undocumented": 7,
       "highlights": [
         "Caching across_turns.breakpoints: [[],[],[]] → none",
         "Caching across_turns.stable_cache_key: true → none",
@@ -758,63 +761,56 @@
     {
       "version": "0.153.0",
       "released_at": "2026-09-03T01:42:05.774Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.152.1",
-      "changes": 23,
+      "changes": 18,
       "categories": {
         "cli": 5,
-        "config": 13,
-        "hooks": 5
+        "config": 13
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 16,
-        "notable": 7
+        "informational": 15,
+        "notable": 3
       },
-      "undocumented": 16,
+      "undocumented": 11,
       "highlights": [
-        "PreToolUse hook control (exit_2) removed",
-        "SessionStart hook control (exit_2) removed",
-        "Stop hook control (exit_2) removed"
+        "New setting: features.mcp_oauth_refresh_coordination",
+        "Default of tui.keymap: {\"agents\":{\"new_task\":null,\"rename\":null,\"search\":null,\"s… → {\"agents\":{\"new_task\":null,\"rename\":null,\"search\":null,\"s…",
+        "Default of tui.keymap.vim_normal: {\"append_after_cursor\":null,\"append_line_end\":null,\"cance… → {\"append_after_cursor\":null,\"append_line_end\":null,\"cance…"
       ],
       "signing": "valid"
     },
     {
       "version": "0.152.1",
       "released_at": "2026-09-01T22:36:50.784Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.152.0",
-      "changes": 5,
-      "categories": {
-        "hooks": 5
-      },
+      "changes": 0,
+      "categories": {},
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
-        "notable": 1
+        "informational": 0,
+        "notable": 0
       },
-      "undocumented": 5,
-      "highlights": [
-        "UserPromptSubmit hook control (json_decision) removed",
-        "PreToolUse hook control (json_decision) added",
-        "SessionStart hook control (additional_context) added"
-      ],
+      "undocumented": 0,
+      "highlights": [],
       "signing": "valid"
     },
     {
       "version": "0.152.0",
       "released_at": "2026-09-01T02:02:46.635Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -844,91 +840,97 @@
     {
       "version": "0.151.0",
       "released_at": "2026-08-29T09:59:26.3Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.150.1",
-      "changes": 34,
+      "changes": 31,
       "categories": {
         "behavior": 1,
         "cli": 4,
         "config": 24,
-        "hooks": 4,
+        "filesystem": 1,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 24,
-        "notable": 10
+        "informational": 25,
+        "notable": 6
       },
-      "undocumented": 34,
+      "undocumented": 31,
       "highlights": [
         "System prompt changed (+844 −1075 chars)",
         "Behaviour: subagents system 1 text changed",
-        "PreToolUse hook control (json_decision) removed"
+        "New setting: features.write_stdin_approval"
       ],
       "signing": "valid"
     },
     {
       "version": "0.150.1",
       "released_at": "2026-08-27T02:01:46.851Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.150.0",
-      "changes": 0,
-      "categories": {},
+      "changes": 1,
+      "categories": {
+        "filesystem": 1
+      },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 0,
-      "highlights": [],
+      "undocumented": 1,
+      "highlights": [
+        "Now connects to the XPC service com.apple.analyticsd.messagetracer (darwin/arm64)"
+      ],
       "signing": "valid"
     },
     {
       "version": "0.150.0",
       "released_at": "2026-08-26T19:43:31.702Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.149.1",
-      "changes": 68,
+      "changes": 73,
       "categories": {
         "behavior": 1,
         "binary": 1,
         "cli": 2,
         "config": 62,
+        "filesystem": 4,
         "hooks": 1,
+        "side_requests": 1,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 57,
-        "notable": 11
+        "informational": 61,
+        "notable": 12
       },
-      "undocumented": 45,
+      "undocumented": 50,
       "highlights": [
         "collaboration/spawn_agent tool description changed (+157 −146 chars)",
-        "Behaviour: sandbox requests changed: 1 → 2",
-        "New hook event: Interrupt"
+        "Side request POST /analytics/codex/turn-costs added",
+        "Behaviour: sandbox requests changed: 1 → 2"
       ],
       "signing": "valid"
     },
     {
       "version": "0.149.1",
       "released_at": "2026-08-24T00:32:45.066Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -956,27 +958,28 @@
     {
       "version": "0.149.0",
       "released_at": "2026-08-20T21:09:05.284Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.148.0",
-      "changes": 57,
+      "changes": 63,
       "categories": {
         "behavior": 3,
         "binary": 2,
         "cli": 22,
         "config": 28,
+        "filesystem": 6,
         "request": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 45,
+        "informational": 51,
         "notable": 12
       },
-      "undocumented": 28,
+      "undocumented": 33,
       "highlights": [
         "No longer sends identifier header:authorization",
         "Behaviour: subagents system 3 text changed",
@@ -987,29 +990,30 @@
     {
       "version": "0.148.0",
       "released_at": "2026-08-18T22:30:14.842Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.147.0",
-      "changes": 122,
+      "changes": 129,
       "categories": {
         "behavior": 3,
         "caching": 1,
         "cli": 37,
         "config": 71,
-        "hooks": 8,
+        "filesystem": 11,
+        "hooks": 4,
         "prompt": 1,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 104,
+        "informational": 111,
         "notable": 18
       },
-      "undocumented": 63,
+      "undocumented": 70,
       "highlights": [
         "System prompt changed (+429 −553 chars)",
         "exec tool description changed (+98 −98 chars)",
@@ -1020,29 +1024,29 @@
     {
       "version": "0.147.0",
       "released_at": "2026-08-07T01:47:21.081Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.146.1",
-      "changes": 67,
+      "changes": 85,
       "categories": {
         "behavior": 5,
         "binary": 2,
         "cli": 39,
         "config": 11,
-        "hooks": 4,
+        "filesystem": 22,
         "prompt": 3,
         "tools": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 56,
+        "informational": 74,
         "notable": 11
       },
-      "undocumented": 18,
+      "undocumented": 35,
       "highlights": [
         "System prompt changed (+2815 −498 chars)",
         "System prompt changed (+498 −2850 chars)",
@@ -1053,56 +1057,56 @@
     {
       "version": "0.146.1",
       "released_at": "2026-08-05T16:00:31.441Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.146.0",
-      "changes": 10,
+      "changes": 8,
       "categories": {
         "behavior": 2,
         "cli": 3,
-        "hooks": 5
+        "filesystem": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
-        "notable": 7
+        "informational": 6,
+        "notable": 2
       },
-      "undocumented": 10,
+      "undocumented": 8,
       "highlights": [
         "Behaviour: subagents added",
         "Behaviour: tool_output added",
-        "Hook events.PreToolUse.control removed"
+        "Description of `codex exec` changed"
       ],
       "signing": "valid"
     },
     {
       "version": "0.146.0",
       "released_at": "2026-07-29T01:45:57.696Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.145.0",
-      "changes": 33,
+      "changes": 36,
       "categories": {
         "behavior": 3,
         "caching": 1,
         "cli": 6,
         "config": 19,
-        "hooks": 4
+        "filesystem": 7
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 23,
+        "informational": 26,
         "notable": 10
       },
-      "undocumented": 17,
+      "undocumented": 20,
       "highlights": [
         "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
         "Behaviour: compaction added",
@@ -1113,17 +1117,18 @@
     {
       "version": "0.145.0",
       "released_at": "2026-07-21T18:24:11.494Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.144.6",
-      "changes": 56,
+      "changes": 101,
       "categories": {
         "behavior": 4,
         "cli": 6,
         "config": 38,
+        "filesystem": 45,
         "hooks": 1,
         "prompt": 3,
         "tools": 4
@@ -1131,10 +1136,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 41,
-        "notable": 15
+        "informational": 85,
+        "notable": 16
       },
-      "undocumented": 35,
+      "undocumented": 72,
       "highlights": [
         "System prompt changed (+511 −462 chars)",
         "System prompt changed (+338 −0 chars)",
@@ -1145,25 +1150,25 @@
     {
       "version": "0.144.6",
       "released_at": "2026-07-18T13:54:50.572Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.144.5",
-      "changes": 16,
+      "changes": 15,
       "categories": {
         "behavior": 11,
-        "hooks": 4,
+        "filesystem": 3,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
-        "notable": 16
+        "informational": 3,
+        "notable": 12
       },
-      "undocumented": 15,
+      "undocumented": 14,
       "highlights": [
         "System prompt changed (+2122 −705 chars)",
         "Behaviour: compaction removed",
@@ -1174,25 +1179,25 @@
     {
       "version": "0.144.5",
       "released_at": "2026-07-16T02:57:51.857Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.144.4",
-      "changes": 13,
+      "changes": 14,
       "categories": {
         "behavior": 10,
         "caching": 1,
-        "hooks": 2
+        "filesystem": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
-        "notable": 13
+        "informational": 3,
+        "notable": 11
       },
-      "undocumented": 13,
+      "undocumented": 14,
       "highlights": [
         "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
         "Behaviour: compaction added",
@@ -1203,24 +1208,24 @@
     {
       "version": "0.144.4",
       "released_at": "2026-07-14T05:10:51.485Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.144.3",
-      "changes": 7,
+      "changes": 4,
       "categories": {
         "behavior": 3,
-        "hooks": 4
+        "filesystem": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
+        "informational": 1,
         "notable": 3
       },
-      "undocumented": 7,
+      "undocumented": 4,
       "highlights": [
         "Behaviour: compaction removed",
         "Behaviour: sandbox added",
@@ -1231,7 +1236,7 @@
     {
       "version": "0.144.3",
       "released_at": "2026-07-13T06:15:20.67Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1242,7 +1247,7 @@
         "behavior": 1,
         "caching": 1,
         "cli": 1,
-        "hooks": 1
+        "filesystem": 1
       },
       "impact": {
         "breaking": 0,
@@ -1254,14 +1259,14 @@
       "highlights": [
         "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
         "Behaviour: sandbox removed",
-        "Hook events.UserPromptSubmit.control added"
+        "Full help text of `exec-server -h` changed (+0 −105 chars)"
       ],
       "signing": "valid"
     },
     {
       "version": "0.144.2",
       "released_at": "2026-07-13T04:42:46.19Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1290,25 +1295,25 @@
     {
       "version": "0.144.1",
       "released_at": "2026-07-09T23:05:40.041Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.144.0",
-      "changes": 14,
+      "changes": 13,
       "categories": {
         "behavior": 9,
         "caching": 1,
-        "hooks": 4
+        "filesystem": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 0,
-        "notable": 14
+        "notable": 13
       },
-      "undocumented": 14,
+      "undocumented": 13,
       "highlights": [
         "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
         "Behaviour: compaction added",
@@ -1319,18 +1324,19 @@
     {
       "version": "0.144.0",
       "released_at": "2026-07-09T16:50:26.998Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.143.0",
-      "changes": 51,
+      "changes": 81,
       "categories": {
         "behavior": 3,
         "caching": 1,
         "config": 6,
-        "hooks": 12,
+        "filesystem": 32,
+        "hooks": 10,
         "model": 4,
         "prompt": 4,
         "request": 3,
@@ -1339,10 +1345,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
-        "notable": 32
+        "informational": 51,
+        "notable": 30
       },
-      "undocumented": 37,
+      "undocumented": 68,
       "highlights": [
         "Default model: gpt-5.5 → gpt-5.6-sol",
         "Model parameter parallel_tool_calls: true → false",
@@ -1353,26 +1359,27 @@
     {
       "version": "0.143.0",
       "released_at": "2026-07-08T01:34:38.318Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.142.5",
-      "changes": 36,
+      "changes": 44,
       "categories": {
         "behavior": 2,
         "binary": 2,
         "cli": 19,
-        "config": 13
+        "config": 13,
+        "filesystem": 8
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 28,
+        "informational": 36,
         "notable": 8
       },
-      "undocumented": 13,
+      "undocumented": 21,
       "highlights": [
         "Behaviour: compaction added",
         "Behaviour: tool_output added",
@@ -1383,33 +1390,35 @@
     {
       "version": "0.142.5",
       "released_at": "2026-07-01T01:18:19.998Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.142.4",
-      "changes": 2,
+      "changes": 5,
       "categories": {
-        "behavior": 2
+        "behavior": 2,
+        "filesystem": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
+        "informational": 3,
         "notable": 2
       },
-      "undocumented": 2,
+      "undocumented": 5,
       "highlights": [
         "Behaviour: compaction removed",
-        "Behaviour: tool_output removed"
+        "Behaviour: tool_output removed",
+        "Command no longer run: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)"
       ],
       "signing": "valid"
     },
     {
       "version": "0.142.4",
       "released_at": "2026-06-29T05:07:05.914Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1438,7 +1447,7 @@
     {
       "version": "0.142.3",
       "released_at": "2026-06-26T21:32:08.704Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1466,7 +1475,7 @@
     {
       "version": "0.142.2",
       "released_at": "2026-06-25T07:34:58.281Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1477,7 +1486,7 @@
         "behavior": 8,
         "binary": 1,
         "config": 1,
-        "hooks": 3
+        "filesystem": 3
       },
       "impact": {
         "breaking": 0,
@@ -1496,52 +1505,53 @@
     {
       "version": "0.142.1",
       "released_at": "2026-06-25T00:38:54.309Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.142.0",
-      "changes": 4,
+      "changes": 5,
       "categories": {
         "binary": 1,
-        "hooks": 3
+        "filesystem": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 2,
         "notable": 3
       },
-      "undocumented": 4,
+      "undocumented": 5,
       "highlights": [
-        "PreToolUse hook control (exit_2) removed",
-        "SessionStart hook control (exit_2) removed",
-        "Stop hook control (exit_2) removed"
+        "New command at turn: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
+        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
+        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)"
       ],
       "signing": "valid"
     },
     {
       "version": "0.142.0",
       "released_at": "2026-06-22T22:22:41.166Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.141.0",
-      "changes": 42,
+      "changes": 44,
       "categories": {
         "behavior": 9,
-        "config": 33
+        "config": 33,
+        "filesystem": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 27,
+        "informational": 29,
         "notable": 15
       },
-      "undocumented": 24,
+      "undocumented": 25,
       "highlights": [
         "Behaviour: sandbox approval added",
         "Behaviour: sandbox model added",
@@ -1552,26 +1562,26 @@
     {
       "version": "0.141.0",
       "released_at": "2026-06-18T04:45:39.921Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.140.0",
-      "changes": 74,
+      "changes": 12,
       "categories": {
         "behavior": 8,
         "config": 2,
-        "hooks": 63,
+        "filesystem": 1,
         "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 57,
-        "notable": 17
+        "informational": 3,
+        "notable": 9
       },
-      "undocumented": 56,
+      "undocumented": 1,
       "highlights": [
         "Beta dropped: terminal_resize_reflow",
         "Behaviour: sandbox approval removed",
@@ -1582,18 +1592,19 @@
     {
       "version": "0.140.0",
       "released_at": "2026-06-15T21:09:21.79Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.139.0",
-      "changes": 22,
+      "changes": 24,
       "categories": {
         "binary": 1,
         "caching": 1,
         "cli": 5,
         "config": 6,
+        "filesystem": 2,
         "prompt": 1,
         "request": 4,
         "tools": 4
@@ -1602,7 +1613,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 10,
-        "notable": 12
+        "notable": 14
       },
       "undocumented": 11,
       "highlights": [
@@ -1615,7 +1626,7 @@
     {
       "version": "0.139.0",
       "released_at": "2026-06-09T20:17:25.855Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1646,7 +1657,7 @@
     {
       "version": "0.138.0",
       "released_at": "2026-06-08T23:03:39.681Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1673,56 +1684,57 @@
     {
       "version": "0.137.0",
       "released_at": "2026-06-04T01:41:31.275Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.136.0",
-      "changes": 6,
+      "changes": 8,
       "categories": {
         "config": 3,
-        "hooks": 3
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 5,
-        "notable": 1
+        "informational": 6,
+        "notable": 2
       },
-      "undocumented": 4,
+      "undocumented": 7,
       "highlights": [
         "New setting: apps.<name>.approvals_reviewer",
-        "PreToolUse hook control (exit_2) added",
-        "SessionStart hook control (exit_2) added"
+        "New command at turn: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
+        "New setting: features.local_thread_store_compression"
       ],
       "signing": "valid"
     },
     {
       "version": "0.136.0",
       "released_at": "2026-06-01T18:53:55.315Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.135.0",
-      "changes": 47,
+      "changes": 59,
       "categories": {
         "binary": 1,
         "caching": 1,
         "cli": 14,
         "config": 9,
+        "filesystem": 12,
         "prompt": 3,
         "tools": 19
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 21,
-        "notable": 26
+        "informational": 31,
+        "notable": 28
       },
-      "undocumented": 27,
+      "undocumented": 38,
       "highlights": [
         "Injected context changed (+563 −0 chars)",
         "System prompt changed (+56 −81 chars)",
@@ -1733,23 +1745,24 @@
     {
       "version": "0.135.0",
       "released_at": "2026-05-28T19:08:37.797Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.134.0",
-      "changes": 26,
+      "changes": 27,
       "categories": {
         "binary": 1,
         "config": 23,
+        "filesystem": 1,
         "storage": 1,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 20,
+        "informational": 21,
         "notable": 6
       },
       "undocumented": 22,
@@ -1763,7 +1776,7 @@
     {
       "version": "0.134.0",
       "released_at": "2026-05-26T19:33:51.389Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1773,7 +1786,7 @@
       "categories": {
         "cli": 35,
         "config": 3,
-        "hooks": 4
+        "filesystem": 4
       },
       "impact": {
         "breaking": 0,
@@ -1792,7 +1805,7 @@
     {
       "version": "0.133.0",
       "released_at": "2026-05-21T17:13:06.253Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1803,7 +1816,8 @@
         "behavior": 8,
         "cli": 11,
         "config": 22,
-        "hooks": 6,
+        "filesystem": 4,
+        "hooks": 2,
         "prompt": 1,
         "storage": 1,
         "tools": 9
@@ -1811,10 +1825,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 33,
-        "notable": 25
+        "informational": 37,
+        "notable": 21
       },
-      "undocumented": 27,
+      "undocumented": 29,
       "highlights": [
         "System prompt changed (+276 −173 chars)",
         "Tool removed: close_agent",
@@ -1825,27 +1839,28 @@
     {
       "version": "0.132.0",
       "released_at": "2026-05-20T02:39:00.388Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.131.0",
-      "changes": 11,
+      "changes": 12,
       "categories": {
         "binary": 2,
         "cli": 4,
         "config": 1,
+        "filesystem": 1,
         "prompt": 1,
         "tools": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 6,
+        "informational": 7,
         "notable": 5
       },
-      "undocumented": 4,
+      "undocumented": 5,
       "highlights": [
         "System prompt changed (+385 −429 chars)",
         "spawn_agent tool description changed (+641 −2100 chars)",
@@ -1856,18 +1871,19 @@
     {
       "version": "0.131.0",
       "released_at": "2026-05-18T18:08:19.71Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.130.0",
-      "changes": 142,
+      "changes": 171,
       "categories": {
         "behavior": 9,
         "binary": 2,
         "cli": 53,
         "config": 70,
+        "filesystem": 29,
         "prompt": 2,
         "request": 4,
         "tools": 2
@@ -1875,10 +1891,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 101,
-        "notable": 41
+        "informational": 122,
+        "notable": 49
       },
-      "undocumented": 62,
+      "undocumented": 90,
       "highlights": [
         "System prompt changed (+81 −81 chars)",
         "System prompt changed (+218 −203 chars)",
@@ -1889,7 +1905,7 @@
     {
       "version": "0.130.0",
       "released_at": "2026-05-08T23:12:58.744Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1917,58 +1933,60 @@
     {
       "version": "0.129.0",
       "released_at": "2026-05-07T17:05:37.553Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.128.0",
-      "changes": 171,
+      "changes": 123,
       "categories": {
         "behavior": 1,
         "cli": 13,
         "config": 95,
-        "hooks": 61,
+        "filesystem": 11,
+        "hooks": 2,
         "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 102,
-        "notable": 69
+        "informational": 103,
+        "notable": 20
       },
-      "undocumented": 100,
+      "undocumented": 93,
       "highlights": [
         "Now sends identifier header:thread_id",
         "Behaviour: tool_output removed",
-        "PreToolUse hook environment variable LOGNAME removed"
+        "New hook event: PostCompact"
       ],
       "signing": "revoked"
     },
     {
       "version": "0.128.0",
       "released_at": "2026-04-30T16:43:46.064Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.125.0",
-      "changes": 121,
+      "changes": 163,
       "categories": {
         "binary": 1,
         "cli": 18,
         "config": 100,
+        "filesystem": 42,
         "prompt": 1,
         "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 106,
-        "notable": 15
+        "informational": 147,
+        "notable": 16
       },
-      "undocumented": 90,
+      "undocumented": 109,
       "highlights": [
         "System prompt changed (+81 −73 chars)",
         "New beta: terminal_resize_reflow",
@@ -1979,18 +1997,18 @@
     {
       "version": "0.125.0",
       "released_at": "2026-04-24T18:01:41.002Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.124.0",
-      "changes": 19,
+      "changes": 17,
       "categories": {
         "behavior": 2,
         "cli": 7,
         "config": 3,
-        "hooks": 4,
+        "filesystem": 2,
         "model": 1,
         "prompt": 1,
         "tools": 1
@@ -1998,10 +2016,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 9,
-        "notable": 10
+        "informational": 11,
+        "notable": 6
       },
-      "undocumented": 11,
+      "undocumented": 7,
       "highlights": [
         "Default model: gpt-5.4 → gpt-5.5",
         "System prompt changed (+17945 −11407 chars)",
@@ -2012,27 +2030,27 @@
     {
       "version": "0.124.0",
       "released_at": "2026-04-23T18:30:45.892Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.123.0",
-      "changes": 70,
+      "changes": 76,
       "categories": {
         "behavior": 1,
         "cli": 1,
         "config": 63,
-        "hooks": 4,
+        "filesystem": 10,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 65,
+        "informational": 71,
         "notable": 5
       },
-      "undocumented": 50,
+      "undocumented": 54,
       "highlights": [
         "System prompt changed (+376 −387 chars)",
         "Behaviour: sandbox removed",
@@ -2043,18 +2061,18 @@
     {
       "version": "0.123.0",
       "released_at": "2026-04-23T01:27:03.972Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.122.0",
-      "changes": 37,
+      "changes": 44,
       "categories": {
         "behavior": 4,
         "cli": 18,
         "config": 7,
-        "hooks": 4,
+        "filesystem": 11,
         "model": 1,
         "prompt": 1,
         "tools": 2
@@ -2062,10 +2080,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 24,
-        "notable": 13
+        "informational": 34,
+        "notable": 10
       },
-      "undocumented": 18,
+      "undocumented": 25,
       "highlights": [
         "Default model: gpt-5.3-codex → gpt-5.4",
         "System prompt changed (+6570 −4207 chars)",
@@ -2076,25 +2094,26 @@
     {
       "version": "0.122.0",
       "released_at": "2026-04-20T18:39:33.583Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.121.0",
-      "changes": 46,
+      "changes": 68,
       "categories": {
         "cli": 25,
         "config": 20,
+        "filesystem": 22,
         "hooks": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 40,
+        "informational": 62,
         "notable": 6
       },
-      "undocumented": 22,
+      "undocumented": 43,
       "highlights": [
         "New hook event: PermissionRequest",
         "Default of `codex app --download-url`: https://persistent.oaistatic.com/codex-app-prod/Codex.dmg → none",
@@ -2105,26 +2124,27 @@
     {
       "version": "0.121.0",
       "released_at": "2026-04-15T20:46:45.517Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.120.0",
-      "changes": 32,
+      "changes": 36,
       "categories": {
         "binary": 1,
         "cli": 14,
         "config": 16,
+        "filesystem": 4,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 31,
+        "informational": 35,
         "notable": 1
       },
-      "undocumented": 15,
+      "undocumented": 19,
       "highlights": [
         "view_image tool parameter detail added",
         "New flag `codex app-server --ws-token-sha256`",
@@ -2135,42 +2155,46 @@
     {
       "version": "0.120.0",
       "released_at": "2026-04-11T02:54:37.375Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.119.0",
-      "changes": 1,
+      "changes": 6,
       "categories": {
-        "binary": 1
+        "binary": 1,
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
-        "notable": 1
+        "informational": 1,
+        "notable": 5
       },
-      "undocumented": 1,
+      "undocumented": 5,
       "highlights": [
-        "Signed with a different certificate"
+        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --sandbox-policy {\"type\":\"works …` (linux/amd64)",
+        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --sandbox-policy {\"type\":\"works …` (linux/amd64)",
+        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --sandbox-policy {\"type\":\"works …` (linux/amd64)"
       ],
       "signing": "revoked"
     },
     {
       "version": "0.119.0",
       "released_at": "2026-04-10T22:45:06.804Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.118.0",
-      "changes": 50,
+      "changes": 63,
       "categories": {
         "binary": 1,
         "cli": 24,
         "config": 19,
+        "filesystem": 13,
         "request": 4,
         "storage": 1,
         "tools": 1
@@ -2178,10 +2202,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 43,
+        "informational": 56,
         "notable": 7
       },
-      "undocumented": 23,
+      "undocumented": 33,
       "highlights": [
         "spawn_agent tool description changed (+803 −808 chars)",
         "Now sends identifier client_metadata.x-codex-installation-id",
@@ -2192,25 +2216,26 @@
     {
       "version": "0.118.0",
       "released_at": "2026-03-31T17:03:18.49Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.117.0",
-      "changes": 23,
+      "changes": 31,
       "categories": {
         "binary": 1,
         "cli": 14,
-        "config": 8
+        "config": 8,
+        "filesystem": 8
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 21,
+        "informational": 29,
         "notable": 2
       },
-      "undocumented": 12,
+      "undocumented": 19,
       "highlights": [
         "Setting no longer read: features.voice_transcription",
         "New setting: model_providers.<name>.auth",
@@ -2221,18 +2246,19 @@
     {
       "version": "0.117.0",
       "released_at": "2026-03-26T22:28:43.427Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.116.0",
-      "changes": 62,
+      "changes": 95,
       "categories": {
         "binary": 1,
         "caching": 1,
         "cli": 24,
         "config": 14,
+        "filesystem": 33,
         "hooks": 7,
         "prompt": 1,
         "tools": 14
@@ -2240,10 +2266,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 40,
+        "informational": 73,
         "notable": 22
       },
-      "undocumented": 27,
+      "undocumented": 50,
       "highlights": [
         "System prompt changed (+1106 −0 chars)",
         "close_agent tool description changed (+216 −172 chars)",
@@ -2254,49 +2280,51 @@
     {
       "version": "0.116.0",
       "released_at": "2026-03-19T17:52:17.991Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.115.0",
-      "changes": 21,
+      "changes": 34,
       "categories": {
         "binary": 1,
         "cli": 12,
         "config": 6,
+        "filesystem": 13,
         "hooks": 1,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
-        "notable": 2
+        "informational": 31,
+        "notable": 3
       },
-      "undocumented": 5,
+      "undocumented": 15,
       "highlights": [
         "close_agent tool description changed (+172 −144 chars)",
         "New hook event: UserPromptSubmit",
-        "New flag `codex --remote`"
+        "Now looks for the program bwrap on the PATH (linux/amd64)"
       ],
       "signing": "revoked"
     },
     {
       "version": "0.115.0",
       "released_at": "2026-03-16T19:38:16.363Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.114.0",
-      "changes": 46,
+      "changes": 85,
       "categories": {
         "behavior": 2,
         "caching": 1,
         "cli": 3,
         "config": 31,
+        "filesystem": 39,
         "prompt": 3,
         "request": 1,
         "tools": 5
@@ -2304,10 +2332,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 21,
-        "notable": 25
+        "informational": 56,
+        "notable": 29
       },
-      "undocumented": 30,
+      "undocumented": 53,
       "highlights": [
         "Injected context changed (+152 −2940 chars)",
         "Injected context block removed",
@@ -2318,24 +2346,25 @@
     {
       "version": "0.114.0",
       "released_at": "2026-03-11T00:29:28.692Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.113.0",
-      "changes": 10,
+      "changes": 21,
       "categories": {
         "config": 8,
+        "filesystem": 11,
         "hooks": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 7,
-        "notable": 3
+        "informational": 17,
+        "notable": 4
       },
-      "undocumented": 3,
+      "undocumented": 9,
       "highlights": [
         "New hook event: SessionStart",
         "New hook event: Stop",
@@ -2346,29 +2375,30 @@
     {
       "version": "0.113.0",
       "released_at": "2026-03-10T05:25:37.995Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.112.0",
-      "changes": 38,
+      "changes": 67,
       "categories": {
         "behavior": 2,
         "binary": 1,
         "caching": 1,
         "cli": 1,
         "config": 31,
+        "filesystem": 29,
         "prompt": 1,
         "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 14,
-        "notable": 24
+        "informational": 41,
+        "notable": 26
       },
-      "undocumented": 33,
+      "undocumented": 59,
       "highlights": [
         "Injected context changed (+0 −430 chars)",
         "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
@@ -2379,7 +2409,7 @@
     {
       "version": "0.112.0",
       "released_at": "2026-03-08T20:44:58.047Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2410,26 +2440,27 @@
     {
       "version": "0.111.0",
       "released_at": "2026-03-05T19:13:00.697Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.110.0",
-      "changes": 6,
+      "changes": 27,
       "categories": {
         "behavior": 2,
         "caching": 1,
         "config": 2,
+        "filesystem": 21,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 23,
         "notable": 4
       },
-      "undocumented": 6,
+      "undocumented": 25,
       "highlights": [
         "Injected context changed (+430 −0 chars)",
         "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
@@ -2440,26 +2471,27 @@
     {
       "version": "0.110.0",
       "released_at": "2026-03-05T02:23:39.861Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.107.0",
-      "changes": 24,
+      "changes": 64,
       "categories": {
         "behavior": 1,
         "binary": 1,
         "config": 21,
+        "filesystem": 40,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
-        "notable": 5
+        "informational": 53,
+        "notable": 11
       },
-      "undocumented": 16,
+      "undocumented": 44,
       "highlights": [
         "System prompt changed (+73 −48 chars)",
         "Behaviour: sandbox sandbox changed",
@@ -2470,46 +2502,48 @@
     {
       "version": "0.107.0",
       "released_at": "2026-03-02T18:00:55.212Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.106.0",
-      "changes": 10,
+      "changes": 23,
       "categories": {
         "config": 9,
+        "filesystem": 13,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 8,
-        "notable": 2
+        "informational": 18,
+        "notable": 5
       },
-      "undocumented": 4,
+      "undocumented": 9,
       "highlights": [
         "Injected context changed (+70 −0 chars)",
         "New setting: mcp_servers.<name>.oauth_resource",
-        "New setting: audio"
+        "`/usr/libexec/path_helper -s` now runs as the build's own doing (was both the build's own and the tool call's) (darwin/arm64)"
       ],
       "signing": "revoked"
     },
     {
       "version": "0.106.0",
       "released_at": "2026-02-26T23:12:45.073Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.105.0",
-      "changes": 15,
+      "changes": 16,
       "categories": {
         "behavior": 5,
         "binary": 1,
         "cli": 2,
         "config": 3,
+        "filesystem": 1,
         "model": 2,
         "prompt": 1,
         "request": 1
@@ -2517,10 +2551,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 6,
+        "informational": 7,
         "notable": 9
       },
-      "undocumented": 7,
+      "undocumented": 8,
       "highlights": [
         "Default model: gpt-5.2-codex → gpt-5.3-codex",
         "Model parameter text added",
@@ -2531,26 +2565,27 @@
     {
       "version": "0.105.0",
       "released_at": "2026-02-25T17:22:34.496Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.104.0",
-      "changes": 68,
+      "changes": 78,
       "categories": {
         "binary": 2,
         "cli": 7,
         "config": 58,
+        "filesystem": 10,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 47,
+        "informational": 57,
         "notable": 21
       },
-      "undocumented": 44,
+      "undocumented": 48,
       "highlights": [
         "exec_command tool parameter prefix_rule: description changed (+260 −252 chars)",
         "New setting: allow_login_shell",
@@ -2561,23 +2596,24 @@
     {
       "version": "0.104.0",
       "released_at": "2026-02-18T07:13:25.235Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.103.0",
-      "changes": 3,
+      "changes": 8,
       "categories": {
-        "cli": 3
+        "cli": 3,
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 8,
       "highlights": [
         "Description of `codex fork` changed",
         "Full help text of `app-server -h` changed (+0 −97 chars)",
@@ -2588,24 +2624,25 @@
     {
       "version": "0.103.0",
       "released_at": "2026-02-17T23:03:50.048Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.102.0",
-      "changes": 3,
+      "changes": 8,
       "categories": {
         "cli": 1,
-        "config": 2
+        "config": 2,
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 8,
       "highlights": [
         "Full help text of `app-server -h` changed (+97 −0 chars)",
         "New setting: commit_attribution",
@@ -2616,25 +2653,26 @@
     {
       "version": "0.102.0",
       "released_at": "2026-02-17T20:03:25.029Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.101.0",
-      "changes": 31,
+      "changes": 45,
       "categories": {
         "cli": 13,
         "config": 15,
+        "filesystem": 14,
         "tools": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 28,
-        "notable": 3
+        "informational": 40,
+        "notable": 5
       },
-      "undocumented": 14,
+      "undocumented": 24,
       "highlights": [
         "Tool removed: list_mcp_resource_templates",
         "Tool removed: list_mcp_resources",
@@ -2645,7 +2683,7 @@
     {
       "version": "0.101.0",
       "released_at": "2026-02-12T20:06:40.829Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2666,26 +2704,27 @@
     {
       "version": "0.100.0",
       "released_at": "2026-02-12T18:30:51.007Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.99.0",
-      "changes": 14,
+      "changes": 22,
       "categories": {
         "binary": 1,
         "cli": 4,
         "config": 7,
+        "filesystem": 8,
         "tools": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 11,
+        "informational": 19,
         "notable": 3
       },
-      "undocumented": 8,
+      "undocumented": 12,
       "highlights": [
         "exec_command tool parameter justification: description changed (+315 −319 chars)",
         "exec_command tool parameter prefix_rule: description changed (+61 −62 chars)",
@@ -2696,28 +2735,29 @@
     {
       "version": "0.99.0",
       "released_at": "2026-02-11T20:43:52.809Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.98.0",
-      "changes": 31,
+      "changes": 62,
       "categories": {
         "binary": 2,
         "caching": 1,
         "cli": 4,
         "config": 21,
+        "filesystem": 31,
         "prompt": 2,
         "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 26,
-        "notable": 5
+        "informational": 37,
+        "notable": 25
       },
-      "undocumented": 17,
+      "undocumented": 43,
       "highlights": [
         "System prompt changed (+5606 −4070 chars)",
         "System prompt changed (+119 −711 chars)",
@@ -2728,7 +2768,7 @@
     {
       "version": "0.98.0",
       "released_at": "2026-02-05T17:01:54.85Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2749,20 +2789,21 @@
     {
       "version": "0.97.0",
       "released_at": "2026-02-05T05:12:14.841Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.96.0",
-      "changes": 3,
+      "changes": 20,
       "categories": {
-        "config": 3
+        "config": 3,
+        "filesystem": 17
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 19,
         "notable": 1
       },
       "undocumented": 1,
@@ -2776,24 +2817,25 @@
     {
       "version": "0.96.0",
       "released_at": "2026-02-04T18:24:44.133Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.95.0",
-      "changes": 4,
+      "changes": 10,
       "categories": {
+        "filesystem": 6,
         "request": 1,
         "tools": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
+        "informational": 6,
         "notable": 4
       },
-      "undocumented": 4,
+      "undocumented": 10,
       "highlights": [
         "Tool removed: shell_command",
         "New tool: exec_command",
@@ -2804,26 +2846,27 @@
     {
       "version": "0.95.0",
       "released_at": "2026-02-04T04:55:36.663Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.94.0",
-      "changes": 34,
+      "changes": 45,
       "categories": {
         "binary": 5,
         "cli": 19,
         "config": 9,
+        "filesystem": 11,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 27,
-        "notable": 7
+        "informational": 36,
+        "notable": 9
       },
-      "undocumented": 21,
+      "undocumented": 27,
       "highlights": [
         "request_user_input tool description changed",
         "Default of model_providers.<name>.wire_api: chat → responses",
@@ -2834,25 +2877,26 @@
     {
       "version": "0.94.0",
       "released_at": "2026-02-02T18:28:42.99Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.93.0",
-      "changes": 7,
+      "changes": 30,
       "categories": {
         "config": 5,
+        "filesystem": 23,
         "prompt": 1,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 26,
         "notable": 4
       },
-      "undocumented": 4,
+      "undocumented": 22,
       "highlights": [
         "Injected context changed (+504 −326 chars)",
         "New tool: request_user_input",
@@ -2863,27 +2907,28 @@
     {
       "version": "0.93.0",
       "released_at": "2026-01-31T07:00:56.838Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.92.0",
-      "changes": 30,
+      "changes": 40,
       "categories": {
         "binary": 2,
         "cli": 7,
         "config": 18,
+        "filesystem": 10,
         "prompt": 1,
         "tools": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 26,
-        "notable": 4
+        "informational": 34,
+        "notable": 6
       },
-      "undocumented": 20,
+      "undocumented": 30,
       "highlights": [
         "System prompt changed (+463 −458 chars)",
         "shell_command tool parameter justification: description changed (+393 −114 chars)",
@@ -2894,24 +2939,25 @@
     {
       "version": "0.92.0",
       "released_at": "2026-01-27T11:51:59.692Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "0.91.0",
-      "changes": 3,
+      "changes": 5,
       "categories": {
         "config": 2,
+        "filesystem": 2,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 4,
         "notable": 1
       },
-      "undocumented": 1,
+      "undocumented": 3,
       "highlights": [
         "New tool: web_search",
         "New setting: mcp_servers.<name>.scopes",
@@ -2922,7 +2968,7 @@
     {
       "version": "0.91.0",
       "released_at": "2026-01-25T17:34:45.939Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -2943,7 +2989,7 @@
     {
       "version": "0.90.0",
       "released_at": "2026-01-25T16:38:42.443Z",
-      "captured_at": "2026-11-05T02:11:01.502194Z",
+      "captured_at": "2026-11-05T09:54:28.532441Z",
       "platforms": [
         "darwin/arm64"
       ],

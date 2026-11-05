@@ -17802,7 +17802,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.autoUpdate": {
       "kind": "setting",
@@ -17813,7 +17813,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.installLocation": {
       "kind": "setting",
@@ -17824,7 +17824,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.pluginDigests": {
       "kind": "setting",
@@ -17857,7 +17857,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.headers": {
       "kind": "setting",
@@ -17868,7 +17868,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.headersHelper": {
       "kind": "setting",
@@ -17890,7 +17890,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.name": {
       "kind": "setting",
@@ -17901,7 +17901,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.owner": {
       "kind": "setting",
@@ -17912,7 +17912,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.package": {
       "kind": "setting",
@@ -17923,7 +17923,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.path": {
       "kind": "setting",
@@ -17934,7 +17934,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.pathPattern": {
       "kind": "setting",
@@ -17945,7 +17945,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.plugins": {
       "kind": "setting",
@@ -17956,7 +17956,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.ref": {
       "kind": "setting",
@@ -17967,7 +17967,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.registry": {
       "kind": "setting",
@@ -17989,7 +17989,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.skipLfs": {
       "kind": "setting",
@@ -18000,7 +18000,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.source": {
       "kind": "setting",
@@ -18011,7 +18011,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.sparsePaths": {
       "kind": "setting",
@@ -18022,7 +18022,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.url": {
       "kind": "setting",
@@ -18033,7 +18033,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.additionalMarketplaces.<name>.source.version": {
       "kind": "setting",
@@ -19155,7 +19155,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.autoCompactEnabled": {
       "kind": "setting",
@@ -21784,7 +21784,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.managedMcpServers.<name>.<name>": {
       "kind": "setting",
@@ -21795,7 +21795,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.managedSourcesBehavior": {
       "kind": "setting",
@@ -21905,7 +21905,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPicker.options.description": {
       "kind": "setting",
@@ -21916,7 +21916,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPicker.options.label": {
       "kind": "setting",
@@ -21927,7 +21927,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPicker.options.model": {
       "kind": "setting",
@@ -21938,7 +21938,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPicker.options[].behavesAs": {
       "kind": "setting",
@@ -21993,7 +21993,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPricing": {
       "kind": "setting",
@@ -22015,7 +22015,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPricing.overrides": {
       "kind": "setting",
@@ -22026,7 +22026,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPricing.overrides.<name>": {
       "kind": "setting",
@@ -22092,7 +22092,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPricing.overrides.cacheWrite": {
       "kind": "setting",
@@ -22103,7 +22103,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPricing.overrides.input": {
       "kind": "setting",
@@ -22114,7 +22114,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelPricing.overrides.output": {
       "kind": "setting",
@@ -22125,7 +22125,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.modelProposedGoals": {
       "kind": "setting",
@@ -24061,7 +24061,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.remoteControlAtStartup": {
       "kind": "setting",
@@ -24094,7 +24094,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.requiredMaximumVersion": {
       "kind": "setting",
@@ -26492,7 +26492,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.spellcheck.checker.<name>": {
       "kind": "setting",
@@ -26514,7 +26514,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.spellcheck.color.<name>": {
       "kind": "setting",
@@ -26536,7 +26536,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.spellcheck.language": {
       "kind": "setting",
@@ -26547,7 +26547,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.spellcheck.language.<name>": {
       "kind": "setting",
@@ -28153,7 +28153,7 @@
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.vimInsertModeRemaps.email": {
       "kind": "setting",
