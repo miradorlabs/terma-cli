@@ -101,6 +101,26 @@ func TestBinaryFactsOfOffline(t *testing.T) {
 		!slices.Equal(f.EnvVars, []string{"GEMINI_API_KEY"}) {
 		t.Errorf("package facts = %+v", f)
 	}
+
+	// Hermes since 0.22: a user-bin launcher that hands on to the checkout's, which runs a Python
+	// of its own on a bootstrap that puts the checkout on sys.path (shlex.join's quoting).
+	root := filepath.Join(dir, "hermes-agent")
+	python := filepath.Join(dir, "tools", "cpython-3.14.1", "bin", "python3.14")
+	writeFile(t, python, "")
+	if err := os.MkdirAll(filepath.Join(dir, "tools", "cpython-3.14.1", "lib", "python3.14", "site-packages"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "hermes_cli", "main.py"), "os.environ.get('HERMES_HOME')\n")
+	writeFile(t, filepath.Join(root, ".hermes", "bin", "hermes"), "#!/bin/sh\nexec "+python+" -I -c 'import os, re, sys\n"+
+		`sys.path.insert(0, '"'"'`+root+`'"'"')`+"\nimport hermes_bootstrap\n' \"$@\"\n")
+	writeFile(t, filepath.Join(dir, "bin", "hermes"), "#!/bin/sh\nexec "+filepath.Join(root, ".hermes", "bin", "hermes")+" \"$@\"\n")
+	f, err = BinaryFactsOf(Binary{Harness: "hermes", Path: filepath.Join(dir, "bin", "hermes")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Form != "package" || f.Runtime != "python 3.14" || !slices.Equal(f.EnvVars, []string{"HERMES_HOME"}) {
+		t.Errorf("hermes facts = %+v", f)
+	}
 }
 
 func writeFile(t *testing.T, path, content string) {

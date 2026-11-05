@@ -251,6 +251,20 @@ func mostCommon(re *regexp.Regexp, data []byte, group int) string {
 // readPackage reads a script build's package: Node's from its package.json and installed
 // dependencies, Python's from its virtualenv. It returns the package's source, for strings.
 func (f *BinaryFacts) readPackage(script string, head []byte) []byte {
+	// A shell launcher that only hands on to another script (`exec <script> "$@"`) is read as
+	// that script: Hermes's ~/.local/bin/hermes starts the launcher in its checkout.
+	for range 3 {
+		shebang, _, _ := bytes.Cut(head, []byte("\n"))
+		next := shellForwardRE.FindSubmatch(head)
+		if next == nil || !bytes.Contains(shebang, []byte("sh")) || string(next[1]) == script {
+			break
+		}
+		data, err := os.ReadFile(string(next[1]))
+		if err != nil || !bytes.HasPrefix(data, []byte("#!")) {
+			break
+		}
+		script, head = string(next[1]), data
+	}
 	shebang, _, _ := bytes.Cut(head, []byte("\n"))
 	if bytes.Contains(shebang, []byte("python")) {
 		return f.readPythonPackage(string(bytes.Fields(shebang[2:])[0]), filepath.Dir(script))
@@ -258,6 +272,13 @@ func (f *BinaryFacts) readPackage(script string, head []byte) []byte {
 	// A shell launcher that runs a virtualenv's Python on the app's source (Hermes's).
 	if m := pythonLauncherRE.FindSubmatch(head); m != nil {
 		return f.readPythonPackage(string(m[1]), filepath.Dir(string(m[2])))
+	}
+	// One that runs a Python with a bootstrap of its own that puts the app on sys.path (Hermes's
+	// since 0.22: `exec <python> -I -c '…sys.path.insert(0, <root>)…'`).
+	if m := pythonBootstrapRE.FindSubmatch(head); m != nil {
+		if root := pythonBootstrapRootRE.FindSubmatch(head); root != nil {
+			return f.readPythonPackage(string(m[1]), string(root[1]))
+		}
 	}
 	f.Runtime = "node"
 	root := filepath.Dir(script)
@@ -291,6 +312,17 @@ func (f *BinaryFacts) readPackage(script string, head []byte) []byte {
 // pythonLauncherRE finds a launcher's `exec "<venv>/bin/python" "<app>/<script>"`.
 var pythonLauncherRE = regexp.MustCompile(`exec\s+"([^"]*/bin/python[0-9.]*)"\s+"([^"]+)"`)
 
+var (
+	// pythonBootstrapRE finds a launcher's `exec <python> -I -c`, the interpreter's path as
+	// shlex.join writes it (quoted only where it must be).
+	pythonBootstrapRE = regexp.MustCompile(`(?m)^exec\s+'?(/[^'\s]*/python[0-9.]*)'?\s+-I\s+-c\s`)
+	// pythonBootstrapRootRE finds the folder its bootstrap puts first on sys.path, its repr's
+	// quotes inside the shell's ('"'"'…'"'"').
+	pythonBootstrapRootRE = regexp.MustCompile(`sys\.path\.insert\(0,\s*(?:'"'"'|'|")(/[^'"]+)`)
+	// shellForwardRE finds a shell launcher's `exec <script> "$@"`.
+	shellForwardRE = regexp.MustCompile(`(?m)^exec\s+'?(/[^'\s]+)'?\s+"\$@"\s*$`)
+)
+
 // readPythonPackage reads a Python build: its virtualenv's version and distributions, and the
 // source of the app (in app) and of what it installed.
 func (f *BinaryFacts) readPythonPackage(python, app string) []byte {
@@ -309,6 +341,10 @@ func (f *BinaryFacts) readPythonPackage(python, app string) []byte {
 		return nil
 	}
 	site := sites[0]
+	if f.Runtime == "" {
+		// An interpreter of its own, no virtualenv (Hermes's store Python): its library's version.
+		f.Runtime = "python " + strings.TrimPrefix(filepath.Base(filepath.Dir(site)), "python")
+	}
 	f.SDK = map[string]string{}
 	infos, _ := filepath.Glob(filepath.Join(site, "*.dist-info"))
 	for _, info := range infos {
