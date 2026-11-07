@@ -102,11 +102,19 @@ func load(dir string) (published, error) {
 			if err := readJSON(f, &d); err != nil {
 				return p, err
 			}
+			// What was published of a changelog is bounded as a fetched one is.
+			if d.Changelog != nil {
+				b := d.Changelog.Bounded()
+				d.Changelog = &b
+			}
 			p.diffs[h][d.From+".."+d.To] = &d
 		}
 		var cl Changelogs
 		if err := readJSON(filepath.Join(dir, h, "changelog.json"), &cl); err == nil {
-			p.changelogs[h] = cl.Versions
+			p.changelogs[h] = map[string]ChangelogNote{}
+			for v, note := range cl.Versions {
+				p.changelogs[h][v] = note.Bounded()
+			}
 		}
 		var hi HarnessIndex
 		if err := readJSON(filepath.Join(dir, h, "index.json"), &hi); err == nil {

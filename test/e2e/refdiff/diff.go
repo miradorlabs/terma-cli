@@ -980,13 +980,19 @@ func CompareRange(from, to *Snapshot, notes map[string]ChangelogNote, now time.T
 		}
 	}
 	slices.SortStableFunc(versions, func(a, b string) int { return VersionCompare(b, a) })
+	// The notes joined are bounded as one note is: each part first, then the whole, which is
+	// truncated where any part was or the join was cut.
 	var note *ChangelogNote
 	if len(versions) > 0 {
 		var sb strings.Builder
+		cut := false
 		for _, v := range versions {
-			fmt.Fprintf(&sb, "## %s\n\n%s\n\n", v, strings.TrimSpace(notes[v].Text))
+			part := notes[v].Bounded()
+			cut = cut || part.Truncated
+			fmt.Fprintf(&sb, "## %s\n\n%s\n\n", v, strings.TrimSpace(part.Text))
 		}
-		note = &ChangelogNote{URL: notes[versions[0]].URL, Text: strings.TrimSpace(sb.String())}
+		note = BoundedNote(notes[versions[0]].URL, strings.TrimSpace(sb.String()))
+		note.Truncated = note.Truncated || cut
 	}
 	return New(from, to, note, now)
 }

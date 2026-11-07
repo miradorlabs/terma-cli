@@ -802,3 +802,47 @@ func TestPublishRefusesEscapingNames(t *testing.T) {
 		}
 	}
 }
+
+// A changelog loaded back from what was published (changelog.json, an old diff's) is bounded
+// as a fetched one is, before it is published again.
+func TestLoadedChangelogIsBounded(t *testing.T) {
+	dir := t.TempDir()
+	for i, v := range []string{"1.0.0", "1.0.1"} {
+		n := night{now: time.Date(2026, 11, 3+i, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{claudeProfile(v, "Be brief "+v+".", []string{"Bash"}, "", "")}}
+		if _, err := publish(dir, n, options{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	long := strings.Repeat("x", refdiff.MaxChangelogLine*2)
+	if err := writeJSON(filepath.Join(dir, "claude", "changelog.json"), Changelogs{SchemaVersion: 1, Harness: "claude",
+		Versions: map[string]ChangelogNote{"0.9.0": {URL: "u", Text: long}}}); err != nil {
+		t.Fatal(err)
+	}
+	diffPath := filepath.Join(dir, "claude", "diffs", "1.0.0..1.0.1.json")
+	var d Diff
+	if err := readJSON(diffPath, &d); err != nil {
+		t.Fatal(err)
+	}
+	d.Changelog = &ChangelogNote{URL: "u", Text: long}
+	if err := writeJSON(diffPath, &d); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := publish(dir, night{now: time.Date(2026, 11, 6, 5, 0, 0, 0, time.UTC)}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	var cl Changelogs
+	if err := readJSON(filepath.Join(dir, "claude", "changelog.json"), &cl); err != nil {
+		t.Fatal(err)
+	}
+	for v, note := range cl.Versions {
+		if len(note.Text) > refdiff.MaxChangelogLine || !note.Truncated {
+			t.Errorf("changelog.json %s: %d bytes, truncated %v", v, len(note.Text), note.Truncated)
+		}
+	}
+	if err := readJSON(diffPath, &d); err != nil {
+		t.Fatal(err)
+	}
+	if d.Changelog == nil || len(d.Changelog.Text) > refdiff.MaxChangelogLine || !d.Changelog.Truncated {
+		t.Errorf("the diff's changelog = %+v", d.Changelog)
+	}
+}

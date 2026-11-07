@@ -773,7 +773,9 @@ What the reference publishes of a changelog is bounded, so the pages that read i
 the bounds rather than guard every input: a line is at most 2,000 bytes (a longer one is cut
 there and ends `…`) and a version's text at most 128 KiB (cut at the last whole line that
 fits). A note that was cut has `"truncated": true`. The largest published so far are 43.8 KB
-of text (Codex) and a 758-character line (Pi), well inside both.
+of text (Codex) and a 758-character line (Pi), well inside both. The bounds are `refdiff`'s
+(`BoundedNote`), applied wherever a note is made: fetched, loaded back from `changelog.json` or
+an earlier diff, and joined for a range of versions.
 
 Lists are compared by key: tools by `name`, telemetry by surface then key, hooks by event (a
 list of names, as `supported`, as a set), egress by host, method and path, capabilities by `id`
@@ -880,7 +882,8 @@ go.run(instance);
 ```
 
 Its `changelog.text` joins the range's changelogs newest first, each under a `## <version>`
-heading.
+heading, within the same bounds as one version's: cut at the last whole line that fits, and
+`truncated` where the join was cut or any changelog in it had been.
 
 `harnessReferenceCompare(fromSnapshotJSON, toSnapshotJSON, changelogJSON)` returns, as a
 string, a diff in the schema above between the two snapshots (`from` and `to` the two

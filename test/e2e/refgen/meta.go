@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/miradorlabs/terma-cli/e2e"
 	"github.com/miradorlabs/terma-cli/e2e/refdiff"
@@ -180,7 +179,7 @@ func (c *changelogs) of(harness, version string) *ChangelogNote {
 			c.markdown[harness] = secs
 		}
 		if text, ok := secs[version]; ok {
-			return boundedNote(m.changelog, text)
+			return refdiff.BoundedNote(m.changelog, text)
 		}
 		return nil
 	}
@@ -199,43 +198,5 @@ func (c *changelogs) of(harness, version string) *ChangelogNote {
 	if json.Unmarshal(data, &rel) != nil || strings.TrimSpace(rel.Body) == "" {
 		return nil
 	}
-	return boundedNote(rel.HTMLURL, strings.TrimSpace(rel.Body))
-}
-
-// boundedNote is a version's changelog as the reference publishes it: a line longer than
-// refdiff.MaxChangelogLine cut there, the whole cut at the last line that fits refdiff.MaxChangelogText, and
-// Truncated set where either cut anything, so a page that reads it never meets more.
-func boundedNote(url, text string) *ChangelogNote {
-	note := &ChangelogNote{URL: url}
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		if len(line) > refdiff.MaxChangelogLine {
-			lines[i] = truncateUTF8(line, refdiff.MaxChangelogLine-len("…")) + "…"
-			note.Truncated = true
-		}
-	}
-	var sb strings.Builder
-	for i, line := range lines {
-		if sb.Len()+len(line)+1 > refdiff.MaxChangelogText {
-			note.Truncated = true
-			break
-		}
-		if i > 0 {
-			sb.WriteByte('\n')
-		}
-		sb.WriteString(line)
-	}
-	note.Text = sb.String()
-	return note
-}
-
-// truncateUTF8 is s cut to at most n bytes, never inside a character.
-func truncateUTF8(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	for n > 0 && !utf8.RuneStart(s[n]) {
-		n--
-	}
-	return s[:n]
+	return refdiff.BoundedNote(rel.HTMLURL, strings.TrimSpace(rel.Body))
 }
