@@ -54,9 +54,9 @@ func TestIncrementalRenderIsAFullOne(t *testing.T) {
 	if _, err := publish(incremental, next, options{}); err != nil {
 		t.Fatal(err)
 	}
-	fullScrub = true
+	fullRender = true
 	_, err := publish(full, next, options{})
-	fullScrub = false
+	fullRender = false
 	if err != nil {
 		t.Fatal(err)
 	}

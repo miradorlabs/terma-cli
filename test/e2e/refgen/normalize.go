@@ -222,7 +222,7 @@ func scrubMachineFields(s *Snapshot) bool {
 		}
 		// A field with nothing a rule reads (what was published since the rules were) is left
 		// as it is without a walk: its JSON is read in one pass.
-		if data, err := json.Marshal(v); err == nil && !fullScrub && !machineMayApply(data) {
+		if data, err := json.Marshal(v); err == nil && !fullRender && !machineMayApply(data) {
 			continue
 		}
 		before := jsonOf(v)
@@ -268,9 +268,9 @@ func scrubMachineTree(v any) any {
 	return v
 }
 
-// fullScrub walks every observed field, and reads every observed value for the guard, whatever
+// fullRender walks every observed field, and reads every observed value for the guard, whatever
 // one pass over its JSON says (refgen -full): a full render, to compare an incremental one with.
-var fullScrub bool
+var fullRender bool
 
 // machineMayApply reports whether scrubMachineText could change a string in data, a field's
 // JSON: a machine path's mark, or a run id normalization has not named.
@@ -305,7 +305,7 @@ func hasUUID(data []byte) bool {
 // mayLeak reports whether any string in data, a JSON document, could hold a machine path: one
 // pass over it, false certain (no machine path holds a quote or an escape), true says to look.
 func mayLeak(data []byte) bool {
-	return fullScrub || e2e.MachineLeak(string(data)) != ""
+	return fullRender || e2e.MachineLeak(string(data)) != ""
 }
 
 // scrubMachineText is one observed string with the machine's paths named, and a run's id that
@@ -430,8 +430,8 @@ func observedChange(c Change) bool {
 }
 
 // machineGuard refuses to publish harness h if any observed value of its snapshots or its
-// diffs still names the machine: the error names the file, the field and the machine path, and
-// how many more there are.
+// diffs still names the machine: the error names the file, the field and the machine path it
+// matched (never the value), and how many more there are.
 func machineGuard(h string, snaps map[string]*Snapshot, diffs map[string]*Diff) error {
 	type found struct {
 		file string
@@ -451,12 +451,10 @@ func machineGuard(h string, snaps map[string]*Snapshot, diffs map[string]*Diff) 
 	if len(all) == 0 {
 		return nil
 	}
+	// The value itself stays out of the error: a publish job's log is public, and the guard is
+	// there to keep what it holds from being published.
 	first := all[0]
-	value := first.value
-	if len(value) > 160 {
-		value = value[:160] + "…"
-	}
-	msg := fmt.Sprintf("refusing to publish what names the machine: %s, %s: %q holds %s", first.file, first.field, value, first.match)
+	msg := fmt.Sprintf("refusing to publish what names the machine: %s, %s holds %s", first.file, first.field, first.match)
 	if len(all) > 1 {
 		msg += fmt.Sprintf(" (and %d more)", len(all)-1)
 	}

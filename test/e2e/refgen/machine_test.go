@@ -272,10 +272,14 @@ func TestPublishRefusesMachinePaths(t *testing.T) {
 	if err == nil {
 		t.Fatal("published a path that names the machine")
 	}
-	for _, want := range []string{"claude/versions/1.0.1.json", "filesystem", "/Users/runner/x", "holds /Users/"} {
+	for _, want := range []string{"claude/versions/1.0.1.json", "filesystem", "holds /Users/"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the refusal lacks %q: %v", want, err)
 		}
+	}
+	// The value stays out of it: a publish job's log is public.
+	if strings.Contains(err.Error(), "runner/x") {
+		t.Errorf("the refusal repeats the value: %v", err)
 	}
 	if after := treeBytes(t, dir); !reflect.DeepEqual(before, after) {
 		t.Error("publish wrote files before it refused")

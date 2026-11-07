@@ -42,7 +42,7 @@ func main() {
 	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them, and read its configuration options and environment variables from it (a tarball a build)")
 	clones := flag.String("source-clones", defaultCloneRoot(), "where local clones of public harnesses' sources are kept (<owner>-<name>); a release's source is read from its clone where there is one ($"+envSourceClones+")")
 	flag.IntVar(&timelineSteps, "timeline-steps", timelineSteps, "how many steps timeline.json holds, and each timeline-<n>.json archive of the older ones at most")
-	flag.BoolVar(&fullScrub, "full", false, "rewrite every file, and walk every observed value to name the machine's paths and guard against them, rather than what one pass over each says to: a full render, to compare a republish with")
+	flag.BoolVar(&fullRender, "full", false, "rewrite every file, and walk every observed value to name the machine's paths and guard against them, rather than what one pass over each says to: a full render, to compare a republish with")
 	nowFlag := flag.String("now", "", "the time the run takes for its own, RFC 3339 (default the current time): two runs over the same input then write the same bytes")
 	lineageSources := flag.Bool("lineage-sources", false, "look up, in a clone of each harness's source under -source-clones (cloned, or its tags fetched, first), the release and commit that introduced each item its oldest build tracked has (lineage.json); a one-time backfill, by hand")
 	flag.Parse()

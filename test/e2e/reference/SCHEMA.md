@@ -813,8 +813,12 @@ A step is as large as its changes' ids (a command's id holds its whole command l
 file is bounded by steps: `timeline.json` holds the newest 25 steps, and `archives` lists the
 files of the older ones, oldest first, each by the versions of its oldest (`first`) and newest
 (`last`) step and how many it holds. An archive, `timeline-<n>.json`, is a timeline of its own
-steps (the same fields, newest first, no `archives`), 25 a file counted from the oldest step, so
-a full archive never changes and only the newest one fills as versions arrive. The steps of
+steps (the same fields, newest first, no `archives`), 25 a file counted from the oldest step.
+While versions arrive newest last only the newest archive fills, but an archive is not
+immutable: a backfill of older versions, or a release of an older line published after newer
+ones, moves every boundary after it, and a step's changes are rewritten when what they are
+matched against (changelogs, source links) improves. A reader caches archives as it caches
+`timeline.json`, never as immutable. The steps of
 `timeline.json` and of every archive are each step once. A harness of 25 steps or fewer has
 them all in `timeline.json` and no `archives`. To read a range, read `timeline.json`, and the
 archives whose `first`..`last` reach into the range where its oldest step does not.

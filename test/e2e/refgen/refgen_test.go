@@ -897,7 +897,7 @@ func TestSectionViews(t *testing.T) {
 }
 
 // timeline.json holds the newest steps; the older ones are in archives of the same size counted
-// from the oldest, so a full archive never changes; together they are every step, once.
+// from the oldest; together they are every step, once.
 func TestTimelineArchives(t *testing.T) {
 	steps := func(n int) Timeline {
 		tl := Timeline{SchemaVersion: 1, Harness: "codex"}

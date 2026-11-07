@@ -29,7 +29,9 @@ const envAllowRootChanges = "TERMA_E2E_ALLOW_ROOT_CHANGES"
 
 // rootChangesAllowed says whether this machine may have its machine-wide state changed as root,
 // or why not: only a GitHub-hosted runner (a fresh VM thrown away after the job), or a machine
-// that says it is as throwaway (TERMA_E2E_ALLOW_ROOT_CHANGES=1).
+// that says it is as throwaway (TERMA_E2E_ALLOW_ROOT_CHANGES=1). It reads what the environment
+// says, so it guards against running these by accident, not against someone who sets them; on a
+// developer's machine sudoers allows eslogger and lsof alone anyway.
 func rootChangesAllowed() (bool, string) {
 	switch {
 	case os.Getenv(envAllowRootChanges) == "1":
