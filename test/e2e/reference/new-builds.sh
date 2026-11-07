@@ -14,6 +14,12 @@ set -euo pipefail
 base=${TERMA_REFERENCE_URL:-https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses}
 max=${TERMA_REFERENCE_MAX:-5}
 
+# vsort sorts versions as the reference ranks them (refdiff.VersionCompare): a prerelease
+# before its release (0.2.1-rc.10 before 0.2.1), which sort -V alone puts after it. sort -V
+# ranks "~" before anything, the end of a version included, so the prerelease's "-" is a "~"
+# while it sorts. Its arguments are sort's (-u).
+vsort() { sed 's/-/~/' | sort -V "$@" | sed 's/~/-/'; }
+
 # The builds the suite can fetch by version (TERMA_E2E_<HARNESS>_VERSIONS), each with its
 # npm package, read in npm's abbreviated form (versions and tags, not every manifest).
 # DeepSeek Harness ships prereleases alone: its newest is npm's latest tag.
@@ -36,12 +42,12 @@ for entry in "${harnesses[@]}"; do
 		releases=$(jq -r '.["dist-tags"].latest // empty' <<<"$doc")
 	else
 		# A release is numbers and dots: no prerelease, as the suite's isRelease says.
-		releases=$(jq -r '.versions | keys[]' <<<"$doc" | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V)
+		releases=$(jq -r '.versions | keys[]' <<<"$doc" | grep -E '^[0-9]+(\.[0-9]+)*$' | vsort)
 	fi
 	[ -n "$releases" ] || continue
 	published=""
 	if index=$(curl -fsSL --max-time 30 "$base/$harness/index.json" 2>/dev/null); then
-		published=$(jq -r '.versions[].version' <<<"$index" | sort -V)
+		published=$(jq -r '.versions[].version' <<<"$index" | vsort)
 	fi
 	if [ -z "$published" ]; then
 		new=$(tail -n 1 <<<"$releases")
@@ -49,7 +55,7 @@ for entry in "${harnesses[@]}"; do
 		newest=$(tail -n 1 <<<"$published")
 		# Newer than the newest published, and not published: an older build released late
 		# (a backport) is the night's to judge.
-		new=$(printf '%s\n%s\n' "$releases" "$newest" | sort -V -u | sed -n "/^$(sed 's/[.]/\\./g' <<<"$newest")\$/,\$p" | tail -n +2 |
+		new=$(printf '%s\n%s\n' "$releases" "$newest" | vsort -u | sed -n "/^$(sed 's/[.]/\\./g' <<<"$newest")\$/,\$p" | tail -n +2 |
 			grep -vxF -f <(printf '%s\n' "$published") | tail -n "$max" || true)
 	fi
 	[ -n "$new" ] || continue
@@ -71,9 +77,9 @@ for entry in "${desktop[@]}"; do
 		continue
 	fi
 	if [ "$kind" = squirrel ]; then
-		newest=$(jq -r '.releases[].updateTo.version // empty' <<<"$doc" | sort -V | tail -n 1)
+		newest=$(jq -r '.releases[].updateTo.version // empty' <<<"$doc" | vsort | tail -n 1)
 	else
-		newest=$(grep -o '<sparkle:shortVersionString>[^<]*' <<<"$doc" | sed 's/.*>//' | sort -V | tail -n 1)
+		newest=$(grep -o '<sparkle:shortVersionString>[^<]*' <<<"$doc" | sed 's/.*>//' | vsort | tail -n 1)
 	fi
 	[ -n "$newest" ] || continue
 	if index=$(curl -fsSL --max-time 30 "$base/$harness/index.json" 2>/dev/null) &&

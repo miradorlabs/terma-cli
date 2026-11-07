@@ -36,11 +36,15 @@ copilot) pkg=@github/copilot name=Copilot ;;
 esac
 var="TERMA_E2E_$(tr '[:lower:]' '[:upper:]' <<<"$harness")_VERSIONS"
 
+# vsort sorts versions as the reference ranks them, a prerelease before its release
+# (new-builds.sh says how).
+vsort() { sed 's/-/~/' | sort -V "$@" | sed 's/~/-/'; }
+
 if [ -n "${BACKFILL_VERSIONS:-}" ]; then
-	versions=$(tr ', ' '\n\n' <<<"$BACKFILL_VERSIONS" | grep . | sort -V)
+	versions=$(tr ', ' '\n\n' <<<"$BACKFILL_VERSIONS" | grep . | vsort)
 else
 	versions=$(curl -fsSL -H "Accept: application/vnd.npm.install-v1+json" "https://registry.npmjs.org/${pkg//\//%2F}" |
-		jq -r '.versions | keys[]' | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V | tail -n "$count")
+		jq -r '.versions | keys[]' | grep -E '^[0-9]+(\.[0-9]+)*$' | vsort | tail -n "$count")
 fi
 tests=${BACKFILL_TESTS:-"^Test${name}(Profile|Probe)"}
 
