@@ -320,3 +320,21 @@ func TestSudoOnlyThroughGuardOffline(t *testing.T) {
 		}
 	}
 }
+
+// A desktop release's version names the folder it is unpacked in: a feed's version that would
+// name one outside it is refused.
+func TestDesktopFeedRefusesEscapingVersionOffline(t *testing.T) {
+	squirrel := `{"releases":[{"updateTo":{"version":"../../../escaped","url":"https://x/a.zip","pub_date":"2026-11-01T00:00:00Z"}}]}`
+	if _, err := ParseDesktopFeed("claude-desktop", []byte(squirrel)); err == nil || !strings.Contains(err.Error(), "escaped") {
+		t.Errorf("squirrel: %v", err)
+	}
+	appcast := `<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><item><sparkle:version>1</sparkle:version>` +
+		`<sparkle:shortVersionString>../../../escaped</sparkle:shortVersionString><enclosure url="https://x/a.zip"/></item></channel></rss>`
+	if _, err := ParseDesktopFeed("codex-desktop", []byte(appcast)); err == nil || !strings.Contains(err.Error(), "escaped") {
+		t.Errorf("appcast: %v", err)
+	}
+	ok := `{"releases":[{"updateTo":{"version":"4.16336.0","url":"https://x/a.zip","pub_date":"2026-11-01T00:00:00Z"}}]}`
+	if rs, err := ParseDesktopFeed("claude-desktop", []byte(ok)); err != nil || len(rs) != 1 {
+		t.Errorf("a good feed: %v %v", rs, err)
+	}
+}

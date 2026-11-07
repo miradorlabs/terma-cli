@@ -764,3 +764,41 @@ func TestVersionsSortWithTieBreak(t *testing.T) {
 		}
 	}
 }
+
+// A harness id or version that could name a file outside the published tree is refused before
+// anything is written: a vendor's feed is not trusted to stay inside it.
+func TestPublishRefusesEscapingNames(t *testing.T) {
+	for _, id := range []buildID{{"claude", "../../../escaped"}, {"../claude", "1.0.0"}, {"claude", "1.0..2"}, {"claude", ".hidden"}, {"claude", "1.0/2"}} {
+		root := t.TempDir()
+		dir := filepath.Join(root, "a", "b", "harnesses")
+		p := claudeProfile(id.version, "Be brief.", []string{"Bash"}, "", "")
+		p.Harness = id.harness
+		_, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{p}}, options{})
+		if err == nil || !strings.Contains(err.Error(), "refusing") {
+			t.Errorf("%v: err = %v", id, err)
+		}
+		var written []string
+		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err == nil && !info.IsDir() {
+				written = append(written, path)
+			}
+			return nil
+		})
+		if len(written) > 0 {
+			t.Errorf("%v: wrote %q", id, written)
+		}
+	}
+	// A published snapshot whose version would escape is refused as it is loaded.
+	dir := t.TempDir()
+	if err := writeJSON(filepath.Join(dir, "claude", "versions", "x.json"), &Snapshot{Harness: "claude", Version: "../../../escaped"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := publish(dir, night{now: time.Now()}, options{}); err == nil || !strings.Contains(err.Error(), "escaped") {
+		t.Errorf("loading an escaping version: %v", err)
+	}
+	for _, ok := range []string{"2.1.318", "0.2.1-rc.10", "26.1029.70936", "1.0.5+b", "1.0.0_beta"} {
+		if err := checkBuild(buildID{"claude", ok}); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+	}
+}

@@ -91,6 +91,10 @@ func parseSquirrelFeed(data []byte) ([]DesktopRelease, error) {
 	var out []DesktopRelease
 	for _, r := range feed.Releases {
 		if u := r.UpdateTo; u.Version != "" && u.URL != "" {
+			// A release's version names the folder it is unpacked in, and its published files.
+			if err := CheckPathName("Claude Desktop's RELEASES.json version", u.Version); err != nil {
+				return nil, err
+			}
 			out = append(out, DesktopRelease{Version: u.Version, URL: u.URL, Released: u.PubDate})
 		}
 	}
@@ -126,6 +130,9 @@ func parseAppcast(data []byte) ([]DesktopRelease, error) {
 	for _, it := range feed.Items {
 		if it.Short == "" || it.Enclosure.URL == "" {
 			continue
+		}
+		if err := CheckPathName("the appcast's version", it.Short); err != nil {
+			return nil, err
 		}
 		at, _ := time.Parse(time.RFC1123Z, it.PubDate)
 		out = append(out, DesktopRelease{Version: it.Short, Build: it.Version, URL: it.Enclosure.URL, Released: at.UTC()})

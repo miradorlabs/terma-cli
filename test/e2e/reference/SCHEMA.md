@@ -27,8 +27,13 @@ docs/harnesses/refdiff.wasm, wasm_exec.js          the comparison of any two ver
 ```
 
 `<harness>` is a stable id: `claude`, `codex`, `gemini`, `opencode`, `pi`, `omp`, `hermes`,
-`dsh`, `copilot`, `t3`, `claude-desktop`, `codex-desktop`. Versions compare as the harness
-numbers them (semver where it is semver); `..` joins the two in a diff's name.
+`dsh`, `copilot`, `t3`, `claude-desktop`, `codex-desktop`. Versions compare as semantic
+versioning ranks them (`refdiff.VersionCompare`): release numbers numerically, a prerelease
+before its release (`0.2.1-rc.9` before `0.2.1-rc.10` before `0.2.1`), build metadata no part of
+it; every tie is broken, by the build metadata and then the strings (`1.2` before `1.2.0`), so a
+harness's versions are listed in one order. `..` joins the two in a diff's name. A harness id and
+a version are a letter or digit, then letters, digits and `.`, `+`, `_`, `-`, never `..`: refgen
+refuses any other (a vendor's update feed's) before it writes a file.
 
 ## index.json
 

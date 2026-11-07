@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -458,4 +459,19 @@ func sinceChecked(releases, checked []string, max int) []string {
 		}
 	}
 	return append(out, after...)
+}
+
+// pathNameRE is what a harness id or a version may be where it names a file or a folder: a
+// letter or digit, then letters, digits, dots, plus signs, underscores and dashes.
+var pathNameRE = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+_-]*$`)
+
+// CheckPathName says why name, a harness id or a version (what kind says), cannot name a file
+// or folder of the suite's or the published reference's, nil where it can: it is
+// [0-9A-Za-z][0-9A-Za-z.+_-]* and holds no "..". A version comes from a registry or a vendor's
+// update feed, and is never trusted to stay inside the folder it names a file in.
+func CheckPathName(kind, name string) error {
+	if !pathNameRE.MatchString(name) || strings.Contains(name, "..") {
+		return fmt.Errorf("refusing %s %q to name a file: want a letter or digit, then letters, digits and . + _ -, and no \"..\"", kind, name)
+	}
+	return nil
 }

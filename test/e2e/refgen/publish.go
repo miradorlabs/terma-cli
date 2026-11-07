@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/e2e"
 	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 	"github.com/miradorlabs/terma-cli/e2e/sourcelink"
 )
@@ -49,6 +50,14 @@ type published struct {
 	rescrubbed map[buildID]bool
 }
 
+// checkBuild says why id's harness or version cannot name a file of the published tree.
+func checkBuild(id buildID) error {
+	if err := e2e.CheckPathName("harness", id.harness); err != nil {
+		return err
+	}
+	return e2e.CheckPathName(id.harness+" version", id.version)
+}
+
 func load(dir string) (published, error) {
 	p := published{snapshots: map[string]map[string]*Snapshot{}, diffs: map[string]map[string]*Diff{}, versions: map[string]map[string]VersionEntry{},
 		changelogs: map[string]map[string]ChangelogNote{}, rescrubbed: map[buildID]bool{}}
@@ -70,6 +79,11 @@ func load(dir string) (published, error) {
 			var s Snapshot
 			if err := readJSON(f, &s); err != nil {
 				return p, err
+			}
+			// A snapshot's version names the file it is written back to: one that could name a
+			// file outside the tree is refused.
+			if err := checkBuild(buildID{h, s.Version}); err != nil {
+				return p, fmt.Errorf("%s: %w", f, err)
 			}
 			// A snapshot published while an empty side_requests was left out: its first turn
 			// was captured (it has a prompt), so its side requests were read, and there were none.
@@ -137,6 +151,13 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 	before := map[string]string{}
 	for h, byVersion := range pub.snapshots {
 		before[h] = newestCaptured(byVersion)
+	}
+	// Each harness id and version names a folder or file of the tree: one that would name
+	// something outside it (a vendor's feed's ../../x) is refused before anything is written.
+	for _, id := range n.builds() {
+		if err := checkBuild(id); err != nil {
+			return nil, err
+		}
 	}
 	changed := map[buildID]bool{}
 	for _, id := range n.builds() {
