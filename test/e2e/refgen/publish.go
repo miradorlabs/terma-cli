@@ -415,7 +415,7 @@ func writeHarness(dir string, entry HarnessEntry, entries []VersionEntry, snaps 
 	if err := writeJSON(filepath.Join(dir, "changelog.json"), cl); err != nil {
 		return err
 	}
-	if err := writeJSON(filepath.Join(dir, "timeline.json"), timelineOf(entry.ID, entries, diffs)); err != nil {
+	if err := writeTimeline(dir, timelineOf(entry.ID, entries, diffs), timelineSteps); err != nil {
 		return err
 	}
 	return writeJSON(filepath.Join(dir, "index.json"), HarnessIndex{SchemaVersion: schemaVersion, Harness: entry, Versions: entries})
@@ -437,6 +437,50 @@ func timelineOf(harness string, entries []VersionEntry, diffs map[string]*Diff) 
 		t.Steps = append(t.Steps, step)
 	}
 	return t
+}
+
+// timelineSteps is how many steps timeline.json holds, and each archive at most: the newest
+// steps, which a harness's page reads, in one bounded file, and every older one in a file of its
+// own (refgen -timeline-steps).
+var timelineSteps = 25
+
+// writeTimeline writes t's newest steps (at most per) to timeline.json, and the older ones to
+// timeline-1.json, timeline-2.json and on, per steps each counted from the oldest, so a full
+// archive's steps never move; an archive no longer needed is removed. A harness of per steps or
+// fewer has every step in timeline.json, and no archives.
+func writeTimeline(dir string, t Timeline, per int) error {
+	if per < 1 {
+		per = 1
+	}
+	head, older := t, []TimelineStep(nil)
+	if len(t.Steps) > per {
+		head.Steps, older = t.Steps[:per], t.Steps[per:]
+	}
+	// Oldest first, in archives of per steps from the oldest.
+	slices.Reverse(older)
+	n := 0
+	for len(older) > 0 {
+		n++
+		chunk := older[:min(per, len(older))]
+		older = older[len(chunk):]
+		steps := slices.Clone(chunk)
+		slices.Reverse(steps) // newest first, as every timeline lists them
+		name := fmt.Sprintf("timeline-%d.json", n)
+		head.Archives = append(head.Archives, TimelineArchive{File: name, First: chunk[0].Version, Last: chunk[len(chunk)-1].Version, Steps: len(chunk)})
+		if err := writeJSON(filepath.Join(dir, name), Timeline{SchemaVersion: t.SchemaVersion, Harness: t.Harness, Steps: steps}); err != nil {
+			return err
+		}
+	}
+	stale, _ := filepath.Glob(filepath.Join(dir, "timeline-*.json"))
+	for _, f := range stale {
+		var k int
+		if _, err := fmt.Sscanf(filepath.Base(f), "timeline-%d.json", &k); err == nil && k > n {
+			if err := os.Remove(f); err != nil {
+				return err
+			}
+		}
+	}
+	return writeJSON(filepath.Join(dir, "timeline.json"), head)
 }
 
 // promptMarkdown is a build's prompts as one text a person reads, "" where none was captured.

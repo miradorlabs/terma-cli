@@ -895,3 +895,77 @@ func TestSectionViews(t *testing.T) {
 		t.Errorf("signing = %+v", bin.Signing)
 	}
 }
+
+// timeline.json holds the newest steps; the older ones are in archives of the same size counted
+// from the oldest, so a full archive never changes; together they are every step, once.
+func TestTimelineArchives(t *testing.T) {
+	steps := func(n int) Timeline {
+		tl := Timeline{SchemaVersion: 1, Harness: "codex"}
+		for i := n; i >= 1; i-- { // newest first
+			tl.Steps = append(tl.Steps, TimelineStep{Version: fmt.Sprintf("1.0.%d", i), Previous: fmt.Sprintf("1.0.%d", i-1), Changes: []TimelineChange{}})
+		}
+		return tl
+	}
+	read := func(dir, name string) Timeline {
+		var tl Timeline
+		if err := readJSON(filepath.Join(dir, name), &tl); err != nil {
+			t.Fatal(err)
+		}
+		return tl
+	}
+	dir := t.TempDir()
+	if err := writeTimeline(dir, steps(60), 25); err != nil {
+		t.Fatal(err)
+	}
+	head := read(dir, "timeline.json")
+	if len(head.Steps) != 25 || head.Steps[0].Version != "1.0.60" || head.Steps[24].Version != "1.0.36" {
+		t.Errorf("timeline.json: %d steps, %s..%s", len(head.Steps), head.Steps[len(head.Steps)-1].Version, head.Steps[0].Version)
+	}
+	want := []TimelineArchive{{File: "timeline-1.json", First: "1.0.1", Last: "1.0.25", Steps: 25}, {File: "timeline-2.json", First: "1.0.26", Last: "1.0.35", Steps: 10}}
+	if !reflect.DeepEqual(head.Archives, want) {
+		t.Errorf("archives = %+v", head.Archives)
+	}
+	seen := map[string]bool{}
+	for i, tl := range []Timeline{head, read(dir, "timeline-1.json"), read(dir, "timeline-2.json")} {
+		if i > 0 && (tl.Archives != nil || tl.Harness != "codex" || tl.SchemaVersion != 1) {
+			t.Errorf("archive %d = %+v", i, tl)
+		}
+		for i, s := range tl.Steps {
+			if seen[s.Version] {
+				t.Errorf("%s twice", s.Version)
+			}
+			seen[s.Version] = true
+			if i > 0 && !versionLess(s.Version, tl.Steps[i-1].Version) {
+				t.Errorf("not newest first at %s", s.Version)
+			}
+		}
+	}
+	if len(seen) != 60 {
+		t.Errorf("%d steps of 60", len(seen))
+	}
+	full, _ := os.ReadFile(filepath.Join(dir, "timeline-1.json"))
+	// A step more: the full archive stays as it was, the partial one takes the step.
+	if err := writeTimeline(dir, steps(61), 25); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := os.ReadFile(filepath.Join(dir, "timeline-1.json")); string(again) != string(full) {
+		t.Error("a full archive changed")
+	}
+	if a := read(dir, "timeline.json").Archives; a[1].Steps != 11 || a[1].Last != "1.0.36" {
+		t.Errorf("archives = %+v", a)
+	}
+	// Fewer steps than one file holds: no archives, and none left behind.
+	if err := writeTimeline(dir, steps(20), 25); err != nil {
+		t.Fatal(err)
+	}
+	if head := read(dir, "timeline.json"); len(head.Steps) != 20 || head.Archives != nil {
+		t.Errorf("small timeline = %d steps, archives %+v", len(head.Steps), head.Archives)
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, "timeline-*.json")); len(left) != 0 {
+		t.Errorf("archives left: %v", left)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "timeline.json"))
+	if strings.Contains(string(data), "archives") {
+		t.Errorf("a timeline with every step says archives:\n%s", data)
+	}
+}

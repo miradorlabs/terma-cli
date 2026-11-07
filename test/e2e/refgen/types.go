@@ -104,11 +104,25 @@ type Changelogs struct {
 	Versions      map[string]ChangelogNote `json:"versions"`
 }
 
-// Timeline is docs/harnesses/<harness>/timeline.json: every step between consecutive versions.
+// Timeline is docs/harnesses/<harness>/timeline.json: the newest steps between consecutive
+// versions, and the archives that hold the older ones; an archive (timeline-<n>.json) is a
+// Timeline of its own steps, without archives.
 type Timeline struct {
 	SchemaVersion int            `json:"schema_version"`
 	Harness       string         `json:"harness"`
 	Steps         []TimelineStep `json:"steps"`
+	// Archives are the files of the steps older than Steps, oldest first; absent where Steps
+	// holds every step.
+	Archives []TimelineArchive `json:"archives,omitempty"`
+}
+
+// TimelineArchive is one file of older steps: its name beside timeline.json, the versions of
+// its oldest and newest step, and how many steps it holds.
+type TimelineArchive struct {
+	File  string `json:"file"`
+	First string `json:"first"`
+	Last  string `json:"last"`
+	Steps int    `json:"steps"`
 }
 
 // TimelineStep is one version's changes from the one before it.

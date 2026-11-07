@@ -21,7 +21,8 @@ docs/harnesses/<harness>/versions/<version>.json   a build's snapshot
 docs/harnesses/<harness>/diffs/<from>..<to>.json   what changed from one build to the next
 docs/harnesses/<harness>/prompts/<version>.md      the build's system prompt, as text
 docs/harnesses/<harness>/changelog.json            what the vendor's changelog says of each version
-docs/harnesses/<harness>/timeline.json             every step's changes, without their values
+docs/harnesses/<harness>/timeline.json             the newest steps' changes, without their values
+docs/harnesses/<harness>/timeline-<n>.json         older steps, 25 a file from the oldest
 docs/harnesses/<harness>/lineage.json              since which version each command, option, setting and variable is there
 docs/harnesses/refdiff.wasm, wasm_exec.js          the comparison of any two versions, for a browser
 ```
@@ -803,8 +804,20 @@ version made each change (a net change matches its steps by `id`).
 ```json
 { "schema_version": 1, "harness": "claude",
   "steps": [ { "version": "2.1.318", "previous": "2.1.317",
-               "changes": [ { "id": "tools.Monitor", "category": "tools", "op": "added", "title": "New tool: Monitor", "impact": "notable", "documented": true } ] } ] }
+               "changes": [ { "id": "tools.Monitor", "category": "tools", "op": "added", "title": "New tool: Monitor", "impact": "notable", "documented": true } ] } ],
+  "archives": [ { "file": "timeline-1.json", "first": "2.1.207", "last": "2.1.232", "steps": 25 },
+                { "file": "timeline-2.json", "first": "2.1.233", "last": "2.1.265", "steps": 25 } ] }
 ```
+
+A step is as large as its changes' ids (a command's id holds its whole command line), so the
+file is bounded by steps: `timeline.json` holds the newest 25 steps, and `archives` lists the
+files of the older ones, oldest first, each by the versions of its oldest (`first`) and newest
+(`last`) step and how many it holds. An archive, `timeline-<n>.json`, is a timeline of its own
+steps (the same fields, newest first, no `archives`), 25 a file counted from the oldest step, so
+a full archive never changes and only the newest one fills as versions arrive. The steps of
+`timeline.json` and of every archive are each step once. A harness of 25 steps or fewer has
+them all in `timeline.json` and no `archives`. To read a range, read `timeline.json`, and the
+archives whose `first`..`last` reach into the range where its oldest step does not.
 
 ## <harness>/lineage.json
 
