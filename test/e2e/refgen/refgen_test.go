@@ -733,3 +733,34 @@ func TestNormalizeUnderscoredUUID(t *testing.T) {
 		}
 	}
 }
+
+// Versions that rank alike (1.2 and 1.2.0) are listed in one order whatever order the published
+// tree gave them, each diffed with its neighbour.
+func TestVersionsSortWithTieBreak(t *testing.T) {
+	for range 5 {
+		dir := t.TempDir()
+		var profiles []e2e.Profile
+		for _, v := range []string{"1.2.0", "1.2", "1.1.9", "1.2.1"} {
+			profiles = append(profiles, claudeProfile(v, "Be brief "+v+".", []string{"Bash"}, "", ""))
+		}
+		if _, err := publish(dir, night{now: time.Date(2026, 11, 3, 5, 0, 0, 0, time.UTC), profiles: profiles}, options{}); err != nil {
+			t.Fatal(err)
+		}
+		var hi HarnessIndex
+		if err := readJSON(filepath.Join(dir, "claude", "index.json"), &hi); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, v := range hi.Versions {
+			got = append(got, v.Version)
+		}
+		if want := []string{"1.2.1", "1.2.0", "1.2", "1.1.9"}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("versions = %q, want %q", got, want)
+		}
+		for _, f := range []string{"1.1.9..1.2.json", "1.2..1.2.0.json", "1.2.0..1.2.1.json"} {
+			if _, err := os.Stat(filepath.Join(dir, "claude", "diffs", f)); err != nil {
+				t.Errorf("diff %s: %v", f, err)
+			}
+		}
+	}
+}

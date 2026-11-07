@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/e2e"
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 // A night's snapshot of a build is put together from what the night captured of it: its
@@ -72,11 +73,11 @@ func (n night) builds() []buildID {
 		seen[id] = true
 	}
 	out := slices.Collect(maps.Keys(seen))
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].harness != out[j].harness {
-			return out[i].harness < out[j].harness
+	slices.SortStableFunc(out, func(a, b buildID) int {
+		if c := strings.Compare(a.harness, b.harness); c != 0 {
+			return c
 		}
-		return versionLess(out[i].version, out[j].version)
+		return refdiff.VersionCompare(a.version, b.version)
 	})
 	return out
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -978,7 +979,7 @@ func CompareRange(from, to *Snapshot, notes map[string]ChangelogNote, now time.T
 			versions = append(versions, v)
 		}
 	}
-	sort.Slice(versions, func(i, j int) bool { return VersionLess(versions[j], versions[i]) })
+	slices.SortStableFunc(versions, func(a, b string) int { return VersionCompare(b, a) })
 	var note *ChangelogNote
 	if len(versions) > 0 {
 		var sb strings.Builder

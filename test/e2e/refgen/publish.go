@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -179,7 +180,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		for v := range byVersion {
 			versions = append(versions, v)
 		}
-		sort.Slice(versions, func(i, j int) bool { return versionLess(versions[i], versions[j]) })
+		// Stable, and a total order: 1.2 and 1.2.0 rank alike, and their strings break the tie.
+		slices.SortStableFunc(versions, refdiff.VersionCompare)
 		meta := metaOf(h)
 		var dates map[string]time.Time
 		if opt.fetch {

@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 	"github.com/miradorlabs/terma-cli/e2e/sourcelink"
 )
 
@@ -201,15 +202,7 @@ func (c *sourceClone) releases(s sourcelink.Source) ([]string, error) {
 			vs = append(vs, m[1])
 		}
 	}
-	slices.SortFunc(vs, func(a, b string) int {
-		switch {
-		case versionLess(a, b):
-			return -1
-		case versionLess(b, a):
-			return 1
-		}
-		return 0
-	})
+	slices.SortFunc(vs, refdiff.VersionCompare)
 	return slices.Compact(vs), nil
 }
 
