@@ -59,7 +59,7 @@ func TestMachineLeakOffline(t *testing.T) {
 		"/home/claude/.claude/remote/x":                      "",
 		"/home/runner/.cache":                                "/home/runner",
 		"file:///Users/runner/x":                             "/Users/",
-		"/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T/x": "/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T",
+		"/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T/x": "/var/folders",
 		"/private/var/folders/CLAUDE.md":                     "",
 	} {
 		if got := MachineLeak(in); got != want {

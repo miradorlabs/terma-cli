@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -181,6 +182,10 @@ var (
 	fetchBackoff  = 3 * time.Second
 )
 
+// errNotFound is a download the server says is not there (HTTP 404): an asset a release does
+// not ship, not a failure to retry or to stop for.
+var errNotFound = errors.New("HTTP 404")
+
 func fetch(url string) ([]byte, error) {
 	var err error
 	for attempt := range fetchAttempts {
@@ -205,6 +210,9 @@ func fetchOnce(url string) (body []byte, retry bool, err error) {
 		return nil, true, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, false, fmt.Errorf("%s: %w", url, errNotFound)
+	}
 	if resp.StatusCode != 200 {
 		return nil, resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
 	}
@@ -323,9 +331,12 @@ func ensureCodex(version string) (string, error) {
 	}
 	// On Linux, the bubblewrap its sandbox runs tool commands in where the system has none,
 	// beside it, as npm installs it (linux-sandbox/src/bundled_bwrap.rs). A release that ships
-	// none uses the system's.
+	// none (404) uses the system's; any other failure stops the install, or its sandbox's
+	// failures would be recorded as the harness's behaviour.
 	if runtime.GOOS == "linux" {
-		_, _ = ensureCodexExecutable(version, "bwrap")
+		if _, err := ensureCodexExecutable(version, "bwrap"); err != nil && !errors.Is(err, errNotFound) {
+			return "", fmt.Errorf("codex %s bwrap: %w", version, err)
+		}
 	}
 	return path, nil
 }

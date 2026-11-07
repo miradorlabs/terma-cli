@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -30,7 +31,12 @@ func TestFetchRetriesOffline(t *testing.T) {
 		t.Fatalf("fetch = %q, %v after %d calls; want the build on the third", body, err, calls.Load())
 	}
 	calls.Store(0)
-	if _, err := fetch(srv.URL + "/missing"); err == nil || calls.Load() != 1 {
-		t.Fatalf("a 404 was fetched %d times (err %v); want once, failed", calls.Load(), err)
+	if _, err := fetch(srv.URL + "/missing"); !errors.Is(err, errNotFound) || calls.Load() != 1 {
+		t.Fatalf("a 404 was fetched %d times (err %v); want once, errNotFound", calls.Load(), err)
+	}
+	// A server that keeps failing is a failure, never an asset the release lacks.
+	calls.Store(-100)
+	if _, err := fetch(srv.URL + "/build"); err == nil || errors.Is(err, errNotFound) {
+		t.Fatalf("a server failing every try: %v; want an error that is not errNotFound", err)
 	}
 }

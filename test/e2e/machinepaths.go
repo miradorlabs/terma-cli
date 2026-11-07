@@ -148,11 +148,12 @@ func installedName(rest string) string {
 // machine's paths in it.
 var machineLeaks = []string{"/Users/", "/opt/homebrew", "/Applications/Xcode", "/usr/local/Cellar", "/home/runner", "/home/linuxbrew"}
 
-// MachineLeak is the first machine path s still holds ("/opt/homebrew"), "" for none: what
-// refgen's publish-time guard looks for in every observed value.
+// MachineLeak is the first machine path s still holds, as the kind of path it is
+// ("/opt/homebrew", "/var/folders") and never more of s, "" for none: what refgen's
+// publish-time guard looks for in every observed value, and names in its refusal.
 func MachineLeak(s string) string {
-	if m := userTemp(s); m != "" {
-		return m
+	if userTemp(s) != "" {
+		return "/var/folders" // the kind of path, never the per-machine id in it
 	}
 	for _, l := range machineLeaks {
 		for at := strings.Index(s, l); at >= 0; {
