@@ -313,7 +313,7 @@ func TestSudoOnlyThroughGuardOffline(t *testing.T) {
 				continue
 			}
 			eslogger := f == "filetrace_eslogger.go" && strings.Contains(line, `"/usr/bin/eslogger"`)
-			guard := f == "desktop.go" && strings.Contains(line, `desktopCmd("sudo", append([]string{"-n"}, args...)...)`)
+			guard := f == "desktop_root.go" && strings.Contains(line, `desktopCmd("sudo", append([]string{"-n"}, args...)...)`)
 			if !eslogger && !guard {
 				t.Errorf("%s:%d runs sudo outside rootCommand: %s", f, i+1, strings.TrimSpace(line))
 			}

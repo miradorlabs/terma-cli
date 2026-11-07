@@ -400,7 +400,7 @@ they record how the app started its agent (its command line and environment, rea
 kernel), the app bundle's signature and the agent it bundles or downloads. They change
 machine-wide settings (managed preferences, the proxy's CA trusted in the System keychain) and
 put them back, so they run only on a CI runner: `TERMA_E2E_DESKTOP_APPS=1` opts in, and every
-change they make as root goes through one guard (`rootCommand` in `desktop.go`) that refuses
+change they make as root goes through one guard (`rootCommand` in `desktop_root.go`) that refuses
 unless the machine is a GitHub-hosted runner (`GITHUB_ACTIONS=true`,
 `RUNNER_ENVIRONMENT=github-hosted`) or says it is as throwaway
 (`TERMA_E2E_ALLOW_ROOT_CHANGES=1`). A developer's machine only ever runs `sudo -n
