@@ -389,14 +389,54 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 
 // present are the sections s has, in the schema's order.
 func present(s *Snapshot) []string {
-	t := s.Tree()
 	var out []string
 	for _, sec := range sections {
-		if t[sec] != nil {
+		if sectionPresent(s, sec) {
 			out = append(out, sec)
 		}
 	}
 	return out
+}
+
+// sectionPresent reports whether s has section sec, as its JSON has it: a map or list that is
+// not empty (they are left out empty), side_requests not null, support set. It reads the
+// fields, not the snapshot's JSON: publishing asks it of every snapshot.
+func sectionPresent(s *Snapshot, sec string) bool {
+	switch sec {
+	case "model":
+		return len(s.Model) > 0
+	case "prompt":
+		return len(s.Prompt) > 0
+	case "tools":
+		return len(s.Tools) > 0
+	case "caching":
+		return len(s.Caching) > 0
+	case "request":
+		return len(s.Request) > 0
+	case "side_requests":
+		return s.SideRequests != nil
+	case "behavior":
+		return len(s.Behavior) > 0
+	case "telemetry":
+		return len(s.Telemetry) > 0
+	case "hooks":
+		return len(s.Hooks) > 0
+	case "cli":
+		return len(s.CLI) > 0
+	case "config":
+		return len(s.Config) > 0
+	case "network":
+		return len(s.Network) > 0
+	case "storage":
+		return len(s.Storage) > 0
+	case "filesystem":
+		return len(s.Filesystem) > 0
+	case "binary":
+		return len(s.Binary) > 0
+	case "support":
+		return s.Support != nil
+	}
+	return s.Tree()[sec] != nil
 }
 
 func hasFirstTurn(p e2e.Profile) bool {

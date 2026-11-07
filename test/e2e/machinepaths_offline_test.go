@@ -67,3 +67,23 @@ func TestMachineLeakOffline(t *testing.T) {
 		}
 	}
 }
+
+// MachinePathsMayApply is never false where MachinePaths changes a text.
+func TestMachinePathsMayApplyOffline(t *testing.T) {
+	texts := []string{
+		"/opt/homebrew/bin/git", "/home/runner/x", "/home/someone/work/a/b", "/System/Volumes/Data/usr/local/bin/x",
+		"/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T/x", "<checkout>/test/e2e/versions/codex-desktop/1/ChatGPT.app/x",
+		"/Applications/Xcode_1.app", "/usr/local/lib/node_modules/npm/bin/npm-cli.js", "/home/linuxbrew/.linuxbrew/bin/rg",
+		"file:///Users/runner/x", "git status", "/home/claude/.claude", "<home>/x", "/Users/Shared/x",
+	}
+	for _, s := range texts {
+		if MachinePaths(s) != s && !MachinePathsMayApply(s) {
+			t.Errorf("MachinePaths changes %q, which MachinePathsMayApply passes over", s)
+		}
+	}
+	for _, s := range []string{"git status", "/home/claude/.claude", "<home>/x", "/usr/bin/git"} {
+		if MachinePathsMayApply(s) {
+			t.Errorf("%q would be walked for nothing", s)
+		}
+	}
+}

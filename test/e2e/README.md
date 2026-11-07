@@ -335,7 +335,12 @@ go run ./refgen -profiles report/profiles.json -fields report/fields.json -censu
 
 `-catalog docs/compat/fields.json` takes a census from the field catalog for each build a
 whole census saw, for a backfill whose builds were censused on earlier nights. `-now` pins the
-time a run stamps, so two runs over the same input write the same bytes.
+time a run stamps, so two runs over the same input write the same bytes. A republish is
+incremental where that is cheap: a diff whose two snapshots did not change is kept, an observed
+field that one pass over its JSON shows nothing to name is not walked, and a file that already
+holds its bytes is not rewritten. `-full` walks and rewrites everything, a full render to
+compare a republish with (`TestIncrementalRenderIsAFullOne`). `-timeline-steps` sets how many
+steps `timeline.json` and each of its archives hold.
 
 refgen names the machine's paths (`machinepaths.go`: an installed program by its name, Xcode
 as `<xcode>`, a home `<home>`, a runner's checkout `<checkout>`) in every observed value it

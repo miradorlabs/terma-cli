@@ -93,6 +93,34 @@ func MachinePaths(s string) string {
 	})
 }
 
+// machineMarks are what a text holds wherever MachinePaths would change it: each rule's path
+// starts with one of them (a checkout under /home/<name> holds "/home/" and "/work/").
+var machineMarks = []string{"/Users/", "/home/runner", "/home/linuxbrew", "/opt/homebrew", "/usr/local/Cellar",
+	"/usr/local/opt", "/usr/local/lib/node_modules", "/Applications/Xcode", "/test/e2e/versions/",
+	"/System/Volumes/Data/"}
+
+// MachinePathsMayApply reports whether MachinePaths could change s: false is certain (it would
+// return s as it is), true says to look. A text that is already named, the whole of a JSON
+// document included (no rule's path holds a quote or an escape), is read in one pass.
+func MachinePathsMayApply(s string) bool {
+	for _, m := range machineMarks {
+		if strings.Contains(s, m) {
+			return true
+		}
+	}
+	return strings.Contains(s, "/home/") && strings.Contains(s, "/work/") || userTemp(s) != ""
+}
+
+// userTemp is the first per-user temporary folder s names, "" for none; /private/var/folders
+// alone (a build walking up from the repository looks there) is none, and is passed over
+// without the regular expression.
+func userTemp(s string) string {
+	if !strings.Contains(s, "/var/folders/") {
+		return ""
+	}
+	return userTempRE.FindString(s)
+}
+
 // isHome reports whether dir, /Users/<name> or /home/<name>, is a home MachinePaths names: any
 // user's on macOS but the machine's shared folder, and on Linux the runner's alone.
 func isHome(dir string) bool {
@@ -123,7 +151,7 @@ var machineLeaks = []string{"/Users/", "/opt/homebrew", "/Applications/Xcode", "
 // MachineLeak is the first machine path s still holds ("/opt/homebrew"), "" for none: what
 // refgen's publish-time guard looks for in every observed value.
 func MachineLeak(s string) string {
-	if m := userTempRE.FindString(s); m != "" {
+	if m := userTemp(s); m != "" {
 		return m
 	}
 	for _, l := range machineLeaks {

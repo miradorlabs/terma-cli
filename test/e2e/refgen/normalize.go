@@ -220,6 +220,11 @@ func scrubMachineFields(s *Snapshot) bool {
 		if v == nil || reflect.ValueOf(v).IsNil() {
 			continue
 		}
+		// A field with nothing a rule reads (what was published since the rules were) is left
+		// as it is without a walk: its JSON is read in one pass.
+		if data, err := json.Marshal(v); err == nil && !fullScrub && !machineMayApply(data) {
+			continue
+		}
 		before := jsonOf(v)
 		after := scrubMachineTree(jsonOf(v))
 		if reflect.DeepEqual(before, after) {
@@ -261,6 +266,46 @@ func scrubMachineTree(v any) any {
 		return out
 	}
 	return v
+}
+
+// fullScrub walks every observed field, and reads every observed value for the guard, whatever
+// one pass over its JSON says (refgen -full): a full render, to compare an incremental one with.
+var fullScrub bool
+
+// machineMayApply reports whether scrubMachineText could change a string in data, a field's
+// JSON: a machine path's mark, or a run id normalization has not named.
+func machineMayApply(data []byte) bool {
+	return e2e.MachinePathsMayApply(string(data)) || hasUUID(data)
+}
+
+// hasUUID reports a uuid anywhere in data, boundaries aside (in JSON, an escape before an id,
+// \n, would hide the boundary uuidPattern wants): its dashes at 8, 13, 18 and 23, hex between.
+// A scan, not a regular expression: it reads every published snapshot.
+func hasUUID(data []byte) bool {
+	hex := func(b []byte) bool {
+		for _, c := range b {
+			if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F') {
+				return false
+			}
+		}
+		return true
+	}
+	for i := 8; i+28 <= len(data); i++ {
+		if data[i] != '-' {
+			continue
+		}
+		u := data[i-8 : i+28]
+		if u[13] == '-' && u[18] == '-' && u[23] == '-' && hex(u[:8]) && hex(u[9:13]) && hex(u[14:18]) && hex(u[19:23]) && hex(u[24:36]) {
+			return true
+		}
+	}
+	return false
+}
+
+// mayLeak reports whether any string in data, a JSON document, could hold a machine path: one
+// pass over it, false certain (no machine path holds a quote or an escape), true says to look.
+func mayLeak(data []byte) bool {
+	return fullScrub || e2e.MachineLeak(string(data)) != ""
 }
 
 // scrubMachineText is one observed string with the machine's paths named, and a run's id that
@@ -328,6 +373,9 @@ func machineLeaks(s *Snapshot) []machineLeak {
 		if v == nil || reflect.ValueOf(v).IsNil() {
 			continue
 		}
+		if data, err := json.Marshal(v); err == nil && !mayLeak(data) {
+			continue
+		}
 		walkStrings(jsonOf(v), func(str string) string {
 			if l := e2e.MachineLeak(str); l != "" {
 				out = append(out, machineLeak{f.name, str, l})
@@ -341,6 +389,9 @@ func machineLeaks(s *Snapshot) []machineLeak {
 // diffMachineLeaks are the values of d's changes to observed fields that still name the
 // machine: their ids, titles, paths, values and text diffs.
 func diffMachineLeaks(d *Diff) []machineLeak {
+	if data, err := json.Marshal(d.Changes); err == nil && !mayLeak(data) {
+		return nil
+	}
 	var out []machineLeak
 	for _, c := range d.Changes {
 		if !observedChange(c) {

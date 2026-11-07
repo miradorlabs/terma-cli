@@ -142,10 +142,21 @@ func writeJSON(path string, v any) error {
 	if err := enc.Encode(v); err != nil {
 		return err
 	}
+	return writeFile(path, buf.Bytes())
+}
+
+// writeFile writes data to path, but leaves a file that holds data already as it is: a
+// republish rewrites only what changed (refgen -full rewrites every file).
+func writeFile(path string, data []byte) error {
+	if !fullScrub {
+		if have, err := os.ReadFile(path); err == nil && bytes.Equal(have, data) {
+			return nil
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, buf.Bytes(), 0o644)
+	return os.WriteFile(path, data, 0o644)
 }
 
 // publish merges the night into dir, and says which versions to announce.
@@ -394,7 +405,7 @@ func writeHarness(dir string, entry HarnessEntry, entries []VersionEntry, snaps 
 			if err := os.MkdirAll(filepath.Join(dir, "prompts"), 0o755); err != nil {
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(dir, "prompts", v+".md"), []byte(md), 0o644); err != nil {
+			if err := writeFile(filepath.Join(dir, "prompts", v+".md"), []byte(md)); err != nil {
 				return err
 			}
 		}
