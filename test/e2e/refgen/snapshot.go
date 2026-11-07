@@ -285,7 +285,7 @@ func deriveTelemetryProbe(s *Snapshot, p e2e.Profile) {
 // deriveSupport is terma's verdict on the build, from every capability check the history
 // holds of it.
 func (n night) deriveSupport(s *Snapshot) {
-	var caps []any
+	var caps []refdiff.Capability
 	pass, fail := 0, 0
 	coreFailed := false
 	// A desktop app's capability checks run the agent build the app runs, launched as the app
@@ -302,14 +302,7 @@ func (n night) deriveSupport(s *Snapshot) {
 		if h.Harness != s.Harness || h.Version != version {
 			continue
 		}
-		c := map[string]any{"id": h.Capability, "result": h.Result, "platform": h.Platform}
-		if l := n.labels[h.Capability]; l != "" {
-			c["label"] = l
-		}
-		if h.Why != "" {
-			c["why"] = h.Why
-		}
-		caps = append(caps, c)
+		caps = append(caps, refdiff.Capability{ID: h.Capability, Result: h.Result, Platform: h.Platform, Label: n.labels[h.Capability], Why: h.Why})
 		switch h.Result {
 		case "pass":
 			pass++
@@ -323,11 +316,8 @@ func (n night) deriveSupport(s *Snapshot) {
 	if len(caps) == 0 {
 		return
 	}
-	sort.SliceStable(caps, func(i, j int) bool {
-		a, b := caps[i].(map[string]any), caps[j].(map[string]any)
-		return a["id"].(string)+a["platform"].(string) < b["id"].(string)+b["platform"].(string)
-	})
-	s.Support = map[string]any{"status": verdict(pass, fail, coreFailed), "capabilities": caps}
+	sort.SliceStable(caps, func(i, j int) bool { return caps[i].ID+caps[i].Platform < caps[j].ID+caps[j].Platform })
+	s.Support = &refdiff.Support{Status: verdict(pass, fail, coreFailed), Capabilities: caps}
 }
 
 func verdict(pass, fail int, coreFailed bool) string {

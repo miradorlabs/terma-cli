@@ -43,7 +43,7 @@ type Snapshot struct {
 	// platform ("linux/amd64"): each platform's files profile.
 	Filesystem map[string]any `json:"filesystem,omitempty"`
 	Binary     map[string]any `json:"binary,omitempty"`
-	Support    map[string]any `json:"support,omitempty"`
+	Support    *Support       `json:"support,omitempty"`
 
 	// Live is the first turn as it ran with the vendor's live feature flags, beside the
 	// published one, which ran with the flags the build ships with: its prompt, and whether
@@ -56,6 +56,23 @@ type Snapshot struct {
 	// reads that no reference mentions. A page describes the current release, not the build, so
 	// it is no section and never compared.
 	Docs map[string]any `json:"docs,omitempty"`
+}
+
+// Support is terma's verdict on a build, from every capability check the history holds of it.
+// Its fields are in the order the JSON lists them.
+type Support struct {
+	Capabilities []Capability `json:"capabilities,omitempty"`
+	// Status is "supported", "degraded", "unsupported" or "untested".
+	Status string `json:"status"`
+}
+
+// Capability is one capability check of a build on a platform.
+type Capability struct {
+	ID       string `json:"id"`
+	Label    string `json:"label,omitempty"`
+	Platform string `json:"platform"`
+	Result   string `json:"result"` // pass | fail | skip …
+	Why      string `json:"why,omitempty"`
 }
 
 // Capture says how a snapshot was taken.

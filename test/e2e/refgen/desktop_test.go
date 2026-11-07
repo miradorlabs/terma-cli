@@ -55,8 +55,7 @@ func TestDesktopAppSnapshot(t *testing.T) {
 	if s.Config == nil || s.Config["env_vars"] == nil {
 		t.Errorf("config = %v", s.Config)
 	}
-	caps, _ := s.Support["capabilities"].([]any)
-	if len(caps) != 1 {
+	if s.Support == nil || len(s.Support.Capabilities) != 1 {
 		t.Errorf("support = %v: the checks of the agent build the release runs, alone", s.Support)
 	}
 }

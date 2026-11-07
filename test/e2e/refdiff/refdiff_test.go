@@ -1,10 +1,12 @@
 package refdiff
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -165,5 +167,23 @@ func TestBinarySizeTitle(t *testing.T) {
 	d := New(a, b, nil, time.Now())
 	if len(d.Changes) != 1 || d.Changes[0].Title != "Binary size: 46,114,544 → 52,400,000 bytes (46.1 MB → 52.4 MB)" {
 		t.Errorf("changes = %+v", d.Changes)
+	}
+}
+
+// The support section, typed, reads and writes the JSON it was published as, byte for byte.
+func TestSupportRoundTrips(t *testing.T) {
+	in := `{"capabilities":[{"id":"relay.telemetry","label":"Telemetry reaches the project","platform":"darwin/arm64","result":"pass"},{"id":"x","platform":"linux/amd64","result":"fail","why":"timed out"}],"status":"degraded"}`
+	var s Support
+	if err := json.Unmarshal([]byte(in), &s); err != nil {
+		t.Fatal(err)
+	}
+	out, err := json.Marshal(s)
+	if err != nil || string(out) != in {
+		t.Errorf("round trip:\n got %s\nwant %s (%v)", out, in, err)
+	}
+	// Its generic form, which a diff compares, is the same.
+	snap := &Snapshot{Support: &s}
+	if !reflect.DeepEqual(snap.Tree()["support"].(map[string]any)["status"], "degraded") {
+		t.Errorf("tree = %v", snap.Tree()["support"])
 	}
 }

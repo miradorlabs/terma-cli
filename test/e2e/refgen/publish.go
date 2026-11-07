@@ -188,7 +188,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			}
 			fresh := &Snapshot{Harness: h, Version: v, Binary: s.Binary}
 			n.deriveSupport(fresh)
-			if fresh.Support != nil && !reflect.DeepEqual(jsonOf(fresh.Support), jsonOf(s.Support)) {
+			if fresh.Support != nil && !reflect.DeepEqual(fresh.Support, s.Support) {
 				s.Support = fresh.Support
 				if s.Capture.Sections == nil {
 					s.Capture.Sections = map[string]time.Time{}
@@ -486,13 +486,6 @@ type (
 			Status jsonString `json:"status"`
 		} `json:"signing"`
 	}
-	// supportView is the support section's verdict and the platforms its checks ran on.
-	supportView struct {
-		Status       jsonString `json:"status"`
-		Capabilities []struct {
-			Platform string `json:"platform"`
-		} `json:"capabilities"`
-	}
 	// promptView is the prompt section's texts: the system prompt's blocks, the injected
 	// context's, and an interactive session's.
 	promptView struct {
@@ -568,11 +561,11 @@ func platformsOf(s *Snapshot) []string {
 	if s.Platform != "" {
 		seen[s.Platform] = true
 	}
-	var sup supportView
-	view(s.Support, &sup)
-	for _, c := range sup.Capabilities {
-		if c.Platform != "" {
-			seen[c.Platform] = true
+	if s.Support != nil {
+		for _, c := range s.Support.Capabilities {
+			if c.Platform != "" {
+				seen[c.Platform] = true
+			}
 		}
 	}
 	// A platform the build's files and processes were traced on is one it was captured on.
@@ -583,10 +576,8 @@ func platformsOf(s *Snapshot) []string {
 }
 
 func supportOf(s *Snapshot) string {
-	var sup supportView
-	view(s.Support, &sup)
-	if st := sup.Status.ptr(); st != nil {
-		return *st
+	if s.Support != nil {
+		return s.Support.Status
 	}
 	return "untested"
 }

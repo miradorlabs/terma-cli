@@ -115,7 +115,7 @@ func TestSnapshotFromProfile(t *testing.T) {
 	if s.Telemetry["surfaces"].(map[string]any)["logs/api_request"] == nil {
 		t.Errorf("telemetry = %v", s.Telemetry)
 	}
-	if s.Support["status"] != "supported" {
+	if s.Support == nil || s.Support.Status != "supported" {
 		t.Errorf("support = %v", s.Support)
 	}
 }
@@ -179,8 +179,8 @@ func TestDiffClassifies(t *testing.T) {
 // A section only one snapshot has is not compared: an older build captured before a capture
 // existed did not lack what the newer one shows.
 func TestDiffSkipsSectionsOnlyOneHas(t *testing.T) {
-	a := &Snapshot{Harness: "codex", Version: "0.1.0", Support: map[string]any{"status": "supported"}}
-	b := &Snapshot{Harness: "codex", Version: "0.1.1", Support: map[string]any{"status": "supported"}, Tools: []any{map[string]any{"name": "shell"}}}
+	a := &Snapshot{Harness: "codex", Version: "0.1.0", Support: &refdiff.Support{Status: "supported"}}
+	b := &Snapshot{Harness: "codex", Version: "0.1.1", Support: &refdiff.Support{Status: "supported"}, Tools: []any{map[string]any{"name": "shell"}}}
 	if d := refdiff.New(a, b, nil, time.Now()); len(d.Changes) != 0 || d.Summary.Undocumented != nil {
 		t.Errorf("changes = %+v", d.Changes)
 	}
@@ -411,17 +411,17 @@ func TestSameCaptureKeepsItsTime(t *testing.T) {
 // no change. A model named in words in the changelog is documented.
 func TestSupportPlatformsAndModelWords(t *testing.T) {
 	a := &Snapshot{Harness: "codex", Version: "0.1.0", Model: map[string]any{"default": "gpt-6-astra"},
-		Support: map[string]any{"status": "supported", "capabilities": []any{
-			map[string]any{"id": "relay.telemetry", "platform": "darwin/arm64", "result": "pass", "label": "Telemetry reaches the project"}}}}
+		Support: &refdiff.Support{Status: "supported", Capabilities: []refdiff.Capability{
+			{ID: "relay.telemetry", Platform: "darwin/arm64", Result: "pass", Label: "Telemetry reaches the project"}}}}
 	b := &Snapshot{Harness: "codex", Version: "0.1.1", Model: map[string]any{"default": "gpt-6.1-sol"},
-		Support: map[string]any{"status": "supported", "capabilities": []any{
-			map[string]any{"id": "relay.telemetry", "platform": "darwin/arm64", "result": "pass", "label": "Telemetry reaches the project"},
-			map[string]any{"id": "global.commits", "platform": "linux/amd64", "result": "pass", "label": "Commits stamped"}}}}
+		Support: &refdiff.Support{Status: "supported", Capabilities: []refdiff.Capability{
+			{ID: "relay.telemetry", Platform: "darwin/arm64", Result: "pass", Label: "Telemetry reaches the project"},
+			{ID: "global.commits", Platform: "linux/amd64", Result: "pass", Label: "Commits stamped"}}}}
 	d := refdiff.New(a, b, &ChangelogNote{Text: "- Added GPT-6.1 Sol as the default model"}, time.Now())
 	if len(d.Changes) != 1 || d.Changes[0].ID != "model.default" || !*d.Changes[0].Documented {
 		t.Errorf("changes = %+v", d.Changes)
 	}
-	b.Support["capabilities"].([]any)[0].(map[string]any)["result"] = "fail"
+	b.Support.Capabilities[0].Result = "fail"
 	d = refdiff.New(a, b, nil, time.Now())
 	if c := changeByID(d, "support.capabilities.relay.telemetry@darwin/arm64.result"); c == nil || c.Title != "Terma: Telemetry reaches the project now fails on darwin/arm64" {
 		t.Errorf("capability change = %+v", c)
@@ -867,7 +867,7 @@ func TestSlackMessageJSON(t *testing.T) {
 // field of another kind than it expects is left out without losing the rest.
 func TestSectionViews(t *testing.T) {
 	s := &Snapshot{Version: "1.0.0", Platform: "darwin/arm64",
-		Support: map[string]any{"status": "degraded", "capabilities": []any{map[string]any{"id": "a", "platform": "linux/amd64"}, map[string]any{"id": "b"}}},
+		Support: &refdiff.Support{Status: "degraded", Capabilities: []refdiff.Capability{{ID: "a", Platform: "linux/amd64"}, {ID: "b"}}},
 		Prompt: map[string]any{"system": []any{map[string]any{"text": "One."}, map[string]any{"text": "Two."}}, "context": "not a list",
 			"interactive": map[string]any{"system": []any{map[string]any{"text": "Three."}}}},
 		Binary: map[string]any{"signing": map[string]any{"status": "valid"}}}
@@ -877,10 +877,8 @@ func TestSectionViews(t *testing.T) {
 	if got := supportOf(s); got != "degraded" {
 		t.Errorf("support = %q", got)
 	}
-	for _, st := range []any{3, nil, map[string]any{}} {
-		if got := supportOf(&Snapshot{Support: map[string]any{"status": st}}); got != "untested" {
-			t.Errorf("a status of %v = %q", st, got)
-		}
+	if got := supportOf(&Snapshot{}); got != "untested" {
+		t.Errorf("no support = %q", got)
 	}
 	md := promptMarkdown("X", s)
 	for _, want := range []string{"## System 1\n\nOne.\n", "## System 2\n\nTwo.\n", "## Interactive session: system\n\nThree.\n"} {
