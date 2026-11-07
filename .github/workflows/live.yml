@@ -277,7 +277,9 @@ jobs:
           for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
           # The catalog compatgen just merged gives each build a whole census saw its telemetry,
           # tonight's or an earlier night's: a backfill that took no census still has it.
-          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch -source -announce "$RUNNER_TEMP/announcements.json"
+          # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
+          # load the timeline-<n>.json archives; then the default pages it.
+          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"
           # The comparison of any two versions, run in the reader's browser: the same code that
           # made the diffs, built reproducibly, so an unchanged engine is no change on the branch.
           GOOS=js GOARCH=wasm go build -trimpath -buildvcs=false -ldflags='-s -w' -o ../../docs/harnesses/refdiff.wasm ./refdiff/wasm
