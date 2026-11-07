@@ -201,6 +201,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 
 	var notes changelogs
 	var news []Announcement
+	// Each harness's files, written once every harness has passed the machine guard.
+	var writes []func() error
 	var recent []RecentEntry
 	index := Index{SchemaVersion: schemaVersion, GeneratedAt: n.now, Harnesses: []HarnessEntry{}}
 	for _, h := range sortedHarnesses(pub.snapshots) {
@@ -323,21 +325,31 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 				cl.Versions[d.To] = *d.Changelog
 			}
 		}
-		if err := writeHarness(filepath.Join(dir, h), entry, entries, byVersion, diffs, cl); err != nil {
+		// Nothing that names the machine is written: the guard reads every observed value of the
+		// harness's snapshots and diffs before any file of the run is.
+		if err := machineGuard(h, byVersion, diffs); err != nil {
 			return nil, err
 		}
 		var src lineageSourcer
 		if opt.lineage != nil {
 			src = opt.lineage(h)
 		}
-		if err := writeLineage(filepath.Join(dir, h), h, versions, byVersion, src); err != nil {
-			return nil, err
-		}
+		writes = append(writes, func() error {
+			if err := writeHarness(filepath.Join(dir, h), entry, entries, byVersion, diffs, cl); err != nil {
+				return err
+			}
+			return writeLineage(filepath.Join(dir, h), h, versions, byVersion, src)
+		})
 		news = append(news, announce(opt.site, entry, entries, diffs, byVersion, before[h])...)
 		for _, e := range entries {
 			if e.Previous != nil {
 				recent = append(recent, RecentEntry{Harness: h, Name: meta.name, VersionEntry: e})
 			}
+		}
+	}
+	for _, write := range writes {
+		if err := write(); err != nil {
+			return nil, err
 		}
 	}
 	if err := writeJSON(filepath.Join(dir, "recent.json"), recentOf(recent, n.now)); err != nil {

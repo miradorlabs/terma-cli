@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -207,8 +209,11 @@ var machineFields = []machineField{
 }
 
 // scrubMachine names the machine's paths in s's observed values (machineFields), and reports
-// whether it changed any. A field it leaves as it was keeps its values as they were.
-func scrubMachine(s *Snapshot) bool {
+// whether it changed any. A field it leaves as it was keeps its values as they were. A variable,
+// so a test can take a rule away and see the guard refuse.
+var scrubMachine = scrubMachineFields
+
+func scrubMachineFields(s *Snapshot) bool {
 	changed := false
 	for _, f := range machineFields {
 		v := f.get(s)
@@ -307,10 +312,17 @@ func mergeObserved(key string, a, b any) any {
 	return a
 }
 
-// machineLeaks are the machine paths each observed value of s still holds once named, by field:
-// none, where publishing works. The publish-time guard and the check of published data use it.
-func machineLeaks(s *Snapshot) map[string][]string {
-	out := map[string][]string{}
+// machineLeak is an observed value that still names the machine: the field it is in, the
+// value, and the machine path in it (e2e.MachineLeak).
+type machineLeak struct {
+	field, value, match string
+}
+
+// machineLeaks are the observed values of s that still name the machine once named: none,
+// where publishing works. machineGuard refuses to publish any, and the check of published data
+// (TestPublishedMachineLeaks) counts them.
+func machineLeaks(s *Snapshot) []machineLeak {
+	var out []machineLeak
 	for _, f := range machineFields {
 		v := f.get(s)
 		if v == nil || reflect.ValueOf(v).IsNil() {
@@ -318,10 +330,84 @@ func machineLeaks(s *Snapshot) map[string][]string {
 		}
 		walkStrings(jsonOf(v), func(str string) string {
 			if l := e2e.MachineLeak(str); l != "" {
-				out[f.name] = append(out[f.name], str)
+				out = append(out, machineLeak{f.name, str, l})
 			}
 			return str
 		})
 	}
 	return out
+}
+
+// diffMachineLeaks are the values of d's changes to observed fields that still name the
+// machine: their ids, titles, paths, values and text diffs.
+func diffMachineLeaks(d *Diff) []machineLeak {
+	var out []machineLeak
+	for _, c := range d.Changes {
+		if !observedChange(c) {
+			continue
+		}
+		field := c.Category
+		if len(c.Path) > 1 {
+			field += "." + c.Path[1]
+		}
+		see := func(s string) string {
+			if l := e2e.MachineLeak(s); l != "" {
+				out = append(out, machineLeak{field, s, l})
+			}
+			return s
+		}
+		for _, s := range append([]string{c.ID, c.Title}, c.Path...) {
+			see(s)
+		}
+		walkStrings(jsonOf([]any{c.Before, c.After}), see)
+		if c.TextDiff != nil {
+			see(*c.TextDiff)
+		}
+	}
+	return out
+}
+
+// observedChange reports a change to one of a snapshot's machineFields.
+func observedChange(c Change) bool {
+	for _, f := range machineFields {
+		sec, sub, _ := strings.Cut(f.name, ".")
+		if c.Category == sec && (sub == "" || len(c.Path) > 1 && c.Path[1] == sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// machineGuard refuses to publish harness h if any observed value of its snapshots or its
+// diffs still names the machine: the error names the file, the field and the machine path, and
+// how many more there are.
+func machineGuard(h string, snaps map[string]*Snapshot, diffs map[string]*Diff) error {
+	type found struct {
+		file string
+		machineLeak
+	}
+	var all []found
+	for _, v := range slices.Sorted(maps.Keys(snaps)) {
+		for _, l := range machineLeaks(snaps[v]) {
+			all = append(all, found{h + "/versions/" + v + ".json", l})
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(diffs)) {
+		for _, l := range diffMachineLeaks(diffs[key]) {
+			all = append(all, found{h + "/diffs/" + key + ".json", l})
+		}
+	}
+	if len(all) == 0 {
+		return nil
+	}
+	first := all[0]
+	value := first.value
+	if len(value) > 160 {
+		value = value[:160] + "…"
+	}
+	msg := fmt.Sprintf("refusing to publish what names the machine: %s, %s: %q holds %s", first.file, first.field, value, first.match)
+	if len(all) > 1 {
+		msg += fmt.Sprintf(" (and %d more)", len(all)-1)
+	}
+	return errors.New(msg)
 }

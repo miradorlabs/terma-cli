@@ -209,10 +209,8 @@ func scanMachineLeaks(t *testing.T, dir string) machineScan {
 		if err := readJSON(f, &s); err != nil {
 			t.Fatal(err)
 		}
-		for field, values := range machineLeaks(&s) {
-			for _, v := range values {
-				see("snapshot", field, f, v)
-			}
+		for _, l := range machineLeaks(&s) {
+			see("snapshot", l.field, f, l.value)
 		}
 	}
 	diffs, _ := filepath.Glob(filepath.Join(dir, "*", "diffs", "*.json"))
@@ -221,35 +219,11 @@ func scanMachineLeaks(t *testing.T, dir string) machineScan {
 		if err := readJSON(f, &d); err != nil {
 			t.Fatal(err)
 		}
-		for _, c := range d.Changes {
-			field := c.Category
-			if len(c.Path) > 1 {
-				field += "." + c.Path[1]
-			}
-			if !observedChange(c) {
-				continue
-			}
-			for _, s := range append([]string{c.ID, c.Title}, c.Path...) {
-				see("diff", field, f, s)
-			}
-			walkStrings(jsonOf([]any{c.Before, c.After}), func(s string) string { see("diff", field, f, s); return s })
-			if c.TextDiff != nil {
-				see("diff", field, f, *c.TextDiff)
-			}
+		for _, l := range diffMachineLeaks(&d) {
+			see("diff", l.field, f, l.value)
 		}
 	}
 	return m
-}
-
-// observedChange reports a change to one of a snapshot's machineFields.
-func observedChange(c Change) bool {
-	for _, f := range machineFields {
-		sec, sub, _ := strings.Cut(f.name, ".")
-		if c.Category == sec && (sub == "" || len(c.Path) > 1 && c.Path[1] == sub) {
-			return true
-		}
-	}
-	return false
 }
 
 func truncate(s string, n int) string {
@@ -278,4 +252,50 @@ func TestScrubMachineRunIDs(t *testing.T) {
 	if got := s.CLI["launch"].(map[string]any)["env_values"].(map[string]any)["CLAUDE_CODE_HOST_SESSION_ID"]; got != "local_<uuid>" {
 		t.Errorf("session id = %v", got)
 	}
+}
+
+// The guard is publish's own: a snapshot whose observed value still names the machine (a path
+// no rule names yet) makes publish refuse, naming the file, the field and the path, and write
+// nothing.
+func TestPublishRefusesMachinePaths(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := publish(dir, night{now: time.Date(2026, 11, 3, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{filesRow("1.0.0", "darwin/arm64", nil)}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	before := treeBytes(t, dir)
+	// A leak scrubbing leaves: what a build ran, after a placeholder no rule reads past.
+	p := filesRow("1.0.1", "darwin/arm64", map[string]any{"<sandbox>/Users/runner/x": map[string]any{"ops": []string{"read"}, "phases": []string{"startup"}}})
+	saved := scrubMachine
+	scrubMachine = func(*Snapshot) bool { return false } // a rule missing for it
+	defer func() { scrubMachine = saved }()
+	_, err := publish(dir, night{now: time.Date(2026, 11, 4, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{p}}, options{})
+	if err == nil {
+		t.Fatal("published a path that names the machine")
+	}
+	for _, want := range []string{"claude/versions/1.0.1.json", "filesystem", "/Users/runner/x", "holds /Users/"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal lacks %q: %v", want, err)
+		}
+	}
+	if after := treeBytes(t, dir); !reflect.DeepEqual(before, after) {
+		t.Error("publish wrote files before it refused")
+	}
+}
+
+// treeBytes is every file under dir, by path.
+func treeBytes(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		out[strings.TrimPrefix(path, dir)] = string(data)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
