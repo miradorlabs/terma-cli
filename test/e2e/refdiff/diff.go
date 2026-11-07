@@ -846,13 +846,22 @@ var genericSegments = map[string]bool{"keys": true, "surfaces": true, "system": 
 	"supported": true, "control": true, "env_paths": true, "matcher": true, "fired": true, "count": true,
 	"options": true, "enum": true, "deprecated": true, "env_vars": true, "settings_keys": true, "source": true, "env_source": true}
 
-// documented reports whether changelog mentions c: the thing it names (a tool, a field, a
-// flag, a model), or for a prompt's change, the prompt.
-func documented(c Change, changelog string) bool {
-	// A changelog says gpt-6.1-sol as "GPT-6.1 Sol", and a field's name as words: dashes and
-	// underscores read as spaces on both sides.
-	words := strings.NewReplacer("-", " ", "_", " ")
-	text := words.Replace(strings.ToLower(changelog))
+// changelogWords reads a changelog's words alike, both sides: a changelog says gpt-6.1-sol as
+// "GPT-6.1 Sol", and a field's name as words, so it is lower case, its dashes and underscores
+// spaces.
+var changelogWords = strings.NewReplacer("-", " ", "_", " ")
+
+// changelogText is a changelog as documented reads it: lower case, dashes and underscores
+// spaces. New makes it once for every change it checks.
+func changelogText(changelog string) string {
+	return changelogWords.Replace(strings.ToLower(changelog))
+}
+
+// documented reports whether a changelog mentions c: the thing it names (a tool, a field, a
+// flag, a model), or for a prompt's change, the prompt. text is the changelog as changelogText
+// reads it.
+func documented(c Change, text string) bool {
+	words := changelogWords
 	if c.Category == "prompt" {
 		return strings.Contains(text, "system prompt")
 	}
@@ -904,8 +913,9 @@ func New(a, b *Snapshot, changelog *ChangelogNote, now time.Time) *Diff {
 	d.Summary = summarize(d.Changes)
 	if changelog != nil {
 		undocumented := 0
+		text := changelogText(changelog.Text)
 		for i := range d.Changes {
-			doc := documented(d.Changes[i], changelog.Text)
+			doc := documented(d.Changes[i], text)
 			d.Changes[i].Documented = &doc
 			if !doc && d.Changes[i].Category != "support" {
 				undocumented++

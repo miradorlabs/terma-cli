@@ -81,3 +81,24 @@ func TestCompareRangeBoundsChangelog(t *testing.T) {
 		t.Errorf("nothing was cut: %+v", d.Changelog)
 	}
 }
+
+// New reads the changelog once for all its changes: each is judged against its words, lower
+// case, dashes and underscores spaces, whatever case and spelling the vendor used.
+func TestNewJudgesEveryChangeAgainstOneReading(t *testing.T) {
+	a := &Snapshot{Harness: "codex", Version: "1.0.0", Model: map[string]any{"default": "gpt-6.0"},
+		Tools: []any{map[string]any{"name": "Shell", "description": "Runs."}}}
+	b := &Snapshot{Harness: "codex", Version: "1.0.1", Model: map[string]any{"default": "gpt-6.1-sol"},
+		Tools: []any{map[string]any{"name": "Shell", "description": "Runs."}, map[string]any{"name": "apply_patch", "description": "Patches."}}}
+	d := New(a, b, &ChangelogNote{Text: "- Default model is now GPT-6.1 Sol\n- New APPLY PATCH tool"}, time.Now())
+	if len(d.Changes) < 2 {
+		t.Fatalf("changes = %+v", d.Changes)
+	}
+	for _, c := range d.Changes {
+		if c.Documented == nil || !*c.Documented {
+			t.Errorf("%s not documented", c.ID)
+		}
+	}
+	if *d.Summary.Undocumented != 0 {
+		t.Errorf("undocumented = %d", *d.Summary.Undocumented)
+	}
+}
