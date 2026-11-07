@@ -27,7 +27,7 @@ var patterns = []struct {
 }{
 	// A date stands alone: one inside a name (a beta's, a model's) is part of the name.
 	{regexp.MustCompile(`(^|[^\w-])\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?`), "${1}<timestamp>"},
-	{regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`), "<uuid>"},
+	{uuidPattern, uuidWith},
 	{regexp.MustCompile(`(^|[^\w-])\d{4}-\d{2}-\d{2}\b`), "${1}<date>"},
 	{regexp.MustCompile(`\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),? (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2},? \d{4}\b`), "<date>"},
 	{regexp.MustCompile(`\b(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2},? \d{4}\b`), "<date>"},
@@ -40,6 +40,12 @@ var patterns = []struct {
 	// The scratch repository's commits, as a harness lists them in its git context.
 	{regexp.MustCompile(`(Recent commits:\s*\n)[0-9a-f]{7,12}\b`), "${1}<commit>"},
 }
+
+// uuidPattern is an id that stands alone or after an underscore (Claude Desktop's
+// local_<uuid> session ids): \b never falls between _ and a digit, both word characters.
+var uuidPattern = regexp.MustCompile(`(?i)(^|[^0-9a-z])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(_|\b)`)
+
+const uuidWith = "${1}<uuid>${2}"
 
 var (
 	nonAlnum    = regexp.MustCompile(`[^A-Za-z0-9]`)
@@ -226,7 +232,7 @@ func scrubMachine(s *Snapshot) bool {
 func scrubMachineTree(v any) any {
 	switch x := v.(type) {
 	case string:
-		return e2e.MachinePaths(x)
+		return scrubMachineText(x)
 	case []any:
 		out := make([]any, len(x))
 		for i := range x {
@@ -241,7 +247,7 @@ func scrubMachineTree(v any) any {
 		sort.Strings(keys)
 		out := make(map[string]any, len(x))
 		for _, k := range keys {
-			nk, nv := e2e.MachinePaths(k), scrubMachineTree(x[k])
+			nk, nv := scrubMachineText(k), scrubMachineTree(x[k])
 			if prev, ok := out[nk]; ok {
 				nv = mergeObserved(nk, prev, nv)
 			}
@@ -250,6 +256,12 @@ func scrubMachineTree(v any) any {
 		return out
 	}
 	return v
+}
+
+// scrubMachineText is one observed string with the machine's paths named, and a run's id that
+// normalization once missed (one after an underscore) a placeholder.
+func scrubMachineText(s string) string {
+	return uuidPattern.ReplaceAllString(e2e.MachinePaths(s), uuidWith)
 }
 
 // mergeObserved is what two observed values become when their keys name the same thing (a

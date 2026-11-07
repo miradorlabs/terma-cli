@@ -266,3 +266,16 @@ func changeIDs(d *Diff) []string {
 	}
 	return out
 }
+
+// A run's id normalization once missed in an observed value is a placeholder when it is loaded
+// back: Claude Desktop's local_<uuid> session id.
+func TestScrubMachineRunIDs(t *testing.T) {
+	s := &Snapshot{CLI: map[string]any{"launch": map[string]any{"env_values": map[string]any{
+		"CLAUDE_CODE_HOST_SESSION_ID": "local_88d385d8-fbba-4414-a316-90943ceface5"}}}}
+	if !scrubMachine(s) {
+		t.Fatal("nothing named")
+	}
+	if got := s.CLI["launch"].(map[string]any)["env_values"].(map[string]any)["CLAUDE_CODE_HOST_SESSION_ID"]; got != "local_<uuid>" {
+		t.Errorf("session id = %v", got)
+	}
+}

@@ -718,3 +718,18 @@ func TestVendorTelemetry(t *testing.T) {
 		t.Errorf("changes = %v", titles)
 	}
 }
+
+// A run's id after an underscore is the run's too: Claude Desktop's session ids.
+func TestNormalizeUnderscoredUUID(t *testing.T) {
+	for in, want := range map[string]string{
+		"local_88d385d8-fbba-4414-a316-90943ceface5":                                "local_<uuid>",
+		"<uuid>/4d2b7fd5-e813-4ae3-b573-50692bf90f1c":                               "<uuid>/<uuid>",
+		"4d2b7fd5-e813-4ae3-b573-50692bf90f1c/88d385d8-fbba-4414-a316-90943ceface5": "<uuid>/<uuid>",
+		"id=88D385D8-FBBA-4414-A316-90943CEFACE5_tmp":                               "id=<uuid>_tmp",
+		"x88d385d8-fbba-4414-a316-90943ceface5":                                     "x88d385d8-fbba-4414-a316-90943ceface5",
+	} {
+		if got := normalizeText(in, nil, nil, nil); got != want {
+			t.Errorf("normalizeText(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
