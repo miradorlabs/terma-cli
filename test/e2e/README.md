@@ -365,7 +365,7 @@ listens on and connects to, and whether it touches the fake credentials and sock
 its home and repository (`decoys.go`); refgen publishes it as the snapshot's `filesystem`
 section, by platform. Each program started says which commands started it (`parents`), whether
 it was the build's own doing or the tool call's (`role`), and, for a well-known command, what it
-is for (`purpose`, from `execPurposes` in `filetrace.go`). The run is a clean room
+is for (`purpose`, from `execPurposes` in `filetrace_purpose.go`). The run is a clean room
 (`CleanRoom` in `sandbox.go`): no terma setup, hooks, relay or exporter, HOME and the
 harness's config folders the sandbox's, `SHELL` the OS's default login shell (`/bin/zsh` on
 macOS, `/bin/bash` on Linux), and the network only through the recording proxy. The hooks
