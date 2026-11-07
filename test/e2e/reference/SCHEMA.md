@@ -649,7 +649,10 @@ versioned by the app's own release, its `CFBundleShortVersionString` (`4.16336.0
 `26.1029.70936`), as the app's own update feed lists it: Claude Desktop's Squirrel
 `RELEASES.json` (its current release alone), the Codex app's Sparkle appcast. Each release is
 run whole (`test/e2e/profile_desktop_test.go`) on a hosted macOS runner, a fresh machine with a
-desktop session, for one first turn against the fixture provider, its window driven as a person
+desktop session (the run changes machine-wide state as root, managed preferences and the
+System keychain's trust, which the suite refuses to do anywhere but a GitHub-hosted runner or a
+machine that says it is throwaway: a developer's machine runs only eslogger and lsof under
+sudo), for one first turn against the fixture provider, its window driven as a person
 drives it: so what the agent sends the model, and how the app starts it, are the app's own.
 `capture.notes` say how each run differed from a person's at the app: how it was signed in
 without an account (Claude Desktop in its third-party inference mode, set up as an
@@ -682,15 +685,17 @@ source at the build the app runs), and:
 
 | field | |
 |---|---|
-| `cli.launch` | how the app started its agent: the command line and environment its process was started with, read from the kernel (`KERN_PROCARGS2`), and the processes between the app and it (`parents`, the agent's parent first). `env` are the variables the app set: those neither the app's own environment nor its user's login shell's has with the same value; `inherited` how many more it passed on as it had them. `env_values` are their values, a secret's `<redacted>` (by its name or its shape), a list of folders `<path>`, a login session's variable the app changed `<session>`, a key made for the run `<key>`, the machine's user and OS release `<user>` and `<os-release>` |
+| `cli.launch` | how the app started its agent: the command line and environment its process was started with, read from the kernel (`KERN_PROCARGS2`), and the processes between the app and it (`parents`, the agent's parent first). `env` are the variables the app set: those neither the app's own environment nor its user's login shell's has with the same value; `inherited` how many more it passed on as it had them. `env_values` are their values, a secret's `<redacted>` (by its name or its shape), a list of folders `<path>`, a login session's variable the app changed `<session>`, a key made for the run `<key>`, the machine's user, name and OS release `<user>`, `<host>` and `<os-release>`, and its paths as the [filesystem](#filesystem)'s machine paths are |
 | `cli.app_server` | the JSON-RPC methods of the app-server the app drives, by the schema file of its `generate-json-schema` that names them: `ClientRequest`, `ClientNotification`, `ServerRequest`, `ServerNotification` |
 | `binary.agent` | the agent the app runs: its harness and build, where the app runs it from, and how it comes by it: `bundled` in the app, or `downloaded` (Claude Desktop's, from `download` on first use, checked against `checksum`, the release's pin), and the SDK the app drives it with |
 | `binary.app` | the app bundle: its name, bundle id, version and build, where it was downloaded from, its size, and its signature, read before it first ran (Developer ID, team, certificate, notarization, Gatekeeper's verdict) |
 
 Placeholders of a desktop app's run, besides the agent's: `<app>` (the app bundle), `<app-dir>`
 (the folder it was unpacked in), `<app-data>` (the app's own folder in Application Support),
-`<agent>` (the agent's executable) and `<home>` (the runner's home, where the app and its agent
-keep their state, as a person's do).
+`<agent>` (the agent's executable), `<home>` (the runner's home, where the app and its agent
+keep their state, as a person's do), `<checkout>` (the checkout the suite runs from), `<user>`
+and `<host>` (the machine's user and name). A value is named by the most it says, longest
+first: the app's paths are `<app>/…` and the home's `<home>/…`, never `/Users/<user>/…`.
 
 `support` is the capability checks of the build of the agent the release runs: the relay
 scenarios run the agent build the app pins, launched as the app launches it

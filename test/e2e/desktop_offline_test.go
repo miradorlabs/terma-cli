@@ -265,3 +265,58 @@ func TestDesktopPlacesOffline(t *testing.T) {
 		t.Errorf("checkout %s: %v", checkout, got)
 	}
 }
+
+// A change to machine-wide state as root runs only on a throwaway runner: a developer's machine
+// runs eslogger and lsof under sudo, nothing else.
+func TestRootChangesGuardOffline(t *testing.T) {
+	for _, c := range []struct {
+		actions, runner, allow string
+		ok                     bool
+	}{
+		{"", "", "", false},
+		{"true", "self-hosted", "", false},
+		{"true", "", "", false},
+		{"", "github-hosted", "", false},
+		{"true", "github-hosted", "", true},
+		{"", "", "1", true},
+		{"", "", "yes", false},
+	} {
+		t.Setenv("GITHUB_ACTIONS", c.actions)
+		t.Setenv("RUNNER_ENVIRONMENT", c.runner)
+		t.Setenv(envAllowRootChanges, c.allow)
+		cmd, err := rootCommand("rm", "-f", "/Library/Managed Preferences/x.plist")
+		if ok := err == nil; ok != c.ok {
+			t.Errorf("%+v: allowed %v, want %v (%v)", c, ok, c.ok, err)
+		}
+		if err == nil && !slices.Equal(cmd.Args, []string{"sudo", "-n", "rm", "-f", "/Library/Managed Preferences/x.plist"}) {
+			t.Errorf("command = %q", cmd.Args)
+		}
+		if err != nil && !strings.Contains(err.Error(), "eslogger and lsof") {
+			t.Errorf("the refusal says not why: %v", err)
+		}
+	}
+}
+
+// Every sudo the suite runs is eslogger's, or goes through rootCommand.
+func TestSudoOnlyThroughGuardOffline(t *testing.T) {
+	files, _ := filepath.Glob("*.go")
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			if !strings.Contains(line, `"sudo"`) || strings.HasPrefix(strings.TrimSpace(line), "//") {
+				continue
+			}
+			eslogger := f == "filetrace_eslogger.go" && strings.Contains(line, `"/usr/bin/eslogger"`)
+			guard := f == "desktop.go" && strings.Contains(line, `desktopCmd("sudo", append([]string{"-n"}, args...)...)`)
+			if !eslogger && !guard {
+				t.Errorf("%s:%d runs sudo outside rootCommand: %s", f, i+1, strings.TrimSpace(line))
+			}
+		}
+	}
+}

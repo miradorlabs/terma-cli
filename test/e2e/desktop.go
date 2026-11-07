@@ -169,10 +169,58 @@ func desktopEnabled() (bool, string) {
 	case os.Getenv("TERMA_E2E_DESKTOP_APPS") != "1":
 		return false, "the desktop apps' profiles change machine-wide settings: they run only with TERMA_E2E_DESKTOP_APPS=1, on a CI runner"
 	}
-	if err := desktopCmd("sudo", "-n", "true").Run(); err != nil {
+	check, err := rootCommand("true")
+	if err != nil {
+		return false, "the desktop apps' profiles change machine-wide settings as root: " + err.Error()
+	}
+	if err := check.Run(); err != nil {
 		return false, "the desktop apps' profiles need sudo without a password (managed preferences, the proxy's CA)"
 	}
 	return true, ""
+}
+
+// Root on a developer's machine: the suite runs exactly two commands there as root,
+// `sudo -n /usr/bin/eslogger` and lsof, which a sudoers rule allows alone (filetrace_eslogger.go),
+// and changes nothing of the machine's. Everything else it would run as root (the desktop
+// profiles' managed preferences, the files they remove, the proxy's CA in the System keychain)
+// changes machine-wide state, and runs only on a throwaway runner: rootCommand is the one way
+// to it, and refuses anywhere else.
+
+// envAllowRootChanges opts a machine that is not a GitHub-hosted runner into changes as root:
+// a throwaway VM's.
+const envAllowRootChanges = "TERMA_E2E_ALLOW_ROOT_CHANGES"
+
+// rootChangesAllowed says whether this machine may have its machine-wide state changed as root,
+// or why not: only a GitHub-hosted runner (a fresh VM thrown away after the job), or a machine
+// that says it is as throwaway (TERMA_E2E_ALLOW_ROOT_CHANGES=1).
+func rootChangesAllowed() (bool, string) {
+	switch {
+	case os.Getenv(envAllowRootChanges) == "1":
+		return true, ""
+	case os.Getenv("GITHUB_ACTIONS") == "true" && os.Getenv("RUNNER_ENVIRONMENT") == "github-hosted":
+		return true, ""
+	}
+	return false, "only a GitHub-hosted runner (GITHUB_ACTIONS=true, RUNNER_ENVIRONMENT=github-hosted) or a throwaway machine (" +
+		envAllowRootChanges + "=1) has its machine-wide state changed as root; a developer's machine runs eslogger and lsof under sudo, nothing else"
+}
+
+// rootCommand is `sudo -n args…`, a change to machine-wide state, where rootChangesAllowed
+// allows it: the one way the suite runs anything as root but eslogger and lsof.
+func rootCommand(args ...string) (*exec.Cmd, error) {
+	if ok, why := rootChangesAllowed(); !ok {
+		return nil, fmt.Errorf("refusing sudo %s: %s", strings.Join(args, " "), why)
+	}
+	return desktopCmd("sudo", append([]string{"-n"}, args...)...), nil
+}
+
+// rootCmd is rootCommand for a test: one the machine refuses fails it, saying why.
+func rootCmd(t testing.TB, args ...string) *exec.Cmd {
+	t.Helper()
+	cmd, err := rootCommand(args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cmd
 }
 
 // DesktopApps are the releases of harness's app to profile, installed: the versions
@@ -714,8 +762,9 @@ func ancestry(pid, top int) []string {
 
 // --- Machine-wide state the apps read ---------------------------------------------------
 
-// desktopCmd is a command the desktop profiles run of the machine's (sudo, open, osascript),
-// ended after 90 seconds: one that waits on a dialog nobody answers would hold the run.
+// desktopCmd is a command the desktop profiles run of the machine's (open, osascript, and
+// sudo through rootCommand alone), ended after 90 seconds: one that waits on a dialog nobody
+// answers would hold the run.
 func desktopCmd(name string, args ...string) *exec.Cmd {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	time.AfterFunc(90*time.Second, cancel)
@@ -725,12 +774,12 @@ func desktopCmd(name string, args ...string) *exec.Cmd {
 // sudoWrite writes data to path as root, and removes it with t.
 func sudoWrite(t *testing.T, path string, data []byte) {
 	t.Helper()
-	cmd := desktopCmd("sudo", "-n", "sh", "-c", `mkdir -p "$(dirname "$1")" && cat > "$1" && chmod 644 "$1"`, "sh", path)
+	cmd := rootCmd(t, "sh", "-c", `mkdir -p "$(dirname "$1")" && cat > "$1" && chmod 644 "$1"`, "sh", path)
 	cmd.Stdin = bytes.NewReader(data)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("write %s: %v: %s", path, err, out)
 	}
-	t.Cleanup(func() { _ = desktopCmd("sudo", "-n", "rm", "-f", path).Run() })
+	t.Cleanup(func() { _ = rootCmd(t, "rm", "-f", path).Run() })
 }
 
 // trustProxyCA has the machine trust the recording proxy's CA, as a company's TLS-inspecting
@@ -739,12 +788,12 @@ func sudoWrite(t *testing.T, path string, data []byte) {
 func trustProxyCA(t *testing.T, p *EgressProxy) {
 	t.Helper()
 	const keychain = "/Library/Keychains/System.keychain"
-	if out, err := desktopCmd("sudo", "-n", "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", keychain, p.CAFile).CombinedOutput(); err != nil {
+	if out, err := rootCmd(t, "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", keychain, p.CAFile).CombinedOutput(); err != nil {
 		t.Fatalf("trust the proxy's CA: %v: %s", err, out)
 	}
 	t.Cleanup(func() {
-		_ = desktopCmd("sudo", "-n", "security", "remove-trusted-cert", "-d", p.CAFile).Run()
-		_ = desktopCmd("sudo", "-n", "security", "delete-certificate", "-c", egressCAName, keychain).Run()
+		_ = rootCmd(t, "security", "remove-trusted-cert", "-d", p.CAFile).Run()
+		_ = rootCmd(t, "security", "delete-certificate", "-c", egressCAName, keychain).Run()
 	})
 }
 
