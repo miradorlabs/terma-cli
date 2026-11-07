@@ -23,6 +23,18 @@ func TestMachinePathsOffline(t *testing.T) {
 		"/Users/runner/work/_temp/x":                                 "<home>/work/_temp/x",
 		"/home/runner/.cache":                                        "<home>/.cache",
 		"--config=/Users/someone/.config/x":                          "--config=<home>/.config/x",
+		// A path wherever it starts: in a URL, after a word, as a firmlink spells it.
+		"file:///Users/runner/x":                                              "file://<home>/x",
+		"file:///opt/homebrew/bin/git":                                        "file://git",
+		"file:///opt/homebrew/share/doc/index.html":                           "file://<machine>/index.html",
+		"/System/Volumes/Data/Users/runner/x":                                 "<home>/x",
+		"/System/Volumes/Data/opt/homebrew/bin/node":                          "node",
+		"/System/Volumes/Data/Applications/Xcode_26.6.app/Contents/Developer": "<xcode>",
+		"cwd=/c/Users/runner/x":                                               "cwd=/c<home>/x",
+		"/private/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T/x.sock":     "<tmp>/x.sock",
+		"/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/C/com.apple.x":        "<tmp>/../C/com.apple.x",
+		"/private/var/folders/.git/info/exclude":                              "/private/var/folders/.git/info/exclude",
+		"/private/var/folders/CLAUDE.md":                                      "/private/var/folders/CLAUDE.md",
 		// Neither the machine's nor anyone's home.
 		"/Users/Shared/Library":                    "/Users/Shared/Library",
 		"/home/claude/.claude/remote/.oauth_token": "/home/claude/.claude/remote/.oauth_token",
@@ -38,14 +50,17 @@ func TestMachinePathsOffline(t *testing.T) {
 
 func TestMachineLeakOffline(t *testing.T) {
 	for in, want := range map[string]string{
-		"git config":                      "",
-		"/Users/Shared/x":                 "",
-		"/Users/Shared/x /Users/runner/y": "/Users/",
-		"<xcode>/usr/bin/xcodebuild":      "",
-		"/opt/homebrew/bin/git":           "/opt/homebrew",
-		"/Applications/Xcode_26.6.app":    "/Applications/Xcode",
-		"/home/claude/.claude/remote/x":   "",
-		"/home/runner/.cache":             "/home/runner",
+		"git config":                                         "",
+		"/Users/Shared/x":                                    "",
+		"/Users/Shared/x /Users/runner/y":                    "/Users/",
+		"<xcode>/usr/bin/xcodebuild":                         "",
+		"/opt/homebrew/bin/git":                              "/opt/homebrew",
+		"/Applications/Xcode_26.6.app":                       "/Applications/Xcode",
+		"/home/claude/.claude/remote/x":                      "",
+		"/home/runner/.cache":                                "/home/runner",
+		"file:///Users/runner/x":                             "/Users/",
+		"/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T/x": "/var/folders/nc/1hy9ccx54nlbmblcm7_lnp3m0000gn/T",
+		"/private/var/folders/CLAUDE.md":                     "",
 	} {
 		if got := MachineLeak(in); got != want {
 			t.Errorf("MachineLeak(%q) = %q, want %q", in, got, want)

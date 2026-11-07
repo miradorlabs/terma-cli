@@ -18,12 +18,12 @@ import (
 // can (a files profile's commands and paths, a desktop launch's variables, a hook's payload, the
 // binary's facts) and whose vendor text names paths as examples, as real builds do.
 func machineProfiles(version string) []e2e.Profile {
-	first := claudeProfile(version, "Work in /home/user/monorepo/CLAUDE.md like /Users/name/My Documents.", []string{"Bash"}, "", "")
+	first := claudeProfile(version, "Work in /home/user/monorepo/CLAUDE.md like /Users/name/My Documents, never file:///Users/name/x.", []string{"Bash"}, "", "")
 	first.Probes = map[string]json.RawMessage{
 		"launch": json.RawMessage(`{"argv":["<agent>","--model=x"],"env":["CLAUDE_CODE_DIAGNOSTICS_FILE","CODEX_TECTONIC_PATH","HOMEBREW_PREFIX"],
 			"env_values":{"CLAUDE_CODE_DIAGNOSTICS_FILE":"/Users/<user>/Library/Logs/Claude-3p/cli-diagnostics.jsonl",
 			"CODEX_TECTONIC_PATH":"/Users/<user>/work/terma-cli/terma-cli/test/e2e/versions/codex-desktop/<version>/ChatGPT.app/Contents/Resources/tectonic/tectonic",
-			"HOMEBREW_PREFIX":"/opt/homebrew"}}`),
+			"HOMEBREW_PREFIX":"/opt/homebrew", "DATA":"file:///System/Volumes/Data/Users/runner/x"}}`),
 	}
 	first.Binary = json.RawMessage(`{"form":"executable","size_bytes":1,"agent":{"path":"/Users/runner/.local/bin/claude"}}`)
 	files := filesRow(version, "darwin/arm64", map[string]any{
@@ -79,7 +79,7 @@ func TestPublishNamesNoMachinePaths(t *testing.T) {
 	}
 	env := s.CLI["launch"].(map[string]any)["env_values"].(map[string]any)
 	for k, want := range map[string]string{"CLAUDE_CODE_DIAGNOSTICS_FILE": "<home>/Library/Logs/Claude-3p/cli-diagnostics.jsonl",
-		"CODEX_TECTONIC_PATH": "<app>/Contents/Resources/tectonic/tectonic", "HOMEBREW_PREFIX": "<machine>"} {
+		"CODEX_TECTONIC_PATH": "<app>/Contents/Resources/tectonic/tectonic", "HOMEBREW_PREFIX": "<machine>", "DATA": "file://<home>/x"} {
 		if env[k] != want {
 			t.Errorf("%s = %q, want %q", k, env[k], want)
 		}
@@ -89,7 +89,7 @@ func TestPublishNamesNoMachinePaths(t *testing.T) {
 	}
 	// The vendor's text is the build's: its example paths stay.
 	md, _ := os.ReadFile(filepath.Join(dir, "claude", "prompts", "1.0.1.md"))
-	if !strings.Contains(string(md), "/home/user/monorepo/CLAUDE.md like /Users/name/My Documents.") {
+	if !strings.Contains(string(md), "/home/user/monorepo/CLAUDE.md like /Users/name/My Documents, never file:///Users/name/x.") {
 		t.Errorf("the prompt's own example paths were changed:\n%s", md)
 	}
 }

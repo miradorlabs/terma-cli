@@ -534,8 +534,10 @@ as a PATH lookup names it (`git config user.name`), anything else it installed i
 and its file's name, an Xcode's developer folder is `<xcode>` and its bundle `<xcode-app>`
 (`<xcode>/usr/bin/xcodebuild -license check`). The rule is `test/e2e/machinepaths.go`'s, the one
 set of them, which also names a user's home `<home>` (any `/Users/<name>` but `/Users/Shared`,
-and the runner's `/home/runner`), a CI runner's checkout `<checkout>`, and a desktop app's
-bundle where the suite unpacked it `<app>`. refgen applies it again to every observed value it
+and the runner's `/home/runner`), a CI runner's checkout `<checkout>`, a desktop app's
+bundle where the suite unpacked it `<app>`, and macOS's per-user temporary folder
+(`/var/folders/<xx>/<id>/T`) `<tmp>`. A path is found wherever it starts, in a URL
+(`file:///Users/…`) or as macOS's data volume spells it (`/System/Volumes/Data/Users/…`). refgen applies it again to every observed value it
 publishes and loads back (paths, command lines, the desktop launch's variables, hook payloads,
 storage, network and binary facts; never a prompt, a tool's description, help or a
 configuration option's text, where a vendor names a path as an example), so a rule added there

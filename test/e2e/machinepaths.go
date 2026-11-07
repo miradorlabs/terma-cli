@@ -38,43 +38,58 @@ var (
 	// suiteAppRE is a desktop app's bundle under the suite's versions folder
 	// (test/e2e/versions/<harness>/<version>/<Name>.app), from a checkout's path or a placeholder.
 	suiteAppRE = regexp.MustCompile(`(?:<[a-z-]+>|(?:/` + pathChars + `+)+)/test/e2e/versions/` + pathChars + `+/` + pathChars + `+/` + pathChars + `+\.app\b`)
+	// dataVolumeRE is macOS's firmlink spelling of a path on the data volume
+	// (/System/Volumes/Data/Users/runner is /Users/runner): the path is named as the shorter one.
+	dataVolumeRE = regexp.MustCompile(`/System/Volumes/Data(/(?:Users|home|opt|usr/local|Applications|private/var/folders)/)`)
 	// checkoutRE is a CI runner's checkout of a repository: ~/work/<repo>/<repo>, GitHub's.
-	checkoutRE = regexp.MustCompile(`(^|[^\w./<>-])(?:/Users|/home)/` + pathChars + `+/work/[^/\s"'=:;,|&()_]` + pathChars + `*/[^/\s"'=:;,|&()_]` + pathChars + `*`)
+	checkoutRE = regexp.MustCompile(`(?:/Users|/home)/` + pathChars + `+/work/[^/\s"'=:;,|&()_]` + pathChars + `*/[^/\s"'=:;,|&()_]` + pathChars + `*`)
 	// xcodeDevRE and xcodeAppRE are an Xcode's developer folder and bundle, by any name a runner
 	// image gives it (Xcode_26.6.app, Xcode-beta.app).
 	xcodeDevRE = regexp.MustCompile(`/Applications/Xcode` + pathChars + `*\.app/Contents/Developer\b`)
 	xcodeAppRE = regexp.MustCompile(`/Applications/Xcode` + pathChars + `*\.app\b`)
 	// installedRE is a path under a package manager's prefix.
-	installedRE = regexp.MustCompile(`(^|[^\w./<>-])(/home/linuxbrew/\.linuxbrew|/home/linuxbrew|/opt/homebrew|/usr/local/Cellar|/usr/local/opt|/usr/local/lib/node_modules)([^\s"'=:;,|&()<>]*)`)
+	installedRE = regexp.MustCompile(`(/home/linuxbrew/\.linuxbrew|/home/linuxbrew|/opt/homebrew|/usr/local/Cellar|/usr/local/opt|/usr/local/lib/node_modules)([^\s"'=:;,|&()<>]*)`)
 	// homeRE is a user's home: any user's on macOS, the runner's on Linux (another /home/<name>
 	// is as likely a build's own path: Claude Code's /home/claude/.claude/remote).
-	homeRE = regexp.MustCompile(`(^|[^\w./<>-])(/(?:Users|home)/` + pathChars + `+)`)
+	homeRE = regexp.MustCompile(`/(?:Users|home)/` + pathChars + `+`)
+	// userTempRE is macOS's per-user temporary folder (/var/folders/<xx>/<id>/T, its parent the
+	// user's cache root): <tmp> and <tmp>/.., as a trace names them. /private/var/folders alone,
+	// which a build walking up from the repository looks in, is no user's.
+	userTempRE = regexp.MustCompile(`(?:/private)?/var/folders/[0-9a-z_]{2}/[0-9a-z_+]{16,}(/T\b)?`)
 )
 
 // MachinePaths is s with the machine's paths in it named as reference/SCHEMA.md names them:
 // longest first, a desktop app's bundle, then the checkout, Xcode, what a package manager
-// installed and last a home, so each path is named by the most it says.
+// installed, a user's temporary folder and last a home, so each path is named by the most it
+// says. A path is found wherever it starts, after a slash or a word too (file:///Users/runner,
+// a firmlink's /System/Volumes/Data/Users/runner): only observed values are passed here.
 func MachinePaths(s string) string {
 	if !strings.Contains(s, "/") {
 		return s
 	}
+	s = dataVolumeRE.ReplaceAllString(s, "$1")
 	s = suiteAppRE.ReplaceAllString(s, "<app>")
-	s = checkoutRE.ReplaceAllString(s, "${1}<checkout>")
+	s = checkoutRE.ReplaceAllString(s, "<checkout>")
 	s = xcodeDevRE.ReplaceAllString(s, "<xcode>")
 	s = xcodeAppRE.ReplaceAllString(s, "<xcode-app>")
 	s = installedRE.ReplaceAllStringFunc(s, func(m string) string {
 		sub := installedRE.FindStringSubmatch(m)
-		if sub[3] != "" && sub[3][0] != '/' {
+		if sub[2] != "" && sub[2][0] != '/' {
 			return m // a longer name (/opt/homebrew-ish), not the prefix
 		}
-		return sub[1] + installedName(sub[3])
+		return installedName(sub[2])
+	})
+	s = userTempRE.ReplaceAllStringFunc(s, func(m string) string {
+		if strings.HasSuffix(m, "/T") {
+			return "<tmp>"
+		}
+		return "<tmp>/.."
 	})
 	return homeRE.ReplaceAllStringFunc(s, func(m string) string {
-		sub := homeRE.FindStringSubmatch(m)
-		if !isHome(sub[2]) {
+		if !isHome(m) {
 			return m
 		}
-		return sub[1] + "<home>"
+		return "<home>"
 	})
 }
 
@@ -108,6 +123,9 @@ var machineLeaks = []string{"/Users/", "/opt/homebrew", "/Applications/Xcode", "
 // MachineLeak is the first machine path s still holds ("/opt/homebrew"), "" for none: what
 // refgen's publish-time guard looks for in every observed value.
 func MachineLeak(s string) string {
+	if m := userTempRE.FindString(s); m != "" {
+		return m
+	}
 	for _, l := range machineLeaks {
 		for at := strings.Index(s, l); at >= 0; {
 			if !strings.HasPrefix(s[at:], "/Users/Shared") {
