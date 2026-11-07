@@ -95,7 +95,7 @@ var pinnedSafeKeys = []string{
 	"user_prompt_length", "version", "wire_api",
 }
 
-var pinnedSafePrefixes = []string{"codex.turn.token_usage.", "codex.usage.", "gen_ai.usage."}
+var pinnedSafePrefixes = []string{"codex.turn.token_usage.", "codex.usage.", "gen_ai.usage.", "terma.sensor."}
 
 func TestComposedSafeKeysArePinned(t *testing.T) {
 	t.Parallel()

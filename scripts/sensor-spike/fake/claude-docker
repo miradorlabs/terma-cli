@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stands in for an agent that works through containers: pulls an image, runs a container
+# that installs a package, downloads, writes and removes inside it.
+set -e
+docker pull -q alpine:3.19 >/dev/null
+docker run --rm alpine:3.19 sh -c 'apk add -q curl && curl -s -o /tmp/big "https://speed.cloudflare.com/__down?bytes=15000000" && head -c 2000000 /dev/zero > /tmp/out && rm /tmp/big'

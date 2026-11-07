@@ -1,0 +1,9 @@
+# Dev image for the sensor spike on Linux: Go, clang and bpftool to build the eBPF
+# programs, curl/python3/git to stand in for an agent's children. Run privileged with the
+# host's pid namespace and network, so the sensor sees every container OrbStack runs.
+FROM golang:1.27-trixie
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      clang llvm libbpf-dev bpftool curl python3 git ca-certificates procps docker-cli \
+    && rm -rf /var/lib/apt/lists/*
+RUN go install github.com/cilium/ebpf/cmd/bpf2go@latest
+WORKDIR /src

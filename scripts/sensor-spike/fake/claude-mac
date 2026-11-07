@@ -1,0 +1,13 @@
+#!/bin/sh
+# Stands in for an agent on macOS (no python in a vanilla install): downloads with curl,
+# short and long, uploads, writes, reads, renames and removes files.
+set -e
+cd "$(mktemp -d)"
+curl -s -o dl.bin https://proof.ovh.net/files/100Mb.dat
+for i in 1 2 3 4 5 6 7 8; do curl -s -o /dev/null https://www.example.com/; done
+head -c 3000000 /dev/urandom > notes.txt
+cat notes.txt > /dev/null
+mv notes.txt notes-final.txt
+curl -s -o /dev/null --data-binary @notes-final.txt https://speed.cloudflare.com/__up || true
+rm dl.bin
+sleep "${HOLD:-0}"

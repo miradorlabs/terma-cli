@@ -22,7 +22,7 @@ var primaryCommands = []string{
 // version), Terma's engineers do (config, nate), or the e2e suites still do (status; MIR-80
 // removes it once those move to the primary commands).
 var advancedCommands = []string{
-	"auth", "config", "hook", "launch", "nate", "relay", "spool", "status", "version",
+	"auth", "config", "hook", "launch", "nate", "relay", "sensor", "spool", "status", "version",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {

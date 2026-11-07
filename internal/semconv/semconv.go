@@ -9,6 +9,10 @@ const SchemaVersion = "2"
 
 // Attribute keys, terma's own and those it references from OpenTelemetry's registries.
 const (
+	// ContainerImageNameKey is container.image.name: Name of the image the container was built on.
+	ContainerImageNameKey = "container.image.name"
+	// ContainerNameKey is container.name: Container name used by container runtime.
+	ContainerNameKey = "container.name"
 	// ErrorTypeKey is error.type: Describes a class of error the operation ended with.
 	ErrorTypeKey = "error.type"
 	// GenAIAgentNameKey is gen_ai.agent.name: Human-readable name of the GenAI agent provided by the application.
@@ -39,6 +43,8 @@ const (
 	HostNameKey = "host.name"
 	// MiradorProjectIDKey is mirador.project.id: The Mirador project the record is delivered to, the platform's routing key.
 	MiradorProjectIDKey = "mirador.project.id"
+	// ServerAddressKey is server.address: Server domain name if available without reverse DNS lookup; otherwise, IP address or UNIX domain socket name.
+	ServerAddressKey = "server.address"
 	// ServiceNameKey is service.name: Logical name of the service.
 	ServiceNameKey = "service.name"
 	// ServiceVersionKey is service.version: The version string of the service component. The format is not defined by these conventions.
@@ -263,6 +269,28 @@ const (
 	TermaResponseServiceTierKey = "terma.response.service_tier"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
+	// TermaSensorBlockEnforcedKey is terma.sensor.block.enforced: Whether the policy blocked it (enforce mode) or only reported it (audit mode).
+	TermaSensorBlockEnforcedKey = "terma.sensor.block.enforced"
+	// TermaSensorBlockKindKey is terma.sensor.block.kind: What a sensor policy rule denied.
+	TermaSensorBlockKindKey = "terma.sensor.block.kind"
+	// TermaSensorBlockRuleKey is terma.sensor.block.rule: The id of the policy rule that denied it.
+	TermaSensorBlockRuleKey = "terma.sensor.block.rule"
+	// TermaSensorFilesReadKey is terma.sensor.files.read: The bytes the session's processes read from files in the window.
+	TermaSensorFilesReadKey = "terma.sensor.files.read"
+	// TermaSensorFilesRemovedKey is terma.sensor.files.removed: The files the session's processes removed in the window.
+	TermaSensorFilesRemovedKey = "terma.sensor.files.removed"
+	// TermaSensorFilesWrittenKey is terma.sensor.files.written: The bytes the session's processes wrote to files in the window.
+	TermaSensorFilesWrittenKey = "terma.sensor.files.written"
+	// TermaSensorNetworkConnectionsKey is terma.sensor.network.connections: The connections to server.address that opened or closed in the window.
+	TermaSensorNetworkConnectionsKey = "terma.sensor.network.connections"
+	// TermaSensorNetworkReceivedKey is terma.sensor.network.received: The bytes the session's connections to server.address received in the window.
+	TermaSensorNetworkReceivedKey = "terma.sensor.network.received"
+	// TermaSensorNetworkSentKey is terma.sensor.network.sent: The bytes the session's connections to server.address sent in the window.
+	TermaSensorNetworkSentKey = "terma.sensor.network.sent"
+	// TermaSensorProcessesKey is terma.sensor.processes: The processes the session started in the window.
+	TermaSensorProcessesKey = "terma.sensor.processes"
+	// TermaSensorWindowKey is terma.sensor.window: The seconds a sensor rollup covers, ending at the record's time.
+	TermaSensorWindowKey = "terma.sensor.window"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
 	TermaSessionParentIDKey = "terma.session.parent.id"
 	// TermaSessionTitleKey is terma.session.title: The name the agent gave the session.
@@ -339,6 +367,14 @@ const (
 	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
 	TermaRelayHeartbeatEvent = "terma.relay.heartbeat"
+	// TermaSensorBlockEvent is terma.sensor.block: A sensor policy rule denied a session's connection or open, or would have.
+	TermaSensorBlockEvent = "terma.sensor.block"
+	// TermaSensorContainerEvent is terma.sensor.container: A container a session started, counted with the session from then on.
+	TermaSensorContainerEvent = "terma.sensor.container"
+	// TermaSensorFilesEvent is terma.sensor.files: What a session's processes did to files, and how many they started, over a sensor window.
+	TermaSensorFilesEvent = "terma.sensor.files"
+	// TermaSensorNetworkEvent is terma.sensor.network: A session's traffic to one host over a sensor window; sent with service.name terma-sensor.
+	TermaSensorNetworkEvent = "terma.sensor.network"
 	// TermaSessionAccountEvent is terma.session.account: The account state the session's agent holds.
 	TermaSessionAccountEvent = "terma.session.account"
 	// TermaSessionCaptureEvent is terma.session.capture: How a capture is going, kept apart from what it captured.
@@ -433,6 +469,10 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaSensorBlockKindConnect is terma.sensor.block.kind connect: A connection to a denied host or address.
+	TermaSensorBlockKindConnect = "connect"
+	// TermaSensorBlockKindOpen is terma.sensor.block.kind open: An open of a denied file or directory.
+	TermaSensorBlockKindOpen = "open"
 	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
 	TermaUpdateAutoOn = "on"
 	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).

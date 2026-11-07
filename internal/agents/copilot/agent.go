@@ -25,8 +25,11 @@ type Agent struct {
 	ConfigDir string
 }
 
-func (Agent) Name() string        { return name }
-func (Agent) DisplayName() string { return "GitHub Copilot" }
+func (Agent) Name() string { return name }
+
+// ProcessNames is what the sensor knows the agent's process by.
+func (Agent) ProcessNames() []string { return []string{command} }
+func (Agent) DisplayName() string    { return "GitHub Copilot" }
 
 // Installed looks for the CLI, or a VS Code whose Copilot has run on this machine.
 func (Agent) Installed(context.Context) bool {

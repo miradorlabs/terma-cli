@@ -27,6 +27,9 @@ type Agent struct {
 // Name is the agent's token.
 func (Agent) Name() string { return name }
 
+// ProcessNames is what the sensor knows the agent's process by.
+func (Agent) ProcessNames() []string { return []string{name} }
+
 // DisplayName is how prose names the agent.
 func (Agent) DisplayName() string { return displayName }
 

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Stands in for an agent: downloads with curl and python, writes, reads, renames and removes files.
+set -e
+cd "$(mktemp -d)"
+curl -s -o dl.bin 'https://speed.cloudflare.com/__down?bytes=20000000'
+python3 -c 'import urllib.request as u; u.urlopen(u.Request("https://speed.cloudflare.com/__down?bytes=5000000", headers={"User-Agent": "curl/8"})).read()'
+for i in 1 2 3 4 5 6 7 8; do curl -s -o /dev/null 'https://speed.cloudflare.com/__down?bytes=300000'; done
+head -c 3000000 /dev/urandom > notes.txt
+cat notes.txt > /dev/null
+mv notes.txt notes-final.txt
+rm dl.bin
+curl -s -o /dev/null --data-binary @notes-final.txt https://speed.cloudflare.com/__up
+sleep "${HOLD:-0}"

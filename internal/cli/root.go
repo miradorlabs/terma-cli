@@ -104,6 +104,8 @@ Every command is safe to run again.`,
 		app.newNateCommand(),
 		// Hidden until the e2e suites stop calling it (MIR-80); setup and doctor do its job.
 		app.newStatusCommand(),
+		// Hidden: the opt-in sensor is a spike; nothing installs or starts it.
+		app.newSensorCommand(),
 	)
 	return root
 }

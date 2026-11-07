@@ -1,0 +1,7 @@
+#!/bin/sh
+# Stands in for an agent under a policy: one host and one directory are denied.
+mkdir -p /tmp/secret && echo hunter2 > /tmp/secret/key
+curl -s -m 5 -o /dev/null -w 'denied host: %{http_code}\n' https://speed.cloudflare.com/__down?bytes=1000 || echo "denied host: curl exit $?"
+curl -s -m 5 -o /dev/null -w 'allowed host: %{http_code}\n' https://example.com/ || echo "allowed host: curl exit $?"
+cat /tmp/secret/key >/dev/null 2>&1 && echo "denied file: read" || echo "denied file: open failed"
+cat /etc/hostname >/dev/null && echo "allowed file: read"

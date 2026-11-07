@@ -645,3 +645,70 @@ events:
             When terma is signed in as a person in the profile's organization and environment,
             and the beat goes with the key of the team whose policy that login fetched, filed
             with the profile's own hosts, to the profile's own ingest.
+
+  - name: terma.sensor.network
+    stability: development
+    requirement_level: recommended
+    brief: A session's traffic to one host over a sensor window; sent with service.name terma-sensor.
+    note: >
+      One record per host the session's processes, and the containers it started, reached in
+      the window. The host is the name a DNS answer, a TLS or QUIC hello, or the connection
+      itself gave, else the address.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: server.address
+        requirement_level: required
+      - ref: terma.sensor.window
+        requirement_level: required
+      - ref: terma.sensor.network.sent
+        requirement_level: required
+      - ref: terma.sensor.network.received
+        requirement_level: required
+      - ref: terma.sensor.network.connections
+        requirement_level: required
+
+  - name: terma.sensor.files
+    stability: development
+    requirement_level: recommended
+    brief: What a session's processes did to files, and how many they started, over a sensor window.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: terma.sensor.window
+        requirement_level: required
+      - ref: terma.sensor.files.read
+        requirement_level: required
+      - ref: terma.sensor.files.written
+        requirement_level: required
+      - ref: terma.sensor.files.removed
+        requirement_level: required
+      - ref: terma.sensor.processes
+        requirement_level: required
+
+  - name: terma.sensor.block
+    stability: development
+    requirement_level: recommended
+    brief: A sensor policy rule denied a session's connection or open, or would have.
+    note: The target is not sent; the rule names what it denies.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: terma.sensor.block.kind
+        requirement_level: required
+      - ref: terma.sensor.block.rule
+        requirement_level: required
+      - ref: terma.sensor.block.enforced
+        requirement_level: required
+
+  - name: terma.sensor.container
+    stability: development
+    requirement_level: recommended
+    brief: A container a session started, counted with the session from then on.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: container.name
+        requirement_level: required
+      - ref: container.image.name
+        requirement_level: required

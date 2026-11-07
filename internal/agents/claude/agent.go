@@ -26,6 +26,10 @@ type Agent struct {
 // Name is the agent's token.
 func (Agent) Name() string { return name }
 
+// ProcessNames is what the sensor knows the agent's process by: the npm package links
+// `claude` to a native binary named claude.exe, which a direct exec is known by.
+func (Agent) ProcessNames() []string { return []string{name, "claude.exe"} }
+
 // DisplayName is how prose names the agent.
 func (Agent) DisplayName() string { return displayName }
 

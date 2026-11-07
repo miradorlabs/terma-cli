@@ -53,8 +53,9 @@ var genericSafeKeys = setOf(
 	"telemetry.sdk.language", "telemetry.sdk.name", "telemetry.sdk.version",
 )
 
-// genericSafePrefixes are key families that are numbers by construction.
-var genericSafePrefixes = []string{"gen_ai.usage."}
+// genericSafePrefixes are key families that are numbers by construction: token counts, and
+// the sensor's counts, windows and block kinds (never a path or a target).
+var genericSafePrefixes = []string{"gen_ai.usage.", "terma.sensor."}
 
 func setOf(keys ...string) map[string]bool {
 	m := make(map[string]bool, len(keys))

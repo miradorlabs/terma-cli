@@ -19,6 +19,8 @@ import (
 var hookContent = map[string][]string{
 	semconv.TermaToolCallEvent:          {semconv.GenAIToolCallArgumentsKey},
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
+	// The sensor's (sent by the relay, which withholds the same names by its allowlist).
+	semconv.TermaSensorContainerEvent: {semconv.ContainerNameKey, semconv.ContainerImageNameKey},
 }
 
 // contentFree are the event kinds that carry no content, or (a reply, a thread's name) that
@@ -34,6 +36,8 @@ var contentFree = map[string]bool{
 	semconv.TermaSubagentCallEvent: true, semconv.TermaSessionObservationEvent: true,
 	semconv.TermaAssistantMessageEvent: true, semconv.TermaSessionTitleEvent: true,
 	semconv.TermaModelCallResponseEvent: true,
+	// The sensor's counts, and the hosts the relay classes safe.
+	semconv.TermaSensorNetworkEvent: true, semconv.TermaSensorFilesEvent: true, semconv.TermaSensorBlockEvent: true,
 }
 
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without

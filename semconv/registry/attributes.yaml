@@ -892,3 +892,62 @@ attributes:
       may belong to another organization or environment. Terma sets it, so the platform shows it
       and never authorizes with it.
     examples: ["5b0e5f8c-3c2a-4d1e-9f6b-2a7c8d9e0f11"]
+
+  # The opt-in sensor (a spike): what an agent session's processes did on the machine,
+  # rolled up per window by `terma sensor` and placed by the relay through the session's
+  # claim. Counts and hosts only: never a file's path or a connection's content.
+  - key: terma.sensor.window
+    type: int
+    stability: development
+    brief: The seconds a sensor rollup covers, ending at the record's time.
+  - key: terma.sensor.network.sent
+    type: int
+    stability: development
+    brief: The bytes the session's connections to server.address sent in the window.
+  - key: terma.sensor.network.received
+    type: int
+    stability: development
+    brief: The bytes the session's connections to server.address received in the window.
+  - key: terma.sensor.network.connections
+    type: int
+    stability: development
+    brief: The connections to server.address that opened or closed in the window.
+  - key: terma.sensor.files.read
+    type: int
+    stability: development
+    brief: The bytes the session's processes read from files in the window.
+    note: Exact on Linux; macOS reports none (Endpoint Security does not count them).
+  - key: terma.sensor.files.written
+    type: int
+    stability: development
+    brief: The bytes the session's processes wrote to files in the window.
+    note: Exact on Linux; on macOS the size a modified file closed at, an upper bound.
+  - key: terma.sensor.files.removed
+    type: int
+    stability: development
+    brief: The files the session's processes removed in the window.
+  - key: terma.sensor.processes
+    type: int
+    stability: development
+    brief: The processes the session started in the window.
+  - key: terma.sensor.block.kind
+    type:
+      members:
+        - id: connect
+          value: connect
+          brief: A connection to a denied host or address.
+          stability: development
+        - id: open
+          value: open
+          brief: An open of a denied file or directory.
+          stability: development
+    stability: development
+    brief: What a sensor policy rule denied.
+  - key: terma.sensor.block.rule
+    type: int
+    stability: development
+    brief: The id of the policy rule that denied it.
+  - key: terma.sensor.block.enforced
+    type: boolean
+    stability: development
+    brief: Whether the policy blocked it (enforce mode) or only reported it (audit mode).

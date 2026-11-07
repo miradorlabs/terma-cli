@@ -1,0 +1,4 @@
+{"enforce": true, "rules": [
+  {"id": 1, "host": "speed.cloudflare.com"},
+  {"id": 2, "path": "/tmp/secret"}
+]}

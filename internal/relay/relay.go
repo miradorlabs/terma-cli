@@ -228,6 +228,8 @@ func (r *Relay) routes() *http.ServeMux {
 	for _, s := range []Signal{Logs, Metrics, Traces} {
 		mux.HandleFunc("/v1/"+string(s), func(w http.ResponseWriter, req *http.Request) { r.export(w, req, s) })
 	}
+	// `terma sensor` sends its rollups here, by root process (sensor.go).
+	mux.HandleFunc("/v1/sensor", r.sensor)
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, req *http.Request) {
 		if !r.authorized(req) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
