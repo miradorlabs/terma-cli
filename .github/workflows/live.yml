@@ -41,7 +41,10 @@ jobs:
       # what is new to classify, and a harness sending it still sends what terma expects.
       TERMA_E2E_UNCLASSIFIED: note
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -166,7 +169,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # Ubuntu 24.04 gives a process no capabilities in a user namespace it creates unless an
       # AppArmor profile allows it, so Codex's bwrap sandbox cannot bring up its loopback
       # ("bwrap: loopback: Failed RTM_NEWADDR") and every tool command fails. This runner is
@@ -231,6 +237,7 @@ jobs:
       group: compat-matrix
       cancel-in-progress: false
     steps:
+      # Keeps its token: this job pushes to compat-matrix (publish.sh).
       - uses: actions/checkout@v7
       - name: Start from the published history and catalog
         run: test/e2e/compatgen/publish.sh restore

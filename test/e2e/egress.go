@@ -192,7 +192,7 @@ func (p *EgressProxy) Serve(host, path string, body []byte) {
 // the scenario has it serve.
 func (p *EgressProxy) answer(w http.ResponseWriter, r *http.Request, host string) {
 	data, _ := io.ReadAll(io.LimitReader(r.Body, maxProfileBody))
-	req := ProviderRequest{Host: host, Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery,
+	req := ProviderRequest{Host: host, Method: r.Method, Path: r.URL.Path, Query: RedactQuery(r.URL.RawQuery),
 		Header: RedactHeader(r.Header), Status: http.StatusOK, At: time.Now().UTC()}
 	req.Body, req.Text = profileBody(r.Header.Get("Content-Encoding"), data)
 	p.mu.Lock()

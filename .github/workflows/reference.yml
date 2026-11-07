@@ -42,6 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           sparse-checkout: test/e2e/reference/new-builds.sh
           sparse-checkout-cone-mode: false
       - name: Ask the registries what is new
@@ -80,7 +81,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -134,7 +138,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # As the nightly machine job: Codex's bubblewrap needs capabilities in its user namespace.
       - name: Let sandboxes have capabilities in their user namespaces
         run: |
@@ -173,7 +180,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -229,6 +239,7 @@ jobs:
       group: compat-matrix
       cancel-in-progress: false
     steps:
+      # Keeps its token: this job pushes to compat-matrix (publish.sh).
       - uses: actions/checkout@v7
       - name: Start from the published reference
         run: test/e2e/compatgen/publish.sh restore

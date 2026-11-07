@@ -157,3 +157,23 @@ func TestNpmPackageRootOffline(t *testing.T) {
 		t.Errorf("npmPackageRoot(a lone executable) = %q, want none", got)
 	}
 }
+
+// A recorded request keeps its query as sent but for a credential's value.
+func TestRedactQueryOffline(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                                    "",
+		"beta=true":                           "beta=true",
+		"key=AIzaSyabc&alt=sse":               "key=[redacted]&alt=sse",
+		"api_key=x&access_token=y&page=2":     "api_key=[redacted]&access_token=[redacted]&page=2",
+		"X-Amz-Signature=abc&X-Amz-Date=2026": "X-Amz-Signature=[redacted]&X-Amz-Date=2026",
+		"sig=abc&v=1":                         "sig=[redacted]&v=1",
+		"q=sk-abcdefghijklmnopqrstuv":         "q=[redacted]",
+		"q=hello%20world&flag":                "q=hello%20world&flag",
+		"token=":                              "token=",
+		"monkey=banana":                       "monkey=banana",
+	} {
+		if got := RedactQuery(in); got != want {
+			t.Errorf("RedactQuery(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

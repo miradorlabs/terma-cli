@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -160,7 +161,7 @@ func CaptureProbe(t *testing.T, b Binary, probe string, next http.Handler) http.
 			t.Errorf("read the provider request: %v", err)
 		}
 		r.Body = io.NopCloser(bytes.NewReader(data))
-		req := ProviderRequest{Probe: probe, At: time.Now().UTC(), Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery, Header: RedactHeader(r.Header)}
+		req := ProviderRequest{Probe: probe, At: time.Now().UTC(), Method: r.Method, Path: r.URL.Path, Query: RedactQuery(r.URL.RawQuery), Header: RedactHeader(r.Header)}
 		req.Body, req.Text = profileBody(r.Header.Get("Content-Encoding"), data)
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
@@ -316,6 +317,35 @@ func RedactHeader(h http.Header) map[string][]string {
 		out[strings.ToLower(name)] = values
 	}
 	return out
+}
+
+// RedactQuery is a raw query string with no credential's value: a parameter whose name says it
+// holds a secret (key, token, signature, password, as a variable's does; sig), or whose value has
+// a credential's shape, is "[redacted]", as a credential header's value is. The rest is as sent,
+// in its order and encoding.
+func RedactQuery(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	parts := strings.Split(raw, "&")
+	for i, part := range parts {
+		k, v, ok := strings.Cut(part, "=")
+		if !ok || v == "" {
+			continue
+		}
+		name, err := url.QueryUnescape(k)
+		if err != nil {
+			name = k
+		}
+		value, err := url.QueryUnescape(v)
+		if err != nil {
+			value = v
+		}
+		if secretName(name) || strings.EqualFold(name, "sig") || secretValueRE.MatchString(value) {
+			parts[i] = k + "=[redacted]"
+		}
+	}
+	return strings.Join(parts, "&")
 }
 
 // ProfileBody is a request body as a profile keeps it: JSON as sent, or text.
