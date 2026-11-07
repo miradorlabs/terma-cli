@@ -853,7 +853,7 @@ func (s TraceScope) normalize(path string) string {
 			break
 		}
 	}
-	return s.normalizeSegments(path)
+	return s.normalizeSegments(MachinePaths(path))
 }
 
 // literals are the scope's literals, longest first.
@@ -961,7 +961,8 @@ func volatileSegment(seg string, inTmp bool) string {
 	return strings.ReplaceAll(seg, "\x00", "ed25519")
 }
 
-// installedDirs are where package managers install programs.
+// installedDirs are where package managers install programs: a file the build reads there is
+// dropped ("machine"), and a program it runs from there is named as MachinePaths names it.
 var installedDirs = []string{"/opt/homebrew/", "/usr/local/Cellar/", "/usr/local/lib/node_modules/", "/usr/local/opt/", "/home/linuxbrew/"}
 
 // mkdtempRE is a path ending in a dash and six letters or digits, as mkdtemp names a folder.
@@ -985,9 +986,10 @@ func mixedToken(tok string) bool {
 	return lower && upper || (lower || upper) && digit
 }
 
-// normalizeArgv is a command line with its paths and the run's values in placeholders. The
-// build's own helper processes take numbers (descriptors, process ids) the run picks: those
-// are <n>.
+// normalizeArgv is a command line with its paths and the run's values in placeholders, and
+// the machine's paths named as MachinePaths names them: a program a package manager installed
+// by its name, an Xcode's as <xcode>. The build's own helper processes take numbers
+// (descriptors, process ids) the run picks: those are <n>.
 func (s TraceScope) normalizeArgv(argv []string, exe string, own bool) []string {
 	if len(argv) == 0 {
 		argv = []string{exe}
@@ -1015,6 +1017,10 @@ func (s TraceScope) normalizeText(text string) string {
 	for lit, name := range s.Endpoints {
 		text = strings.ReplaceAll(text, lit, name)
 	}
+	// The machine's programs by their names, as a PATH lookup names them (/opt/homebrew/bin/git
+	// is git), Xcode as <xcode> whichever version the runner image has: the same build's
+	// commands read the same on any machine (machinepaths.go).
+	text = MachinePaths(text)
 	text = pathTokenRE.ReplaceAllStringFunc(text, s.normalizeSegments)
 	// An id the run made, in a name (Claude Code's keychain entry is named by a hash of its
 	// configuration folder).

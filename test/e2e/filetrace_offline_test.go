@@ -328,6 +328,20 @@ func TestTraceNormalizeOffline(t *testing.T) {
 			t.Errorf("normalizeText(%q) = %q, want %q", in, got, want)
 		}
 	}
+	// A program the runner image installed is named as on any machine: Homebrew's git by its
+	// name, Xcode's tools under <xcode> whichever version the image has.
+	for in, want := range map[string]string{
+		"/opt/homebrew/bin/git config user.name":                                            "git config user.name",
+		"/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -license check": "<xcode>/usr/bin/xcodebuild -license check",
+	} {
+		argv := strings.Fields(in)
+		if got := strings.Join(s.normalizeArgv(argv, argv[0], false), " "); got != want {
+			t.Errorf("normalizeArgv(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := s.normalize("/Applications/Xcode_26.6.app/Contents/Developer/usr/share/git-core/templates"); got != "<xcode>/usr/share/git-core/templates" {
+		t.Errorf("an Xcode path = %q", got)
+	}
 }
 
 // eslogger lines as Endpoint Security's JSON has them (the fields the trace reads, and enough
@@ -470,7 +484,8 @@ func TestFilesOfStubHandOffOffline(t *testing.T) {
 	scope := straceScope()
 	scope.Root = 100
 	got := slices.Sorted(maps.Keys(FilesOf(events, scope).Exec))
-	want := []string{xcode + " rev-parse HEAD", "git log -1", "git status --short"}
+	// Xcode's git under <xcode>, whichever Xcode the machine has (machinepaths.go).
+	want := []string{"<xcode>/usr/bin/git rev-parse HEAD", "git log -1", "git status --short"}
 	if !slices.Equal(got, want) {
 		t.Errorf("exec = %q, want %q", got, want)
 	}

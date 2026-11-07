@@ -519,6 +519,23 @@ Endpoint Security dropped because eslogger did not read them in time. A trace th
 not published (the section keeps the last whole one): it says nothing of what the build did
 not do.
 
+**Machine paths.** A command the build runs names the machine's programs as the machine has
+them: Homebrew's git at `/opt/homebrew/bin/git`, Xcode's tools under
+`/Applications/Xcode_26.6.app`. The same rule that drops what a package manager installed from
+`paths` (`machine`) names it in `exec`'s keys, `argv` and `parents`, so a runner image bump changes
+nothing: a program in a package manager's `bin` or `sbin` (`/opt/homebrew`,
+`/usr/local/Cellar`, `/usr/local/opt`, `/usr/local/lib/node_modules`, Linuxbrew's) is its name,
+as a PATH lookup names it (`git config user.name`), anything else it installed is `<machine>/`
+and its file's name, an Xcode's developer folder is `<xcode>` and its bundle `<xcode-app>`
+(`<xcode>/usr/bin/xcodebuild -license check`). The rule is `test/e2e/machinepaths.go`'s, the one
+set of them, which also names a user's home `<home>` (any `/Users/<name>` but `/Users/Shared`,
+and the runner's `/home/runner`), a CI runner's checkout `<checkout>`, and a desktop app's
+bundle where the suite unpacked it `<app>`. refgen applies it again to every observed value it
+publishes and loads back (paths, command lines, the desktop launch's variables, hook payloads,
+storage, network and binary facts; never a prompt, a tool's description, help or a
+configuration option's text, where a vendor names a path as an example), so a rule added there
+corrects what is already published at the next publish.
+
 **Sampling.** On macOS TCP and UDP sockets are sampled with lsof every 250 ms over the build's
 process tree: a socket opened and closed between two samples is missed (a short HTTP request),
 so `connections` there say less than strace's.
