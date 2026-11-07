@@ -287,10 +287,10 @@ func TestTraceNormalizeOffline(t *testing.T) {
 	s.Path = "/sb/path:/Users/me/.grok/bin:/usr/bin"
 	for in, want := range map[string]string{
 		"/sb/claude/projects/-sb-repo/0f8fad5b-d9cb-469f-a165-70867728950e.jsonl": "<claude-config>/projects/<repo-slug>/<uuid>.jsonl",
-		"/tmp/claude-3f2a-cwd":           "<tmp>/claude-<id>-cwd",
-		"/tmp/bun-node-a1b2c3d4e5f6a7b8": "<tmp>/bun-node-<hash>",
-		"/sb/home/.config/gh/hosts.yml":  "<home>/.config/gh/hosts.yml",
-		"/sbx/other":                     "/sbx/other",
+		"/tmp/claude-3f2a-cwd":                                     "<tmp>/claude-<id>-cwd",
+		"/tmp/bun-node-a1b2c3d4e5f6a7b8":                           "<tmp>/bun-node-<hash>",
+		"/sb/home/.config/gh/hosts.yml":                            "<home>/.config/gh/hosts.yml",
+		"/sbx/other":                                               "/sbx/other",
 		"/sb/claude/statsig/statsig.cached.evaluations.1234567890": "<claude-config>/statsig/statsig.cached.evaluations.<n>",
 		// What real builds write: Claude Code's atomic writes and per-process files, Codex's
 		// tempfile names, git's object folders, mkdtemp's and short hex names in /tmp.
