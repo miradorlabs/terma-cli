@@ -334,7 +334,19 @@ go run ./refgen -profiles report/profiles.json -fields report/fields.json -censu
 ```
 
 `-catalog docs/compat/fields.json` takes a census from the field catalog for each build a
-whole census saw, for a backfill whose builds were censused on earlier nights.
+whole census saw, for a backfill whose builds were censused on earlier nights. `-now` pins the
+time a run stamps, so two runs over the same input write the same bytes.
+
+refgen names the machine's paths (`machinepaths.go`: an installed program by its name, Xcode
+as `<xcode>`, a home `<home>`, a runner's checkout `<checkout>`) in every observed value it
+publishes, and in every snapshot it loads back, so republishing corrects what was published
+before a rule. `TestPublishNamesNoMachinePaths` is the guard over the fixtures; to scan a
+published tree, or a re-render of one, with the same rules:
+
+```sh
+git archive origin/compat-matrix docs | tar x -C /tmp/pub
+REFGEN_SCAN_DIR=/tmp/pub/docs/harnesses go test ./refgen -run TestPublishedMachineLeaks -v
+```
 
 A build's `config` itemizes every option it reads and every environment variable
 (`configschema/`). With `-source`, a public harness's are read from its source at the

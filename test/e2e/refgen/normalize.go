@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -160,4 +162,154 @@ func walkStrings(v any, f func(string) string) any {
 		return out
 	}
 	return v
+}
+
+// Machine paths. What a build ran and touched names the machine it ran on (an installed
+// program's path, an Xcode's, a user's home, the runner's checkout): e2e.MachinePaths names each
+// as on any machine. The recorders apply it as they record; publishing applies it again to
+// every snapshot it makes and to every one it loads back, so a rule added there corrects what
+// was published before it. It touches observed values alone, never a vendor's own text: a
+// system prompt's /home/user/monorepo or a tool's description's /Users/name/My Documents is
+// the build's, not the machine's.
+
+// machineField is a part of a snapshot that holds observed values: where the machine's paths
+// show, if anywhere.
+type machineField struct {
+	name string
+	get  func(s *Snapshot) any
+	set  func(s *Snapshot, v any)
+}
+
+// machineFields are the observed parts of a snapshot: the capture's command line, how a desktop
+// app launched its agent (its arguments and variables), the hooks' payloads and variables, the
+// network's egress, storage's paths, the files profile's paths and commands, and the binary's
+// facts. The rest (prompt, tools, help, configuration options, the vendor's docs, live) is the
+// vendor's text, or terma's.
+var machineFields = []machineField{
+	{"capture.command", func(s *Snapshot) any { return s.Capture.Command }, func(s *Snapshot, v any) {
+		s.Capture.Command = nil
+		for _, a := range v.([]any) {
+			s.Capture.Command = append(s.Capture.Command, a.(string))
+		}
+	}},
+	{"cli.launch", func(s *Snapshot) any { return s.CLI["launch"] }, func(s *Snapshot, v any) { s.CLI["launch"] = v }},
+	{"hooks", func(s *Snapshot) any { return s.Hooks }, func(s *Snapshot, v any) { s.Hooks = v.(map[string]any) }},
+	{"network", func(s *Snapshot) any { return s.Network }, func(s *Snapshot, v any) { s.Network = v.(map[string]any) }},
+	{"storage", func(s *Snapshot) any { return s.Storage }, func(s *Snapshot, v any) { s.Storage = v.(map[string]any) }},
+	{"filesystem", func(s *Snapshot) any { return s.Filesystem }, func(s *Snapshot, v any) { s.Filesystem = v.(map[string]any) }},
+	{"binary", func(s *Snapshot) any { return s.Binary }, func(s *Snapshot, v any) { s.Binary = v.(map[string]any) }},
+}
+
+// scrubMachine names the machine's paths in s's observed values (machineFields), and reports
+// whether it changed any. A field it leaves as it was keeps its values as they were.
+func scrubMachine(s *Snapshot) bool {
+	changed := false
+	for _, f := range machineFields {
+		v := f.get(s)
+		if v == nil || reflect.ValueOf(v).IsNil() {
+			continue
+		}
+		before := jsonOf(v)
+		after := scrubMachineTree(jsonOf(v))
+		if reflect.DeepEqual(before, after) {
+			continue
+		}
+		f.set(s, after)
+		changed = true
+	}
+	return changed
+}
+
+// scrubMachineTree is v with the machine's paths named in every string, map keys included. Two
+// keys that name the same once named (/opt/homebrew/bin/git status and git status) are one: their
+// values merged (mergeObserved), in the order of their keys as they were.
+func scrubMachineTree(v any) any {
+	switch x := v.(type) {
+	case string:
+		return e2e.MachinePaths(x)
+	case []any:
+		out := make([]any, len(x))
+		for i := range x {
+			out[i] = scrubMachineTree(x[i])
+		}
+		return out
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		out := make(map[string]any, len(x))
+		for _, k := range keys {
+			nk, nv := e2e.MachinePaths(k), scrubMachineTree(x[k])
+			if prev, ok := out[nk]; ok {
+				nv = mergeObserved(nk, prev, nv)
+			}
+			out[nk] = nv
+		}
+		return out
+	}
+	return v
+}
+
+// mergeObserved is what two observed values become when their keys name the same thing (a
+// command run from two installed paths): objects merged key by key, lists the first's with what
+// the second adds, counts added, a role either had both, anything else the first's.
+func mergeObserved(key string, a, b any) any {
+	switch x := a.(type) {
+	case map[string]any:
+		y, ok := b.(map[string]any)
+		if !ok {
+			return a
+		}
+		keys := make([]string, 0, len(y))
+		for k := range y {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if prev, ok := x[k]; ok {
+				x[k] = mergeObserved(k, prev, y[k])
+			} else {
+				x[k] = y[k]
+			}
+		}
+		return x
+	case []any:
+		y, _ := b.([]any)
+		for _, item := range y {
+			if !slices.ContainsFunc(x, func(have any) bool { return reflect.DeepEqual(have, item) }) {
+				x = append(x, item)
+			}
+		}
+		return x
+	case float64:
+		if y, ok := b.(float64); ok && key == "count" {
+			return x + y
+		}
+	case string:
+		if y, ok := b.(string); ok && key == "role" && x != y {
+			return e2e.RoleBoth
+		}
+	}
+	return a
+}
+
+// machineLeaks are the machine paths each observed value of s still holds once named, by field:
+// none, where publishing works. The publish-time guard and the check of published data use it.
+func machineLeaks(s *Snapshot) map[string][]string {
+	out := map[string][]string{}
+	for _, f := range machineFields {
+		v := f.get(s)
+		if v == nil || reflect.ValueOf(v).IsNil() {
+			continue
+		}
+		walkStrings(jsonOf(v), func(str string) string {
+			if l := e2e.MachineLeak(str); l != "" {
+				out[f.name] = append(out[f.name], str)
+			}
+			return str
+		})
+	}
+	return out
 }

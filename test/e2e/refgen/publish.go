@@ -43,11 +43,14 @@ type published struct {
 	diffs      map[string]map[string]*Diff
 	versions   map[string]map[string]VersionEntry
 	changelogs map[string]map[string]ChangelogNote
+	// rescrubbed are the snapshots whose machine paths load named (scrubMachine): published
+	// before a rule that names them, their diffs are made again.
+	rescrubbed map[buildID]bool
 }
 
 func load(dir string) (published, error) {
 	p := published{snapshots: map[string]map[string]*Snapshot{}, diffs: map[string]map[string]*Diff{}, versions: map[string]map[string]VersionEntry{},
-		changelogs: map[string]map[string]ChangelogNote{}}
+		changelogs: map[string]map[string]ChangelogNote{}, rescrubbed: map[buildID]bool{}}
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return p, nil
@@ -71,6 +74,10 @@ func load(dir string) (published, error) {
 			// was captured (it has a prompt), so its side requests were read, and there were none.
 			if s.Prompt != nil && s.SideRequests == nil {
 				s.SideRequests = []any{}
+			}
+			// What was published before a machine-path rule named it is named now.
+			if scrubMachine(&s) {
+				p.rescrubbed[buildID{h, s.Version}] = true
 			}
 			p.snapshots[h][s.Version] = &s
 		}
@@ -201,7 +208,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			from, to := versions[i-1], versions[i]
 			key := from + ".." + to
 			old := pub.diffs[h][key]
-			if old != nil && !changed[buildID{h, from}] && !changed[buildID{h, to}] {
+			fresh := !changed[buildID{h, from}] && !changed[buildID{h, to}] && !pub.rescrubbed[buildID{h, from}] && !pub.rescrubbed[buildID{h, to}]
+			if old != nil && fresh {
 				diffs[key] = old
 				continue
 			}

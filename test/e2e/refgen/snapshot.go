@@ -208,6 +208,7 @@ func (n night) tonight(id buildID) *Snapshot {
 	n.deriveFilesystem(s, id)
 	n.deriveTelemetry(s)
 	n.deriveSupport(s)
+	scrubMachine(s)
 	if len(present(s)) == 0 && slices.Contains(n.attempted, id) {
 		s.Capture = Capture{Partial: true, Notes: []string{"This build's capture failed; the next nightly run tries it again."}}
 	}
