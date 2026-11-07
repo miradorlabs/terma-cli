@@ -103,7 +103,18 @@ type DiffSource struct {
 type ChangelogNote struct {
 	URL  string `json:"url"`
 	Text string `json:"text"`
+	// Truncated says the vendor's text was longer than the reference publishes (a line past
+	// MaxChangelogLine, the whole past MaxChangelogText) and was cut to fit.
+	Truncated bool `json:"truncated,omitempty"`
 }
+
+// What the reference publishes of a vendor's changelog for one version, at most: the pages
+// that read it rely on these bounds rather than guarding every input themselves. The largest
+// published so far are 43.8 KB of text (Codex) and a 758-character line (Pi).
+const (
+	MaxChangelogText = 128 << 10
+	MaxChangelogLine = 2000
+)
 
 // DiffSummary counts a diff's changes.
 type DiffSummary struct {

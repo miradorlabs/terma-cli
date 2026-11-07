@@ -742,6 +742,12 @@ and `chars` are derived and never read as changes. The changelog is the vendor's
 changelog section for `to` (Claude Code, Copilot CLI) or the release notes of its tag
 (harnesses whose source is public).
 
+What the reference publishes of a changelog is bounded, so the pages that read it can rely on
+the bounds rather than guard every input: a line is at most 2,000 bytes (a longer one is cut
+there and ends `…`) and a version's text at most 128 KiB (cut at the last whole line that
+fits). A note that was cut has `"truncated": true`. The largest published so far are 43.8 KB
+of text (Codex) and a 758-character line (Pi), well inside both.
+
 Lists are compared by key: tools by `name`, telemetry by surface then key, hooks by event (a
 list of names, as `supported`, as a set), egress by host, method and path, capabilities by `id`
 and platform. Strings of more than one line are compared as text.
