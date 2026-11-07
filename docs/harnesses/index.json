@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T11:56:08.292632Z",
+  "generated_at": "2026-11-07T05:31:09Z",
   "harnesses": [
     {
       "id": "claude",
@@ -9,19 +9,17 @@
       "homepage": "https://claude.com/claude-code",
       "source": null,
       "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-      "latest": "2.1.318",
+      "latest": "2.1.319",
       "support": "supported",
-      "versions_tracked": 100,
+      "versions_tracked": 101,
       "first_tracked": "2026-07-09",
       "last_change": {
-        "from": "2.1.317",
-        "to": "2.1.318",
-        "at": "2026-11-05T09:54:28.532441Z",
-        "released_at": "2026-11-03T21:55:17.247Z",
-        "changes": 26,
-        "categories": {
-          "config": 26
-        }
+        "from": "2.1.318",
+        "to": "2.1.319",
+        "at": "2026-11-07T05:31:09Z",
+        "released_at": null,
+        "changes": 0,
+        "categories": {}
       }
     },
     {
@@ -47,21 +45,17 @@
         "language": "rust"
       },
       "changelog": "https://github.com/openai/codex/releases",
-      "latest": "0.166.0",
+      "latest": "0.167.0",
       "support": "supported",
-      "versions_tracked": 100,
+      "versions_tracked": 101,
       "first_tracked": "2026-01-25",
       "last_change": {
-        "from": "0.165.0",
-        "to": "0.166.0",
-        "at": "2026-11-05T09:54:28.532441Z",
-        "released_at": "2026-10-29T19:56:19.746Z",
-        "changes": 63,
-        "categories": {
-          "cli": 18,
-          "config": 24,
-          "telemetry": 21
-        }
+        "from": "0.166.0",
+        "to": "0.167.0",
+        "at": "2026-11-07T05:31:09Z",
+        "released_at": null,
+        "changes": 0,
+        "categories": {}
       }
     },
     {
@@ -100,15 +94,15 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/deepseek-ai/deepseek-harness/releases",
-      "latest": "0.2.1-rc.5",
+      "latest": "0.2.2-rc.1",
       "support": "supported",
-      "versions_tracked": 3,
+      "versions_tracked": 4,
       "first_tracked": "2026-09-29",
       "last_change": {
-        "from": "0.2.1-rc.2",
-        "to": "0.2.1-rc.5",
-        "at": "2026-11-05T11:12:22.390019Z",
-        "released_at": "2026-10-29T14:15:23.355Z",
+        "from": "0.2.1-rc.5",
+        "to": "0.2.2-rc.1",
+        "at": "2026-11-07T05:31:09Z",
+        "released_at": null,
         "changes": 0,
         "categories": {}
       }

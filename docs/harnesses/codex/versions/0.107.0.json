@@ -3524,22 +3524,6 @@
         "system": 474
       },
       "exec": {
-        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -license check": {
-          "argv": [
-            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
-            "-license",
-            "check"
-          ],
-          "by": "git",
-          "count": 1,
-          "parents": [
-            "git status --short"
-          ],
-          "phases": [
-            "turn"
-          ],
-          "role": "tool"
-        },
         "/bin/bash -c git status --short && git log --oneline -1": {
           "argv": [
             "/bin/bash",
@@ -3697,6 +3681,22 @@
           ],
           "purpose": "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell",
           "role": "harness"
+        },
+        "<xcode>/usr/bin/xcodebuild -license check": {
+          "argv": [
+            "<xcode>/usr/bin/xcodebuild",
+            "-license",
+            "check"
+          ],
+          "by": "git",
+          "count": 1,
+          "parents": [
+            "git status --short"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
         },
         "awk \n/^(export|declare -x|typeset -x) / {\n  line=$0\n  name=line\n  sub(/^(export|declare -x|typeset -x) /, \"\", name)\n  sub(/=.*/, \"\", name)\n  if (name ~ /^(PWD|OLDPWD)$/) {\n    next\n  }\n  if (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {\n    print line\n  }\n}": {
           "argv": [
@@ -5589,9 +5589,9 @@
       "tracer": "eslogger",
       "unobserved": {
         "exec": [
-          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
           "/bin/bash -lc git status --short && git log --oneline -1",
-          "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+          "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
+          "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
         ],
         "paths": [
           "<repo>/@rpath",

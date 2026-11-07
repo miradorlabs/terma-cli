@@ -3,6 +3,11 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.319",
+      "previous": "2.1.318",
+      "changes": []
+    },
+    {
       "version": "2.1.318",
       "previous": "2.1.317",
       "changes": [
@@ -800,34 +805,34 @@
           "documented": null
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() …` (+95 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` (+95 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": null
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+95 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c c …` (+95 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": null
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+95 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c c …` (+95 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": null
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false config user.name",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+95 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c c …` (+95 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": null
         },
@@ -1046,34 +1051,34 @@
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (+30 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (+30 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+30 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+30 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+30 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+30 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false config user.name",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+30 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+30 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -2782,18 +2787,18 @@
           "documented": true
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -3400,10 +3405,10 @@
           "documented": true
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -4457,114 +4462,114 @@
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false config user.name",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false config user.name",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "Command no longer run: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -5591,58 +5596,58 @@
           "documented": true
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (+23 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (+23 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+23 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+23 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+23 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+23 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false config user.name",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+23 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+23 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks rev-parse --abbrev-ref HEAD",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never --no-optional-locks symbolic-ref --short refs/remotes/origin/HEAD",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= config --get user.email",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
@@ -8296,34 +8301,34 @@
           "documented": true
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (+37 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (+37 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+37 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+37 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+37 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+37 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+80 −43 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+80 −43 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -9191,10 +9196,10 @@
           "documented": true
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+25 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+25 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -11463,58 +11468,58 @@
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (+95 −0 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (+95 −0 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git --no-optional-locks log --oneline -n 5` (darwin/arm64)",
+          "title": "Command no longer run: `git --no-optional-locks log --oneline -n 5` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git --no-optional-locks status --short",
+          "id": "filesystem.darwin/arm64.exec.git --no-optional-locks status --short",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git --no-optional-locks status --short` (darwin/arm64)",
+          "title": "Command no longer run: `git --no-optional-locks status --short` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name",
+          "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name",
           "category": "filesystem",
           "op": "added",
-          "title": "New command at startup: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (darwin/arm64)",
+          "title": "New command at startup: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (darwin/arm64)",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git config user.name",
+          "id": "filesystem.darwin/arm64.exec.git config user.name",
           "category": "filesystem",
           "op": "removed",
-          "title": "Command no longer run: `/opt/homebrew/bin/git config user.name` (darwin/arm64)",
+          "title": "Command no longer run: `git config user.name` (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
@@ -16537,10 +16542,10 @@
           "documented": false
         },
         {
-          "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+          "id": "filesystem.darwin/arm64.exec.git -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
           "category": "filesystem",
           "op": "changed",
-          "title": "Command changed: `/opt/homebrew/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin` (+88 −43 chars) (darwin/arm64)",
+          "title": "Command changed: `git -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin` (+70 −25 chars) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },

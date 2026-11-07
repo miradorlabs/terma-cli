@@ -9222,71 +9222,6 @@
           ],
           "role": "tool"
         },
-        "/opt/homebrew/bin/git --no-optional-locks log --oneline -n 5": {
-          "argv": [
-            "/opt/homebrew/bin/git",
-            "--no-optional-locks",
-            "log",
-            "--oneline",
-            "-n",
-            "5"
-          ],
-          "by": "claude",
-          "count": 1,
-          "parents": [],
-          "phases": [
-            "startup"
-          ],
-          "purpose": "reads the repository's state for the model's context",
-          "role": "harness"
-        },
-        "/opt/homebrew/bin/git --no-optional-locks status --short": {
-          "argv": [
-            "/opt/homebrew/bin/git",
-            "--no-optional-locks",
-            "status",
-            "--short"
-          ],
-          "by": "claude",
-          "count": 1,
-          "parents": [],
-          "phases": [
-            "startup"
-          ],
-          "purpose": "reads the repository's state for the model's context",
-          "role": "harness"
-        },
-        "/opt/homebrew/bin/git config user.name": {
-          "argv": [
-            "/opt/homebrew/bin/git",
-            "config",
-            "user.name"
-          ],
-          "by": "claude",
-          "count": 1,
-          "parents": [],
-          "phases": [
-            "startup"
-          ],
-          "purpose": "reads the user's git identity",
-          "role": "harness"
-        },
-        "/opt/homebrew/bin/git remote get-url origin": {
-          "argv": [
-            "/opt/homebrew/bin/git",
-            "remote",
-            "get-url",
-            "origin"
-          ],
-          "by": "claude",
-          "count": 1,
-          "parents": [],
-          "phases": [
-            "startup"
-          ],
-          "purpose": "reads the repository's state for the model's context",
-          "role": "harness"
-        },
         "/usr/libexec/path_helper -s": {
           "argv": [
             "/usr/libexec/path_helper",
@@ -9333,6 +9268,55 @@
           "purpose": "the spawn-env probe: reads the environment a shell the build starts has, beside the shell snapshot's",
           "role": "harness"
         },
+        "git --no-optional-locks log --oneline -n 5": {
+          "argv": [
+            "git",
+            "--no-optional-locks",
+            "log",
+            "--oneline",
+            "-n",
+            "5"
+          ],
+          "by": "claude",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git --no-optional-locks status --short": {
+          "argv": [
+            "git",
+            "--no-optional-locks",
+            "status",
+            "--short"
+          ],
+          "by": "claude",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
+        },
+        "git config user.name": {
+          "argv": [
+            "git",
+            "config",
+            "user.name"
+          ],
+          "by": "claude",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the user's git identity",
+          "role": "harness"
+        },
         "git log --oneline -1": {
           "argv": [
             "git",
@@ -9349,6 +9333,22 @@
             "turn"
           ],
           "role": "tool"
+        },
+        "git remote get-url origin": {
+          "argv": [
+            "git",
+            "remote",
+            "get-url",
+            "origin"
+          ],
+          "by": "claude",
+          "count": 1,
+          "parents": [],
+          "phases": [
+            "startup"
+          ],
+          "purpose": "reads the repository's state for the model's context",
+          "role": "harness"
         },
         "git status --short": {
           "argv": [

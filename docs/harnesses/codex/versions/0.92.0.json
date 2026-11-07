@@ -2784,22 +2784,6 @@
         "system": 178
       },
       "exec": {
-        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -license check": {
-          "argv": [
-            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
-            "-license",
-            "check"
-          ],
-          "by": "git",
-          "count": 1,
-          "parents": [
-            "git status --short"
-          ],
-          "phases": [
-            "turn"
-          ],
-          "role": "tool"
-        },
         "/bin/bash -lc git status --short && git log --oneline -1": {
           "argv": [
             "/bin/bash",
@@ -2895,6 +2879,22 @@
             "turn"
           ],
           "purpose": "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell",
+          "role": "tool"
+        },
+        "<xcode>/usr/bin/xcodebuild -license check": {
+          "argv": [
+            "<xcode>/usr/bin/xcodebuild",
+            "-license",
+            "check"
+          ],
+          "by": "git",
+          "count": 1,
+          "parents": [
+            "git status --short"
+          ],
+          "phases": [
+            "turn"
+          ],
           "role": "tool"
         },
         "git log --oneline -1": {
@@ -4455,8 +4455,8 @@
       "tracer": "eslogger",
       "unobserved": {
         "exec": [
-          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
-          "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+          "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
+          "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
         ],
         "paths": [
           "<repo>/@rpath",

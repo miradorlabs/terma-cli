@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "harness": "dsh",
+  "from": "0.2.1-rc.5",
+  "to": "0.2.2-rc.1",
+  "generated_at": "2026-11-07T05:31:09Z",
+  "source": {
+    "compare": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.5...dsh-v0.2.2-rc.1"
+  },
+  "changelog": null,
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": null
+  },
+  "changes": []
+}

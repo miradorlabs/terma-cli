@@ -3,7 +3,7 @@
   "harness": "claude",
   "from": "2.1.268",
   "to": "2.1.269",
-  "generated_at": "2026-11-05T09:54:28.532441Z",
+  "generated_at": "2026-11-07T05:31:09Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
@@ -3372,19 +3372,19 @@
       "documented": true
     },
     {
-      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
       "category": "filesystem",
       "op": "changed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin"
+        "git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin"
       ],
-      "title": "Command changed: `/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log …` (+37 −0 chars) (darwin/arm64)",
+      "title": "Command changed: `git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=fal …` (+37 −0 chars) (darwin/arm64)",
       "impact": "informational",
-      "before": "/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
-      "after": "/opt/homebrew/bin/git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "before": "git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+      "after": "git -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
       "text_diff": "@@ -3,5 +3,7 @@\n -c protocol.ext.allow=never\n -c submodule.recurse=false\n -c log.showSignature=false\n+-c gc.auto=0\n+-c maintenance.auto=false\n -c core.hooksPath=/dev/null\n -c core.fsmonitor= remote get-url origin\n",
       "stats": {
         "added_chars": 37,
@@ -3395,19 +3395,19 @@
       "documented": false
     },
     {
-      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
+      "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
       "category": "filesystem",
       "op": "changed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5"
+        "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5"
       ],
-      "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+37 −0 chars) (darwin/arm64)",
+      "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+37 −0 chars) (darwin/arm64)",
       "impact": "informational",
-      "before": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5",
-      "after": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
+      "before": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks log --oneline -n 5",
+      "after": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks log --oneline -n 5",
       "text_diff": "@@ -5,6 +5,8 @@\n -c protocol.ext.allow=never\n -c submodule.recurse=false\n -c log.showSignature=false\n+-c gc.auto=0\n+-c maintenance.auto=false\n --no-optional-locks log\n --oneline\n -n 5\n",
       "stats": {
         "added_chars": 37,
@@ -3418,19 +3418,19 @@
       "documented": false
     },
     {
-      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
+      "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
       "category": "filesystem",
       "op": "changed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty"
+        "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty"
       ],
-      "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+37 −0 chars) (darwin/arm64)",
+      "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+37 −0 chars) (darwin/arm64)",
       "impact": "informational",
-      "before": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
-      "after": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
+      "before": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
+      "after": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false --no-optional-locks status --short --ignore-submodules=dirty",
       "text_diff": "@@ -5,6 +5,8 @@\n -c protocol.ext.allow=never\n -c submodule.recurse=false\n -c log.showSignature=false\n+-c gc.auto=0\n+-c maintenance.auto=false\n --no-optional-locks status\n --short\n --ignore-submodules=dirty\n",
       "stats": {
         "added_chars": 37,
@@ -3441,19 +3441,19 @@
       "documented": false
     },
     {
-      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name",
+      "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name",
       "category": "filesystem",
       "op": "changed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name"
+        "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name"
       ],
-      "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+80 −43 chars) (darwin/arm64)",
+      "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+80 −43 chars) (darwin/arm64)",
       "impact": "informational",
-      "before": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name",
-      "after": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name",
+      "before": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false config user.name",
+      "after": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false -c gc.auto=0 -c maintenance.auto=false config user.name",
       "text_diff": "@@ -4,4 +4,6 @@\n -c core.askPass=\n -c protocol.ext.allow=never\n -c submodule.recurse=false\n--c log.showSignature=false config user.name\n+-c log.showSignature=false\n+-c gc.auto=0\n+-c maintenance.auto=false config user.name\n",
       "stats": {
         "added_chars": 80,

@@ -3,7 +3,7 @@
   "harness": "claude",
   "from": "2.1.263",
   "to": "2.1.265",
-  "generated_at": "2026-11-05T09:54:28.532441Z",
+  "generated_at": "2026-11-07T05:31:09Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
@@ -594,19 +594,19 @@
       "documented": true
     },
     {
-      "id": "filesystem.darwin/arm64.exec./opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
+      "id": "filesystem.darwin/arm64.exec.git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
       "category": "filesystem",
       "op": "changed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty"
+        "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty"
       ],
-      "title": "Command changed: `/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ex …` (+25 −0 chars) (darwin/arm64)",
+      "title": "Command changed: `git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c s …` (+25 −0 chars) (darwin/arm64)",
       "impact": "informational",
-      "before": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short",
-      "after": "/opt/homebrew/bin/git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
+      "before": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short",
+      "after": "git -c core.fsmonitor= -c core.hooksPath=/dev/null -c core.askPass= -c protocol.ext.allow=never -c submodule.recurse=false -c log.showSignature=false --no-optional-locks status --short --ignore-submodules=dirty",
       "text_diff": "@@ -7,3 +7,4 @@\n -c log.showSignature=false\n --no-optional-locks status\n --short\n+--ignore-submodules=dirty\n",
       "stats": {
         "added_chars": 25,

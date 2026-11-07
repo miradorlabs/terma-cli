@@ -3,6 +3,11 @@
   "harness": "dsh",
   "steps": [
     {
+      "version": "0.2.2-rc.1",
+      "previous": "0.2.1-rc.5",
+      "changes": []
+    },
+    {
       "version": "0.2.1-rc.5",
       "previous": "0.2.1-rc.2",
       "changes": []

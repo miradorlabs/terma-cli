@@ -3,8 +3,8 @@
   "harness": "dsh",
   "window": {
     "oldest": "0.2.0-rc.2",
-    "newest": "0.2.1-rc.5",
-    "builds": 3
+    "newest": "0.2.2-rc.1",
+    "builds": 4
   },
   "items": {
     "cli.commands.dsh headless": {

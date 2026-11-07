@@ -11,20 +11,41 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/deepseek-ai/deepseek-harness/releases",
-    "latest": "0.2.1-rc.5",
+    "latest": "0.2.2-rc.1",
     "support": "supported",
-    "versions_tracked": 3,
+    "versions_tracked": 4,
     "first_tracked": "2026-09-29",
     "last_change": {
-      "from": "0.2.1-rc.2",
-      "to": "0.2.1-rc.5",
-      "at": "2026-11-05T11:12:22.390019Z",
-      "released_at": "2026-10-29T14:15:23.355Z",
+      "from": "0.2.1-rc.5",
+      "to": "0.2.2-rc.1",
+      "at": "2026-11-07T05:31:09Z",
+      "released_at": null,
       "changes": 0,
       "categories": {}
     }
   },
   "versions": [
+    {
+      "version": "0.2.2-rc.1",
+      "released_at": null,
+      "captured_at": "2026-11-07T05:31:09Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.1-rc.5",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
     {
       "version": "0.2.1-rc.5",
       "released_at": "2026-10-29T14:15:23.355Z",

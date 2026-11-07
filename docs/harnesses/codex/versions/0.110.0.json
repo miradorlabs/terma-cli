@@ -3595,22 +3595,6 @@
         "system": 451
       },
       "exec": {
-        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -license check": {
-          "argv": [
-            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
-            "-license",
-            "check"
-          ],
-          "by": "git",
-          "count": 1,
-          "parents": [
-            "git status --short"
-          ],
-          "phases": [
-            "turn"
-          ],
-          "role": "tool"
-        },
         "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'printf '\"'\"'written by the files profile\\n'\"'\"' > notes.txt'": {
           "argv": [
             "/bin/bash",
@@ -3756,6 +3740,22 @@
           ],
           "purpose": "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell",
           "role": "both"
+        },
+        "<xcode>/usr/bin/xcodebuild -license check": {
+          "argv": [
+            "<xcode>/usr/bin/xcodebuild",
+            "-license",
+            "check"
+          ],
+          "by": "git",
+          "count": 1,
+          "parents": [
+            "git status --short"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
         },
         "awk $2==\"on\"{print $1}": {
           "argv": [
@@ -5833,10 +5833,10 @@
       "tracer": "eslogger",
       "unobserved": {
         "exec": [
-          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
           "/bin/bash -c git status --short && git log --oneline -1",
           "/bin/bash -c if . '<codex-home>/shell_snapshots/<uuid>.sh' >/dev/null 2>&1; then :; fi\n\nexec '/bin/bash' -c 'git status --short && git log --oneline -1'",
-          "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+          "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
+          "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
         ],
         "paths": [
           "<repo>/@rpath",

@@ -11,24 +11,42 @@
       "language": "rust"
     },
     "changelog": "https://github.com/openai/codex/releases",
-    "latest": "0.166.0",
+    "latest": "0.167.0",
     "support": "supported",
-    "versions_tracked": 100,
+    "versions_tracked": 101,
     "first_tracked": "2026-01-25",
     "last_change": {
-      "from": "0.165.0",
-      "to": "0.166.0",
-      "at": "2026-11-05T09:54:28.532441Z",
-      "released_at": "2026-10-29T19:56:19.746Z",
-      "changes": 63,
-      "categories": {
-        "cli": 18,
-        "config": 24,
-        "telemetry": 21
-      }
+      "from": "0.166.0",
+      "to": "0.167.0",
+      "at": "2026-11-07T05:31:09Z",
+      "released_at": null,
+      "changes": 0,
+      "categories": {}
     }
   },
   "versions": [
+    {
+      "version": "0.167.0",
+      "released_at": null,
+      "captured_at": "2026-11-07T05:31:09Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.166.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
     {
       "version": "0.166.0",
       "released_at": "2026-10-29T19:56:19.746Z",
@@ -131,22 +149,22 @@
       ],
       "support": "supported",
       "previous": "0.162.1",
-      "changes": 73,
+      "changes": 264,
       "categories": {
         "binary": 1,
         "caching": 1,
         "cli": 9,
         "config": 53,
         "filesystem": 4,
-        "telemetry": 5
+        "telemetry": 196
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 66,
+        "informational": 257,
         "notable": 7
       },
-      "undocumented": 52,
+      "undocumented": 224,
       "highlights": [
         "Caching across_turns.stable_prefix_chars: 996 → 552",
         "New setting: features.credential_masking",
@@ -157,29 +175,27 @@
     {
       "version": "0.162.1",
       "released_at": "2026-10-09T19:50:30.512Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
+      "captured_at": "2026-11-07T05:31:09Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.162.0",
-      "changes": 193,
+      "changes": 2,
       "categories": {
-        "cli": 2,
-        "telemetry": 191
+        "cli": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 193,
+        "informational": 2,
         "notable": 0
       },
-      "undocumented": 191,
+      "undocumented": 2,
       "highlights": [
-        "New telemetry surface: logs/codex.api_request (19 fields)",
-        "New telemetry surface: logs/codex.conversation_starts (19 fields)",
-        "New telemetry surface: logs/codex.sse_event (19 fields)"
+        "Description of `codex agents` changed",
+        "Full help text of `agents --help` changed (+88 −0 chars)"
       ],
       "signing": "valid"
     },

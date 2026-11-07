@@ -4306,40 +4306,6 @@
         "test": 18
       },
       "exec": {
-        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -license check": {
-          "argv": [
-            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
-            "-license",
-            "check"
-          ],
-          "by": "git",
-          "count": 1,
-          "parents": [
-            "git status --short"
-          ],
-          "phases": [
-            "turn"
-          ],
-          "role": "tool"
-        },
-        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git": {
-          "argv": [
-            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
-            "-sdk",
-            "/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
-            "-find",
-            "git"
-          ],
-          "by": "sh",
-          "count": 1,
-          "parents": [
-            "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
-          ],
-          "phases": [
-            "turn"
-          ],
-          "role": "tool"
-        },
         "/bin/bash -c git status --short && git log --oneline -1": {
           "argv": [
             "/bin/bash",
@@ -4500,6 +4466,40 @@
           "purpose": "builds a login shell's PATH from /etc/paths: macOS's /etc/zprofile runs it in every login shell",
           "role": "harness"
         },
+        "<xcode>/usr/bin/xcodebuild -license check": {
+          "argv": [
+            "<xcode>/usr/bin/xcodebuild",
+            "-license",
+            "check"
+          ],
+          "by": "git",
+          "count": 1,
+          "parents": [
+            "git status --short"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
+        "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git": {
+          "argv": [
+            "<xcode>/usr/bin/xcodebuild",
+            "-sdk",
+            "<xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+            "-find",
+            "git"
+          ],
+          "by": "sh",
+          "count": 1,
+          "parents": [
+            "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+          ],
+          "phases": [
+            "turn"
+          ],
+          "role": "tool"
+        },
         "awk $2==\"on\"{print $1}": {
           "argv": [
             "awk",
@@ -4657,11 +4657,11 @@
           "purpose": "the shell snapshot: captures the login shell's environment for the shell tool",
           "role": "harness"
         },
-        "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null": {
+        "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null": {
           "argv": [
             "sh",
             "-c",
-            "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+            "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
           ],
           "by": "git",
           "count": 1,

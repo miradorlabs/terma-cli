@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.166.0",
+  "to": "0.167.0",
+  "generated_at": "2026-11-07T05:31:09Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.166.0...rust-v0.167.0"
+  },
+  "changelog": null,
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": null
+  },
+  "changes": []
+}

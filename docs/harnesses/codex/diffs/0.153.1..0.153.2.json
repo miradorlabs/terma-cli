@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.153.1",
   "to": "0.153.2",
-  "generated_at": "2026-11-05T09:54:28.532441Z",
+  "generated_at": "2026-11-07T05:31:09Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.153.1...rust-v0.153.2"
   },
@@ -103,29 +103,29 @@
       "documented": false
     },
     {
-      "id": "filesystem.darwin/arm64.exec./Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
+      "id": "filesystem.darwin/arm64.exec.<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
       "category": "filesystem",
       "op": "removed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git"
+        "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git"
       ],
-      "title": "Command no longer run: `/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app …` (darwin/arm64)",
+      "title": "Command no longer run: `<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find gi …` (darwin/arm64)",
       "impact": "informational",
       "before": {
         "argv": [
-          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild",
+          "<xcode>/usr/bin/xcodebuild",
           "-sdk",
-          "/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+          "<xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
           "-find",
           "git"
         ],
         "by": "sh",
         "count": 1,
         "parents": [
-          "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+          "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
         ],
         "phases": [
           "turn"
@@ -139,22 +139,22 @@
       "documented": false
     },
     {
-      "id": "filesystem.darwin/arm64.exec.sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null",
+      "id": "filesystem.darwin/arm64.exec.sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null",
       "category": "filesystem",
       "op": "removed",
       "path": [
         "filesystem",
         "darwin/arm64",
         "exec",
-        "sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+        "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
       ],
-      "title": "Command no longer run: `sh -c /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26 …` (darwin/arm64)",
+      "title": "Command no longer run: `sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -f …` (darwin/arm64)",
       "impact": "informational",
       "before": {
         "argv": [
           "sh",
           "-c",
-          "/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
+          "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
         ],
         "by": "git",
         "count": 1,
