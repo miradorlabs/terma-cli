@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"math/rand/v2"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -97,4 +99,51 @@ func fsPlatforms(m map[string]any) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// missedBetween finds what the pass over every other set found: the keys a set before and a set
+// after have and a set has not, for any sets.
+func TestMissedBetweenMatchesEveryPair(t *testing.T) {
+	naive := func(sets []map[string]bool) [][]string {
+		out := make([][]string, len(sets))
+		for i, s := range sets {
+			if s == nil {
+				continue
+			}
+			before, after := map[string]bool{}, map[string]bool{}
+			for j := range i {
+				for k := range sets[j] {
+					before[k] = true
+				}
+			}
+			for j := i + 1; j < len(sets); j++ {
+				for k := range sets[j] {
+					after[k] = true
+				}
+			}
+			for k := range before {
+				if after[k] && !s[k] {
+					out[i] = append(out[i], k)
+				}
+			}
+			sort.Strings(out[i])
+		}
+		return out
+	}
+	rng := rand.New(rand.NewPCG(1, 2))
+	for range 500 {
+		sets := make([]map[string]bool, rng.IntN(8))
+		for i := range sets {
+			if rng.IntN(5) == 0 {
+				continue // takes no part
+			}
+			sets[i] = map[string]bool{}
+			for range rng.IntN(6) {
+				sets[i][string(rune('a'+rng.IntN(8)))] = true
+			}
+		}
+		if got, want := missedBetween(sets), naive(sets); !reflect.DeepEqual(got, want) {
+			t.Fatalf("missedBetween(%v) = %v, want %v", sets, got, want)
+		}
+	}
 }

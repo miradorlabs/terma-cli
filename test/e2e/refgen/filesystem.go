@@ -143,36 +143,26 @@ func markUnobservedFilesystem(versions []string, byVersion map[string]*Snapshot)
 				}
 			}
 		}
-		for i, v := range versions {
-			if per[i] == nil {
-				continue
+		gaps := make([]map[string]any, len(versions))
+		for _, part := range fsParts {
+			sets := make([]map[string]bool, len(versions))
+			for i := range versions {
+				if per[i] != nil {
+					sets[i] = per[i][part.name]
+				}
 			}
-			gaps := map[string]any{}
-			for _, part := range fsParts {
-				before, after := map[string]bool{}, map[string]bool{}
-				for j := range i {
-					for k := range per[j][part.name] {
-						before[k] = true
-					}
-				}
-				for j := i + 1; j < len(versions); j++ {
-					for k := range per[j][part.name] {
-						after[k] = true
-					}
-				}
-				var missed []string
-				for k := range before {
-					if after[k] && !per[i][part.name][k] {
-						missed = append(missed, k)
-					}
-				}
+			for i, missed := range missedBetween(sets) {
 				if len(missed) > 0 {
-					sort.Strings(missed)
-					gaps[part.name] = missed
+					if gaps[i] == nil {
+						gaps[i] = map[string]any{}
+					}
+					gaps[i][part.name] = missed
 				}
 			}
-			if len(gaps) > 0 {
-				byVersion[v].Filesystem[plat].(map[string]any)["unobserved"] = gaps
+		}
+		for i, v := range versions {
+			if len(gaps[i]) > 0 {
+				byVersion[v].Filesystem[plat].(map[string]any)["unobserved"] = gaps[i]
 			}
 		}
 	}

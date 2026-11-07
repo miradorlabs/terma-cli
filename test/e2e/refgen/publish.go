@@ -549,36 +549,50 @@ func markUnobserved(versions []string, byVersion map[string]*Snapshot) {
 		}
 		delete(cfg, "unobserved")
 	}
-	for i, v := range versions {
-		if !approx[i] || len(tops[i]) == 0 {
-			continue
-		}
-		before, after := map[string]bool{}, map[string]bool{}
-		for j := range i {
-			if approx[j] {
-				for k := range tops[j] {
-					before[k] = true
-				}
-			}
-		}
-		for j := i + 1; j < len(versions); j++ {
-			if approx[j] {
-				for k := range tops[j] {
-					after[k] = true
-				}
-			}
-		}
-		var gaps []string
-		for k := range before {
-			if after[k] && !tops[i][k] {
-				gaps = append(gaps, k)
-			}
-		}
-		if len(gaps) > 0 {
-			sort.Strings(gaps)
-			byVersion[v].Config["unobserved"] = gaps
+	sets := make([]map[string]bool, len(versions))
+	for i := range versions {
+		if approx[i] {
+			sets[i] = tops[i]
 		}
 	}
+	for i, gaps := range missedBetween(sets) {
+		if len(tops[i]) > 0 && len(gaps) > 0 {
+			byVersion[versions[i]].Config["unobserved"] = gaps
+		}
+	}
+}
+
+// missedBetween is, for each of sets (one a version, in order; nil one that takes no part), the
+// keys some set before it and some set after it have and it has not, sorted: nil for a nil set.
+// Each key's first and last set say it, so it takes one pass over the sets and one over the
+// keys for each, not a pass over every other set for each.
+func missedBetween(sets []map[string]bool) [][]string {
+	first, last := map[string]int{}, map[string]int{}
+	for i, s := range sets {
+		for k := range s {
+			if _, seen := first[k]; !seen {
+				first[k] = i
+			}
+			last[k] = i
+		}
+	}
+	keys := make([]string, 0, len(first))
+	for k := range first {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([][]string, len(sets))
+	for i, s := range sets {
+		if s == nil {
+			continue
+		}
+		for _, k := range keys {
+			if first[k] < i && last[k] > i && !s[k] {
+				out[i] = append(out[i], k)
+			}
+		}
+	}
+	return out
 }
 
 // markUnobservedEvents says, of each build's vendor telemetry endpoint, the events builds
@@ -600,28 +614,18 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 			}
 		}
 	}
+	missed := map[string][][]string{} // endpoint → each version's gaps there
 	for i, v := range versions {
 		tel, _ := byVersion[v].Network["telemetry"].(map[string]any)
 		for ep, raw := range tel {
-			before, after := map[string]bool{}, map[string]bool{}
-			for j := range i {
-				for name := range per[j][ep] {
-					before[name] = true
+			if _, done := missed[ep]; !done {
+				sets := make([]map[string]bool, len(versions))
+				for j := range versions {
+					sets[j] = per[j][ep]
 				}
+				missed[ep] = missedBetween(sets)
 			}
-			for j := i + 1; j < len(versions); j++ {
-				for name := range per[j][ep] {
-					after[name] = true
-				}
-			}
-			var gaps []string
-			for name := range before {
-				if after[name] && !per[i][ep][name] {
-					gaps = append(gaps, name)
-				}
-			}
-			if len(gaps) > 0 {
-				sort.Strings(gaps)
+			if gaps := missed[ep][i]; len(gaps) > 0 {
 				raw.(map[string]any)["unobserved"] = gaps
 			}
 		}
