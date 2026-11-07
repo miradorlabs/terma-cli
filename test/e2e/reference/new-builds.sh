@@ -14,11 +14,15 @@ set -euo pipefail
 base=${TERMA_REFERENCE_URL:-https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses}
 max=${TERMA_REFERENCE_MAX:-5}
 
-# vsort sorts versions as the reference ranks them (refdiff.VersionCompare): a prerelease
-# before its release (0.2.1-rc.10 before 0.2.1), which sort -V alone puts after it. sort -V
-# ranks "~" before anything, the end of a version included, so the prerelease's "-" is a "~"
-# while it sorts. Its arguments are sort's (-u).
-vsort() { sed 's/-/~/' | sort -V "$@" | sed 's/~/-/'; }
+# vsort sorts versions as the reference ranks them: it is refdiff.VersionCompare itself
+# (refdiff/cmd/versionsort, built once here from test/e2e's go.mod and refdiff alone, no module
+# to download), so the frequent check and the published order never disagree. Its arguments are
+# versionsort's (-u).
+e2e_dir=$(cd "$(dirname "$0")/.." && pwd)
+vsort_dir=$(mktemp -d)
+trap 'rm -rf "$vsort_dir"' EXIT
+(cd "$e2e_dir" && go build -o "$vsort_dir/versionsort" ./refdiff/cmd/versionsort)
+vsort() { "$vsort_dir/versionsort" "$@"; }
 
 # The builds the suite can fetch by version (TERMA_E2E_<HARNESS>_VERSIONS), each with its
 # npm package, read in npm's abbreviated form (versions and tags, not every manifest).

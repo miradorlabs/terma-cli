@@ -3,7 +3,6 @@ package refdiff
 import (
 	"math/rand/v2"
 	"os"
-	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -46,43 +45,20 @@ func TestVersionOrder(t *testing.T) {
 	}
 }
 
-// The frequent check's shell sorts versions as VersionCompare does, for the versions the
-// registries and update feeds publish: dotted releases, prereleases (DeepSeek Harness's
-// 0.2.1-rc.N, which sort -V alone puts after 0.2.1), and the desktop apps' releases.
-func TestShellVersionSortAgrees(t *testing.T) {
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("no bash")
-	}
+// The shell scripts sort versions with refdiff's own ordering (cmd/versionsort), never sort -V,
+// whose suffix handling ranks a prerelease like rc-1 or alpha.beta otherwise.
+func TestShellSortsWithVersionsort(t *testing.T) {
 	for _, script := range []string{"../reference/new-builds.sh", "../reference/backfill.sh"} {
 		data, err := os.ReadFile(script)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var def string
-		for line := range strings.Lines(string(data)) {
-			if strings.HasPrefix(line, "vsort()") {
-				def = line
-			}
+		s := string(data)
+		if strings.Contains(s, "sort -V") {
+			t.Errorf("%s sorts with sort -V", script)
 		}
-		if def == "" {
-			t.Fatalf("%s defines no vsort", script)
-		}
-		want := []string{"0.2.1-rc.1", "0.2.1-rc.5", "0.2.1-rc.9", "0.2.1-rc.10", "0.2.1", "0.2.2-rc.1",
-			"1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-beta", "1.0.0", "1.2", "1.2.0", "2.1.9", "2.1.10", "2.1.300", "26.1029.70936", "26.1030.1"}
-		in := slices.Clone(want)
-		rand.Shuffle(len(in), func(i, j int) { in[i], in[j] = in[j], in[i] })
-		cmd := exec.Command("bash", "-c", def+"\nvsort")
-		cmd.Stdin = strings.NewReader(strings.Join(in, "\n") + "\n")
-		out, err := cmd.Output()
-		if err != nil {
-			t.Skipf("sort -V: %v", err)
-		}
-		got := strings.Fields(string(out))
-		if !slices.Equal(got, want) {
-			t.Errorf("%s's vsort = %q, want %q", script, got, want)
-		}
-		if !slices.IsSortedFunc(want, VersionCompare) {
-			t.Errorf("VersionCompare disagrees with %q", want)
+		if !strings.Contains(s, "./refdiff/cmd/versionsort") || !strings.Contains(s, "vsort()") {
+			t.Errorf("%s does not sort with refdiff/cmd/versionsort", script)
 		}
 	}
 }

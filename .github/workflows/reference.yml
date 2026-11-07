@@ -43,8 +43,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-          sparse-checkout: test/e2e/reference/new-builds.sh
+          # The script, and what it builds its version sort from: refdiff, which needs no
+          # module but the standard library.
+          sparse-checkout: |
+            test/e2e/reference/new-builds.sh
+            test/e2e/go.mod
+            test/e2e/go.sum
+            test/e2e/refdiff/
           sparse-checkout-cone-mode: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache: false
       - name: Ask the registries what is new
         id: new
         run: |

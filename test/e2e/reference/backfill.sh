@@ -36,9 +36,10 @@ copilot) pkg=@github/copilot name=Copilot ;;
 esac
 var="TERMA_E2E_$(tr '[:lower:]' '[:upper:]' <<<"$harness")_VERSIONS"
 
-# vsort sorts versions as the reference ranks them, a prerelease before its release
-# (new-builds.sh says how).
-vsort() { sed 's/-/~/' | sort -V "$@" | sed 's/~/-/'; }
+# vsort sorts versions as the reference ranks them (refdiff/cmd/versionsort, as new-builds.sh).
+vsort_dir=$(mktemp -d)
+go build -o "$vsort_dir/versionsort" ./refdiff/cmd/versionsort
+vsort() { "$vsort_dir/versionsort" "$@"; }
 
 if [ -n "${BACKFILL_VERSIONS:-}" ]; then
 	versions=$(tr ', ' '\n\n' <<<"$BACKFILL_VERSIONS" | grep . | vsort)
@@ -46,6 +47,7 @@ else
 	versions=$(curl -fsSL -H "Accept: application/vnd.npm.install-v1+json" "https://registry.npmjs.org/${pkg//\//%2F}" |
 		jq -r '.versions | keys[]' | grep -E '^[0-9]+(\.[0-9]+)*$' | vsort | tail -n "$count")
 fi
+rm -rf "$vsort_dir"
 tests=${BACKFILL_TESTS:-"^Test${name}(Profile|Probe)"}
 
 # One terma and one test binary for the whole run; a parallel run of another harness
