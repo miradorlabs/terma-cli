@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -141,5 +142,41 @@ func TestHasUUID(t *testing.T) {
 		if uuidPattern.MatchString(s) && !hasUUID([]byte(s)) {
 			t.Errorf("uuidPattern finds an id in %s that hasUUID does not", s)
 		}
+	}
+}
+
+// A newer build shows an older one's run missed a path: the older one is marked so, and its
+// diff from the build before it, published without the marking, is made again.
+func TestUnobservedMarkingRemakesDiffs(t *testing.T) {
+	dir := t.TempDir()
+	path := func(names ...string) map[string]any {
+		out := map[string]any{}
+		for _, n := range names {
+			out["/tmp/TestX/001/home/"+n] = map[string]any{"ops": []string{"read"}, "phases": []string{"startup"}}
+		}
+		return out
+	}
+	night1 := night{now: time.Date(2026, 11, 3, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{
+		filesRow("1.0.0", "linux/amd64", path("a", "b")), filesRow("1.0.1", "linux/amd64", path("a"))}}
+	if _, err := publish(dir, night1, options{}); err != nil {
+		t.Fatal(err)
+	}
+	removed := func() bool {
+		data, err := os.ReadFile(filepath.Join(dir, "claude", "diffs", "1.0.0..1.0.1.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Contains(string(data), "<home>/b")
+	}
+	if !removed() {
+		t.Fatal("the first night's diff does not show <home>/b gone")
+	}
+	night2 := night{now: time.Date(2026, 11, 4, 5, 0, 0, 0, time.UTC), profiles: []e2e.Profile{
+		filesRow("1.0.2", "linux/amd64", path("a", "b"))}}
+	if _, err := publish(dir, night2, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if removed() {
+		t.Error("1.0.0..1.0.1 still shows <home>/b removed, though 1.0.1 is now marked as having missed it")
 	}
 }

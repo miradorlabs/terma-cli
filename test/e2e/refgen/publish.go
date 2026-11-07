@@ -230,9 +230,17 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			dates = releaseDates(meta)
 		}
 
+		// A build a newer one shows missed something is marked so after its snapshot was
+		// read: its diffs either side are made again, not reused from before the marking.
+		marks := unobservedMarks(versions, byVersion)
 		markUnobserved(versions, byVersion)
 		markUnobservedEvents(versions, byVersion)
 		markUnobservedFilesystem(versions, byVersion)
+		for v, was := range marks {
+			if unobservedMark(byVersion[v]) != was {
+				changed[buildID{h, v}] = true
+			}
+		}
 
 		// The vendor's reference tonight goes with tonight's newest build that has its
 		// configuration captured; an older build keeps what it got when it was the newest.
@@ -687,6 +695,37 @@ func markUnobserved(versions []string, byVersion map[string]*Snapshot) {
 			byVersion[versions[i]].Config["unobserved"] = gaps
 		}
 	}
+}
+
+// unobservedMarks is each version's unobservedMark.
+func unobservedMarks(versions []string, byVersion map[string]*Snapshot) map[string]string {
+	out := make(map[string]string, len(versions))
+	for _, v := range versions {
+		out[v] = unobservedMark(byVersion[v])
+	}
+	return out
+}
+
+// unobservedMark is what a snapshot says it did not observe, its settings', telemetry
+// endpoints' and filesystem platforms' "unobserved", as one comparable string.
+func unobservedMark(s *Snapshot) string {
+	marks := map[string]any{}
+	if u, ok := s.Config["unobserved"]; ok {
+		marks["config"] = u
+	}
+	tel, _ := s.Network["telemetry"].(map[string]any)
+	for ep, raw := range tel {
+		if m, ok := raw.(map[string]any); ok && m["unobserved"] != nil {
+			marks["telemetry "+ep] = m["unobserved"]
+		}
+	}
+	for plat, raw := range s.Filesystem {
+		if m, ok := raw.(map[string]any); ok && m["unobserved"] != nil {
+			marks["filesystem "+plat] = m["unobserved"]
+		}
+	}
+	data, _ := json.Marshal(marks) // map keys sorted
+	return string(data)
 }
 
 // missedBetween is, for each of sets (one a version, in order; nil one that takes no part), the
