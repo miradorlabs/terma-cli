@@ -1,0 +1,185 @@
+package refdiff
+
+import (
+	"encoding/json"
+	"time"
+)
+
+// The Harness Reference's snapshots and diffs (reference/SCHEMA.md), and the comparison of
+// two snapshots that makes a diff. refgen publishes a diff for each version and the one
+// before it with it; compiled to WebAssembly (refdiff/wasm), the same comparison runs in the
+// browser for any two versions a reader picks. Field names here are the schema's.
+
+// SchemaVersion is the published schema's version.
+const SchemaVersion = 1
+
+// Snapshot is docs/harnesses/<harness>/versions/<version>.json. Each section is what one kind
+// of capture saw; nil is not observed. Sections are generic JSON beneath their top level so
+// that a new capture adds a key, not a type.
+type Snapshot struct {
+	SchemaVersion int       `json:"schema_version"`
+	Harness       string    `json:"harness"`
+	Version       string    `json:"version"`
+	Platform      string    `json:"platform"`
+	CapturedAt    time.Time `json:"captured_at"`
+	Capture       Capture   `json:"capture"`
+
+	Model   map[string]any `json:"model,omitempty"`
+	Prompt  map[string]any `json:"prompt,omitempty"`
+	Tools   []any          `json:"tools,omitempty"`
+	Caching map[string]any `json:"caching,omitempty"`
+	Request map[string]any `json:"request,omitempty"`
+	// SideRequests are the first turn's other requests; an empty list is observed and empty
+	// (the build made none), null not observed (no first turn captured).
+	SideRequests []any          `json:"side_requests"`
+	Behavior     map[string]any `json:"behavior,omitempty"`
+	Telemetry    map[string]any `json:"telemetry,omitempty"`
+	Hooks        map[string]any `json:"hooks,omitempty"`
+	CLI          map[string]any `json:"cli,omitempty"`
+	Config       map[string]any `json:"config,omitempty"`
+	Network      map[string]any `json:"network,omitempty"`
+	Storage      map[string]any `json:"storage,omitempty"`
+	// Filesystem is what the build did on the file system and with sockets, traced, by
+	// platform ("linux/amd64"): each platform's files profile.
+	Filesystem map[string]any `json:"filesystem,omitempty"`
+	Binary     map[string]any `json:"binary,omitempty"`
+	Support    *Support       `json:"support,omitempty"`
+
+	// Live is the first turn as it ran with the vendor's live feature flags, beside the
+	// published one, which ran with the flags the build ships with: its prompt, and whether
+	// the flags changed it. A rollout changes it from night to night, so it is no section and
+	// never compared.
+	Live map[string]any `json:"live,omitempty"`
+
+	// Docs is what the vendor's reference said of the build's configuration the night it was
+	// the newest: each documented setting and variable, whether the build reads it, and what it
+	// reads that no reference mentions. A page describes the current release, not the build, so
+	// it is no section and never compared.
+	Docs map[string]any `json:"docs,omitempty"`
+}
+
+// Support is terma's verdict on a build, from every capability check the history holds of it.
+// Its fields are in the order the JSON lists them.
+type Support struct {
+	Capabilities []Capability `json:"capabilities,omitempty"`
+	// Status is "supported", "degraded", "unsupported" or "untested".
+	Status string `json:"status"`
+}
+
+// Capability is one capability check of a build on a platform.
+type Capability struct {
+	ID       string `json:"id"`
+	Label    string `json:"label,omitempty"`
+	Platform string `json:"platform"`
+	Result   string `json:"result"` // pass | fail | skip …
+	Why      string `json:"why,omitempty"`
+}
+
+// Capture says how a snapshot was taken.
+type Capture struct {
+	Command []string `json:"command,omitempty"`
+	Partial bool     `json:"partial"`
+	Notes   []string `json:"notes,omitempty"`
+	// Sections says when each section was last captured: a night that did not capture one
+	// keeps the last night's.
+	Sections map[string]time.Time `json:"sections,omitempty"`
+}
+
+// Sections are a snapshot's sections in the schema's order, which is also the order a diff's
+// categories are listed in.
+var Sections = []string{"model", "prompt", "tools", "caching", "request", "side_requests", "behavior",
+	"telemetry", "hooks", "cli", "config", "network", "storage", "filesystem", "binary", "support"}
+
+// Tree is s as generic JSON, by section.
+func (s *Snapshot) Tree() map[string]any {
+	data, _ := json.Marshal(s)
+	var m map[string]any
+	_ = json.Unmarshal(data, &m)
+	return m
+}
+
+// Diff is docs/harnesses/<harness>/diffs/<from>..<to>.json.
+type Diff struct {
+	SchemaVersion int            `json:"schema_version"`
+	Harness       string         `json:"harness"`
+	From          string         `json:"from"`
+	To            string         `json:"to"`
+	GeneratedAt   time.Time      `json:"generated_at"`
+	Source        *DiffSource    `json:"source"`
+	Changelog     *ChangelogNote `json:"changelog"`
+	Summary       DiffSummary    `json:"summary"`
+	Changes       []Change       `json:"changes"`
+}
+
+// DiffSource links the source's changes between the two builds.
+type DiffSource struct {
+	Compare string `json:"compare"`
+}
+
+// ChangelogNote is what the vendor's changelog says of the newer build.
+type ChangelogNote struct {
+	URL  string `json:"url"`
+	Text string `json:"text"`
+	// Truncated says the vendor's text was longer than the reference publishes (a line past
+	// MaxChangelogLine, the whole past MaxChangelogText) and was cut to fit.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+// What the reference publishes of a vendor's changelog for one version, at most: the pages
+// that read it rely on these bounds rather than guarding every input themselves. The largest
+// published so far are 43.8 KB of text (Codex) and a 758-character line (Pi).
+const (
+	MaxChangelogText = 128 << 10
+	MaxChangelogLine = 2000
+)
+
+// DiffSummary counts a diff's changes.
+type DiffSummary struct {
+	Changes      int            `json:"changes"`
+	Categories   map[string]int `json:"categories"`
+	Impact       map[string]int `json:"impact"`
+	Undocumented *int           `json:"undocumented"`
+}
+
+// Change is one difference between two snapshots.
+type Change struct {
+	ID       string       `json:"id"`
+	Category string       `json:"category"`
+	Op       string       `json:"op"` // added | removed | changed
+	Path     []string     `json:"path"`
+	Title    string       `json:"title"`
+	Impact   string       `json:"impact"` // breaking | degrading | notable | informational
+	Before   any          `json:"before"`
+	After    any          `json:"after"`
+	TextDiff *string      `json:"text_diff"`
+	Stats    *TextStats   `json:"stats,omitempty"`
+	Terma    *TermaEffect `json:"terma"`
+	Source   *SourceNote  `json:"source"`
+	// Documented is whether the vendor's changelog for the newer build mentions it; nil
+	// without a changelog.
+	Documented *bool `json:"documented"`
+}
+
+// TextStats counts what a text change added and removed.
+type TextStats struct {
+	AddedChars   int `json:"added_chars"`
+	RemovedChars int `json:"removed_chars"`
+}
+
+// TermaEffect names the capabilities whose result changed with a change.
+type TermaEffect struct {
+	Capabilities []string `json:"capabilities"`
+}
+
+// SourceNote is where the harness's public source names what changed.
+type SourceNote struct {
+	Refs []SourceRef `json:"refs"`
+	Gone bool        `json:"gone"`
+}
+
+// SourceRef is a line of a harness's source.
+type SourceRef struct {
+	Path string `json:"path"`
+	Line int    `json:"line"`
+	URL  string `json:"url"`
+}

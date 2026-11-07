@@ -93,6 +93,8 @@ type Sandbox struct {
 	// RelayAgents are pointed at the relay too, beyond Claude Code, Codex and OpenCode
 	// (UseRelay).
 	RelayAgents []string
+	// cleanRoom is a sandbox with no terma in it (CleanRoom).
+	cleanRoom bool
 	// relayed means the agents export to the local relay (UseRelay), never straight to
 	// the receiver: the scenario is that nothing else reaches it.
 	relayed      bool
@@ -112,6 +114,25 @@ func WithClaude(b Binary) Option { return func(sb *Sandbox) { sb.Claude = b } }
 
 // WithCodex runs the scenario against this Codex build.
 func WithCodex(b Binary) Option { return func(sb *Sandbox) { sb.Codex = b } }
+
+// CleanRoom builds a sandbox with no terma in it: no `terma setup`, so no hooks, relay, exporter
+// or status line of terma's in the harnesses' settings and none in the repository's .git/hooks;
+// no recording terma, nor terma's folder, on the PATH; no terma variables, no terma config
+// folder (TermaConfig is "") and no receiver. SHELL is the OS's default login shell
+// (cleanRoomShell). The harness runs on its own config folders, the sandbox home and the
+// scratch git config, as installed: a scenario that wants hooks configured registers its own
+// (the files profile registers the hooks probe's recorder).
+func CleanRoom() Option { return func(sb *Sandbox) { sb.cleanRoom = true } }
+
+// cleanRoomShell is a clean room's SHELL, the OS's default login shell: zsh on macOS, bash on
+// Linux. HOME is the sandbox's, so no rc file of the developer's loads; the system's own
+// (macOS's /etc/zprofile, Linux's /etc/profile) do, as they do for every login shell.
+func cleanRoomShell() string {
+	if runtime.GOOS == "darwin" {
+		return "/bin/zsh"
+	}
+	return "/bin/bash"
+}
 
 // WithRepositories is the team policy's repository list.
 func WithRepositories(repos ...string) Option {
@@ -141,22 +162,13 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
-	terma := os.Getenv("TERMA_E2E_BINARY")
-	if terma == "" {
-		terma = "terma"
-	}
-	if p, err := exec.LookPath(terma); err == nil {
-		terma = p
-	} else {
-		t.Fatalf("terma binary not found (%s); run make build", terma)
-	}
 	dir := t.TempDir()
 	// macOS gives /var/folders/... which is a symlink of /private/var/...; the
 	// harness reports real paths, so resolve once and use the real one throughout.
 	if real, err := filepath.EvalSymlinks(dir); err == nil {
 		dir = real
 	}
-	sb := &Sandbox{T: t, Mode: mode, Dir: dir, Terma: terma, ProjectID: "proj_live",
+	sb := &Sandbox{T: t, Mode: mode, Dir: dir, ProjectID: "proj_live",
 		Home: filepath.Join(dir, "home"), TermaConfig: filepath.Join(dir, "terma"),
 		ClaudeConfig: filepath.Join(dir, "claude"), CodexHome: filepath.Join(dir, "codex"),
 		Repo: filepath.Join(dir, "repo"), RendererMarker: "LIVE-RENDERER",
@@ -165,12 +177,30 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	for _, o := range opts {
 		o(sb)
 	}
+	if sb.cleanRoom {
+		sb.TermaConfig = ""
+	} else {
+		terma := os.Getenv("TERMA_E2E_BINARY")
+		if terma == "" {
+			terma = "terma"
+		}
+		p, err := exec.LookPath(terma)
+		if err != nil {
+			t.Fatalf("terma binary not found (%s); run make build", terma)
+		}
+		sb.Terma = p
+	}
 	for _, d := range []string{sb.Home, sb.TermaConfig, sb.ClaudeConfig, sb.CodexHome, sb.Repo} {
+		if d == "" {
+			continue
+		}
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
-	sb.Receiver = StartReceiver(t)
+	if !sb.cleanRoom {
+		sb.Receiver = StartReceiver(t)
+	}
 
 	sb.git("init", "-q", "-b", "main")
 	sb.git("config", "user.email", "live@terma.test")
@@ -182,11 +212,14 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	sb.git("commit", "-q", "-m", "init")
 
 	// A status line the developer already had. printf ignores stdin, which is
-	// its own test of the wrapper.
-	renderer := filepath.Join(dir, "renderer.sh")
-	sb.writeAbs(renderer, "#!/bin/sh\nprintf '"+sb.RendererMarker+" %s' \"${COLUMNS:-0}\"\n")
-	_ = os.Chmod(renderer, 0o755)
-	settings := map[string]any{"statusLine": map[string]any{"type": "command", "command": renderer, "padding": 0}}
+	// its own test of the wrapper. A clean room has none: it is there for terma to wrap.
+	settings := map[string]any{}
+	if !sb.cleanRoom {
+		renderer := filepath.Join(dir, "renderer.sh")
+		sb.writeAbs(renderer, "#!/bin/sh\nprintf '"+sb.RendererMarker+" %s' \"${COLUMNS:-0}\"\n")
+		_ = os.Chmod(renderer, 0o755)
+		settings["statusLine"] = map[string]any{"type": "command", "command": renderer, "padding": 0}
+	}
 	raw, _ := json.MarshalIndent(settings, "", "  ")
 	sb.writeAbs(filepath.Join(sb.ClaudeConfig, "settings.json"), string(raw)+"\n")
 	// Skip onboarding and trust in the scratch config; the developer's real one
@@ -195,6 +228,9 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 		"projects": map[string]any{sb.Repo: map[string]any{"hasTrustDialogAccepted": true, "allowedTools": []string{}}}}
 	raw, _ = json.MarshalIndent(state, "", "  ")
 	sb.writeAbs(filepath.Join(sb.ClaudeConfig, ".claude.json"), string(raw)+"\n")
+	if sb.cleanRoom {
+		return sb
+	}
 
 	// The real terma paths: the profile's ingest URL is the receiver, so the
 	// background flushes the hooks start deliver there. The account fixture provides
@@ -316,7 +352,15 @@ func (sb *Sandbox) claudeLauncher() string {
 // termaEnv is the environment terma itself runs with: its scratch config and
 // the scratch harness config, so it writes there and nowhere else.
 func (sb *Sandbox) termaEnv() []string {
-	return append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig, "CLAUDE_CONFIG_DIR="+sb.ClaudeConfig, "CODEX_HOME="+sb.CodexHome)
+	return append(append(sb.baseEnv(), sb.termaConfigEnv()...), "CLAUDE_CONFIG_DIR="+sb.ClaudeConfig, "CODEX_HOME="+sb.CodexHome)
+}
+
+// termaConfigEnv points terma at the scratch config folder; a clean room has none.
+func (sb *Sandbox) termaConfigEnv() []string {
+	if sb.TermaConfig == "" {
+		return nil
+	}
+	return []string{"TERMA_CONFIG_DIR=" + sb.TermaConfig}
 }
 
 // gitConfigGlobal is the sandbox's git global config, so no setting of the developer's
@@ -335,7 +379,11 @@ func (sb *Sandbox) gitConfigGlobal() string { return filepath.Join(sb.Dir, "gitc
 func (sb *Sandbox) baseEnv() []string {
 	// The build under test first: terma's own detection and any `claude` a script
 	// runs must both mean this one.
-	path := sb.binDir() + filepath.Dir(sb.Terma) + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+	path := sb.binDir()
+	if sb.Terma != "" {
+		path += filepath.Dir(sb.Terma) + ":"
+	}
+	path += "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 	for p := range strings.SplitSeq(os.Getenv("PATH"), ":") {
 		if p != "" && !strings.Contains(path, p) {
 			path += ":" + p
@@ -355,15 +403,23 @@ func (sb *Sandbox) baseEnv() []string {
 		}
 	} else {
 		env = []string{"HOME=" + sb.Home, "LANG=en_US.UTF-8", "TMPDIR=" + os.TempDir()}
-		if runtime.GOOS == "darwin" {
+		switch {
+		case sb.cleanRoom:
+			env = append(env, "SHELL="+cleanRoomShell())
+		case runtime.GOOS == "darwin":
 			env = append(env, "SHELL=/bin/zsh")
 		}
 	}
-	// TERMA_RELAY_SERVICE=0: setup in a sandbox must not register the sandbox's relay
-	// with the developer's service manager; each test runs its own. Git, terma and the
-	// agents all read the sandbox's git global config, never the developer's.
-	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor", "TERMA_RELAY_SERVICE=0",
+	// Git, terma and the agents all read the sandbox's git global config, never the
+	// developer's.
+	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor",
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+sb.gitConfigGlobal())
+	if sb.cleanRoom {
+		return append(env, sb.ExtraEnv...)
+	}
+	// TERMA_RELAY_SERVICE=0: setup in a sandbox must not register the sandbox's relay
+	// with the developer's service manager; each test runs its own.
+	env = append(env, "TERMA_RELAY_SERVICE=0")
 	// The one terma setting carried across: which environment's auth and API hosts a
 	// run may reach (TERMA_ENV=dev keeps anything that is not the receiver off
 	// production). Everything else of the developer's terma stays out.
@@ -381,13 +437,15 @@ func (sb *Sandbox) binDir() string {
 	dir := filepath.Join(sb.Dir, "path")
 	if _, err := os.Stat(dir); err != nil {
 		_ = os.MkdirAll(dir, 0o755)
-		_ = os.MkdirAll(sb.payloadDir(), 0o755)
 		for _, b := range []Binary{sb.Claude, sb.Codex} {
 			if b.Path != "" && filepath.IsAbs(b.Path) {
 				_ = os.Symlink(b.Path, filepath.Join(dir, b.Harness))
 			}
 		}
-		sb.writeShim()
+		if !sb.cleanRoom {
+			_ = os.MkdirAll(sb.payloadDir(), 0o755)
+			sb.writeShim()
+		}
 	}
 	return dir + ":"
 }
@@ -459,7 +517,7 @@ func (sb *Sandbox) gitIn(dir string, args ...string) string {
 	sb.T.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig)
+	cmd.Env = append(sb.baseEnv(), sb.termaConfigEnv()...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		sb.T.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -484,7 +542,7 @@ func (sb *Sandbox) Commit(message string) string {
 	sb.git("add", "-A")
 	cmd := exec.Command("git", "commit", "-q", "-m", message)
 	cmd.Dir = sb.Repo
-	cmd.Env = append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig)
+	cmd.Env = append(sb.baseEnv(), sb.termaConfigEnv()...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		sb.T.Fatalf("git commit: %v\n%s", err, out)
 	}

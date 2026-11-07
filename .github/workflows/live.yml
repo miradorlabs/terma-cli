@@ -41,7 +41,10 @@ jobs:
       # what is new to classify, and a harness sending it still sends what terma expects.
       TERMA_E2E_UNCLASSIFIED: note
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -141,19 +144,35 @@ jobs:
             test/e2e/report/census.json
           if-no-files-found: ignore
           retention-days: 30
+      # What each build sends its provider on a user's first turn, and its help: the evidence
+      # each build's published snapshot is normalized from (profile.go). It holds each build's
+      # macOS files profile too: the hosted runner lets `sudo -n eslogger` create its Endpoint
+      # Security client, so the run above traces them (profile_files_test.go).
+      - name: Upload this platform's harness profiles
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: profiles-macos
+          path: test/e2e/report/profiles.json
+          if-no-files-found: ignore
+          retention-days: 90
       - name: Remove temporary login
         if: always()
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
 
   # The same night on a fresh Linux machine (test/e2e/machine/Dockerfile): global mode, the
-  # managed configuration and the core relay contracts with real Claude Code and Codex.
+  # managed configuration and the core relay contracts with real Claude Code and Codex, and
+  # their files profiles, traced with strace.
   machines:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
     steps:
+      # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # Ubuntu 24.04 gives a process no capabilities in a user namespace it creates unless an
       # AppArmor profile allows it, so Codex's bwrap sandbox cannot bring up its loopback
       # ("bwrap: loopback: Failed RTM_NEWADDR") and every tool command fails. This runner is
@@ -181,9 +200,21 @@ jobs:
             test/e2e/report/linux/notes.json
           if-no-files-found: ignore
           retention-days: 30
+      # The files profile of each build, traced with strace (profile_files_test.go): the Harness
+      # Reference's filesystem section for linux/amd64. The compat job's refgen takes it with
+      # macOS's profiles.
+      - name: Upload this platform's harness profiles
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: profiles-linux
+          path: test/e2e/report/linux/profiles.json
+          if-no-files-found: ignore
+          retention-days: 90
 
-  # The matrix and the field catalog: this night's rows from both platforms, and the field
-  # census macOS takes, merged into the history and catalog, rendered as docs/COMPATIBILITY.md,
+  # The matrix, the field catalog and the Harness Reference: this night's rows from both
+  # platforms, and the field census and profiles macOS takes, merged into the history, catalog
+  # and reference (docs/harnesses), rendered as docs/COMPATIBILITY.md,
   # docs/compat/compat.json (the website's data) and docs/FIELDS.md, published as an artefact
   # and the run's summary. Both live on the compat-matrix branch, which each scheduled run
   # extends and pushes: that branch's docs/compat/compat.json is the published matrix.
@@ -200,7 +231,13 @@ jobs:
     environment: live-harnesses
     permissions:
       contents: write
+    # The frequent new-build check (reference.yml) publishes the reference to the same
+    # branch: never both at once.
+    concurrency:
+      group: compat-matrix
+      cancel-in-progress: false
     steps:
+      # Keeps its token: this job pushes to compat-matrix (publish.sh).
       - uses: actions/checkout@v7
       - name: Start from the published history and catalog
         run: test/e2e/compatgen/publish.sh restore
@@ -210,7 +247,7 @@ jobs:
           cache-dependency-path: test/e2e/go.sum
       - uses: actions/download-artifact@v8
         with:
-          pattern: "{compat,fields}-*"
+          pattern: "{compat,fields,profiles}-*"
           path: test/e2e/runs
       - name: Say what changed, and render the matrix and catalog
         working-directory: test/e2e
@@ -225,6 +262,28 @@ jobs:
           go run ./compatgen "${args[@]}" -digest report -source -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
           if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
+      # The Harness Reference: each build the night captured, normalized into its snapshot and
+      # merged into the published ones, each harness's versions compared in order, changes
+      # checked against the vendor's changelog (refgen; test/e2e/reference/SCHEMA.md). After
+      # compatgen, so a build's support is tonight's history.
+      - name: Render the Harness Reference
+        working-directory: test/e2e
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
+          for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
+          for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
+          # The catalog compatgen just merged gives each build a whole census saw its telemetry,
+          # tonight's or an earlier night's: a backfill that took no census still has it.
+          # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
+          # load the timeline-<n>.json archives; then the default pages it.
+          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"
+          # The comparison of any two versions, run in the reader's browser: the same code that
+          # made the diffs, built reproducibly, so an unchanged engine is no change on the branch.
+          GOOS=js GOARCH=wasm go build -trimpath -buildvcs=false -ldflags='-s -w' -o ../../docs/harnesses/refdiff.wasm ./refdiff/wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" ../../docs/harnesses/wasm_exec.js
       - name: Post the digest to Slack
         # A webhook that fails (revoked, Slack down) must not keep the night from being published.
         continue-on-error: true
@@ -244,6 +303,7 @@ jobs:
             docs/COMPATIBILITY.md
             docs/FIELDS.md
             docs/compat/
+            docs/harnesses/
             test/e2e/report/drift.*
             test/e2e/report/slack.json
           if-no-files-found: ignore
@@ -251,3 +311,21 @@ jobs:
       - name: Publish to the compat-matrix branch
         if: github.event_name == 'schedule'
         run: test/e2e/compatgen/publish.sh publish
+      # Each version newer than any captured before, once, after it is published: never a
+      # backfill, never twice. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without
+      # it, the digest's.
+      - name: Announce new versions
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          news="$RUNNER_TEMP/announcements.json"
+          [ -s "$news" ] || exit 0
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::notice::No Slack webhook in the live-harnesses environment: $(jq length "$news") new versions not announced."
+            exit 0
+          fi
+          jq -c '.[].slack' "$news" | while read -r message; do
+            curl -fsS -X POST -H 'Content-Type: application/json' --data "$message" "$SLACK_WEBHOOK_URL"
+          done

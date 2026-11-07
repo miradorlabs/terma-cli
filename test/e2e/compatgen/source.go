@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/e2e"
+	"github.com/miradorlabs/terma-cli/e2e/sourcelink"
 )
 
 // Source links. With -source, a finding about a harness whose source is public links the
@@ -17,36 +16,17 @@ import (
 // says which it is: still named in the new build's source (not sent tonight: a condition, a
 // schedule, a scenario), or no longer (removed), with where the build before named it. A new
 // build's headline links the comparison of the two. A build whose source cannot be read
-// leaves its findings unlinked, and the digest says so: links never fail the night.
-
-// source is where a harness's source is public.
-type source struct {
-	repo string // on GitHub, owner/name
-	tag  string // a build's tag, with %s for its version
-	dir  string // the part of the tree that holds the code that names its fields
-	ext  string // the files that do
-}
-
-var sources = map[string]source{
-	"codex": {repo: "openai/codex", tag: "rust-v%s", dir: "codex-rs/", ext: ".rs"},
-}
-
-func (s source) tagOf(version string) string { return fmt.Sprintf(s.tag, version) }
-
-func (s source) blob(version, file string, line int) string {
-	return fmt.Sprintf("https://github.com/%s/blob/%s/%s#L%d", s.repo, s.tagOf(version), file, line)
-}
-
-func (s source) compare(from, to string) string {
-	return fmt.Sprintf("https://github.com/%s/compare/%s...%s", s.repo, s.tagOf(from), s.tagOf(to))
-}
+// leaves its findings unlinked, and the digest says so: links never fail the night. Which
+// harnesses' sources are public, and how each is read, is sourcelink's: its Sources.
 
 // SourceRef is a line of a harness's source that names a finding.
-type SourceRef struct {
-	Path string `json:"path"`
-	Line int    `json:"line"`
-	URL  string `json:"url"`
-}
+type SourceRef = sourcelink.Ref
+
+// needle and hit are what a build's source is scanned for, and where it names one.
+type (
+	needle = sourcelink.Needle
+	hit    = sourcelink.Hit
+)
 
 // SourceSays is where a harness's source names a finding: Refs in Version, the build it was
 // found in (for one Gone, the new build), and Before in Previous, for one gone, where the
@@ -61,28 +41,15 @@ type SourceSays struct {
 	BeforeMore int         `json:"before_more,omitempty"`
 }
 
-// maxRefs bounds the lines a finding links; maxHits the lines a scan keeps of one name, far
-// past any the ranking needs, so it only bounds a pathological tree; maxUnplaced the lines a
-// key may be named in to be linked by its name alone (rank).
+// maxRefs bounds the lines a finding links; maxUnplaced the lines a key may be named in to
+// be linked by its name alone (rank).
 const (
 	maxRefs     = 2
-	maxHits     = 10000
 	maxUnplaced = 3
 )
 
 // openSource reads a tarball of repo at tag; tests replace it.
-var openSource = func(repo, tag string) (io.ReadCloser, error) {
-	client := &http.Client{Timeout: 3 * time.Minute}
-	resp, err := client.Get("https://codeload.github.com/" + repo + "/tar.gz/refs/tags/" + tag)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, fmt.Errorf("%s at %s: %s", repo, tag, resp.Status)
-	}
-	return resp.Body, nil
-}
+var openSource = sourcelink.Download
 
 // surfaceName is the name a harness's source gives a surface: a log event's, a metric's, a
 // span's or a span event's; none for the resource, the scope, or a name terma made up.
@@ -120,14 +87,14 @@ type finding struct {
 
 func (f finding) names() []needle {
 	if f.surface {
-		return []needle{{f.name, false}}
+		return []needle{{Text: f.name}}
 	}
-	return []needle{{f.name, false}, {f.name, true}}
+	return []needle{{Text: f.name}, {Text: f.name, Field: true}}
 }
 
 func (f finding) needles() []needle {
 	if f.within != "" {
-		return append(f.names(), needle{f.within, false})
+		return append(f.names(), needle{Text: f.within})
 	}
 	return f.names()
 }
@@ -166,13 +133,17 @@ func linkSources(d *Drift, known map[string][]string) {
 	// A release's comparison is of the build known before it, censused tonight or not.
 	for i := range d.Releases {
 		r := &d.Releases[i]
-		if s, ok := sources[r.Harness]; ok && r.Previous != "" {
-			r.Compare = s.compare(r.Previous, r.Version)
+		if s, ok := sourcelink.Sources[r.Harness]; ok && r.Previous != "" {
+			r.Compare = s.Compare(r.Previous, r.Version)
 		}
 	}
+	// Each build is read once, and nothing is kept past the night.
+	lib := sourcelink.New("")
+	lib.Open = func(repo, tag string) (io.ReadCloser, error) { return openSource(repo, tag) }
+	defer lib.Close()
 	for i := range d.Harnesses {
 		h := &d.Harnesses[i]
-		s, ok := sources[h.Harness]
+		s, ok := sourcelink.Sources[h.Harness]
 		if !ok {
 			continue
 		}
@@ -182,7 +153,7 @@ func linkSources(d *Drift, known map[string][]string) {
 			base = h.Since
 		}
 		if base != "" && versionLess(base, h.Version) {
-			h.Compare = s.compare(base, h.Version)
+			h.Compare = s.Compare(base, h.Version)
 		}
 		fs := h.findings()
 		if len(fs) == 0 {
@@ -221,7 +192,7 @@ func linkSources(d *Drift, known map[string][]string) {
 			if need[version] == nil {
 				need[version] = map[needle]bool{}
 				for _, name := range names {
-					need[version][needle{name, false}] = true
+					need[version][needle{Text: name}] = true
 				}
 			}
 			for _, n := range ns {
@@ -237,7 +208,7 @@ func linkSources(d *Drift, known map[string][]string) {
 		}
 		hits := map[string]map[needle][]hit{}
 		for _, version := range slices.Sorted(maps.Keys(need)) {
-			found, err := scanBuild(s, version, need[version])
+			found, err := lib.Scan(s, version, need[version])
 			if err != nil {
 				d.SourceErrors = append(d.SourceErrors, fmt.Sprintf("%s %s: %v", h.Name, version, err))
 				continue
@@ -295,7 +266,7 @@ func rank(f finding, hits map[needle][]hit, owned map[string][]owner) (all []hit
 		}
 		return all, false, true
 	}
-	within := hits[needle{f.within, false}]
+	within := hits[needle{Text: f.within}]
 	if f.within == "" || len(within) == 0 {
 		return unplaced()
 	}
@@ -305,11 +276,11 @@ func rank(f finding, hits map[needle][]hit, owned map[string][]owner) (all []hit
 	// harness is known to send (an event not yet censused) is no known surface's.
 	distance := func(h hit) int {
 		best, d := "", -1
-		for _, o := range owned[h.path] {
-			if o.fn != h.fn {
+		for _, o := range owned[h.Path] {
+			if o.fn != h.Fn {
 				continue
 			}
-			od := abs(o.line - h.line)
+			od := abs(o.line - h.Line)
 			if d < 0 || od < d || (od == d && o.name == f.within) {
 				best, d = o.name, od
 			}
@@ -342,8 +313,8 @@ type owner struct {
 func owners(hits map[needle][]hit, names []string) map[string][]owner {
 	out := map[string][]owner{}
 	for _, name := range names {
-		for _, h := range hits[needle{name, false}] {
-			out[h.path] = append(out[h.path], owner{h.line, h.fn, name})
+		for _, h := range hits[needle{Text: name}] {
+			out[h.Path] = append(out[h.Path], owner{h.Line, h.Fn, name})
 		}
 	}
 	return out
@@ -375,10 +346,12 @@ func knownSurfaces(cat Catalog, rows []e2e.FieldRow) map[string][]string {
 }
 
 // refs links at most maxRefs of hits in version, and counts the rest.
-func refs(s source, version string, hits []hit) ([]SourceRef, int) {
+func refs(s sourcelink.Source, version string, hits []hit) ([]SourceRef, int) {
 	var out []SourceRef
 	for _, h := range hits[:min(len(hits), maxRefs)] {
-		out = append(out, SourceRef{Path: h.path, Line: h.line, URL: s.blob(version, h.path, h.line)})
+		out = append(out, SourceRef{Path: h.Path, Line: h.Line, URL: s.Blob(version, h.Path, h.Line)})
 	}
 	return out, len(hits) - len(out)
 }
+
+func abs(n int) int { return max(n, -n) }

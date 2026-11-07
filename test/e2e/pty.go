@@ -119,6 +119,21 @@ func (t *Terminal) Consume() {
 	t.mu.Unlock()
 }
 
+// Screen is what the terminal shows now, its lines' trailing spaces trimmed: unlike Text, none
+// of what was drawn before and redrawn since.
+func (t *Terminal) Screen() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.screen == nil {
+		return ""
+	}
+	lines := strings.Split(t.screen.String(), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	return strings.Join(lines, "\n")
+}
+
 // Raw is the unstripped output, for contracts about colour.
 func (t *Terminal) Raw() string {
 	t.mu.Lock()

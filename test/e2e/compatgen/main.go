@@ -27,11 +27,11 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/e2e"
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 type runsFlag []string
@@ -363,32 +363,10 @@ func versionsOf(es []Entry) []string {
 	return vs
 }
 
-// versionLess orders dotted versions numerically, a pre-release before its release.
+// versionLess orders versions as the reference ranks them (refdiff.VersionCompare, the one
+// ordering of versions in this module), a tag's leading v aside.
 func versionLess(a, b string) bool {
-	pa, pre1, _ := strings.Cut(strings.TrimPrefix(a, "v"), "-")
-	pb, pre2, _ := strings.Cut(strings.TrimPrefix(b, "v"), "-")
-	fa, fb := strings.Split(pa, "."), strings.Split(pb, ".")
-	for i := 0; i < max(len(fa), len(fb)); i++ {
-		var x, y int
-		if i < len(fa) {
-			x, _ = strconv.Atoi(fa[i])
-		}
-		if i < len(fb) {
-			y, _ = strconv.Atoi(fb[i])
-		}
-		if x != y {
-			return x < y
-		}
-	}
-	switch {
-	case pre1 == pre2:
-		return false
-	case pre1 == "":
-		return false
-	case pre2 == "":
-		return true
-	}
-	return pre1 < pre2
+	return refdiff.VersionLess(strings.TrimPrefix(a, "v"), strings.TrimPrefix(b, "v"))
 }
 
 func contains(list []string, s string) bool {
