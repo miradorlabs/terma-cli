@@ -41,10 +41,18 @@ func main() {
 	announcePath := flag.String("announce", "", "write the versions to announce (new, newer than any captured before) to this JSON file")
 	source := flag.Bool("source", false, "link changes to the lines of each public harness's source that name them, and read its configuration options and environment variables from it (a tarball a build)")
 	clones := flag.String("source-clones", defaultCloneRoot(), "where local clones of public harnesses' sources are kept (<owner>-<name>); a release's source is read from its clone where there is one ($"+envSourceClones+")")
+	nowFlag := flag.String("now", "", "the time the run takes for its own, RFC 3339 (default the current time): two runs over the same input then write the same bytes")
 	lineageSources := flag.Bool("lineage-sources", false, "look up, in a clone of each harness's source under -source-clones (cloned, or its tags fetched, first), the release and commit that introduced each item its oldest build tracked has (lineage.json); a one-time backfill, by hand")
 	flag.Parse()
 
 	n := night{now: time.Now().UTC(), labels: map[string]string{}}
+	if *nowFlag != "" {
+		at, err := time.Parse(time.RFC3339, *nowFlag)
+		if err != nil {
+			fail(fmt.Errorf("-now: %w", err))
+		}
+		n.now = at.UTC()
+	}
 	for _, f := range profiles {
 		var ps []e2e.Profile
 		if err := readOptional(f, &ps); err != nil {
