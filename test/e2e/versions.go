@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 // Versions under test. A harness changes weekly, and a collection surface that
@@ -165,17 +167,9 @@ func isRelease(v string) bool {
 	return true
 }
 
-func versionLess(a, b string) bool {
-	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < 3 && i < len(pa) && i < len(pb); i++ {
-		x, _ := strconv.Atoi(pa[i])
-		y, _ := strconv.Atoi(pb[i])
-		if x != y {
-			return x < y
-		}
-	}
-	return a < b
-}
+// versionLess orders versions as the reference ranks them (refdiff.VersionCompare, the one
+// ordering of versions in this module): a prerelease before its release, every tie broken.
+func versionLess(a, b string) bool { return refdiff.VersionLess(a, b) }
 
 var httpClient = &http.Client{Timeout: 5 * time.Minute}
 

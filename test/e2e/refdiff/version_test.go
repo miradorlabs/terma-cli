@@ -13,6 +13,7 @@ import (
 func TestVersionOrder(t *testing.T) {
 	// Each before the next.
 	ordered := []string{
+		"", // no version: before every one
 		"0.2.1-rc.1", "0.2.1-rc.9", "0.2.1-rc.10", "0.2.1", "0.2.2-rc.1",
 		"1.0.0-1", "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0",
 		"1.0.1", "1.0.5", "1.0.5+a", "1.0.5+b", "1.0.5+b.2", "1.0.10",

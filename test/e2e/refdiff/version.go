@@ -40,16 +40,17 @@ func VersionCompare(a, b string) int {
 	return cmp.Compare(a, b)
 }
 
-// compareRelease compares dotted release numbers, a missing one 0; a part that is no number
-// ranks after every number, its kind among themselves in ASCII order.
+// compareRelease compares dotted release numbers, a missing or empty one 0 (so "", no version,
+// ranks first); a part that is no number ranks after every number, its kind among themselves
+// in ASCII order.
 func compareRelease(a, b string) int {
 	as, bs := strings.Split(a, "."), strings.Split(b, ".")
 	for i := range max(len(as), len(bs)) {
 		x, y := "0", "0"
-		if i < len(as) {
+		if i < len(as) && as[i] != "" {
 			x = as[i]
 		}
-		if i < len(bs) {
+		if i < len(bs) && bs[i] != "" {
 			y = bs[i]
 		}
 		if c := compareIdentifier(x, y); c != 0 {
