@@ -142,7 +142,7 @@ func TestClaudeDesktopProfile(t *testing.T) {
 		if agent == 0 {
 			t.Fatalf("no Claude Code process under Desktop:\n%v", descendants(r.PID))
 		}
-		launch, err := launchOf(agent, r.PID)
+		launch, err := launchOf(agent, r.PID, desktopPlaces(app, home))
 		if err != nil {
 			t.Fatalf("read how Desktop started Claude Code: %v", err)
 		}
@@ -282,7 +282,7 @@ trust_level = "trusted"
 		if server == 0 {
 			t.Fatalf("no app-server under the Codex app:\n%v", descendants(r.PID))
 		}
-		launch, err := launchOf(server, r.PID)
+		launch, err := launchOf(server, r.PID, desktopPlaces(app, home))
 		if err != nil {
 			t.Fatalf("read how the Codex app started its app-server: %v", err)
 		}

@@ -168,7 +168,7 @@ func TestLaunchScrubOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
-	l, err := launchOf(cmd.Process.Pid, os.Getpid())
+	l, err := launchOf(cmd.Process.Pid, os.Getpid(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestLaunchScrubOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = cmd2.Process.Kill(); _ = cmd2.Wait() }()
-	inherited, err := launchOf(cmd2.Process.Pid, os.Getpid())
+	inherited, err := launchOf(cmd2.Process.Pid, os.Getpid(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,12 +216,52 @@ func TestPlistXMLOffline(t *testing.T) {
 
 // The machine's names an app writes into a value of its own are placeholders.
 func TestMachineNamesOffline(t *testing.T) {
-	t.Setenv("USER", "runner")
-	got := machineNames("service.name=claude-code-desktop,os.type=darwin,os.version=26.6.2,process.owner=runner,host.arch=arm64")
+	m := machine{home: "/Users/runner", user: "runner", host: "Mac-1730000000000.local"}
+	none := map[string]string{}
+	got := machineNames("service.name=claude-code-desktop,os.type=darwin,os.version=26.6.2,process.owner=runner,host.arch=arm64", none, m)
 	if want := "service.name=claude-code-desktop,os.type=darwin,os.version=<os-release>,process.owner=<user>,host.arch=arm64"; got != want {
 		t.Errorf("machineNames = %q, want %q", got, want)
 	}
-	if got := machineNames("the test runners run"); got != "the test runners run" {
+	if got := machineNames("the test runners run", none, m); got != "the test runners run" {
 		t.Errorf("a word that holds the name is no name: %q", got)
+	}
+	if got := machineNames("host.name=Mac-1730000000000.local,peer=Mac-1730000000000", none, m); got != "host.name=<host>,peer=<host>" {
+		t.Errorf("the machine's name: %q", got)
+	}
+	// The run's places go before the user's name inside them: a path is <app>/…, <home>/…, never
+	// /Users/<user>/…, whatever order the places are given in.
+	app := DesktopApp{Bundle: "/Users/runner/work/terma-cli/terma-cli/test/e2e/versions/codex-desktop/26.1029.70936/ChatGPT.app"}
+	places := map[string]string{"/Users/runner": "<home>", app.Bundle: "<app>", filepath.Dir(app.Bundle): "<app-dir>",
+		"/Users/runner/work/terma-cli/terma-cli": "<checkout>"}
+	for in, want := range map[string]string{
+		app.Bundle + "/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex": "<app>/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+		"/Users/runner/Library/Logs/Claude-3p/cli-diagnostics.jsonl":                   "<home>/Library/Logs/Claude-3p/cli-diagnostics.jsonl",
+		"/Users/runner/work/terma-cli/terma-cli/go.mod":                                "<checkout>/go.mod",
+		"/Users/runner/Library/Application Support/Claude-3p/skills-plugin/<uuid>":     "<home>/Library/Application Support/Claude-3p/skills-plugin/<uuid>",
+		"/opt/homebrew/bin/node":      "node",
+		"/Users/someone-else/.config": "<home>/.config",
+	} {
+		if got := machineNames(in, places, m); got != want {
+			t.Errorf("machineNames(%q)\n got %q\nwant %q", in, got, want)
+		}
+	}
+	// Without the run's places (a value the places miss), MachinePaths still names the home.
+	if got := machineNames("/Users/runner/Library/Logs/x.jsonl", none, m); got != "<home>/Library/Logs/x.jsonl" {
+		t.Errorf("a home the places missed: %q", got)
+	}
+}
+
+// A desktop app's places: its bundle and folder, the checkout the suite runs from, the home.
+func TestDesktopPlacesOffline(t *testing.T) {
+	app := DesktopApp{Bundle: "/x/test/e2e/versions/codex-desktop/1.0/ChatGPT.app"}
+	got := desktopPlaces(app, "/Users/runner")
+	for lit, name := range map[string]string{app.Bundle: "<app>", filepath.Dir(app.Bundle): "<app-dir>", "/Users/runner": "<home>"} {
+		if got[lit] != name {
+			t.Errorf("%s = %q, want %q (%v)", lit, got[lit], name, got)
+		}
+	}
+	wd, _ := os.Getwd()
+	if checkout := filepath.Dir(filepath.Dir(wd)); got[checkout] != "<checkout>" {
+		t.Errorf("checkout %s: %v", checkout, got)
 	}
 }

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -893,13 +895,51 @@ var sessionEnv = map[string]bool{"HOME": true, "USER": true, "LOGNAME": true, "S
 	"MallocNanoZone": true, "LC_ALL": true, "LC_CTYPE": true, "TERM": true, "TERM_PROGRAM": true}
 
 // machineNames is v with the machine's own names in it placeholders, as an app writes them into
-// a value of its own (Claude Desktop's OTEL_RESOURCE_ATTRIBUTES: process.owner, os.version):
-// the user's name <user>, the OS's release <os-release>.
-func machineNames(v string) string {
-	if user := os.Getenv("USER"); len(user) >= 3 {
-		v = regexp.MustCompile(`\b`+regexp.QuoteMeta(user)+`\b`).ReplaceAllString(v, "<user>")
+// a value of its own (Claude Desktop's CLAUDE_CODE_DIAGNOSTICS_FILE, OTEL_RESOURCE_ATTRIBUTES'
+// process.owner and os.version). The run's places go first, longest first, each its placeholder
+// (the app's bundle <app>, the checkout <checkout>, the home <home>), so a path is named by the
+// most it says before the user's name inside it is taken for a name; then the user's name
+// <user>, the machine's name <host>, the OS's release <os-release>, and last what MachinePaths
+// says of the paths left (a home or a program the run's places did not name).
+func machineNames(v string, places map[string]string, m machine) string {
+	lits := slices.SortedFunc(maps.Keys(places), func(a, b string) int { return cmp.Compare(len(b), len(a)) })
+	for _, lit := range lits {
+		if len(lit) > 1 {
+			v = strings.ReplaceAll(v, lit, places[lit])
+		}
 	}
-	return osVersionAttr.ReplaceAllString(v, "${1}<os-release>")
+	for _, name := range []struct{ lit, with string }{{m.user, "<user>"}, {m.host, "<host>"}, {shortHost(m.host), "<host>"}} {
+		// A short name (a user "dev") would match words that are not it.
+		if len(name.lit) >= 3 {
+			v = regexp.MustCompile(`\b`+regexp.QuoteMeta(name.lit)+`\b`).ReplaceAllString(v, name.with)
+		}
+	}
+	return MachinePaths(osVersionAttr.ReplaceAllString(v, "${1}<os-release>"))
+}
+
+// shortHost is a host name without its domain (Mac-1730.local is Mac-1730), "" where it has
+// none.
+func shortHost(host string) string {
+	if short, _, ok := strings.Cut(host, "."); ok {
+		return short
+	}
+	return ""
+}
+
+// desktopPlaces are the places of a desktop app's run whose paths it hands its agent, each its
+// placeholder: the app's bundle and the folder it sits in, the checkout the suite runs from
+// (where it unpacked the app), and the home.
+func desktopPlaces(app DesktopApp, home string) map[string]string {
+	places := map[string]string{home: "<home>"}
+	if app.Bundle != "" {
+		places[app.Bundle] = "<app>"
+		places[filepath.Dir(app.Bundle)] = "<app-dir>"
+	}
+	if wd, err := os.Getwd(); err == nil && filepath.Base(wd) == "e2e" && filepath.Base(filepath.Dir(wd)) == "test" {
+		places[filepath.Dir(filepath.Dir(wd))] = "<checkout>"
+	}
+	delete(places, "")
+	return places
 }
 
 // osVersionAttr is an OS release as a resource attribute names it.
@@ -911,8 +951,8 @@ var runKey = regexp.MustCompile(`^[A-Za-z0-9+/]{40,}={0,2}$`)
 // launchOf is how pid was started, below the app at top: what the app set of its environment
 // (neither the app's own environment, read from the kernel, nor its login shell's), its values
 // scrubbed as a hook's variables are (a secret's by its name or shape redacted, a list of folders
-// <path>).
-func launchOf(pid, top int) (Launch, error) {
+// <path>), and the run's places in them (desktopPlaces) and the machine's names placeholders.
+func launchOf(pid, top int, places map[string]string) (Launch, error) {
 	argv, env, err := procArgs(pid)
 	if err != nil {
 		return Launch{}, err
@@ -925,6 +965,7 @@ func launchOf(pid, top int) (Launch, error) {
 		}
 	}
 	l := Launch{Argv: argv, EnvValues: map[string]string{}}
+	m := machineOf()
 	if chain := ancestry(pid, top); len(chain) > 1 {
 		l.Parents = chain[1:]
 	}
@@ -950,7 +991,7 @@ func launchOf(pid, top int) (Launch, error) {
 		case runKey.MatchString(v):
 			l.EnvValues[k] = "<key>" // a key the app made for this run (a public key, base64)
 		default:
-			l.EnvValues[k] = machineNames(v)
+			l.EnvValues[k] = machineNames(v, places, m)
 		}
 	}
 	sort.Strings(l.Env)
