@@ -361,7 +361,7 @@ func TestAnnouncements(t *testing.T) {
 	if !strings.HasPrefix(a.Text, "Claude Code 1.0.1 is out.") || !strings.HasSuffix(a.Text, a.URL) || len([]rune(a.Text))-len(a.URL)+23 > 280 {
 		t.Errorf("post = %q", a.Text)
 	}
-	if a.Slack["blocks"] == nil || !strings.Contains(a.Slack["text"].(string), a.URL) {
+	if a.Slack == nil || len(a.Slack.Blocks) == 0 || !strings.Contains(a.Slack.Text, a.URL) {
 		t.Errorf("slack = %v", a.Slack)
 	}
 	if news, _ := publish(dir, second, opt); len(news) != 0 {
@@ -844,5 +844,56 @@ func TestLoadedChangelogIsBounded(t *testing.T) {
 	}
 	if d.Changelog == nil || len(d.Changelog.Text) > refdiff.MaxChangelogLine || !d.Changelog.Truncated {
 		t.Errorf("the diff's changelog = %+v", d.Changelog)
+	}
+}
+
+// An announcement's Slack message is the JSON it was when it was built of maps: what posts it
+// reads the same fields.
+func TestSlackMessageJSON(t *testing.T) {
+	undoc, sig := 2, "revoked"
+	for a, want := range map[*Announcement]string{
+		{Harness: "claude", Name: "Claude Code", Version: "2.1.319", Previous: "2.1.318", URL: "https://terma.ai/h/claude/2.1.319",
+			CompareURL: "https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319", Changes: 4, Impact: ImpactN{"breaking": 1, "notable": 2, "degrading": 0},
+			Undocumented: &undoc, Highlights: []string{"New tool: Monitor", "a <b> & c"}, Signing: &sig}: `{"blocks":[{"text":{"text":"*Claude Code 2.1.319* is out: 4 changes since 2.1.318\n1 breaking · 2 notable · 2 not in the vendor's changelog · code signature revoked","type":"mrkdwn"},"type":"section"},{"text":{"text":"• New tool: Monitor\n• a &lt;b&gt; &amp; c","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/claude/2.1.319"},{"text":{"text":"Compare with 2.1.318","type":"plain_text"},"type":"button","url":"https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319"}],"type":"actions"}],"text":"Claude Code 2.1.319 is out: https://terma.ai/h/claude/2.1.319","unfurl_links":false}`,
+		{Harness: "codex", Name: "Codex CLI", Version: "0.167.0", URL: "https://terma.ai/h/codex/0.167.0", Highlights: []string{}}: `{"blocks":[{"text":{"text":"*Codex CLI 0.167.0* is out","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/codex/0.167.0"}],"type":"actions"}],"text":"Codex CLI 0.167.0 is out: https://terma.ai/h/codex/0.167.0","unfurl_links":false}`,
+	} {
+		if got := string(marshalPlain(slackMessage(*a))); got != want {
+			t.Errorf("slack message:\n got %s\nwant %s", got, want)
+		}
+	}
+}
+
+// Publishing reads a section's few fields through a typed view: what it reads is the same, and a
+// field of another kind than it expects is left out without losing the rest.
+func TestSectionViews(t *testing.T) {
+	s := &Snapshot{Version: "1.0.0", Platform: "darwin/arm64",
+		Support: map[string]any{"status": "degraded", "capabilities": []any{map[string]any{"id": "a", "platform": "linux/amd64"}, map[string]any{"id": "b"}}},
+		Prompt: map[string]any{"system": []any{map[string]any{"text": "One."}, map[string]any{"text": "Two."}}, "context": "not a list",
+			"interactive": map[string]any{"system": []any{map[string]any{"text": "Three."}}}},
+		Binary: map[string]any{"signing": map[string]any{"status": "valid"}}}
+	if got := platformsOf(s); !reflect.DeepEqual(got, []string{"darwin/arm64", "linux/amd64"}) {
+		t.Errorf("platforms = %v", got)
+	}
+	if got := supportOf(s); got != "degraded" {
+		t.Errorf("support = %q", got)
+	}
+	for _, st := range []any{3, nil, map[string]any{}} {
+		if got := supportOf(&Snapshot{Support: map[string]any{"status": st}}); got != "untested" {
+			t.Errorf("a status of %v = %q", st, got)
+		}
+	}
+	md := promptMarkdown("X", s)
+	for _, want := range []string{"## System 1\n\nOne.\n", "## System 2\n\nTwo.\n", "## Interactive session: system\n\nThree.\n"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("prompt markdown lacks %q:\n%s", want, md)
+		}
+	}
+	if strings.Contains(md, "Injected context") {
+		t.Errorf("a context of another kind is published:\n%s", md)
+	}
+	var bin binaryView
+	view(s.Binary, &bin)
+	if bin.Signing == nil || bin.Signing.Status.ptr() == nil || *bin.Signing.Status.ptr() != "valid" {
+		t.Errorf("signing = %+v", bin.Signing)
 	}
 }

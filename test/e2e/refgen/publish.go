@@ -279,10 +279,10 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			s := byVersion[v]
 			e := VersionEntry{Version: v, CapturedAt: s.CapturedAt, Platforms: platformsOf(s), Support: supportOf(s),
 				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{}}
-			if sig, ok := s.Binary["signing"].(map[string]any); ok {
-				if st, ok := sig["status"].(string); ok {
-					e.Signing = &st
-				}
+			var bin binaryView
+			view(s.Binary, &bin)
+			if bin.Signing != nil {
+				e.Signing = bin.Signing.Status.ptr()
 			}
 			if t, ok := dates[v]; ok {
 				e.ReleasedAt = &t
@@ -435,23 +435,22 @@ func promptMarkdown(name string, s *Snapshot) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "# %s %s: system prompt\n\nCaptured %s by Terma's Harness Reference. Paths, dates and ids are placeholders.\n",
 		name, s.Version, s.CapturedAt.Format("2006-01-02"))
-	block := func(heading string, v any) {
-		list, _ := v.([]any)
+	block := func(heading string, list []promptBlock) {
 		for i, b := range list {
-			m, _ := b.(map[string]any)
-			text, _ := m["text"].(string)
 			title := heading
 			if len(list) > 1 {
 				title = fmt.Sprintf("%s %d", heading, i+1)
 			}
-			fmt.Fprintf(&sb, "\n## %s\n\n%s\n", title, text)
+			fmt.Fprintf(&sb, "\n## %s\n\n%s\n", title, b.Text)
 		}
 	}
-	block("System", s.Prompt["system"])
-	block("Injected context", s.Prompt["context"])
-	if in, ok := s.Prompt["interactive"].(map[string]any); ok {
-		block("Interactive session: system", in["system"])
-		block("Interactive session: injected context", in["context"])
+	var p promptView
+	view(s.Prompt, &p)
+	block("System", p.System)
+	block("Injected context", p.Context)
+	if p.Interactive != nil {
+		block("Interactive session: system", p.Interactive.System)
+		block("Interactive session: injected context", p.Interactive.Context)
 	}
 	return sb.String()
 }
@@ -464,6 +463,74 @@ func sameSections(a, b *Snapshot) bool {
 		}
 	}
 	return true
+}
+
+// The few fields of a snapshot's generic sections publishing reads, typed: each a view of the
+// section's JSON (view), its other keys left out.
+type (
+	// binaryView is the binary section's signature verdict.
+	binaryView struct {
+		Signing *struct {
+			Status jsonString `json:"status"`
+		} `json:"signing"`
+	}
+	// supportView is the support section's verdict and the platforms its checks ran on.
+	supportView struct {
+		Status       jsonString `json:"status"`
+		Capabilities []struct {
+			Platform string `json:"platform"`
+		} `json:"capabilities"`
+	}
+	// promptView is the prompt section's texts: the system prompt's blocks, the injected
+	// context's, and an interactive session's.
+	promptView struct {
+		System      []promptBlock `json:"system"`
+		Context     []promptBlock `json:"context"`
+		Interactive *struct {
+			System  []promptBlock `json:"system"`
+			Context []promptBlock `json:"context"`
+		} `json:"interactive"`
+	}
+	promptBlock struct {
+		Text string `json:"text"`
+	}
+	// configView is where the config section's options were read from, and their keys.
+	configView struct {
+		Source  string                     `json:"source"`
+		Options map[string]json.RawMessage `json:"options"`
+	}
+	// telemetryView is the network section's vendor telemetry: each endpoint's events.
+	telemetryView map[string]struct {
+		Events map[string]json.RawMessage `json:"events"`
+	}
+)
+
+// jsonString is a JSON string where the value is one: null or any other kind reads as none.
+type jsonString struct {
+	s  string
+	ok bool
+}
+
+func (j *jsonString) UnmarshalJSON(data []byte) error {
+	j.ok = json.Unmarshal(data, &j.s) == nil && string(data) != "null"
+	return nil
+}
+
+// ptr is the string, nil where there was none.
+func (j jsonString) ptr() *string {
+	if !j.ok {
+		return nil
+	}
+	s := j.s
+	return &s
+}
+
+// view reads v, generic JSON or any value, into out, a typed view of the fields a reader
+// needs: a field whose JSON is of another kind than out's is left zero, the rest still read.
+func view(v, out any) {
+	if data, err := json.Marshal(v); err == nil {
+		_ = json.Unmarshal(data, out)
+	}
 }
 
 func jsonOf(v any) any {
@@ -489,11 +556,11 @@ func platformsOf(s *Snapshot) []string {
 	if s.Platform != "" {
 		seen[s.Platform] = true
 	}
-	if caps, ok := s.Support["capabilities"].([]any); ok {
-		for _, c := range caps {
-			if p, _ := c.(map[string]any)["platform"].(string); p != "" {
-				seen[p] = true
-			}
+	var sup supportView
+	view(s.Support, &sup)
+	for _, c := range sup.Capabilities {
+		if c.Platform != "" {
+			seen[c.Platform] = true
 		}
 	}
 	// A platform the build's files and processes were traced on is one it was captured on.
@@ -504,8 +571,10 @@ func platformsOf(s *Snapshot) []string {
 }
 
 func supportOf(s *Snapshot) string {
-	if st, ok := s.Support["status"].(string); ok {
-		return st
+	var sup supportView
+	view(s.Support, &sup)
+	if st := sup.Status.ptr(); st != nil {
+		return *st
 	}
 	return "untested"
 }
@@ -538,11 +607,11 @@ func markUnobserved(versions []string, byVersion map[string]*Snapshot) {
 	approx := make([]bool, len(versions))
 	for i, v := range versions {
 		cfg := byVersion[v].Config
-		src, _ := cfg["source"].(string)
-		approx[i] = strings.Contains(src, "minified")
+		var c configView
+		view(cfg, &c)
+		approx[i] = strings.Contains(c.Source, "minified")
 		tops[i] = map[string]bool{}
-		opts, _ := cfg["options"].(map[string]any)
-		for k := range opts {
+		for k := range c.Options {
 			top, _, _ := strings.Cut(k, ".")
 			top, _, _ = strings.Cut(top, "[")
 			tops[i][top] = true
@@ -604,12 +673,16 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 	for i, v := range versions {
 		per[i] = seen{}
 		tel, _ := byVersion[v].Network["telemetry"].(map[string]any)
-		for ep, raw := range tel {
-			m, _ := raw.(map[string]any)
-			delete(m, "unobserved")
-			evs, _ := m["events"].(map[string]any)
+		for _, raw := range tel {
+			if m, ok := raw.(map[string]any); ok {
+				delete(m, "unobserved")
+			}
+		}
+		var endpoints telemetryView
+		view(tel, &endpoints)
+		for ep, e := range endpoints {
 			per[i][ep] = map[string]bool{}
-			for name := range evs {
+			for name := range e.Events {
 				per[i][ep][name] = true
 			}
 		}

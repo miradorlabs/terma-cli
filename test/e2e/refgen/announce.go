@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-
 	"strings"
 	"unicode/utf8"
 
@@ -30,8 +29,36 @@ type Announcement struct {
 	Signing      *string  `json:"signing"`
 	// Text is the announcement as a post of at most 280 characters, a link counted as X
 	// counts one (23).
-	Text  string         `json:"text"`
-	Slack map[string]any `json:"slack"`
+	Text  string        `json:"text"`
+	Slack *SlackMessage `json:"slack"`
+}
+
+// SlackMessage is an announcement as Slack's chat.postMessage takes it: its fallback text, its
+// blocks, and no link previews. Fields are in the order the JSON lists them.
+type SlackMessage struct {
+	Blocks      []SlackBlock `json:"blocks"`
+	Text        string       `json:"text"`
+	UnfurlLinks bool         `json:"unfurl_links"`
+}
+
+// SlackBlock is a section of text, or a row of buttons (actions).
+type SlackBlock struct {
+	Elements []SlackButton `json:"elements,omitempty"`
+	Text     *SlackText    `json:"text,omitempty"`
+	Type     string        `json:"type"`
+}
+
+// SlackButton is a button that opens a link.
+type SlackButton struct {
+	Text SlackText `json:"text"`
+	Type string    `json:"type"`
+	URL  string    `json:"url"`
+}
+
+// SlackText is a text object: mrkdwn or plain_text.
+type SlackText struct {
+	Text string `json:"text"`
+	Type string `json:"type"`
 }
 
 // ImpactN counts a version's changes by impact.
@@ -114,7 +141,7 @@ func postText(a Announcement) string {
 
 // slackMessage is a as a Slack message: its headline, what changed, and buttons to its page
 // and to the comparison with the version before.
-func slackMessage(a Announcement) map[string]any {
+func slackMessage(a Announcement) *SlackMessage {
 	summary := fmt.Sprintf("*%s %s* is out", a.Name, a.Version)
 	if a.Previous != "" {
 		summary += fmt.Sprintf(": %d %s since %s", a.Changes, plural(a.Changes, "change", "changes"), a.Previous)
@@ -134,20 +161,26 @@ func slackMessage(a Announcement) map[string]any {
 	if len(counts) > 0 {
 		summary += "\n" + strings.Join(counts, " · ")
 	}
-	blocks := []any{map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": summary}}}
+	section := func(text string) SlackBlock {
+		return SlackBlock{Type: "section", Text: &SlackText{Type: "mrkdwn", Text: text}}
+	}
+	button := func(label, url string) SlackButton {
+		return SlackButton{Type: "button", Text: SlackText{Type: "plain_text", Text: label}, URL: url}
+	}
+	blocks := []SlackBlock{section(summary)}
 	if len(a.Highlights) > 0 {
 		var sb strings.Builder
 		for _, h := range a.Highlights {
 			sb.WriteString("• " + slackEscape(h) + "\n")
 		}
-		blocks = append(blocks, map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": strings.TrimSpace(sb.String())}})
+		blocks = append(blocks, section(strings.TrimSpace(sb.String())))
 	}
-	buttons := []any{map[string]any{"type": "button", "text": map[string]any{"type": "plain_text", "text": "View changelog"}, "url": a.URL}}
+	buttons := []SlackButton{button("View changelog", a.URL)}
 	if a.CompareURL != "" {
-		buttons = append(buttons, map[string]any{"type": "button", "text": map[string]any{"type": "plain_text", "text": "Compare with " + a.Previous}, "url": a.CompareURL})
+		buttons = append(buttons, button("Compare with "+a.Previous, a.CompareURL))
 	}
-	blocks = append(blocks, map[string]any{"type": "actions", "elements": buttons})
-	return map[string]any{"text": fmt.Sprintf("%s %s is out: %s", a.Name, a.Version, a.URL), "blocks": blocks, "unfurl_links": false}
+	blocks = append(blocks, SlackBlock{Type: "actions", Elements: buttons})
+	return &SlackMessage{Text: fmt.Sprintf("%s %s is out: %s", a.Name, a.Version, a.URL), Blocks: blocks}
 }
 
 func slackEscape(s string) string {
