@@ -3,6 +3,7 @@ package e2e
 import (
 	"encoding/json"
 	"maps"
+	"os/exec"
 	"reflect"
 	"slices"
 	"strconv"
@@ -699,5 +700,21 @@ func TestExecPurposesOffline(t *testing.T) {
 		if c.purpose == "" && got != "" || !strings.Contains(got, c.purpose) {
 			t.Errorf("execPurpose(%q, tool %v) = %q, want %q", c.argv, c.tool, got, c.purpose)
 		}
+	}
+}
+
+// A traced command that fails while something it started still runs: strace is stopped after
+// it, so its status comes from the trace's exit line, which -qq would leave out.
+func TestStraceExitStatusOffline(t *testing.T) {
+	if !slices.Contains(straceArgs("x"), "-q") || slices.Contains(straceArgs("x"), "-qq") {
+		t.Fatalf("strace's options %q: want -q (keeps exit lines), not -qq", straceArgs("x"))
+	}
+	if why := straceAvailable(); why != "" {
+		t.Skip(why)
+	}
+	cmd := exec.Command("sh", "-c", "sleep 5 & exit 3")
+	_, _, _, err := runStrace(t, cmd, time.Second)
+	if err == nil || !strings.Contains(err.Error(), "exit status 3") {
+		t.Fatalf("runStrace = %v; want exit status 3", err)
 	}
 }

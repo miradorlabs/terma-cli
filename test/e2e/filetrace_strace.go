@@ -30,9 +30,11 @@ import (
 // call, and reads (to tell a decoy read from one only opened).
 const straceSyscalls = "%file,%process,%network,read,pread64,readv,fchdir"
 
-// straceArgs are strace's options for a trace written to out.
+// straceArgs are strace's options for a trace written to out. -q, not -qq: -qq also drops the
+// `+++ exited with N +++` lines, and exitWatch reads the traced command's status from them when
+// strace is stopped while something it started still runs.
 func straceArgs(out string) []string {
-	return []string{"-f", "-qq", "-ttt", "-yy", "-s", "512", "--pidns-translation", "-e", "signal=none", "-e", "trace=" + straceSyscalls, "-o", out}
+	return []string{"-f", "-q", "-ttt", "-yy", "-s", "512", "--pidns-translation", "-e", "signal=none", "-e", "trace=" + straceSyscalls, "-o", out}
 }
 
 var (
