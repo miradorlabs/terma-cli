@@ -279,6 +279,9 @@ func checkSumMetric(t contractReporter, e telemetryEvidence, name string, filter
 
 // Wait for the entire contract, never just the first matching log. The harness
 // has exited; this also waits for detached Terma hook delivery.
+// maxHeldLines caps what a timed-out wait prints of the relay's hold.
+const maxHeldLines = 40
+
 func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, telemetryEvidence)) {
 	t.Helper()
 	deadline := time.Now().Add(45 * time.Second)
@@ -294,6 +297,15 @@ func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, tele
 				t.Logf("still queued: %s for %s", event.Name, event.SessionID)
 			}
 			t.Logf("captured SessionEnd hooks: codex=%d claude=%d", len(sb.HookPayloads("codex-session-end")), len(sb.HookPayloads("session-end")))
+			// What the relay still holds and why, when a record never arrived.
+			held := sb.RelayHeld()
+			for i, line := range held {
+				if i == maxHeldLines {
+					t.Logf("relay holds %d more", len(held)-i)
+					break
+				}
+				t.Logf("relay holds %s", line)
+			}
 			for _, span := range evidence.spans {
 				if strings.Contains(span.Name, "hook") || strings.Contains(span.Name, "shutdown") {
 					t.Logf("lifecycle span %s: start=%d end=%d attrs=%v events=%v", span.Name, span.Proto.GetStartTimeUnixNano(), span.Proto.GetEndTimeUnixNano(), span.Attrs, span.Proto.GetEvents())

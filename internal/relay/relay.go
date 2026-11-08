@@ -236,6 +236,16 @@ func (r *Relay) routes() *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(r.stats.Snapshot())
 	})
+	// What the hold keeps and why, for a test to print when it waited in vain; names
+	// sessions and processes, so like /stats it answers only the token.
+	mux.HandleFunc("/held", func(w http.ResponseWriter, req *http.Request) {
+		if !r.authorized(req) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(r.Held())
+	})
 	// `terma setup` asks for a beat as it finishes, proving the relay, credential and endpoint work.
 	mux.HandleFunc("/heartbeat", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
