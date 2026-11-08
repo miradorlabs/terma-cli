@@ -32,9 +32,10 @@ const straceSyscalls = "%file,%process,%network,read,pread64,readv,fchdir"
 
 // straceArgs are strace's options for a trace written to out. -q, not -qq: -qq also drops the
 // `+++ exited with N +++` lines, and exitWatch reads the traced command's status from them when
-// strace is stopped while something it started still runs.
+// strace is stopped while something it started still runs. -I2: strace running a command into a
+// file ignores SIGTERM by default (-I3), and runStrace stops it with one.
 func straceArgs(out string) []string {
-	return []string{"-f", "-q", "-ttt", "-yy", "-s", "512", "--pidns-translation", "-e", "signal=none", "-e", "trace=" + straceSyscalls, "-o", out}
+	return []string{"-f", "-q", "-I2", "-ttt", "-yy", "-s", "512", "--pidns-translation", "-e", "signal=none", "-e", "trace=" + straceSyscalls, "-o", out}
 }
 
 var (

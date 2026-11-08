@@ -712,9 +712,15 @@ func TestStraceExitStatusOffline(t *testing.T) {
 	if why := straceAvailable(); why != "" {
 		t.Skip(why)
 	}
-	cmd := exec.Command("sh", "-c", "sleep 5 & exit 3")
+	// It outlives runStrace's first look (200 ms), so it is seen exit while its sleep runs on,
+	// and strace is stopped (SIGTERM, which -I2 lets end it) rather than ending by itself.
+	cmd := exec.Command("sh", "-c", "sleep 30 >/dev/null 2>&1 & sleep 0.6; exit 3")
+	start := time.Now()
 	_, _, _, err := runStrace(t, cmd, time.Second)
 	if err == nil || !strings.Contains(err.Error(), "exit status 3") {
 		t.Fatalf("runStrace = %v; want exit status 3", err)
+	}
+	if took := time.Since(start); took > 8*time.Second {
+		t.Errorf("runStrace took %v: strace was killed, not stopped", took)
 	}
 }
