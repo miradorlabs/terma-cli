@@ -30,6 +30,7 @@ jobs:
     outputs:
       builds: ${{ steps.new.outputs.builds }}
       tests: ${{ steps.new.outputs.tests }}
+      harnesses: ${{ steps.new.outputs.harnesses }}
       claude: ${{ steps.new.outputs.claude }}
       codex: ${{ steps.new.outputs.codex }}
       gemini: ${{ steps.new.outputs.gemini }}
@@ -65,19 +66,29 @@ jobs:
           fi
           # Each new harness's scenarios, by the name its tests carry; a desktop app's are its
           # job's own (capture-desktop).
+          # Harnesses other than Claude Code and Codex also share the TestHarnessProbe*
+          # scenarios (across turns, retries, tool output), each a subtest by harness: the run
+          # takes those too, for the new harnesses alone (TERMA_E2E_HARNESSES).
           names=()
           desktop=()
+          shared=()
           while IFS='=' read -r harness versions; do
             echo "${harness//-/_}=$versions" >> "$GITHUB_OUTPUT"
             case "$harness" in
-              opencode) names+=(OpenCode) ;;
+              claude|codex) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}") ;;
+              opencode) names+=(OpenCode); shared+=(opencode) ;;
               claude-desktop) desktop+=(TestClaudeDesktopProfile) ;;
               codex-desktop) desktop+=(TestCodexDesktopProfile) ;;
-              *) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}") ;;
+              *) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}"); shared+=("$harness") ;;
             esac
           done <<<"$builds"
           if [ ${#names[@]} -gt 0 ]; then
-            echo "tests=^Test($(IFS='|'; echo "${names[*]}"))(Profile|Probe)" >> "$GITHUB_OUTPUT"
+            tests="^Test($(IFS='|'; echo "${names[*]}"))(Profile|Probe)"
+            if [ ${#shared[@]} -gt 0 ]; then
+              tests="$tests|^TestHarnessProbe(AcrossTurns|Retries|ToolOutput)\$"
+              echo "harnesses=$(IFS=','; echo "${shared[*]}")" >> "$GITHUB_OUTPUT"
+            fi
+            echo "tests=$tests" >> "$GITHUB_OUTPUT"
           fi
           if [ ${#desktop[@]} -gt 0 ]; then
             echo "desktop_tests=^($(IFS='|'; echo "${desktop[*]}"))\$" >> "$GITHUB_OUTPUT"
@@ -126,6 +137,7 @@ jobs:
           TERMA_E2E_OPENCODE_VERSIONS: ${{ needs.detect.outputs.opencode }}
           TERMA_E2E_COPILOT_VERSIONS: ${{ needs.detect.outputs.copilot }}
           TERMA_E2E_DSH_VERSIONS: ${{ needs.detect.outputs.dsh }}
+          TERMA_E2E_HARNESSES: ${{ needs.detect.outputs.harnesses }}
           TESTS: ${{ needs.detect.outputs.tests }}
         run: ./bin/e2e.test -test.v -test.timeout 50m -test.run "$TESTS"
       - name: Upload the profiles
@@ -236,7 +248,9 @@ jobs:
   publish:
     needs: [detect, capture, capture-linux, capture-desktop]
     # A capture that failed outright still publishes its builds, partial, so the next check
-    # does not take them for new again; the night tries them again.
+    # does not take them for new again; the night tries them again. A desktop app's release is
+    # the exception: the night does not capture the apps, so one whose capture failed is not
+    # published as tried, and the next check takes it for new and tries it again.
     if: always() && needs.detect.outputs.builds != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -268,11 +282,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           BUILDS: ${{ needs.detect.outputs.builds }}
+          DESKTOP_CAPTURE: ${{ needs.capture-desktop.result }}
         run: |
           mkdir -p runs
           args=()
           for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
-          while read -r line; do args+=(-attempted "$line"); done <<<"$BUILDS"
+          while read -r line; do
+            case "$line" in
+              claude-desktop=*|codex-desktop=*) [ "$DESKTOP_CAPTURE" = success ] || continue ;;
+            esac
+            args+=(-attempted "$line")
+          done <<<"$BUILDS"
           # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
           # load the timeline-<n>.json archives; then the default pages it.
           go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"
