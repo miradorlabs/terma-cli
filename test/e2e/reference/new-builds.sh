@@ -8,7 +8,8 @@
 # nothing is new.
 #
 # A registry or the reference that cannot be read is a warning, not a failure: the next
-# check, or the night, catches up.
+# check, or the night, catches up. Only a reference that says it has no index for a harness
+# (404) makes it a harness never published.
 set -euo pipefail
 
 base=${TERMA_REFERENCE_URL:-https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses}
@@ -23,6 +24,24 @@ vsort_dir=$(mktemp -d)
 trap 'rm -rf "$vsort_dir"' EXIT
 (cd "$e2e_dir" && go build -o "$vsort_dir/versionsort" ./refdiff/cmd/versionsort)
 vsort() { "$vsort_dir/versionsort" "$@"; }
+
+# read_index sets index to harness's published index.json: status 0 when there is one, 1 when the
+# reference has none (404, a harness never published), 2 when it could not be read (a timeout, a
+# 5xx), which the caller skips rather than take for never published: an outage of the host
+# would otherwise start every capture each quarter hour.
+read_index() {
+	local code
+	index=""
+	code=$(curl -sSL --max-time 30 -o "$vsort_dir/index.json" -w '%{http_code}' "$base/$1/index.json" 2>/dev/null) || code=000
+	case "$code" in
+	200) index=$(cat "$vsort_dir/index.json") ;;
+	404) return 1 ;;
+	*)
+		echo "::warning::could not read $1's published index (HTTP $code)" >&2
+		return 2
+		;;
+	esac
+}
 
 # The builds the suite can fetch by version (TERMA_E2E_<HARNESS>_VERSIONS), each with its
 # npm package, read in npm's abbreviated form (versions and tags, not every manifest).
@@ -50,9 +69,12 @@ for entry in "${harnesses[@]}"; do
 	fi
 	[ -n "$releases" ] || continue
 	published=""
-	if index=$(curl -fsSL --max-time 30 "$base/$harness/index.json" 2>/dev/null); then
-		published=$(jq -r '.versions[].version' <<<"$index" | vsort)
-	fi
+	status=0
+	read_index "$harness" || status=$?
+	case $status in
+	0) published=$(jq -r '.versions[].version' <<<"$index" | vsort) ;;
+	2) continue ;;
+	esac
 	if [ -z "$published" ]; then
 		new=$(tail -n 1 <<<"$releases")
 	else
@@ -86,8 +108,10 @@ for entry in "${desktop[@]}"; do
 		newest=$(grep -o '<sparkle:shortVersionString>[^<]*' <<<"$doc" | sed 's/.*>//' | vsort | tail -n 1)
 	fi
 	[ -n "$newest" ] || continue
-	if index=$(curl -fsSL --max-time 30 "$base/$harness/index.json" 2>/dev/null) &&
-		jq -r '.versions[].version' <<<"$index" | grep -qxF "$newest"; then
+	status=0
+	read_index "$harness" || status=$?
+	[ "$status" -ne 2 ] || continue
+	if [ "$status" -eq 0 ] && jq -r '.versions[].version' <<<"$index" | grep -qxF "$newest"; then
 		continue
 	fi
 	echo "$harness=$newest"
