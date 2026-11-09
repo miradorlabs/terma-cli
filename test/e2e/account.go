@@ -60,8 +60,9 @@ func (sb *Sandbox) StartAccount() *Account {
 			a.serveDelegate(w, r)
 			return
 		case "/v1/auth/cli/token":
-			a.serveDelegatedExchange(w, r)
-			return
+			if a.serveDelegatedExchange(w, r) {
+				return
+			}
 		}
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -178,8 +179,10 @@ func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveDelegatedExchange is POST /v1/auth/cli/token for a delegated code: redeemed once,
-// with redirect_port 0 and the verifier of the challenge it was made for.
-func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request) {
+// with redirect_port 0 and the verifier of the challenge it was made for. It answers only
+// a code's exchange: for a refresh it answers nothing and returns false, so a refresh is
+// refused as before.
+func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request) bool {
 	var body struct {
 		GrantType    string `json:"grant_type"`
 		Code         string `json:"code"`
@@ -187,20 +190,24 @@ func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request)
 		RedirectPort *int   `json:"redirect_port"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	if body.GrantType != "authorization_code" {
+		return false
+	}
 	a.mu.Lock()
 	grant, ok := a.delegated[body.Code]
 	delete(a.delegated, body.Code)
 	a.mu.Unlock()
 	sum := sha256.Sum256([]byte(body.CodeVerifier))
-	if !ok || body.GrantType != "authorization_code" || body.RedirectPort == nil || *body.RedirectPort != 0 ||
+	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 ||
 		base64.RawURLEncoding.EncodeToString(sum[:]) != grant.challenge {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, `{"code":"INVALID_ARGUMENT","message":"invalid grant"}`)
-		return
+		return true
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": a.token, "refresh_token": "ter_clr_live", "token_type": "Bearer",
 		"expires_in": 3600, "session_id": "delegated", "organization": map[string]string{"id": accountOrg, "name": "Live"},
 		"user": map[string]string{"id": accountUser, "email": "live@terma.test"}})
+	return true
 }
 
 // Delegate is what Terma Desktop does with the CLI's challenge: it trades its own refresh

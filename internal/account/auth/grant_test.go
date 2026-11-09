@@ -79,7 +79,7 @@ type desktopGrantFixture struct {
 	} `json:"runs"`
 }
 
-func loaddesktopGrantFixture(t *testing.T) desktopGrantFixture {
+func loadDesktopGrantFixture(t *testing.T) desktopGrantFixture {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/delegated_grant.json")
 	if err != nil {
@@ -101,7 +101,7 @@ func TestGrantConstantsAreTheFixtures(t *testing.T) {
 		t.Fatalf("bounds: fixture %d bytes %ds, CLI %d bytes %s", g.MaxLine, g.TimeoutSeconds, maxGrantLine, GrantTimeout)
 	}
 	codes := []string{GrantNoCode, GrantBadInput, GrantRejected, GrantIdentityMismatch}
-	if desk := loaddesktopGrantFixture(t); strings.Join(desk.ErrorCodes, ",") != strings.Join(codes, ",") {
+	if desk := loadDesktopGrantFixture(t); strings.Join(desk.ErrorCodes, ",") != strings.Join(codes, ",") {
 		t.Fatalf("error codes: desktop %v, CLI %v", desk.ErrorCodes, codes)
 	}
 	if !strings.HasSuffix(g.Label, DesktopLabelSuffix) || !strings.HasSuffix(DesktopLabel(), DesktopLabelSuffix) {
@@ -113,7 +113,7 @@ func TestGrantConstantsAreTheFixtures(t *testing.T) {
 // written there, the code passed on byte for byte, and prints only lines the desktop's
 // reader takes, the reuse exactly as pinned.
 func TestGrantMeetsTheDesktopsContract(t *testing.T) {
-	desk := loaddesktopGrantFixture(t)
+	desk := loadDesktopGrantFixture(t)
 	in := strings.NewReader(desk.In1.Line + "\n" + desk.In2.Line + "\n")
 	id, err := ReadGrantIdentity(t.Context(), in, time.Second)
 	if err != nil || id.UserID != desk.In1.UserID || id.OrgID != desk.In1.OrgID {
@@ -273,8 +273,22 @@ func TestGrantIdentityLeavesTheCodeLine(t *testing.T) {
 	}
 }
 
+// Terma's ids are lowercase, so an identity spelled in uppercase is the same user and
+// organization: compared with a stored sign-in and with the exchanged one, it still matches.
+func TestGrantIdentityIsLowercase(t *testing.T) {
+	line := `{"user_id":"0F8FAD5B-D9CB-469F-A165-70867728950E","org_id":"7C9E6679-7425-40DE-944B-E07FC1F90AE7"}` + "\n"
+	id, err := ReadGrantIdentity(t.Context(), strings.NewReader(line), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (GrantIdentity{UserID: "0f8fad5b-d9cb-469f-a165-70867728950e", OrgID: "7c9e6679-7425-40de-944b-e07fc1f90ae7"}); id != want {
+		t.Fatalf("identity = %+v, want %+v", id, want)
+	}
+}
+
 // runGrant is the CLI's side of one desktop run: the identity, then the reuse a stored
-// sign-in allows, or the grant.
+// sign-in allows, or the grant. Whether a stored sign-in may be reused (the same user and
+// organization) is the CLI's check, tested in internal/cli; here stored only stands for it.
 func runGrant(t *testing.T, in io.Reader, out io.Writer, exchanger TokenExchanger, label string, stored bool) error {
 	t.Helper()
 	ctx := t.Context()

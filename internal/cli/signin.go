@@ -166,18 +166,26 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 			cmp.Or(orgName, cred.OrganizationID), want, cmp.Or(orgName, cred.OrganizationID))
 	}
 
+	if err := app.storeLogin(ctx, cfg, cred, orgName); err != nil {
+		return nil, err
+	}
+	return &signInResult{cred: cred, orgName: orgName}, nil
+}
+
+// storeLogin keeps a new sign-in and makes it the profile's. It replaces only its own
+// organization's stored sign-in, which is then ended; the other organizations' stay
+// stored. A sign-in that cannot be stored is ended too, so it does not linger on the web.
+func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.Credential, orgName string) error {
 	replaced, err := auth.SaveCredential(app.dir, cfg.ProfileName, cred)
 	if err != nil {
-		return nil, err
+		_ = app.revokeSession(ctx, cfg, cred)
+		return err
 	}
 	// Best-effort: the superseded session may already be dead, often why the user is here.
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, cred, orgName) }); err != nil {
-		return nil, err
-	}
-	return &signInResult{cred: cred, orgName: orgName}, nil
+	return config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, cred, orgName) })
 }
 
 // reuseStoredSession drops a dead credential so it is not tried again; ok false means

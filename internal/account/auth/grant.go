@@ -92,6 +92,8 @@ func ReadGrantIdentity(ctx context.Context, in io.Reader, timeout time.Duration)
 	if json.Unmarshal(line, &id) != nil || !grantUUID.MatchString(id.UserID) || !grantUUID.MatchString(id.OrgID) {
 		return GrantIdentity{}, &GrantError{Code: GrantBadInput, Message: `the identity line on stdin is not {"user_id":"<uuid>","org_id":"<uuid>"}`}
 	}
+	// Terma's ids are lowercase; an uppercase spelling names the same user and organization.
+	id.UserID, id.OrgID = strings.ToLower(id.UserID), strings.ToLower(id.OrgID)
 	return id, nil
 }
 

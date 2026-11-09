@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -50,7 +51,7 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	if err != nil {
 		return nil, err
 	}
-	if desktop.OrgID != orgID {
+	if !strings.EqualFold(desktop.OrgID, orgID) {
 		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "org_id does not match --org"}
 	}
 
@@ -60,7 +61,7 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 		return cmp.Or(whoami.UserID, verified.UserID) == desktop.UserID &&
 			cmp.Or(whoami.OrganizationID, verified.OrganizationID) == desktop.OrgID && verified.OrganizationID == desktop.OrgID
 	}
-	if _, ok, err := app.reuseStoredSessionIf(ctx, cfg, orgRef{ID: orgID}, sameDesktop); err != nil {
+	if _, ok, err := app.reuseStoredSessionIf(ctx, cfg, orgRef{ID: desktop.OrgID}, sameDesktop); err != nil {
 		return nil, err
 	} else if ok {
 		if err := auth.WriteGrantReused(out); err != nil {
@@ -85,16 +86,9 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	if result := client.LastLogin(); result != nil {
 		orgName = result.OrganizationName
 	}
-	// Replaces only this organization's stored sign-in, another user's included, which is
-	// then ended; the other organizations' stay stored for a switch back.
-	replaced, err := auth.SaveCredential(app.dir, cfg.ProfileName, cred)
-	if err != nil {
-		return nil, err
-	}
-	if replaced != nil {
-		_ = app.revokeSession(ctx, cfg, replaced)
-	}
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, cred, orgName) }); err != nil {
+	// Another user's stored sign-in for this organization is replaced and ended; the other
+	// organizations' stay stored for a switch back.
+	if err := app.storeLogin(ctx, cfg, cred, orgName); err != nil {
 		return nil, err
 	}
 	return app.loadConfig()
