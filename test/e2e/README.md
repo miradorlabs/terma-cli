@@ -276,11 +276,16 @@ each line has a green or red mark. For each harness's newest build it gives:
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
 
-For a harness whose source is public (Codex, `sources` in `compatgen/source.go`; one line
-adds another), `-source` links each of these to the lines of the build's source that name
-it, read from its release tag's tarball, and a new build's headline links the comparison
-of the two tags. Tests, test modules and comments (to the end of a line, or a block) are not
-the build's source. A key is
+For a harness whose source is public (Codex, Gemini CLI, OpenCode, Pi, omp, dsh, T3 Code
+and Hermes: `Sources` in `sourcelink/sourcelink.go`, one line each, with its tag, the folders
+that ship and the language its files are read in, Rust, TypeScript or Python), `-source`
+links each of these to the lines of the build's source that name it, read from its release
+tag's tarball, and a new build's headline links the comparison of the two tags. Tests, test
+modules, comments and documentation are not the build's source. `sourcelink` is a package
+of its own so the harness reference's generator can link what it finds too: any name the
+source quotes (`Find`), and a passage of a prompt or a tool's description wherever the tree
+keeps it, a Markdown file or a template literal (`FindText`); `TERMA_SOURCELINK_LIVE=1 go
+test ./sourcelink/ -v` reads a release of each harness and says what it found. A key is
 linked beside its surface's name (or the constant that holds it): a line that names a key
 belongs to the surface named nearest it in the same function, of all the harness is known to
 send, so a generic key leads to its own metric or event, not to every line that says it nor
@@ -301,6 +306,122 @@ quiet night. The digest goes to the run's summary and to Slack through the
 `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
 channel means the job did not run. Drift never fails the night; a removed key on a surface
 terma parses fails its golden.
+
+## Harness Reference
+
+The public reference of what each harness build does and what changed from one build to the
+next (`reference/SCHEMA.md`). Profile scenarios (`profile_test.go`) run each build with its own
+defaults, none of the suite's settings, against a fixture provider that records every request
+(`profile.go`): the system prompt and injected context, tools, model and parameters, cache
+breakpoints, headers and betas, side requests, and the build's help. Behaviour probes add how
+it retries, compacts, truncates tool output and delegates, and the hooks probe
+(`hooks_probe.go`) every hook event the build knows, what each hands a hook and what a hook's
+answer does (`TERMA_E2E_PROBES=hooks`); out-of-band captures add its
+network egress, what it writes to disk and what its binary says of itself. The run writes
+`report/profiles.json`, credentials redacted.
+
+`refgen` normalizes each build's profile (the run's paths, ids, dates and prompt become
+placeholders), builds its snapshot with its field census and its capability history, merges
+it into the published snapshots (a section the night did not capture keeps the last night's),
+compares each harness's versions in order, checks each change against the vendor's changelog,
+and writes `docs/harnesses/`. The nightly `compat` job runs it after compatgen and publishes
+the tree on `compat-matrix` beside the matrix; `publish.sh restore` starts each night from it.
+
+```sh
+make run RUN='^(TestClaudeProfile|TestCodexProfile)$'
+go run ./refgen -profiles report/profiles.json -fields report/fields.json -census report/census.json \
+  -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -fetch
+```
+
+`-catalog docs/compat/fields.json` takes a census from the field catalog for each build a
+whole census saw, for a backfill whose builds were censused on earlier nights. `-now` pins the
+time a run stamps, so two runs over the same input write the same bytes. A republish is
+incremental where that is cheap: a diff whose two snapshots did not change is kept, an observed
+field that one pass over its JSON shows nothing to name is not walked, and a file that already
+holds its bytes is not rewritten. `-full` walks and rewrites everything, a full render to
+compare a republish with (`TestIncrementalRenderIsAFullOne`). `-timeline-steps` sets how many
+steps `timeline.json` and each of its archives hold.
+
+refgen names the machine's paths (`machinepaths.go`: an installed program by its name, Xcode
+as `<xcode>`, a home `<home>`, a runner's checkout `<checkout>`) in every observed value it
+publishes, and in every snapshot it loads back, so republishing corrects what was published
+before a rule. `TestPublishNamesNoMachinePaths` is the guard over the fixtures; to scan a
+published tree, or a re-render of one, with the same rules:
+
+```sh
+git archive origin/compat-matrix docs | tar x -C /tmp/pub
+REFGEN_SCAN_DIR=/tmp/pub/docs/harnesses go test ./refgen -run TestPublishedMachineLeaks -v
+```
+
+A build's `config` itemizes every option it reads and every environment variable
+(`configschema/`). With `-source`, a public harness's are read from its source at the
+release's tag (Codex's `config.schema.json`, Gemini CLI's and Pi's settings schemas, OpenCode's
+Effect Schema, omp's `register()` calls, DeepSeek Harness's config catalog, Hermes's
+`DEFAULT_CONFIG`, and the variables the code reads), so no capture is needed. Claude Code's and
+the Copilot CLI's are read from the bundle at capture time (`settingsfacts.go`): its settings
+schema and the variables its JavaScript reads. `TestClaudeProfileBinary` and
+`TestCopilotProfileBinary` take only a build's binary facts and signing, no turn, for a backfill
+that re-reads many builds' facts quickly; refgen prefers their facts to an earlier scenario's.
+
+The files profile (`TestClaudeProfileFiles`, `TestCodexProfileFiles`, `filetrace.go`) traces
+the profile's first turn and a tool turn: every path the build reads, writes, creates, deletes,
+renames or looks for, by phase (startup, turn, exit), the programs it starts, the sockets it
+listens on and connects to, and whether it touches the fake credentials and sockets planted in
+its home and repository (`decoys.go`); refgen publishes it as the snapshot's `filesystem`
+section, by platform. Each program started says which commands started it (`parents`), whether
+it was the build's own doing or the tool call's (`role`), and, for a well-known command, what it
+is for (`purpose`, from `execPurposes` in `filetrace_purpose.go`). The run is a clean room
+(`CleanRoom` in `sandbox.go`): no terma setup, hooks, relay or exporter, HOME and the
+harness's config folders the sandbox's, `SHELL` the OS's default login shell (`/bin/zsh` on
+macOS, `/bin/bash` on Linux), and the network only through the recording proxy. The hooks
+probe's recorder is registered for every hook event the build knows, so the build runs as it
+does with hooks configured, and the trace drops it (`dropped.hooks`). Linux traces with strace, in the machine image (`make machines`, which
+runs the scenarios on the image's builds, or on `MACHINE_CLAUDE_VERSIONS` /
+`MACHINE_CODEX_VERSIONS`). macOS traces with Endpoint Security's `eslogger`, which needs root and
+Full Disk Access: the suite runs exactly `sudo -n /usr/bin/eslogger …` (a sudoers rule for it and
+`/usr/sbin/lsof` alone), directly, or through `TERMA_E2E_ESLOGGER_VIA` (`ssh localhost`, where
+Remote Login grants its sessions Full Disk Access and the terminal has none), and samples
+sockets with lsof. GitHub's hosted macOS runner lets eslogger run directly, so the macOS jobs
+trace there as they run everything else. Where neither tracer can run, the scenarios skip and
+say why.
+`TestFileTracerCheck` traces a shell script, to check a machine's tracer, and that no eslogger is
+left running. `TERMA_E2E_TRACE_DIR` keeps each raw trace (it holds the decoys' fake contents and
+the build's environment: never publish it).
+
+```sh
+make machines HOST_ARCH=arm64 MACHINE_CLAUDE_VERSIONS=2.1.318 MACHINE_CODEX_VERSIONS=0.166.0 RUN='^(TestClaudeProfileFiles|TestCodexProfileFiles)$'
+TERMA_E2E_ESLOGGER_VIA="ssh localhost" make run RUN='^(TestClaudeProfileFiles|TestCodexProfileFiles)$'
+```
+
+The desktop apps' profiles (`TestClaudeDesktopProfile`, `TestCodexDesktopProfile`,
+`profile_desktop_test.go`, `desktop.go`) run each release of Claude Desktop and of the Codex
+app whole, versioned by the app's own release, fetched from its update feed: one first turn
+against the fixture provider, the window driven as a person drives it (Claude Desktop through
+the accessibility API, `desktop/ui.swift`, built with swiftc; the Codex app through its DevTools
+protocol, `cdp.go`), the app's other requests through the recording proxy. Claude Desktop runs
+in its third-party inference mode, set up with an organization's managed preferences; the Codex
+app signed in with an API key, its model provider the fixture. Besides the agent's sections
+they record how the app started its agent (its command line and environment, read from the
+kernel), the app bundle's signature and the agent it bundles or downloads. They change
+machine-wide settings (managed preferences, the proxy's CA trusted in the System keychain) and
+put them back, so they run only on a CI runner: `TERMA_E2E_DESKTOP_APPS=1` opts in, and every
+change they make as root goes through one guard (`rootCommand` in `desktop_root.go`) that refuses
+unless the machine is a GitHub-hosted runner (`GITHUB_ACTIONS=true`,
+`RUNNER_ENVIRONMENT=github-hosted`) or says it is as throwaway
+(`TERMA_E2E_ALLOW_ROOT_CHANGES=1`). A developer's machine only ever runs `sudo -n
+/usr/bin/eslogger` and lsof under sudo;
+`TERMA_E2E_CLAUDE_DESKTOP_APP_VERSIONS` / `TERMA_E2E_CODEX_DESKTOP_APP_VERSIONS` pick releases
+(`latest`, `lastN` or versions the feed lists); `TERMA_E2E_DESKTOP_DEBUG` keeps screenshots,
+the window's accessibility tree and the app's logs.
+
+Harnesses release more often than nightly, so `reference.yml` checks every quarter hour:
+`reference/new-builds.sh` asks each registry for builds newer than the newest the reference
+has published (a few requests, no build; nothing else runs when nothing is new), and only
+then captures those builds' profiles on macOS and publishes the reference alone
+(`publish.sh publish-reference`). A build it set out to capture is published even where the
+capture failed, partial (`refgen -attempted`), so the next check does not take it for new
+again; the night tries it again. Its publish job and the nightly compat job share a
+concurrency group, so they never push `compat-matrix` at once.
 
 ## Relay restarts
 
