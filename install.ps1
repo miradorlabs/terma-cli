@@ -75,7 +75,8 @@
             break
           }
           $file = [IO.File]::Create($outFile)
-          try { $resp.Content.CopyToAsync($file).GetAwaiter().GetResult() } finally { $file.Dispose(); $resp.Dispose() }
+          # $null: PowerShell 7 would print the task's VoidTaskResult.
+          try { $null = $resp.Content.CopyToAsync($file).GetAwaiter().GetResult() } finally { $file.Dispose(); $resp.Dispose() }
           return
         }
         if ($null -eq $failure) { $failure = 'too many redirects' }

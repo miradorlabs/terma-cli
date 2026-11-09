@@ -81,7 +81,12 @@ function Install([string]$shell, [hashtable]$vars, [string]$from = $work) {
     $code = $LASTEXITCODE
   } finally {
     Pop-Location
-    foreach ($k in $set.Keys) { [Environment]::SetEnvironmentVariable($k, $set[$k]) }
+    # A variable that was not set is removed, not left set but empty: PowerShell would pass
+    # $null on as "", and an empty TERMA_NO_MODIFY_PATH is still set to the installer.
+    foreach ($k in $set.Keys) {
+      if ($null -eq $set[$k]) { Remove-Item -LiteralPath "Env:$k" -ErrorAction SilentlyContinue }
+      else { [Environment]::SetEnvironmentVariable($k, $set[$k]) }
+    }
   }
   [pscustomobject]@{ Out = ($out -join "`n"); Code = $code }
 }
@@ -200,6 +205,7 @@ try {
   try {
     $res = Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = "$drive\" }
     Assert-Installed $driveRoot $res
+    if ($res.Out -match 'VoidTaskResult') { Fail "the installer printed a .NET task result: $($res.Out)" }
     $entries = (Get-UserPath).Split(';')
     if ($entries -notcontains "$drive\" -or $entries -contains $drive) {
       Fail "user PATH = $(Get-UserPath), want $drive\ on it; machine PATH = $machinePath; the installer said: $($res.Out)"
