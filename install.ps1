@@ -151,8 +151,12 @@
     # still running (the relay) steps aside to terma.exe.old first, as `terma update` does.
     $staged = Join-Path $dest ".terma.$PID.exe"
     # What earlier installs and updates moved aside goes, unless it is still running. One
-    # that is keeps its name, and this one steps aside under a name of its own.
+    # that is keeps its name, and this one steps aside under a name of its own. A binary an
+    # install that died staged goes too, once it is old enough not to be another install's.
     Get-ChildItem -LiteralPath $dest -Filter 'terma.exe*.old' -Force -ErrorAction SilentlyContinue |
+      ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+    Get-ChildItem -LiteralPath $dest -Filter '.terma.*.exe' -Force -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTime -lt (Get-Date).AddHours(-1) } |
       ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
     $old = "$exe.old"
     if (Test-Path -LiteralPath $old) { $old = "$exe.$PID.old" }

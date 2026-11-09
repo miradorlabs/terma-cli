@@ -123,8 +123,10 @@ type GrantOptions struct {
 // LoginWithGrant signs in with a code Terma Desktop obtains for this process: it makes a
 // PKCE pair, prints the challenge and the label as one JSON line, reads the code back as
 // one, and redeems it with the verifier, which never leaves the process. No listener, no
-// browser. Every failure is a *GrantError, and none quotes the code or the verifier. After
-// an error opts.In is not to be read again, as for ReadGrantIdentity.
+// browser. Every failure the desktop's lines or the auth host cause is a *GrantError, and
+// none quotes the code or the verifier; a failed write to opts.Out or an ended ctx is
+// returned as it is. After an error opts.In is not to be read again, as for
+// ReadGrantIdentity.
 func LoginWithGrant(ctx context.Context, exchanger TokenExchanger, opts GrantOptions) (*Credential, error) {
 	pkce, err := NewPKCE()
 	if err != nil {
@@ -167,6 +169,8 @@ func LoginWithGrant(ctx context.Context, exchanger TokenExchanger, opts GrantOpt
 
 // redacted is err with every secret in its text replaced, for a cause that may quote what
 // was sent: an auth host's refusal is printed, and the code and the verifier never are.
+// A redacted error does not unwrap to err on purpose: whatever formatted the original
+// would print the secrets again.
 func redacted(err error, secrets ...string) error {
 	text := err.Error()
 	for _, secret := range secrets {

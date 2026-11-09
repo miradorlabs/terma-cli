@@ -198,9 +198,12 @@ try {
   & subst.exe $drive $driveRoot
   if ($LASTEXITCODE) { Fail "subst $drive $driveRoot failed" }
   try {
-    Assert-Installed $driveRoot (Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = "$drive\" })
+    $res = Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = "$drive\" }
+    Assert-Installed $driveRoot $res
     $entries = (Get-UserPath).Split(';')
-    if ($entries -notcontains "$drive\" -or $entries -contains $drive) { Fail "user PATH = $(Get-UserPath), want $drive\ on it" }
+    if ($entries -notcontains "$drive\" -or $entries -contains $drive) {
+      Fail "user PATH = $(Get-UserPath), want $drive\ on it; machine PATH = $machinePath; the installer said: $($res.Out)"
+    }
   } finally {
     & subst.exe $drive /d | Out-Null
     $envKey.SetValue('Path', "$keep;$default", [Microsoft.Win32.RegistryValueKind]::ExpandString)

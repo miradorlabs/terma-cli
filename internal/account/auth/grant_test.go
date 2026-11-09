@@ -146,12 +146,22 @@ func TestGrantMeetsTheDesktopsContract(t *testing.T) {
 	if err := WriteGrantReused(&reused); err != nil {
 		t.Fatal(err)
 	}
+	// Each pinned case is looked up by name; one the fixture no longer has fails the test
+	// rather than passing with nothing checked.
+	reuseCase := false
 	for _, c := range desk.Cases {
-		if c.Name == "a stored sign-in for the same user and organization" && reused.String() != c.Out+"\n" {
-			t.Fatalf("reuse line %q, want %q", reused.String(), c.Out)
+		if c.Name == "a stored sign-in for the same user and organization" {
+			reuseCase = true
+			if reused.String() != c.Out+"\n" {
+				t.Fatalf("reuse line %q, want %q", reused.String(), c.Out)
+			}
 		}
 	}
+	if !reuseCase {
+		t.Fatal("the desktop's fixture has no reuse case")
+	}
 	// The message the desktop's run shows for a missing code.
+	noCodeRun := false
 	for _, r := range desk.Runs {
 		var line struct {
 			Error struct{ Code, Message string }
@@ -159,11 +169,15 @@ func TestGrantMeetsTheDesktopsContract(t *testing.T) {
 		if json.Unmarshal([]byte(r.CLIError), &line) != nil || line.Error.Code != GrantNoCode {
 			continue
 		}
+		noCodeRun = true
 		_, err := LoginWithGrant(t.Context(), exchanger, GrantOptions{In: strings.NewReader(""), Out: io.Discard, Timeout: time.Second})
 		var ge *GrantError
 		if !errors.As(err, &ge) || ge.Code != line.Error.Code || ge.Message != line.Error.Message {
 			t.Fatalf("%s: err = %v, want %s %q", r.Name, err, line.Error.Code, line.Error.Message)
 		}
+	}
+	if !noCodeRun {
+		t.Fatalf("the desktop's fixture has no run that ends in %s", GrantNoCode)
 	}
 }
 

@@ -56,7 +56,8 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	}
 
 	// The user is the one the auth host answers for: whoami fills it for a credential saved
-	// before terma kept it. Ids compare without regard to case, as ReadGrantIdentity reads them.
+	// before terma kept it. The organization must be the desktop's both as the host answers
+	// and as stored. Ids compare without regard to case, as ReadGrantIdentity reads them.
 	sameDesktop := func(verified *auth.Credential, whoami identityResponse) bool {
 		return strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID) &&
 			strings.EqualFold(cmp.Or(whoami.OrganizationID, verified.OrganizationID), desktop.OrgID) &&
