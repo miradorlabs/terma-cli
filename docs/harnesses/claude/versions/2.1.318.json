@@ -21900,6 +21900,7 @@
       "VERTEX_REGION_CLAUDE_5_SONNET",
       "VERTEX_REGION_CLAUDE_FABLE_5",
       "VERTEX_REGION_CLAUDE_FABLE_5_1",
+      "VERTEX_REGION_CLAUDE_FABLE_5_2",
       "VERTEX_REGION_CLAUDE_HAIKU_4_5",
       "VERTEX_REGION_CLAUDE_HAIKU_5_5"
     ],
@@ -23511,6 +23512,10 @@
         "description": "Override region for Claude Fable 5.1 when using Google Cloud's Agent Platform. Added in v2.1.257",
         "read": false
       },
+      "VERTEX_REGION_CLAUDE_FABLE_5_2": {
+        "description": "Override region for Claude Fable 5.2 when using Google Cloud's Agent Platform. Added in v2.1.321",
+        "read": false
+      },
       "VERTEX_REGION_CLAUDE_HAIKU_4_5": {
         "description": "Override region for Claude Haiku 4.5 when using Google Cloud's Agent Platform",
         "read": false
@@ -23520,7 +23525,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-09T17:38:10.676342852Z",
+    "fetched_at": "2026-11-09T19:11:19.419107329Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24245,7 +24250,7 @@
       },
       "fastModePerSessionOptIn": {
         "default": "`false`",
-        "description": "Normally, running `/fast` saves `fastMode` to a person's user settings, so new sessions on a supported model start with fast mode on. Set this key to `true` to stop that: a saved `fastMode: true` no longer turns fast mode on at session start, and each person runs `/fast` in each session they want it. Claude Code leaves `fastMode` in their file, so turning this key off restores the old behavior.",
+        "description": "Normally, running `/fast` saves `fastMode` to a person's user settings, so new sessions on a supported model start with fast mode on. On Fable 5.2, that happens only if they turned it on while using Fable 5.2. To make each person run `/fast` in each session they want it, set this key to `true`. Claude Code leaves `fastMode` in their file, so turning this key off restores the old behavior.",
         "read": true,
         "scope": "Any file",
         "topic": "Model and responses",
