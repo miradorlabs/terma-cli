@@ -1,11 +1,12 @@
 # A fresh developer machine for the live suite's machine scenarios (`make machines`):
-# Linux, a non-root user with an empty home, git, Node, and the agents from npm. terma
+# Linux, a non-root user with an empty home, git, Node, strace (the files profile traces
+# each build's system calls, profile_files_test.go), and the agents from npm. terma
 # and the test binary are built for Linux on the host and mounted in, so the image is
 # rebuilt only when an agent version changes.
 FROM node:26-bookworm-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates procps \
+ && apt-get install -y --no-install-recommends git ca-certificates procps strace \
  && rm -rf /var/lib/apt/lists/*
 
 ARG CLAUDE_VERSION=2.1.285

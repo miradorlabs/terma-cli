@@ -6,17 +6,21 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 // Versions under test. A harness changes weekly, and a collection surface that
@@ -164,30 +168,56 @@ func isRelease(v string) bool {
 	return true
 }
 
-func versionLess(a, b string) bool {
-	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < 3 && i < len(pa) && i < len(pb); i++ {
-		x, _ := strconv.Atoi(pa[i])
-		y, _ := strconv.Atoi(pb[i])
-		if x != y {
-			return x < y
-		}
-	}
-	return a < b
-}
+// versionLess orders versions as the reference ranks them (refdiff.VersionCompare, the one
+// ordering of versions in this module): a prerelease before its release, every tie broken.
+func versionLess(a, b string) bool { return refdiff.VersionLess(a, b) }
 
 var httpClient = &http.Client{Timeout: 5 * time.Minute}
 
+// fetchAttempts and fetchBackoff are how a download a server or the network failed for a
+// while is tried again: release hosts answer 5xx and drop connections under load (many CI jobs
+// downloading at once), and one such answer would otherwise end a whole run.
+var (
+	fetchAttempts = 5
+	fetchBackoff  = 3 * time.Second
+)
+
+// errNotFound is a download the server says is not there (HTTP 404): an asset a release does
+// not ship, not a failure to retry or to stop for.
+var errNotFound = errors.New("HTTP 404")
+
 func fetch(url string) ([]byte, error) {
+	var err error
+	for attempt := range fetchAttempts {
+		if attempt > 0 {
+			time.Sleep(fetchBackoff << (attempt - 1))
+		}
+		var body []byte
+		var retry bool
+		body, retry, err = fetchOnce(url)
+		if err == nil || !retry {
+			return body, err
+		}
+	}
+	return nil, err
+}
+
+// fetchOnce downloads url once; retry says whether a failure was the server's or the
+// network's for the moment (5xx, 429, a dropped connection), not the request's (404).
+func fetchOnce(url string) (body []byte, retry bool, err error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, false, fmt.Errorf("%s: %w", url, errNotFound)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, 512<<20))
+	if resp.StatusCode != 200 {
+		return nil, resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+	}
+	body, err = io.ReadAll(io.LimitReader(resp.Body, 512<<20))
+	return body, err != nil, err
 }
 
 // --- Claude Code -------------------------------------------------------------
@@ -239,10 +269,7 @@ func ensureClaude(version string) (string, error) {
 	if hex.EncodeToString(sum[:]) != want {
 		return "", fmt.Errorf("claude %s: checksum mismatch", version)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(path, bin, 0o755); err != nil {
+	if err := writeBuild(path, bin); err != nil {
 		return "", err
 	}
 	return abs(path), nil
@@ -302,6 +329,15 @@ func ensureCodex(version string) (string, error) {
 			return "", err
 		}
 	}
+	// On Linux, the bubblewrap its sandbox runs tool commands in where the system has none,
+	// beside it, as npm installs it (linux-sandbox/src/bundled_bwrap.rs). A release that ships
+	// none (404) uses the system's; any other failure stops the install, or its sandbox's
+	// failures would be recorded as the harness's behaviour.
+	if runtime.GOOS == "linux" {
+		if _, err := ensureCodexExecutable(version, "bwrap"); err != nil && !errors.Is(err, errNotFound) {
+			return "", fmt.Errorf("codex %s bwrap: %w", version, err)
+		}
+	}
 	return path, nil
 }
 
@@ -338,10 +374,7 @@ func ensureCodexExecutable(version, name string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(path, bin, 0o755); err != nil {
+		if err := writeBuild(path, bin); err != nil {
 			return "", err
 		}
 		return abs(path), nil
@@ -431,4 +464,19 @@ func sinceChecked(releases, checked []string, max int) []string {
 		}
 	}
 	return append(out, after...)
+}
+
+// pathNameRE is what a harness id or a version may be where it names a file or a folder: a
+// letter or digit, then letters, digits, dots, plus signs, underscores and dashes.
+var pathNameRE = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+_-]*$`)
+
+// CheckPathName says why name, a harness id or a version (what kind says), cannot name a file
+// or folder of the suite's or the published reference's, nil where it can: it is
+// [0-9A-Za-z][0-9A-Za-z.+_-]* and holds no "..". A version comes from a registry or a vendor's
+// update feed, and is never trusted to stay inside the folder it names a file in.
+func CheckPathName(kind, name string) error {
+	if !pathNameRE.MatchString(name) || strings.Contains(name, "..") {
+		return fmt.Errorf("refusing %s %q to name a file: want a letter or digit, then letters, digits and . + _ -, and no \"..\"", kind, name)
+	}
+	return nil
 }
