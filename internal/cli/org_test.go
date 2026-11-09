@@ -46,8 +46,9 @@ type fakeAuth struct {
 	grants    map[string]fakeGrant
 	exchanges atomic.Int32
 	// scopedPolicies refuses a team's policy to a login of another organization, as the
-	// account service does.
+	// account service does (403); policyBodies are each team's, over policyBody.
 	scopedPolicies bool
+	policyBodies   map[string]string
 	mu             sync.Mutex
 	verifiers      []string
 	revoked        []string
@@ -130,7 +131,9 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 				fmt.Fprint(w, `{"code":"PERMISSION_DENIED","message":"no such team in this organization"}`)
 				return
 			}
-			if f.policyBody != "" {
+			if body, ok := f.policyBodies[r.URL.Query().Get("project_id")]; ok {
+				fmt.Fprint(w, body)
+			} else if f.policyBody != "" {
 				fmt.Fprint(w, f.policyBody)
 			} else {
 				fmt.Fprint(w, `{"policy":null}`)

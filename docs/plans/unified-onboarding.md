@@ -260,3 +260,34 @@ install.sh is bash, so the Kotlin app on Windows needs its own path. Both ship; 
 | 6 | e2e case in `test/e2e` against dev | terma-cli | M | 3, platform tasks 11 to 16 on dev | |
 | 7 | `install.ps1` with the install.sh contract, CI smoke test on Windows, served at terma.ai | terma-cli | M | none | |
 | 8 | winget manifest from the release workflow | terma-cli | S | 7 | |
+
+## Implementation notes (branch `dawson/unified-onboarding`)
+
+Where the plan was ambiguous or wrong against the code, the implementation took the smallest choice that keeps every
+council invariant:
+
+- **1a, queued events are held, not dropped.** The transition test (`TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam`
+  in `internal/cli/setup_test.go`) shows what the existing routing does, with no new mechanism. On Personal, a flush asks
+  for team A's policy with Personal's sign-in; the account service answers 403 for a team outside the credential's
+  organization (`GET /v1/policy`), so delivery holds A's events under A (`Result.Held`). They are never sent while the
+  profile is on Personal, never with Personal's key and never under Personal's policy. They stay queued until the spool's
+  `MaxAge` (14 days) drops them, or until the CLI switches back to A's organization before then, when they go with A's key
+  under A's policy as it stands at send time (`Router.Allowed` rechecks it). A relay started on Personal resolves the
+  claim for A to "no validated collection policy for this team": its records are withheld and dropped after the hold.
+  Every invariant holds: in-flight work keeps its team and that team's restrictions, nothing is widened or retargeted,
+  and nothing earlier is uploaded under the new policy.
+- **Identity line failures are `grant_bad_input`.** EOF, a timeout or an over-long line before the identity line reads as
+  a malformed identity. `grant_no_code` stays the code line's.
+- **Every failed exchange is `grant_rejected`.** A refused code and an unreachable auth host both end the grant: the
+  code is single use, so the desktop starts again either way. The message says which. The contract keeps its four codes.
+- **The header goes to stderr** under `--desktop-grant` (the "decide in the PR" choice), so stdout's first line is the
+  grant's. Flag misuse (`-y`, `--org`, `--team` ids, `--no-browser`, `--managed-config`, `TERMA_API_KEY`) is an ordinary
+  error before anything is read or printed.
+- **A code that signs in someone else is also ended.** Besides failing with `grant_identity_mismatch` and storing
+  nothing, the CLI revokes that session (best effort) so it does not linger on the web.
+- **The label is kept on the credential.** The credential did not record its label, so doctor could not tell a desktop
+  sign-in apart. `Credential.Label` (in `credentials.json`, no secret, no new file) is set by the grant only and survives
+  refreshes; a browser sign-in for the same organization replaces it.
+- **The fixture copy precedes the desktop's.** `internal/account/auth/testdata/delegated_grant.json` is written from this
+  plan's and the desktop plan's definition of `delegatedGrant`; copy the desktop's section over it once it lands and
+  rerun `go test ./internal/account/auth/`.
