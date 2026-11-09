@@ -35,6 +35,8 @@ type Account struct {
 	desktopRefresh string
 	delegated      map[string]delegatedCode
 	delegations    atomic.Int32
+	// revokes counts the sessions signed out at /v1/auth/cli/revoke.
+	revokes atomic.Int32
 }
 
 // delegatedCode is a code the delegate endpoint made for a CLI's challenge and label.
@@ -70,6 +72,9 @@ func (sb *Sandbox) StartAccount() *Account {
 			return
 		}
 		switch r.URL.Path {
+		case "/v1/auth/cli/revoke":
+			a.revokes.Add(1)
+			w.WriteHeader(http.StatusNoContent)
 		case "/v1/whoami":
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": accountOrg, "auth_type": "cli_token", "user_id": accountUser, "email": "live@terma.test"})
 		case "/v1/organizations":
@@ -154,8 +159,23 @@ func (sb *Sandbox) SignIn(profile string) {
 	sb.writeAbs(path, string(data))
 }
 
+// The auth gateway's answers, as mirador-platform's gateways/auth/spec/openapi.yaml has
+// them: the organization and user a sign-in is for, and an error.
+var (
+	accountOrganization = map[string]string{"id": accountOrg, "name": "Live", "type": "personal"}
+	accountUserInfo     = map[string]string{"id": accountUser, "email": "live@terma.test"}
+)
+
+func writeAuthError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message}})
+}
+
 // serveDelegate is the platform's POST /v1/auth/cli/delegate, as Terma Desktop calls it:
 // its refresh token rotates and a 60-second single-use code is bound to the CLI's challenge.
+// A challenge that is not 43 characters is 400, a refresh token that is not the desktop's
+// live one 401.
 func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken  string `json:"refresh_token"`
@@ -163,19 +183,24 @@ func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
 		Label         string `json:"label"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	if len(body.CodeChallenge) != 43 {
+		writeAuthError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "code_challenge must be 43 characters")
+		return
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if body.RefreshToken != a.desktopRefresh || body.CodeChallenge == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid refresh token"}`)
+	if body.RefreshToken != a.desktopRefresh {
+		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid or expired refresh token")
 		return
 	}
 	n := a.delegations.Add(1)
 	a.desktopRefresh = fmt.Sprintf("ter_clr_desktop_%d", n)
 	code := fmt.Sprintf("ter_cod_delegated_%d", n)
 	a.delegated[code] = delegatedCode{challenge: body.CodeChallenge, label: body.Label}
+	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": fmt.Sprintf("ter_cli_desktop_%d", n), "refresh_token": a.desktopRefresh,
-		"token_type": "Bearer", "expires_in": 3600, "session_id": "desktop", "code": code, "code_expires_in": 60})
+		"token_type": "Bearer", "expires_in": 3600, "session_id": "desktop", "organization": accountOrganization, "user": accountUserInfo,
+		"code": code, "code_expires_in": 60})
 }
 
 // serveDelegatedExchange is POST /v1/auth/cli/token for a delegated code: redeemed once,
@@ -198,15 +223,15 @@ func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request)
 	delete(a.delegated, body.Code)
 	a.mu.Unlock()
 	sum := sha256.Sum256([]byte(body.CodeVerifier))
+	// Every failed redemption is the same 403, as the platform answers it.
 	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 ||
 		base64.RawURLEncoding.EncodeToString(sum[:]) != grant.challenge {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `{"code":"INVALID_ARGUMENT","message":"invalid grant"}`)
+		writeAuthError(w, http.StatusForbidden, "PERMISSION_DENIED", "invalid or expired authorization code")
 		return true
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": a.token, "refresh_token": "ter_clr_live", "token_type": "Bearer",
-		"expires_in": 3600, "session_id": "delegated", "organization": map[string]string{"id": accountOrg, "name": "Live"},
-		"user": map[string]string{"id": accountUser, "email": "live@terma.test"}})
+		"expires_in": 3600, "session_id": "delegated", "organization": accountOrganization, "user": accountUserInfo})
 	return true
 }
 

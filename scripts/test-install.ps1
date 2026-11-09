@@ -118,23 +118,38 @@ try {
   $left = @(Get-ChildItem -LiteralPath $bin1 -Force | ForEach-Object Name)
   if (($left -join ',') -ne 'terma.exe') { Fail "reinstall left $($left -join ', ')" }
 
-  Write-Host '== a reinstall over a terma that is running moves it aside'
-  # setup --desktop-grant waits on stdin for its identity line: a terma that stays running.
-  $psi = New-Object Diagnostics.ProcessStartInfo
-  $psi.FileName = Join-Path $bin1 'terma.exe'
-  $psi.Arguments = 'setup -y --desktop-grant --org 11111111-1111-4111-8111-111111111111 --team 22222222-2222-4222-8222-222222222222'
-  $psi.UseShellExecute = $false
-  $psi.RedirectStandardInput = $true
-  $psi.RedirectStandardOutput = $true
-  $psi.RedirectStandardError = $true
-  $running = [Diagnostics.Process]::Start($psi)
-  Start-Sleep -Milliseconds 500
-  if ($running.HasExited) { Fail "the stand-in terma exited: $($running.StandardError.ReadToEnd())" }
+  Write-Host '== a reinstall over a terma that is running moves it aside, twice'
+  # Start-Running starts bin1's terma.exe as a terma that stays running: setup --desktop-grant
+  # waits on stdin for its identity line.
+  function Start-Running {
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = Join-Path $bin1 'terma.exe'
+    $psi.Arguments = 'setup -y --desktop-grant --org 11111111-1111-4111-8111-111111111111 --team 22222222-2222-4222-8222-222222222222'
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $p = [Diagnostics.Process]::Start($psi)
+    $script:running += @($p)
+    Start-Sleep -Milliseconds 500
+    if ($p.HasExited) { Fail "the stand-in terma exited: $($p.StandardError.ReadToEnd())" }
+  }
+  function Get-Aside { @(Get-ChildItem -LiteralPath $bin1 -Filter 'terma.exe*.old' -Force | ForEach-Object Name) }
+  $running = @()
+  Start-Running
   Assert-Installed $bin1 (Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = $bin1; TERMA_NO_MODIFY_PATH = '1' })
   if (-not (Test-Path -LiteralPath (Join-Path $bin1 'terma.exe.old'))) { Fail 'the running terma was not moved aside' }
-  $running.Kill(); $running.WaitForExit(); $running = $null
+  # terma.exe.old still runs, and so does the terma that replaced it: the next install moves
+  # that one aside under a name of its own instead of failing on terma.exe.old.
+  Start-Running
   Assert-Installed $bin1 (Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = $bin1; TERMA_NO_MODIFY_PATH = '1' })
-  if (Test-Path -LiteralPath (Join-Path $bin1 'terma.exe.old')) { Fail 'the next install did not remove terma.exe.old' }
+  $aside = @(Get-Aside)
+  if ($aside.Count -ne 2) { Fail "two running terma should be aside, found: $($aside -join ', ')" }
+  foreach ($p in $running) { $p.Kill(); $p.WaitForExit() }
+  $running = @()
+  Assert-Installed $bin1 (Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = $bin1; TERMA_NO_MODIFY_PATH = '1' })
+  $aside = @(Get-Aside)
+  if ($aside.Count) { Fail "the next install did not remove $($aside -join ', ')" }
 
   Write-Host '== default: %LOCALAPPDATA%\Programs\terma, on the user PATH, entries there kept unexpanded'
   $local = Join-Path $work 'localappdata'
@@ -190,7 +205,7 @@ try {
   if ([Environment]::GetEnvironmentVariable('Path', 'Machine') -ne $machinePath) { Fail 'the machine PATH changed' }
   Write-Host 'ok: install.ps1'
 } finally {
-  if ($null -ne $running -and -not $running.HasExited) { $running.Kill() }
+  foreach ($p in @($running)) { if ($null -ne $p -and -not $p.HasExited) { $p.Kill() } }
   if ($null -ne $savedPath) { $envKey.SetValue('Path', $savedPath, $savedKind) } else { $envKey.DeleteValue('Path', $false) }
   $envKey.Dispose()
   Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue

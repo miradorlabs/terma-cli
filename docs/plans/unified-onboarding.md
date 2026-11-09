@@ -287,7 +287,8 @@ council invariant:
   nothing, the CLI revokes that session (best effort) so it does not linger on the web.
 - **The label is kept on the credential.** The credential did not record its label, so doctor could not tell a desktop
   sign-in apart. `Credential.Label` (in `credentials.json`, no secret, no new file) is set by the grant only and survives
-  refreshes; a browser sign-in for the same organization replaces it.
+  refreshes; a browser sign-in for the same organization replaces it. A reused sign-in keeps the label it has, so a
+  browser sign-in the desktop reuses is still a browser sign-in to doctor: the desktop delegated nothing.
 - **Two fixture files.** `internal/account/auth/testdata/delegated_grant.json` is a verbatim copy of terma-desktop's
   `auth.json` `delegatedGrant` and `tokenRequests.delegated`, taken from the desktop's onboarding branch while it was
   still uncommitted there: copy it again once that lands, and rerun `go test ./internal/account/... ./internal/cli/`.

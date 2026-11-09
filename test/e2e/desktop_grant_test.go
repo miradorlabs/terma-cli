@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -13,8 +14,12 @@ import (
 	"time"
 )
 
-// desktopTeam is the sandbox's team as Terma Desktop names it, by id.
-const desktopTeam = "55555555-5555-4555-8555-555555555555"
+// desktopTeam is the sandbox's team as Terma Desktop names it, by id; anotherUser is a
+// desktop signed in as someone the account's codes do not sign in.
+const (
+	desktopTeam = "55555555-5555-4555-8555-555555555555"
+	anotherUser = "99999999-9999-4999-8999-999999999999"
+)
 
 // TestDesktopGrant is Terma Desktop's onboarding as the CLI sees it: the real binary, its
 // stdin and stdout as pipes, and the account fixture's delegate and token endpoints, which
@@ -33,7 +38,7 @@ func TestDesktopGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, rest := sb.desktopSetup(func(request map[string]any) string {
+	delegate := func(request map[string]any) string {
 		challenge, _ := request["challenge"].(string)
 		label, _ := request["label"].(string)
 		if len(challenge) != 43 || !strings.HasSuffix(label, " (via Terma Desktop)") {
@@ -44,8 +49,23 @@ func TestDesktopGrant(t *testing.T) {
 			t.Fatal(err)
 		}
 		return code
-	})
-	if _, ok := first["challenge"]; !ok || sb.account.delegations.Load() != 1 {
+	}
+
+	// A code that signs in someone other than the desktop's user is refused as the desktop
+	// reads it, stored nowhere, and that session is signed out.
+	first, rest, err := sb.desktopSetup(anotherUser, delegate)
+	if code, ok := exitCode(err); !ok || code != 1 || !strings.Contains(rest, `{"error":{"code":"grant_identity_mismatch"`) {
+		t.Fatalf("another user's code: first line %v, exit %v, output:\n%s", first, err, rest)
+	}
+	if _, err := os.Stat(filepath.Join(sb.TermaConfig, "credentials.json")); !os.IsNotExist(err) || sb.account.revokes.Load() != 1 {
+		t.Fatalf("another user's sign-in was kept (%v) or not signed out (%d revokes)", err, sb.account.revokes.Load())
+	}
+
+	first, rest, err = sb.desktopSetup(accountUser, delegate)
+	if err != nil {
+		t.Fatalf("terma setup --desktop-grant: %v\n%s", err, rest)
+	}
+	if _, ok := first["challenge"]; !ok || sb.account.delegations.Load() != 2 {
 		t.Fatalf("first line = %v after %d delegations", first, sb.account.delegations.Load())
 	}
 	if strings.Contains(rest, "ter_cod_") || strings.Contains(rest, "ter_clr_") {
@@ -60,19 +80,29 @@ func TestDesktopGrant(t *testing.T) {
 	}
 
 	// Onboarding again, or a switch back: the CLI's own sign-in serves, nothing is delegated.
-	again, _ := sb.desktopSetup(func(map[string]any) string {
+	again, rest, err := sb.desktopSetup(accountUser, func(map[string]any) string {
 		t.Fatal("a stored sign-in for the same user and organization asked for a grant")
 		return ""
 	})
-	if again["reused"] != true || sb.account.delegations.Load() != 1 {
-		t.Fatalf("second run: first line %v, %d delegations", again, sb.account.delegations.Load())
+	if err != nil || again["reused"] != true || sb.account.delegations.Load() != 2 {
+		t.Fatalf("second run: first line %v, %d delegations, %v\n%s", again, sb.account.delegations.Load(), err, rest)
 	}
 }
 
-// desktopSetup runs `terma setup --desktop-grant` as Terma Desktop does: the identity on
-// stdin, stdout read line by line, grant called with a request for the code to write
-// back. It returns the first line and everything printed after it.
-func (sb *Sandbox) desktopSetup(grant func(request map[string]any) string) (map[string]any, string) {
+// exitCode is a finished command's exit code, ok false when it did not run to an exit.
+func exitCode(err error) (int, bool) {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		return 0, false
+	}
+	return exit.ExitCode(), true
+}
+
+// desktopSetup runs `terma setup --desktop-grant` as Terma Desktop does: the identity of
+// the desktop's user on stdin, stdout read line by line, grant called with a request for
+// the code to write back. It returns the first line, everything printed after it (stdout,
+// then stderr) and how the command exited.
+func (sb *Sandbox) desktopSetup(user string, grant func(request map[string]any) string) (map[string]any, string, error) {
 	t := sb.T
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -95,7 +125,7 @@ func (sb *Sandbox) desktopSetup(grant func(request map[string]any) string) (map[
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := io.WriteString(stdin, `{"user_id":"`+accountUser+`","org_id":"`+accountOrg+`"}`+"\n"); err != nil {
+	if _, err := io.WriteString(stdin, `{"user_id":"`+user+`","org_id":"`+accountOrg+`"}`+"\n"); err != nil {
 		t.Fatal(err)
 	}
 	lines := bufio.NewReader(stdout)
@@ -113,13 +143,11 @@ func (sb *Sandbox) desktopSetup(grant func(request map[string]any) string) (map[
 	}
 	_ = stdin.Close()
 	rest, _ := io.ReadAll(lines)
-	if err := cmd.Wait(); err != nil {
-		t.Fatalf("terma setup --desktop-grant: %v\n%s%s%s", err, line, rest, stderr.String())
-	}
-	if sb.waitRelay(5 * time.Second) {
+	err = cmd.Wait()
+	if err == nil && sb.waitRelay(5*time.Second) {
 		sb.StopRelay()
 	}
-	return first, string(rest) + stderr.String()
+	return first, string(rest) + stderr.String(), err
 }
 
 // doctor is `terma doctor`'s output, whatever its verdict.

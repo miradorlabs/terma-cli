@@ -146,13 +146,17 @@
     # terma. Windows will not replace a running file but lets it be renamed, so a terma
     # still running (the relay) steps aside to terma.exe.old first, as `terma update` does.
     $staged = Join-Path $dest ".terma.$PID.exe"
+    # What earlier installs and updates moved aside goes, unless it is still running. One
+    # that is keeps its name, and this one steps aside under a name of its own.
+    Get-ChildItem -LiteralPath $dest -Filter 'terma.exe*.old' -Force -ErrorAction SilentlyContinue |
+      ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
     $old = "$exe.old"
+    if (Test-Path -LiteralPath $old) { $old = "$exe.$PID.old" }
     $aside = $false
     try {
       Copy-Item -LiteralPath $exeTmp -Destination $staged -Force
       if (Test-Path -LiteralPath $exe) {
-        if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue }
-        Rename-Item -LiteralPath $exe -NewName 'terma.exe.old'
+        Rename-Item -LiteralPath $exe -NewName (Split-Path -Leaf $old)
         $aside = $true
       }
       try {

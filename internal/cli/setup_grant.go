@@ -56,10 +56,11 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	}
 
 	// The user is the one the auth host answers for: whoami fills it for a credential saved
-	// before terma kept it.
+	// before terma kept it. Ids compare without regard to case, as ReadGrantIdentity reads them.
 	sameDesktop := func(verified *auth.Credential, whoami identityResponse) bool {
-		return cmp.Or(whoami.UserID, verified.UserID) == desktop.UserID &&
-			cmp.Or(whoami.OrganizationID, verified.OrganizationID) == desktop.OrgID && verified.OrganizationID == desktop.OrgID
+		return strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID) &&
+			strings.EqualFold(cmp.Or(whoami.OrganizationID, verified.OrganizationID), desktop.OrgID) &&
+			strings.EqualFold(verified.OrganizationID, desktop.OrgID)
 	}
 	if _, ok, err := app.reuseStoredSessionIf(ctx, cfg, orgRef{ID: desktop.OrgID}, sameDesktop); err != nil {
 		return nil, err
@@ -75,7 +76,7 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	if err != nil {
 		return nil, err
 	}
-	if cred.UserID != desktop.UserID || cred.OrganizationID != desktop.OrgID {
+	if !strings.EqualFold(cred.UserID, desktop.UserID) || !strings.EqualFold(cred.OrganizationID, desktop.OrgID) {
 		// Never kept, and best-effort ended, so it does not linger on the web.
 		_ = app.revokeSession(ctx, cfg, cred)
 		return nil, &auth.GrantError{Code: auth.GrantIdentityMismatch,

@@ -226,6 +226,22 @@ func TestDesktopGrantReusesTheSameUsersSignIn(t *testing.T) {
 	}
 }
 
+// An id spelled in uppercase is the same user: Terma's ids are lowercase, so the desktop's
+// identity is read without regard to case and the stored sign-in is still reused.
+func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {
+	gateway := grantSandbox(t)
+	const user = "abcdef01-2345-4678-89ab-cdef01234567"
+	storeSignIn(t, gateway, personalOrg(), user)
+	stdout, stderr, err := desktopSetup(t, identityLine(strings.ToUpper(user), personalOrg().ID), personalOrg().ID, personalTeam())
+	if err != nil {
+		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
+	}
+	if line := firstLine(t, stdout); line["reused"] != true || gateway.exchanges.Load() != 0 || gateway.revokes.Load() != 0 {
+		t.Fatalf("first line = %v with %d exchanges and %d revokes, want the stored sign-in reused", line,
+			gateway.exchanges.Load(), gateway.revokes.Load())
+	}
+}
+
 // A sign-in of another user's, or only for another organization, is never reused: the
 // desktop is asked for a grant. The same organization's is replaced and ended; another
 // organization's stays stored.
