@@ -1,0 +1,653 @@
+{
+  "schema_version": 1,
+  "harness": "codex-desktop",
+  "from": "26.1029.70936",
+  "to": "26.1103.60933",
+  "generated_at": "2026-11-09T19:16:44.022458436Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 30,
+    "categories": {
+      "binary": 2,
+      "cli": 7,
+      "config": 12,
+      "network": 1,
+      "prompt": 3,
+      "request": 1,
+      "storage": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 24,
+      "notable": 6
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "prompt.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Injected context changed (+1135 −1135 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,5 +3,5 @@\n   <shell>zsh</shell>\n   <current_date><date></current_date>\n   <timezone>GMT</timezone>\n-  <filesystem><workspace_roots><root><repo></root><root><codex-home>/visualizations/2026/11/05/<uuid></root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry><entry access=\"write\"><path><repo></path></entry><entry access=\"write\"><path><codex-home>/visualizations/2026/11/05/<uuid></path></entry><entry access=\"write\"><special>:slash_tmp</special></entry><entry access=\"write\"><special>:tmpdir</special></entry><entry access=\"read\"><path><repo>/.git</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/05/<uuid>/.git</path></entry><entry access=\"read\"><path><repo>/.agents</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/05/<uuid>/.agents</path></entry><entry access=\"read\"><path><repo>/.codex</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/05/<uuid>/.codex</path></entry><entry access=\"read\"><path><repo>/.aws</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/05/<uuid>/.aws</path></entry></file_system></permission_profile></filesystem>\n+  <filesystem><workspace_roots><root><repo></root><root><codex-home>/visualizations/2026/11/09/<uuid></root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry><entry access=\"write\"><path><repo></path></entry><entry access=\"write\"><path><codex-home>/visualizations/2026/11/09/<uuid></path></entry><entry access=\"write\"><special>:slash_tmp</special></entry><entry access=\"write\"><special>:tmpdir</special></entry><entry access=\"read\"><path><repo>/.git</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/09/<uuid>/.git</path></entry><entry access=\"read\"><path><repo>/.agents</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/09/<uuid>/.agents</path></entry><entry access=\"read\"><path><repo>/.codex</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/09/<uuid>/.codex</path></entry><entry access=\"read\"><path><repo>/.aws</path></entry><entry access=\"read\"><path><codex-home>/visualizations/2026/11/09/<uuid>/.aws</path></entry></file_system></permission_profile></filesystem>\n </environment_context>\n",
+      "stats": {
+        "added_chars": 1135,
+        "removed_chars": 1135
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+429 −392 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -35,7 +35,7 @@\n \n ### Thread Coordination\n - Treat the terms \"task\", \"thread\", \"chat\", and \"conversation\" as synonyms when they clearly refer to conversations in Codex. Use \"chat\" when referring to conversations in the product. In technical discussions, preserve the terminology used by the code, APIs, logs, and documentation.\n-- When the user asks to create, fork, inspect, continue, hand off, pin, archive, unarchive, rename, or otherwise manage Codex threads, search for the relevant thread tool first: `create_thread`, `fork_thread`, `list_threads`, `list_archived_threads`, `read_thread`, `wait_threads`, `send_message_to_thread`, `handoff_thread`, `set_thread_pinned`, `set_thread_archived`, or `set_thread_title`.\n+- When the user asks to create, fork, inspect, continue, hand off, pin, archive, unarchive, permanently delete, rename, or otherwise manage Codex threads, search for the relevant thread tool first: `create_thread`, `fork_thread`, `list_threads`, `list_archived_threads`, `read_thread`, `wait_threads`, `send_message_to_thread`, `handoff_thread`, `set_thread_pinned`, `set_thread_archived`, `delete_thread`, or `set_thread_title`.\n - When following another task's progress, prefer compact `wait_threads` snapshots over repeated `read_thread` calls.\n Use one target for single-task coordination and `timeoutMs: 0` for a compact immediate snapshot.\n `create_thread` dispatches asynchronously, so explicitly wait for progress.\n",
+      "stats": {
+        "added_chars": 429,
+        "removed_chars": 392
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.system.3.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "3",
+        "text"
+      ],
+      "title": "System prompt changed (+107 −107 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -60,5 +60,5 @@\n - [\"npm\", \"run\", \"dev\"]\n - [\"gh\", \"pr\", \"check\"]\n - [\"cargo\", \"test\"]\n- The writable roots are `<codex-home>/visualizations/2026/11/05/<uuid>`, `/private/tmp`, `<tmp>`, `<repo>`.\n+ The writable roots are `<codex-home>/visualizations/2026/11/09/<uuid>`, `/private/tmp`, `<tmp>`, `<repo>`.\n </permissions instructions>\n",
+      "stats": {
+        "added_chars": 107,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "request.headers.user-agent",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "user-agent"
+      ],
+      "title": "Header user-agent: Codex Desktop/0.166.0-alpha.6 (Mac OS <os-release>; arm64… → Codex Desktop/0.167.0-alpha.3.2 (Mac OS <os-release>; arm…",
+      "impact": "informational",
+      "before": "Codex Desktop/0.166.0-alpha.6 (Mac OS <os-release>; arm64) unknown (Codex Desktop; <version>)",
+      "after": "Codex Desktop/0.167.0-alpha.3.2 (Mac OS <os-release>; arm64) unknown (Codex Desktop; <version>)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.app_server.ServerNotification.thread/section/changed",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "app_server",
+        "ServerNotification",
+        "thread/section/changed"
+      ],
+      "title": "New app-server method (ServerNotification): `thread/section/changed`",
+      "impact": "informational",
+      "before": null,
+      "after": "thread/section/changed",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.codex-desktop agents.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "codex-desktop agents",
+        "description"
+      ],
+      "title": "Description of `codex-desktop agents` changed",
+      "impact": "informational",
+      "before": "Browse all agent sessions on the shared local app-server daemon",
+      "after": "Open the agent command center to browse and switch sessions",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.codex-desktop agents.options.--no-daemon",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "codex-desktop agents",
+        "options",
+        "--no-daemon"
+      ],
+      "title": "New flag `codex-desktop agents --no-daemon`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Run the agents overview with an embedded app server",
+        "names": [
+          "--no-daemon"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+79 −83 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,7 +6,7 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  agents            Browse all agent sessions on the shared local app-server daemon\n+  agents            Open the agent command center to browse and switch sessions\n   exec              Run Codex non-interactively [aliases: e]\n   review            Run a code review non-interactively\n   login             Manage login\n",
+      "stats": {
+        "added_chars": 79,
+        "removed_chars": 83
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.-h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "-h"
+      ],
+      "title": "Full help text of `-h` changed (+79 −83 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,7 +4,7 @@\n        codex [OPTIONS] <COMMAND> [ARGS]\n \n Commands:\n-  agents            Browse all agent sessions on the shared local app-server daemon\n+  agents            Open the agent command center to browse and switch sessions\n   exec              Run Codex non-interactively [aliases: e]\n   review            Run a code review non-interactively\n   login             Manage login\n",
+      "stats": {
+        "added_chars": 79,
+        "removed_chars": 83
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.agents --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents --help"
+      ],
+      "title": "Full help text of `agents --help` changed (+137 −63 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-Browse all agent sessions on the shared local app-server daemon\n+Open the agent command center to browse and switch sessions\n \n Usage: codex agents [OPTIONS]\n \n@@ -10,6 +10,9 @@\n           \n           Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n           shell_environment_policy.inherit=all`\n+\n+      --no-daemon\n+          Run the agents overview with an embedded app server\n \n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n",
+      "stats": {
+        "added_chars": 137,
+        "removed_chars": 63
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.agents -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents -h"
+      ],
+      "title": "Full help text of `agents -h` changed (+137 −63 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-Browse all agent sessions on the shared local app-server daemon\n+Open the agent command center to browse and switch sessions\n \n Usage: codex agents [OPTIONS]\n \n@@ -7,6 +7,8 @@\n           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n           as TOML. If it fails to parse as TOML, the raw string is used as a literal\n+      --no-daemon\n+          Run the agents overview with an embedded app server\n       --enable <FEATURE>\n           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n       --remote <ADDR>\n",
+      "stats": {
+        "added_chars": 137,
+        "removed_chars": 63
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.apps_early_resource_discovery",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.apps_early_resource_discovery"
+      ],
+      "title": "New setting: features.apps_early_resource_discovery",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.code_mode_host_output_truncation",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.code_mode_host_output_truncation"
+      ],
+      "title": "New setting: features.code_mode_host_output_truncation",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.gcp_setup_wizard",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.gcp_setup_wizard"
+      ],
+      "title": "New setting: features.gcp_setup_wizard",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.incremental_exec_tools",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.incremental_exec_tools"
+      ],
+      "title": "New setting: features.incremental_exec_tools",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.interrupt_on_cancel",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.interrupt_on_cancel"
+      ],
+      "title": "New setting: features.interrupt_on_cancel",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.suppress_model_change_announcements",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.suppress_model_change_announcements"
+      ],
+      "title": "New setting: features.suppress_model_change_announcements",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.features.tui_extensions_statusline",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.tui_extensions_statusline"
+      ],
+      "title": "New setting: features.tui_extensions_statusline",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.model_providers.<name>.capabilities.cyber_access_programs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.capabilities.cyber_access_programs"
+      ],
+      "title": "New setting: model_providers.<name>.capabilities.cyber_access_programs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether the provider accepts explicit `access_programs.cyber` selections. Defaults to enabled for the built-in OpenAI provider and disabled otherwise. This does not grant program access or change authentication.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.model_providers.<name>.gateway_oauth.credentials_store",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model_providers.<name>.gateway_oauth.credentials_store"
+      ],
+      "title": "New setting: model_providers.<name>.gateway_oauth.credentials_store",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Where Codex stores this gateway's OAuth credentials. Defaults to the keyring-backed store.",
+        "enum": [
+          "keyring",
+          "file"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.otel.log_sse_deltas",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "otel.log_sse_deltas"
+      ],
+      "title": "New setting: otel.log_sse_deltas",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Log successful SSE events whose kind ends in `.delta`. Defaults to true. Disabling this preserves errors, completion events, and metrics.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.plugins.<name>.apps",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "plugins.<name>.apps"
+      ],
+      "title": "New setting: plugins.<name>.apps",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Connector-wide app settings keyed by connector ID. Ignored when this plugin is disabled by configuration. Explicit top-level app fields win.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.plugins.<name>.apps.<name>",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "plugins.<name>.apps.<name>"
+      ],
+      "title": "New setting: plugins.<name>.apps.<name>",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Config values for a single app/connector.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.egress.POST chatgpt.com/ces/statsc/flush",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "egress",
+        "POST chatgpt.com/ces/statsc/flush"
+      ],
+      "title": "Network request no longer made: POST chatgpt.com/ces/statsc/flush",
+      "impact": "notable",
+      "before": {
+        "body_keys": [
+          "client_type",
+          "counters",
+          "histograms"
+        ],
+        "host": "chatgpt.com",
+        "method": "POST",
+        "path": "/ces/statsc/flush",
+        "when": "after"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "storage.goals.format",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "goals",
+        "format"
+      ],
+      "title": "On-disk goals format changed: \"sqlite\" → \"sqlite-shm\"",
+      "impact": "informational",
+      "before": "sqlite",
+      "after": "sqlite-shm",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "storage.goals.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "goals",
+        "path"
+      ],
+      "title": "On-disk goals path changed",
+      "impact": "informational",
+      "before": "<codex-home>/goals_1.sqlite",
+      "after": "<codex-home>/goals_1.sqlite-shm",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "storage.queue.format",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "queue",
+        "format"
+      ],
+      "title": "On-disk queue format changed: \"sqlite\" → \"sqlite-shm\"",
+      "impact": "informational",
+      "before": "sqlite",
+      "after": "sqlite-shm",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "storage.queue.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "queue",
+        "path"
+      ],
+      "title": "On-disk queue path changed",
+      "impact": "informational",
+      "before": "<codex-home>/queue_1.sqlite",
+      "after": "<codex-home>/queue_1.sqlite-shm",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.version",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "version"
+      ],
+      "title": "Runs its agent's build 0.167.0-alpha.3.2 (was 0.166.0-alpha.6)",
+      "impact": "notable",
+      "before": "0.166.0-alpha.6",
+      "after": "0.167.0-alpha.3.2",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.app.build",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "app",
+        "build"
+      ],
+      "title": "Binary app.build: 24905 → 25894",
+      "impact": "informational",
+      "before": "24905",
+      "after": "25894",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

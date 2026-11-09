@@ -15764,7 +15764,8 @@
       "unobserved": {
         "paths": [
           "/home/claude/.claude/remote/.oauth_token",
-          "/home/claude/.claude/remote/.session_ingress_token"
+          "/home/claude/.claude/remote/.session_ingress_token",
+          "<repo>/.git/worktrees"
         ]
       }
     },
@@ -19158,7 +19159,8 @@
       "unobserved": {
         "paths": [
           "/home/claude/.claude/remote/.oauth_token",
-          "/home/claude/.claude/remote/.session_ingress_token"
+          "/home/claude/.claude/remote/.session_ingress_token",
+          "<repo>/.git/worktrees"
         ]
       }
     }

@@ -18176,7 +18176,12 @@
           }
         }
       },
-      "tracer": "eslogger"
+      "tracer": "eslogger",
+      "unobserved": {
+        "paths": [
+          "<repo>/.git/worktrees"
+        ]
+      }
     },
     "linux/amd64": {
       "decoys": {
@@ -21596,7 +21601,13 @@
           }
         }
       },
-      "tracer": "strace"
+      "tracer": "strace",
+      "unobserved": {
+        "paths": [
+          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json",
+          "<repo>/.git/worktrees"
+        ]
+      }
     }
   },
   "binary": {

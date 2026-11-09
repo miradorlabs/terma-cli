@@ -16366,7 +16366,8 @@
           "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<claude-config>/daemon",
           "<claude-config>/daemon.json",
-          "<claude-config>/jobs"
+          "<claude-config>/jobs",
+          "<repo>/.git/worktrees"
         ]
       }
     },
@@ -19997,7 +19998,8 @@
           "<claude-config>/daemon",
           "<claude-config>/daemon.json",
           "<claude-config>/jobs",
-          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json"
+          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json",
+          "<repo>/.git/worktrees"
         ]
       }
     }

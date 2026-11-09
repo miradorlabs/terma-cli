@@ -14885,7 +14885,8 @@
           "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<claude-config>/daemon",
           "<claude-config>/daemon.json",
-          "<claude-config>/jobs"
+          "<claude-config>/jobs",
+          "<repo>/.git/worktrees"
         ]
       }
     },
@@ -17907,7 +17908,8 @@
           "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<claude-config>/daemon",
           "<claude-config>/daemon.json",
-          "<claude-config>/jobs"
+          "<claude-config>/jobs",
+          "<repo>/.git/worktrees"
         ]
       }
     }

@@ -1,0 +1,3056 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.319",
+  "to": "2.1.321",
+  "generated_at": "2026-11-09T19:16:44.022458436Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 44,
+    "categories": {
+      "telemetry": 44
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 20,
+      "informational": 18,
+      "notable": 6
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "telemetry.export",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "export"
+      ],
+      "title": "Telemetry export added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "interval_batches": {
+          "logs": 2,
+          "metrics": 1
+        },
+        "interval_ms": {
+          "logs": 5000,
+          "metrics": 60000
+        },
+        "protocol": "http/protobuf"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/api_request",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/api_request"
+      ],
+      "title": "Telemetry surface no longer sent: logs/api_request",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "cache_creation_1h_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_creation_5m_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_creation_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_read_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cost_usd": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cost_usd_micros": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "query_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "speed": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "ttft_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/assistant_response",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/assistant_response"
+      ],
+      "title": "Telemetry surface no longer sent: logs/assistant_response",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "message.uuid": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "query_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "response": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "response_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/hook_execution_complete",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/hook_execution_complete"
+      ],
+      "title": "Telemetry surface no longer sent: logs/hook_execution_complete",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "additional_context_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "initial_user_message_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "managed_only": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "num_blocking": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_cancelled": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_hooks": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_non_blocking_error": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_outputs_persisted": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_success": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "stdout_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "system_message_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "total_duration_ms": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/hook_execution_start",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/hook_execution_start"
+      ],
+      "title": "Telemetry surface no longer sent: logs/hook_execution_start",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_only": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "num_hooks": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/hook_registered",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/hook_registered"
+      ],
+      "title": "Telemetry surface no longer sent: logs/hook_registered",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_matcher": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/managed_settings_resolved",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/managed_settings_resolved"
+      ],
+      "title": "Telemetry surface no longer sent: logs/managed_settings_resolved",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.helper.applied": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.helper.state": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.source_behavior": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.sources": {
+            "class": "safe",
+            "kinds": [
+              "list"
+            ]
+          },
+          "managed_settings.trigger": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/permission_mode_changed",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/permission_mode_changed"
+      ],
+      "title": "Telemetry surface no longer sent: logs/permission_mode_changed",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "from_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "to_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "trigger": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/plugin_loaded",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/plugin_loaded"
+      ],
+      "title": "Telemetry surface no longer sent: logs/plugin_loaded",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent_path_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "command_path_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "enabled_via": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "has_hooks": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "has_mcp": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "host_owned_mcp": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "marketplace.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "plugin.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "plugin.scope": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "plugin_id_hash": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "skill_path_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/subagent_completed",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/subagent_completed"
+      ],
+      "title": "Telemetry surface no longer sent: logs/subagent_completed",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent.source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "agent_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "final_model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "is_async": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "is_built_in": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model_swapped": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "total_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "total_tool_uses": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/tool_decision",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/tool_decision"
+      ],
+      "title": "Telemetry surface no longer sent: logs/tool_decision",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "permission_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_parameters": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/tool_result",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/tool_result"
+      ],
+      "title": "Telemetry surface no longer sent: logs/tool_result",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision_type": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "error": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_input": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_input_size_bytes": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_parameters": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_result_size_bytes": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/user_prompt",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/user_prompt"
+      ],
+      "title": "Telemetry surface no longer sent: logs/user_prompt",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "message.uuid": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt_text": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.keys removed",
+      "impact": "notable",
+      "before": {
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "s",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.code_edit_tool.decision",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.code_edit_tool.decision"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/claude_code.code_edit_tool.decision",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "language": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.keys removed",
+      "impact": "notable",
+      "before": {
+        "agent.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "query_source": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "USD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.lines_of_code.count",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.lines_of_code.count"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/claude_code.lines_of_code.count",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.keys removed",
+      "impact": "notable",
+      "before": {
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "start_type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.keys removed",
+      "impact": "notable",
+      "before": {
+        "agent.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "query_source": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "tokens",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.resource",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "resource"
+      ],
+      "title": "Telemetry surface no longer sent: resource",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "host.arch": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.interaction.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.interaction",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.interaction.keys removed",
+      "impact": "notable",
+      "before": {
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.conversation.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.operation.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.provider.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "interaction.duration_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "interaction.sequence": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "parent.source": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "queued_sends": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "span.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user_prompt": {
+          "class": "prompt",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user_prompt_length": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.interaction.root",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.interaction",
+        "root"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.interaction.root added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.llm_request.keys removed",
+      "impact": "notable",
+      "before": {
+        "agent_id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "attempt": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "cache_creation_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "cache_read_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "duration_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "first_content_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "gen_ai.conversation.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.provider.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.request.model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.response.finish_reasons": {
+          "class": "safe",
+          "kinds": [
+            "list"
+          ]
+        },
+        "gen_ai.response.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.system": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "input_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "llm_request.context": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "output_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "query_source_safe": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "request_id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "span.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "speed": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "stop_reason": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "success": {
+          "class": "safe",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "ttft_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.parent",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "parent"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.llm_request.parent added",
+      "impact": "informational",
+      "before": null,
+      "after": "traces/claude_code.interaction",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request/events/gen_ai.request.attempt",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request/events/gen_ai.request.attempt"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.llm_request/events/gen_ai.request.attempt",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "attempt": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "bash_argv0": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "bash_command_class": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "file_path": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "full_command": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "span.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "subagent_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name_safe": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool.blocked_on_user",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool.blocked_on_user"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool.blocked_on_user",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "span.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool.execution",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool.execution"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool.execution",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "error": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error_class": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "span.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool/events/tool.output",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool/events/tool.output"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool/events/tool.output",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "bash_command": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "content": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "diff": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "file_path": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "output": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

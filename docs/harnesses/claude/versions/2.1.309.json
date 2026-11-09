@@ -15595,7 +15595,8 @@
       "tracer": "eslogger",
       "unobserved": {
         "paths": [
-          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json"
+          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json",
+          "<repo>/.git/worktrees"
         ]
       }
     },
@@ -19001,7 +19002,12 @@
           }
         }
       },
-      "tracer": "strace"
+      "tracer": "strace",
+      "unobserved": {
+        "paths": [
+          "<repo>/.git/worktrees"
+        ]
+      }
     }
   },
   "binary": {

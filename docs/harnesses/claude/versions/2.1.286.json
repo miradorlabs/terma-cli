@@ -16011,6 +16011,7 @@
           "<claude-config>/daemon.json",
           "<claude-config>/jobs",
           "<repo>/.claude/rules",
+          "<repo>/.git/worktrees",
           "<sandbox>/../.claude/rules",
           "<sandbox>/.claude/rules",
           "<tmp>/../../.claude/rules",
@@ -19306,6 +19307,7 @@
           "<claude-config>/daemon.json",
           "<claude-config>/jobs",
           "<repo>/.claude/rules",
+          "<repo>/.git/worktrees",
           "<sandbox>/../.claude/rules",
           "<sandbox>/.claude/rules",
           "<tmp>/.claude/rules"

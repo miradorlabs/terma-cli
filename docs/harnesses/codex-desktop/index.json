@@ -6,13 +6,61 @@
     "vendor": "OpenAI",
     "homepage": "https://openai.com/codex",
     "source": null,
-    "latest": "26.1029.70936",
+    "latest": "26.1103.60933",
     "support": "untested",
-    "versions_tracked": 1,
+    "versions_tracked": 2,
     "first_tracked": "2026-11-04",
-    "last_change": null
+    "last_change": {
+      "from": "26.1029.70936",
+      "to": "26.1103.60933",
+      "at": "2026-11-09T19:16:44.022458436Z",
+      "released_at": "2026-11-08T19:18:10Z",
+      "changes": 30,
+      "categories": {
+        "binary": 2,
+        "cli": 7,
+        "config": 12,
+        "network": 1,
+        "prompt": 3,
+        "request": 1,
+        "storage": 4
+      }
+    }
   },
   "versions": [
+    {
+      "version": "26.1103.60933",
+      "released_at": "2026-11-08T19:18:10Z",
+      "captured_at": "2026-11-09T19:16:44.022458436Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1029.70936",
+      "changes": 30,
+      "categories": {
+        "binary": 2,
+        "cli": 7,
+        "config": 12,
+        "network": 1,
+        "prompt": 3,
+        "request": 1,
+        "storage": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 24,
+        "notable": 6
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+1135 −1135 chars)",
+        "System prompt changed (+429 −392 chars)",
+        "System prompt changed (+107 −107 chars)"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "26.1029.70936",
       "released_at": "2026-11-04T20:21:01Z",

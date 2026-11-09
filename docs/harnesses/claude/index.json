@@ -7,20 +7,50 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.319",
-    "support": "supported",
-    "versions_tracked": 101,
+    "latest": "2.1.321",
+    "support": "untested",
+    "versions_tracked": 102,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.318",
-      "to": "2.1.319",
-      "at": "2026-11-07T05:31:09Z",
-      "released_at": "2026-11-06T00:58:56.366Z",
-      "changes": 0,
-      "categories": {}
+      "from": "2.1.319",
+      "to": "2.1.321",
+      "at": "2026-11-09T19:16:44.022458436Z",
+      "released_at": "2026-11-09T19:02:47.641Z",
+      "changes": 44,
+      "categories": {
+        "telemetry": 44
+      }
     }
   },
   "versions": [
+    {
+      "version": "2.1.321",
+      "released_at": "2026-11-09T19:02:47.641Z",
+      "captured_at": "2026-11-09T19:16:44.022458436Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "2.1.319",
+      "changes": 44,
+      "categories": {
+        "telemetry": 44
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 20,
+        "informational": 18,
+        "notable": 6
+      },
+      "undocumented": null,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/api_request",
+        "Telemetry surface no longer sent: logs/assistant_response",
+        "Telemetry surface no longer sent: logs/hook_execution_complete"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "2.1.319",
       "released_at": "2026-11-06T00:58:56.366Z",
@@ -39,7 +69,7 @@
         "informational": 0,
         "notable": 0
       },
-      "undocumented": null,
+      "undocumented": 0,
       "highlights": [],
       "signing": null
     },
@@ -1445,11 +1475,11 @@
       ],
       "support": "untested",
       "previous": "2.1.267",
-      "changes": 56,
+      "changes": 55,
       "categories": {
         "cli": 3,
         "config": 13,
-        "filesystem": 14,
+        "filesystem": 13,
         "hooks": 8,
         "network": 2,
         "prompt": 12,
@@ -1459,10 +1489,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 33,
+        "informational": 32,
         "notable": 23
       },
-      "undocumented": 28,
+      "undocumented": 27,
       "highlights": [
         "Injected context changed (+457 −207 chars)",
         "Injected context removed",

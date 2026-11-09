@@ -15677,7 +15677,12 @@
           }
         }
       },
-      "tracer": "eslogger"
+      "tracer": "eslogger",
+      "unobserved": {
+        "paths": [
+          "<repo>/.git/worktrees"
+        ]
+      }
     },
     "linux/amd64": {
       "decoys": {
@@ -19081,7 +19086,12 @@
           }
         }
       },
-      "tracer": "strace"
+      "tracer": "strace",
+      "unobserved": {
+        "paths": [
+          "<repo>/.git/worktrees"
+        ]
+      }
     }
   },
   "binary": {

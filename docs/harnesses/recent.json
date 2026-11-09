@@ -1,7 +1,37 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-09T19:11:19.419107329Z",
+  "generated_at": "2026-11-09T19:16:44.022458436Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.321",
+      "released_at": "2026-11-09T19:02:47.641Z",
+      "captured_at": "2026-11-09T19:16:44.022458436Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "2.1.319",
+      "changes": 44,
+      "categories": {
+        "telemetry": 44
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 20,
+        "informational": 18,
+        "notable": 6
+      },
+      "undocumented": null,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/api_request",
+        "Telemetry surface no longer sent: logs/assistant_response",
+        "Telemetry surface no longer sent: logs/hook_execution_complete"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -32,6 +62,41 @@
         "System prompt changed (+289 −271 chars)",
         "System prompt changed (+652 −464 chars)",
         "fetch_copilot_cli_documentation tool description changed (+217 −116 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1103.60933",
+      "released_at": "2026-11-08T19:18:10Z",
+      "captured_at": "2026-11-09T19:16:44.022458436Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1029.70936",
+      "changes": 30,
+      "categories": {
+        "binary": 2,
+        "cli": 7,
+        "config": 12,
+        "network": 1,
+        "prompt": 3,
+        "request": 1,
+        "storage": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 24,
+        "notable": 6
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+1135 −1135 chars)",
+        "System prompt changed (+429 −392 chars)",
+        "System prompt changed (+107 −107 chars)"
       ],
       "signing": "valid"
     },
@@ -143,7 +208,7 @@
         "informational": 0,
         "notable": 0
       },
-      "undocumented": null,
+      "undocumented": 0,
       "highlights": [],
       "signing": null
     },
@@ -2717,11 +2782,11 @@
       ],
       "support": "untested",
       "previous": "2.1.267",
-      "changes": 56,
+      "changes": 55,
       "categories": {
         "cli": 3,
         "config": 13,
-        "filesystem": 14,
+        "filesystem": 13,
         "hooks": 8,
         "network": 2,
         "prompt": 12,
@@ -2731,10 +2796,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 33,
+        "informational": 32,
         "notable": 23
       },
-      "undocumented": 28,
+      "undocumented": 27,
       "highlights": [
         "Injected context changed (+457 −207 chars)",
         "Injected context removed",
@@ -6178,78 +6243,6 @@
         "System prompt changed (+1106 −0 chars)",
         "close_agent tool description changed (+216 −172 chars)",
         "close_agent tool parameter id removed"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.116.0",
-      "released_at": "2026-03-19T17:52:17.991Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.115.0",
-      "changes": 34,
-      "categories": {
-        "binary": 1,
-        "cli": 12,
-        "config": 6,
-        "filesystem": 13,
-        "hooks": 1,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 31,
-        "notable": 3
-      },
-      "undocumented": 15,
-      "highlights": [
-        "close_agent tool description changed (+172 −144 chars)",
-        "New hook event: UserPromptSubmit",
-        "Now looks for the program bwrap on the PATH (linux/amd64)"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.115.0",
-      "released_at": "2026-03-16T19:38:16.363Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.114.0",
-      "changes": 85,
-      "categories": {
-        "behavior": 2,
-        "caching": 1,
-        "cli": 3,
-        "config": 31,
-        "filesystem": 39,
-        "prompt": 3,
-        "request": 1,
-        "tools": 5
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 56,
-        "notable": 29
-      },
-      "undocumented": 53,
-      "highlights": [
-        "Injected context changed (+152 −2940 chars)",
-        "Injected context block removed",
-        "System prompt block added"
       ],
       "signing": "revoked"
     }
