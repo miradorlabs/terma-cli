@@ -21202,7 +21202,7 @@
         "read": true
       },
       "CLAUDE_CODE_PROXY_RESOLVES_HOSTS": {
-        "description": "Set to `1` to allow the proxy to perform DNS resolution instead of the caller. Opt-in for environments where the proxy should handle hostname resolution",
+        "description": "Set to `1` to allow the proxy to perform DNS resolution instead of the caller. Opt-in for environments where the proxy should handle hostname resolution. When `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST` is set, set this in the environment of the process that starts Claude Code",
         "read": true
       },
       "CLAUDE_CODE_REMOTE": {
@@ -21870,7 +21870,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-09T20:58:34.920750378Z",
+    "fetched_at": "2026-11-09T21:15:10.232988747Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -22905,7 +22905,7 @@
         "read": true,
         "scope": "Any file",
         "topic": "Permission settings",
-        "type": "object with `allow`, `ask`, `deny`, `additionalDirectories`, `blockReadsOutsideWorkingDirectories`, `blockWritesOutsideWorkingDirectories`, `defaultMode`, `disableBypassPermissionsMode`, and `disableAutoMode`"
+        "type": "object with `allow`, `ask`, `deny`, `additionalDirectories`, `blockReadsOutsideWorkingDirectories`, `blockWritesOutsideWorkingDirectories`, `defaultMode`, `denyInsteadOfPrompting`, `disableBypassPermissionsMode`, and `disableAutoMode`"
       },
       "permissions.additionalDirectories": {
         "default": "unset",
@@ -22965,6 +22965,15 @@
         "scope": "Any file",
         "topic": "Permission settings",
         "type": "array of permission rule strings"
+      },
+      "permissions.denyInsteadOfPrompting": {
+        "default": "unset, so a call that needs approval prompts you",
+        "description": "Set this to `true` to keep a session running when nobody is there to answer a permission prompt. Claude Code denies a tool call that would otherwise wait on a prompt, and the turn continues. Requires Claude Code v2.1.319 or later.",
+        "read": true,
+        "scope": "User or managed",
+        "scope_note": "A repository can't set it for you.",
+        "topic": "Permission settings",
+        "type": "Boolean"
       },
       "permissions.disableBypassPermissionsMode": {
         "default": "unset",
