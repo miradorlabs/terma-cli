@@ -86,14 +86,15 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	// A turn's last response can reach the transcript after its Stop read it, and an interrupted
 	// turn has no Stop.
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
+	captureClaudePromptImages(env, r, in.SessionID, in.TranscriptPath)
 	env.EndSession(r, in.SessionID, claudeTool)
 	// A /rename after the last turn ends no turn.
 	captureClaudeTitle(env, r, in)
 	return nil
 }
 
-// stop refreshes account evidence, the session's title and its calls' responses before the
-// dispatcher starts delivery.
+// stop refreshes account evidence, the session's title, its calls' responses and its
+// prompts' images before the dispatcher starts delivery.
 func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
@@ -108,6 +109,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	captureClaudeAccount(env, r, in)
 	captureClaudeTitle(env, r, in)
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
+	captureClaudePromptImages(env, r, in.SessionID, in.TranscriptPath)
 	return nil
 }
 

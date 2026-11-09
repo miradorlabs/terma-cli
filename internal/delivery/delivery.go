@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -142,21 +143,45 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			if r.User != nil {
 				sender.UserID = r.User(cfg, id, endpoint)
 			}
-			if _, err := sender.Send(ctx, wire(batch)); err != nil {
-				failed[id] = true
-				f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
-				// A pass cut short by its own deadline learned nothing about the host.
-				if ctx.Err() == nil {
-					f.RetryAt = s.DestinationFailed(id, time.Now())
+			// An image is a request of its own, after the rest: no batch outgrows what the
+			// platform takes in one, and a refused image holds up nothing sent before it.
+			requests, images := [][]spool.Event{}, []spool.Event{}
+			for _, e := range batch {
+				if e.Name == semconv.TermaPromptImageEvent {
+					images = append(images, e)
 				}
-				res.Failures = append(res.Failures, f)
-				errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
-				undelivered = append(undelivered, batch...)
-				continue
 			}
-			s.DestinationDelivered(id, time.Now())
-			accepted[endpoint] = true
-			res.Sent += len(batch)
+			if rest := slices.DeleteFunc(slices.Clone(batch), func(e spool.Event) bool { return e.Name == semconv.TermaPromptImageEvent }); len(rest) > 0 {
+				requests = append(requests, rest)
+			}
+			for _, e := range images {
+				requests = append(requests, []spool.Event{withImageData(r.StateDir, e)})
+			}
+			for i, req := range requests {
+				if _, err := sender.Send(ctx, wire(req)); err != nil {
+					failed[id] = true
+					f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
+					// A pass cut short by its own deadline learned nothing about the host.
+					if ctx.Err() == nil {
+						f.RetryAt = s.DestinationFailed(id, time.Now())
+					}
+					res.Failures = append(res.Failures, f)
+					errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
+					for _, left := range requests[i:] {
+						undelivered = append(undelivered, withoutImageData(left)...)
+					}
+					break
+				}
+				s.DestinationDelivered(id, time.Now())
+				accepted[endpoint] = true
+				res.Sent += len(req)
+				for _, e := range req {
+					if e.Name == semconv.TermaPromptImageEvent {
+						imageID, _ := e.Attrs[semconv.TermaImageIDKey].(string)
+						promptimage.Remove(r.StateDir, imageID)
+					}
+				}
+			}
 		}
 		if len(undelivered) > 0 {
 			return held, &spool.PartialDelivery{Undelivered: undelivered, Err: errors.Join(errs...)}
@@ -187,7 +212,7 @@ func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool
 	if org.CollectsNothing || e.Global && !org.Global() || !org.Admits(e.Repository) {
 		return false
 	}
-	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent {
+	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent || e.Name == semconv.TermaPromptImageEvent {
 		prompts, _ := org.Content()
 		return prompts && r.consented(e, org.Global())
 	}
@@ -211,4 +236,33 @@ func (r Router) Endpoint(cfg *config.Config, projectID string) string {
 		return h.OTLP
 	}
 	return cfg.OTLPURL
+}
+
+// withImageData is an image's record as it leaves: with the image's bytes from the store,
+// or saying they are gone. One that never had any to send (too_large) leaves as it is.
+func withImageData(stateDir string, e spool.Event) spool.Event {
+	if _, omitted := e.Attrs[semconv.TermaImageOmittedKey]; omitted {
+		return e
+	}
+	e.Attrs = maps.Clone(e.Attrs)
+	id, _ := e.Attrs[semconv.TermaImageIDKey].(string)
+	if data, ok := promptimage.Load(stateDir, id); ok {
+		e.Attrs[semconv.TermaImageDataKey] = data
+	} else {
+		e.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedUnavailable
+	}
+	return e
+}
+
+// withoutImageData is events as the spool keeps them: an image's bytes stay in the store.
+func withoutImageData(events []spool.Event) []spool.Event {
+	out := make([]spool.Event, len(events))
+	for i, e := range events {
+		if _, ok := e.Attrs[semconv.TermaImageDataKey]; ok {
+			e.Attrs = maps.Clone(e.Attrs)
+			delete(e.Attrs, semconv.TermaImageDataKey)
+		}
+		out[i] = e
+	}
+	return out
 }

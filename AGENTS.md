@@ -85,7 +85,8 @@ credentials' secrets, sign-in tokens and server keys, live in the system keychai
 (`internal/account/secret`), as gh keeps its token: `credentials.json` and `keys.json`
 index them, and hold them only where there is no keychain or `--insecure-storage` asks.
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
-`spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
+`spool/`, `images/` (the images a user put in a prompt, until delivery sends them), `policies/`,
+`agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names

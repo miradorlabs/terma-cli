@@ -589,6 +589,42 @@ events:
       - ref: terma.agent.id
       - ref: gen_ai.agent.name
 
+  - name: terma.prompt.image
+    stability: development
+    requirement_level: recommended
+    brief: >
+      One image a user put in a prompt, as the agent recorded it, one record per image so no
+      record outgrows what the platform takes. Content as a whole.
+    note: >
+      Claude Code's names its prompt in terma.prompt.id; Codex's carries its turn's trace id
+      in the record's TraceId field, as its replies do.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.message.id
+        requirement_level: required
+      - ref: terma.image.id
+        requirement_level: required
+      - ref: terma.image.index
+        requirement_level: required
+      - ref: terma.image.mime_type
+        requirement_level: required
+      - ref: terma.image.size
+        requirement_level: required
+      - ref: terma.image.label
+      - ref: terma.image.width
+      - ref: terma.image.height
+      - ref: terma.image.data
+      - ref: terma.image.omitted
+      - ref: terma.prompt.id
+      - ref: terma.turn.id
+      - ref: terma.agent.id
+      - ref: gen_ai.agent.name
+
   - name: terma.session.title
     stability: development
     requirement_level: recommended

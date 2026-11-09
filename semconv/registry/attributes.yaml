@@ -210,6 +210,68 @@ attributes:
     stability: development
     brief: How many messages the run exchanged.
 
+  # Images a user put in a prompt.
+  - key: terma.prompt.id
+    type: string
+    stability: development
+    brief: The agent's id for the prompt the record belongs to.
+    note: Claude Code's prompt.id, which its own prompt event carries too.
+  - key: terma.image.id
+    type: string
+    stability: development
+    brief: The SHA-256 of the image's bytes, in lowercase hex.
+    note: >
+      The same image put in two prompts has the same id, whether or not its bytes were sent;
+      it is the key the image is stored under.
+  - key: terma.image.index
+    type: int
+    stability: development
+    brief: The image's position among the images of its prompt, from 1.
+  - key: terma.image.label
+    type: string
+    stability: development
+    brief: What the prompt's text shows in the image's place, when the agent shows anything.
+    examples: ["[Image #1]"]
+  - key: terma.image.mime_type
+    type: string
+    stability: development
+    brief: The image's media type, as the agent recorded it.
+    examples: ["image/png", "image/jpeg"]
+  - key: terma.image.size
+    type: int
+    stability: development
+    brief: The image's size in bytes, as the agent sent it to the model.
+  - key: terma.image.width
+    type: int
+    stability: development
+    brief: The image's width in pixels, when its header names it.
+  - key: terma.image.height
+    type: int
+    stability: development
+    brief: The image's height in pixels, when its header names it.
+  - key: terma.image.data
+    type: string
+    stability: development
+    brief: The image's bytes, in padded standard base64.
+    note: >
+      Content; sent only while the team's policy collects prompts, and only for an image of at
+      most 2 MiB. Absent otherwise, and terma.image.omitted says why.
+    annotations:
+      content: prompts
+  - key: terma.image.omitted
+    type:
+      members:
+        - id: too_large
+          value: too_large
+          brief: The image is over the 2 MiB a record may carry.
+          stability: development
+        - id: unavailable
+          value: unavailable
+          brief: The image was no longer on the machine when the record was sent.
+          stability: development
+    stability: development
+    brief: Why a record carries no terma.image.data although the policy collects prompts.
+
   # Usage, as an agent without an export reports it.
   - key: terma.usage.status
     type:

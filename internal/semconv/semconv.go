@@ -137,6 +137,24 @@ const (
 	TermaFundingStatusKey = "terma.funding.status"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
+	// TermaImageDataKey is terma.image.data: The image's bytes, in padded standard base64.
+	TermaImageDataKey = "terma.image.data"
+	// TermaImageHeightKey is terma.image.height: The image's height in pixels, when its header names it.
+	TermaImageHeightKey = "terma.image.height"
+	// TermaImageIDKey is terma.image.id: The SHA-256 of the image's bytes, in lowercase hex.
+	TermaImageIDKey = "terma.image.id"
+	// TermaImageIndexKey is terma.image.index: The image's position among the images of its prompt, from 1.
+	TermaImageIndexKey = "terma.image.index"
+	// TermaImageLabelKey is terma.image.label: What the prompt's text shows in the image's place, when the agent shows anything.
+	TermaImageLabelKey = "terma.image.label"
+	// TermaImageMimeTypeKey is terma.image.mime_type: The image's media type, as the agent recorded it.
+	TermaImageMimeTypeKey = "terma.image.mime_type"
+	// TermaImageOmittedKey is terma.image.omitted: Why a record carries no terma.image.data although the policy collects prompts.
+	TermaImageOmittedKey = "terma.image.omitted"
+	// TermaImageSizeKey is terma.image.size: The image's size in bytes, as the agent sent it to the model.
+	TermaImageSizeKey = "terma.image.size"
+	// TermaImageWidthKey is terma.image.width: The image's width in pixels, when its header names it.
+	TermaImageWidthKey = "terma.image.width"
 	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.
 	TermaInstallMethodKey = "terma.install.method"
 	// TermaInvocationInitialStepsKey is terma.invocation.initial_steps: How many steps the conversation held when the invocation began.
@@ -179,6 +197,8 @@ const (
 	TermaOperationInterruptedKey = "terma.operation.interrupted"
 	// TermaOperationStatusKey is terma.operation.status: How the operation the event records ended.
 	TermaOperationStatusKey = "terma.operation.status"
+	// TermaPromptIDKey is terma.prompt.id: The agent's id for the prompt the record belongs to.
+	TermaPromptIDKey = "terma.prompt.id"
 	// TermaProviderSessionIDKey is terma.provider.session.id: The agent's own session id, where it differs from the session.id terma files the record under.
 	TermaProviderSessionIDKey = "terma.provider.session.id"
 	// TermaPushCommitCountKey is terma.push.commit.count: How many commits the push sent; exact below 10000, at least 10000 otherwise.
@@ -335,6 +355,8 @@ const (
 	TermaFilesTouchedEvent = "terma.files.touched"
 	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
 	TermaModelCallResponseEvent = "terma.model_call.response"
+	// TermaPromptImageEvent is terma.prompt.image: One image a user put in a prompt, as the agent recorded it, one record per image so no record outgrows what the platform takes. Content as a whole.
+	TermaPromptImageEvent = "terma.prompt.image"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.
 	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
@@ -383,6 +405,10 @@ const (
 	TermaCompactionTriggerAuto = "auto"
 	// TermaCompactionTriggerManual is terma.compaction.trigger manual: The developer asked for it.
 	TermaCompactionTriggerManual = "manual"
+	// TermaImageOmittedTooLarge is terma.image.omitted too_large: The image is over the 2 MiB a record may carry.
+	TermaImageOmittedTooLarge = "too_large"
+	// TermaImageOmittedUnavailable is terma.image.omitted unavailable: The image was no longer on the machine when the record was sent.
+	TermaImageOmittedUnavailable = "unavailable"
 	// TermaInstallMethodScript is terma.install.method script: A release binary terma replaces itself, from the install script or a release archive downloaded by hand.
 	TermaInstallMethodScript = "script"
 	// TermaInstallMethodHomebrew is terma.install.method homebrew: Homebrew's, as a cask or a formula.
