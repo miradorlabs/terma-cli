@@ -135,7 +135,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 73,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/cli/src/main.rs#L73",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; d9dbf4882879 adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; d9dbf4882879 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 172,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L172"
+        }
       }
     },
     "cli.commands.codex app-server daemon": {
@@ -167,7 +174,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 221,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.58.0/codex-rs/cli/src/main.rs#L221",
-        "verified": "absent at rust-v0.57.0, present at rust-v0.58.0; fbdedd9a0692 adds it"
+        "verified": "absent at rust-v0.57.0, present at rust-v0.58.0; fbdedd9a0692 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 646,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L646"
+        }
       }
     },
     "cli.commands.codex app-server generate-ts": {
@@ -188,7 +202,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 218,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.58.0/codex-rs/cli/src/main.rs#L218",
-        "verified": "absent at rust-v0.57.0, present at rust-v0.58.0; fbdedd9a0692 adds it"
+        "verified": "absent at rust-v0.57.0, present at rust-v0.58.0; fbdedd9a0692 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 643,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L643"
+        }
       }
     },
     "cli.commands.codex app-server proxy": {
@@ -220,7 +241,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 288,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L288",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; bde734fd1e2e adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; bde734fd1e2e adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 626,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L626"
+        }
       }
     },
     "cli.commands.codex app-server.options.--cloud-skills-snapshot": {
@@ -263,7 +291,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; d9dbf4882879 adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; d9dbf4882879 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex app-server.options.--disable": {
@@ -284,7 +319,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex app-server.options.--enable": {
@@ -305,7 +347,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex app-server.options.--help": {
@@ -326,7 +375,14 @@
         "file": "",
         "line": 0,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/#L0",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; d9dbf4882879 adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; d9dbf4882879 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 572,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L572"
+        }
       }
     },
     "cli.commands.codex app-server.options.--listen": {
@@ -556,7 +612,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 63,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.6.0/codex-rs/cli/src/main.rs#L63",
-        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it"
+        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 202,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L202"
+        }
       }
     },
     "cli.commands.codex apply.options.--config": {
@@ -577,7 +640,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.6.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it"
+        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex apply.options.--disable": {
@@ -598,7 +668,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex apply.options.--enable": {
@@ -619,7 +696,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex apply.options.--help": {
@@ -640,7 +724,14 @@
         "file": "codex-rs/chatgpt/src/apply_command.rs",
         "line": 14,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.6.0/codex-rs/chatgpt/src/apply_command.rs#L14",
-        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it"
+        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/chatgpt/src/apply_command.rs",
+          "line": 16,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/chatgpt/src/apply_command.rs#L16"
+        }
       }
     },
     "cli.commands.codex archive": {
@@ -881,7 +972,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 93,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/cli/src/main.rs#L93",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 230,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L230"
+        }
       }
     },
     "cli.commands.codex cloud apply": {
@@ -902,7 +1000,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 22,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.66.0/codex-rs/cloud-tasks/src/cli.rs#L22",
-        "verified": "absent at rust-v0.65.0, present at rust-v0.66.0; 2e4a40252157 adds it"
+        "verified": "absent at rust-v0.65.0, present at rust-v0.66.0; 2e4a40252157 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 24,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L24"
+        }
       }
     },
     "cli.commands.codex cloud diff": {
@@ -923,7 +1028,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 24,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.66.0/codex-rs/cloud-tasks/src/cli.rs#L24",
-        "verified": "absent at rust-v0.65.0, present at rust-v0.66.0; 2e4a40252157 adds it"
+        "verified": "absent at rust-v0.65.0, present at rust-v0.66.0; 2e4a40252157 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 26,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L26"
+        }
       }
     },
     "cli.commands.codex cloud exec": {
@@ -944,7 +1056,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 18,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cloud-tasks/src/cli.rs#L18",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; 8662162f4515 adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; 8662162f4515 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 18,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L18"
+        }
       }
     },
     "cli.commands.codex cloud list": {
@@ -965,7 +1084,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 22,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/cloud-tasks/src/cli.rs#L22",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; 4125c825f9ac adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; 4125c825f9ac adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 22,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L22"
+        }
       }
     },
     "cli.commands.codex cloud status": {
@@ -986,7 +1112,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 20,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.66.0/codex-rs/cloud-tasks/src/cli.rs#L20",
-        "verified": "absent at rust-v0.65.0, present at rust-v0.66.0; 2e4a40252157 adds it"
+        "verified": "absent at rust-v0.65.0, present at rust-v0.66.0; 2e4a40252157 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 20,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L20"
+        }
       }
     },
     "cli.commands.codex cloud.options.--config": {
@@ -1007,7 +1140,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex cloud.options.--disable": {
@@ -1028,7 +1168,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex cloud.options.--enable": {
@@ -1049,7 +1196,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex cloud.options.--help": {
@@ -1070,7 +1224,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 6,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/cloud-tasks/src/cli.rs#L6",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 7,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L7"
+        }
       }
     },
     "cli.commands.codex cloud.options.--version": {
@@ -1091,7 +1252,14 @@
         "file": "codex-rs/cloud-tasks/src/cli.rs",
         "line": 6,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/cloud-tasks/src/cli.rs#L6",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 5b038135dead adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cloud-tasks/src/cli.rs",
+          "line": 7,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cloud-tasks/src/cli.rs#L7"
+        }
       }
     },
     "cli.commands.codex completion": {
@@ -1112,7 +1280,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 54,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.4.0/codex-rs/cli/src/main.rs#L54",
-        "verified": "absent at rust-v0.3.0, present at rust-v0.4.0; 4a15ebc1ca83 adds it"
+        "verified": "absent at rust-v0.3.0, present at rust-v0.4.0; 4a15ebc1ca83 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 182,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L182"
+        }
       }
     },
     "cli.commands.codex completion.options.--config": {
@@ -1133,7 +1308,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.4.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.3.0, present at rust-v0.4.0; 4a15ebc1ca83 adds it"
+        "verified": "absent at rust-v0.3.0, present at rust-v0.4.0; 4a15ebc1ca83 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex completion.options.--disable": {
@@ -1154,7 +1336,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex completion.options.--enable": {
@@ -1175,7 +1364,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex completion.options.--help": {
@@ -1196,7 +1392,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 61,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.4.0/codex-rs/cli/src/main.rs#L61",
-        "verified": "absent at rust-v0.3.0, present at rust-v0.4.0; 4a15ebc1ca83 adds it"
+        "verified": "absent at rust-v0.3.0, present at rust-v0.4.0; 4a15ebc1ca83 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 248,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L248"
+        }
       }
     },
     "cli.commands.codex debug": {
@@ -1679,7 +1882,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 79,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/exec/src/cli.rs#L79",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 175,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L175"
+        }
       }
     },
     "cli.commands.codex exec review": {
@@ -1700,7 +1910,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 96,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/exec/src/cli.rs#L96",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 181,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L181"
+        }
       }
     },
     "cli.commands.codex exec-server": {
@@ -2051,7 +2268,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 62,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/exec/src/cli.rs#L62",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; b4a53aef4782 adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; b4a53aef4782 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 75,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L75"
+        }
       }
     },
     "cli.commands.codex exec.options.--approve-for-me": {
@@ -2083,7 +2307,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 25,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505061740/codex-rs/exec/src/cli.rs#L25",
-        "verified": "absent at rust-v0.0.2505021951, present at rust-v0.0.2505061740; 421e159888c7 adds it"
+        "verified": "absent at rust-v0.0.2505021951, present at rust-v0.0.2505061740; 421e159888c7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 67,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L67"
+        }
       }
     },
     "cli.commands.codex exec.options.--color": {
@@ -2104,7 +2335,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 33,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2504291921/codex-rs/exec/src/cli.rs#L33",
-        "verified": "present at rust-v0.0.2504291921, the first release; 3b39964f81ef adds it"
+        "verified": "present at rust-v0.0.2504291921, the first release; 3b39964f81ef adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 60,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L60"
+        }
       }
     },
     "cli.commands.codex exec.options.--config": {
@@ -2125,7 +2363,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505291458/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.0.2505270918, present at rust-v0.0.2505291458; d60f350cf8b7 adds it"
+        "verified": "absent at rust-v0.0.2505270918, present at rust-v0.0.2505291458; d60f350cf8b7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex exec.options.--cyber-access-program": {
@@ -2157,7 +2402,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 28,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506261603/codex-rs/exec/src/cli.rs#L28",
-        "verified": "absent at rust-v0.0.2506060849, present at rust-v0.0.2506261603; 50924101d285 adds it"
+        "verified": "absent at rust-v0.0.2506060849, present at rust-v0.0.2506261603; 50924101d285 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 55,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L55"
+        }
       }
     },
     "cli.commands.codex exec.options.--dangerously-bypass-hook-trust": {
@@ -2189,7 +2441,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex exec.options.--enable": {
@@ -2210,7 +2469,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex exec.options.--ephemeral": {
@@ -2307,7 +2573,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 55,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.8.0/codex-rs/exec/src/cli.rs#L55",
-        "verified": "absent at rust-v0.7.0, present at rust-v0.8.0; e16657ca4545 adds it"
+        "verified": "absent at rust-v0.7.0, present at rust-v0.8.0; e16657ca4545 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 65,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L65"
+        }
       }
     },
     "cli.commands.codex exec.options.--local-provider": {
@@ -2328,7 +2601,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 27,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/exec/src/cli.rs#L27",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L31"
+        }
       }
     },
     "cli.commands.codex exec.options.--model": {
@@ -2360,7 +2640,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 17,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.13.0/codex-rs/exec/src/cli.rs#L17",
-        "verified": "absent at rust-v0.12.0, present at rust-v0.13.0; 9285350842fc adds it"
+        "verified": "absent at rust-v0.12.0, present at rust-v0.13.0; 9285350842fc adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 26,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L26"
+        }
       }
     },
     "cli.commands.codex exec.options.--output-last-message": {
@@ -2381,7 +2668,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 45,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505191609/codex-rs/exec/src/cli.rs#L45",
-        "verified": "absent at rust-v0.0.2505191518, present at rust-v0.0.2505191609; d766e845b391 adds it"
+        "verified": "absent at rust-v0.0.2505191518, present at rust-v0.0.2505191609; d766e845b391 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 74,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L74"
+        }
       }
     },
     "cli.commands.codex exec.options.--output-schema": {
@@ -2402,7 +2696,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 56,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.41.0/codex-rs/exec/src/cli.rs#L56",
-        "verified": "absent at rust-v0.40.0, present at rust-v0.41.0; fdb8dadcae9f adds it"
+        "verified": "absent at rust-v0.40.0, present at rust-v0.41.0; fdb8dadcae9f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 53,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L53"
+        }
       }
     },
     "cli.commands.codex exec.options.--profile": {
@@ -2423,7 +2724,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 18,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505141337/codex-rs/exec/src/cli.rs#L18",
-        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it"
+        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 35,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L35"
+        }
       }
     },
     "cli.commands.codex exec.options.--profile-v2": {
@@ -2466,7 +2774,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 19,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.3.0/codex-rs/exec/src/cli.rs#L19",
-        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it"
+        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 40,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L40"
+        }
       }
     },
     "cli.commands.codex exec.options.--skip-git-repo-check": {
@@ -2542,7 +2857,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 108,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L108",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 244,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L244"
+        }
       }
     },
     "cli.commands.codex features disable": {
@@ -2585,7 +2907,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 298,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L298",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 1014,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L1014"
+        }
       }
     },
     "cli.commands.codex features.options.--config": {
@@ -2606,7 +2935,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex features.options.--disable": {
@@ -2627,7 +2963,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex features.options.--enable": {
@@ -2648,7 +2991,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex features.options.--help": {
@@ -2669,7 +3019,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 290,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L290",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 1006,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L1006"
+        }
       }
     },
     "cli.commands.codex fork": {
@@ -2690,7 +3047,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 124,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L124",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 226,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L226"
+        }
       }
     },
     "cli.commands.codex fork.options.--add-dir": {
@@ -2711,7 +3075,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 102,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L102",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 75,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L75"
+        }
       }
     },
     "cli.commands.codex fork.options.--all": {
@@ -2732,7 +3103,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 180,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L180",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 428,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L428"
+        }
       }
     },
     "cli.commands.codex fork.options.--approve-for-me": {
@@ -2764,7 +3142,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 76,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L76",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 70,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L70"
+        }
       }
     },
     "cli.commands.codex fork.options.--cd": {
@@ -2785,7 +3170,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 94,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L94",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 67,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L67"
+        }
       }
     },
     "cli.commands.codex fork.options.--config": {
@@ -2806,7 +3198,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex fork.options.--dangerously-bypass-approvals-and-sandbox": {
@@ -2827,7 +3226,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 86,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L86",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 55,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L55"
+        }
       }
     },
     "cli.commands.codex fork.options.--dangerously-bypass-hook-trust": {
@@ -2859,7 +3265,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 422,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L422",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex fork.options.--enable": {
@@ -2880,7 +3293,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 418,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L418",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex fork.options.--full-auto": {
@@ -2922,7 +3342,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 169,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L169",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 417,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L417"
+        }
       }
     },
     "cli.commands.codex fork.options.--image": {
@@ -2943,7 +3370,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 15,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L15",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 13,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L13"
+        }
       }
     },
     "cli.commands.codex fork.options.--last": {
@@ -2964,7 +3398,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 176,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L176",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 424,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L424"
+        }
       }
     },
     "cli.commands.codex fork.options.--local-provider": {
@@ -2985,7 +3426,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 63,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L63",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L31"
+        }
       }
     },
     "cli.commands.codex fork.options.--model": {
@@ -3006,7 +3454,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 54,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L54",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 23,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L23"
+        }
       }
     },
     "cli.commands.codex fork.options.--no-alt-screen": {
@@ -3027,7 +3482,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 110,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L110",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 80,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L80"
+        }
       }
     },
     "cli.commands.codex fork.options.--no-daemon": {
@@ -3059,7 +3521,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 58,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L58",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 26,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L26"
+        }
       }
     },
     "cli.commands.codex fork.options.--profile": {
@@ -3080,7 +3549,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 67,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L67",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 35,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L35"
+        }
       }
     },
     "cli.commands.codex fork.options.--profile-v2": {
@@ -3134,7 +3610,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 72,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L72",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 40,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L40"
+        }
       }
     },
     "cli.commands.codex fork.options.--search": {
@@ -3155,7 +3638,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 98,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L98",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 74,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L74"
+        }
       }
     },
     "cli.commands.codex fork.options.--strict-config": {
@@ -3187,7 +3677,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 169,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/cli/src/main.rs#L169",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 4223948cf5b1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 417,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L417"
+        }
       }
     },
     "cli.commands.codex fork.options.--worktree": {
@@ -3219,7 +3716,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 41,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506052135/codex-rs/cli/src/main.rs#L41",
-        "verified": "absent at rust-v0.0.2506030956, present at rust-v0.0.2506052135; 515b6331bd1f adds it"
+        "verified": "absent at rust-v0.0.2506030956, present at rust-v0.0.2506052135; 515b6331bd1f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 160,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L160"
+        }
       }
     },
     "cli.commands.codex login status": {
@@ -3240,7 +3744,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 106,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.11.0/codex-rs/cli/src/main.rs#L106",
-        "verified": "absent at rust-v0.10.0, present at rust-v0.11.0; 301ec72107f1 adds it"
+        "verified": "absent at rust-v0.10.0, present at rust-v0.11.0; 301ec72107f1 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 562,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L562"
+        }
       }
     },
     "cli.commands.codex login.options.--config": {
@@ -3261,7 +3772,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506052135/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.0.2506030956, present at rust-v0.0.2506052135; 515b6331bd1f adds it"
+        "verified": "absent at rust-v0.0.2506030956, present at rust-v0.0.2506052135; 515b6331bd1f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex login.options.--device-auth": {
@@ -3282,7 +3800,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 160,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.46.0/codex-rs/cli/src/main.rs#L160",
-        "verified": "absent at rust-v0.45.0, present at rust-v0.46.0; b6165aee0c01 adds it"
+        "verified": "absent at rust-v0.45.0, present at rust-v0.46.0; b6165aee0c01 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 543,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L543"
+        }
       }
     },
     "cli.commands.codex login.options.--disable": {
@@ -3303,7 +3828,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex login.options.--enable": {
@@ -3324,7 +3856,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex login.options.--help": {
@@ -3345,7 +3884,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 70,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506052135/codex-rs/cli/src/main.rs#L70",
-        "verified": "absent at rust-v0.0.2506030956, present at rust-v0.0.2506052135; 515b6331bd1f adds it"
+        "verified": "absent at rust-v0.0.2506030956, present at rust-v0.0.2506052135; 515b6331bd1f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 517,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L517"
+        }
       }
     },
     "cli.commands.codex login.options.--with-access-token": {
@@ -3388,7 +3934,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 147,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.45.0/codex-rs/cli/src/main.rs#L147",
-        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 69ac5153d421 adds it"
+        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 69ac5153d421 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 522,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L522"
+        }
       }
     },
     "cli.commands.codex logout": {
@@ -3409,7 +3962,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 53,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.15.0/codex-rs/cli/src/main.rs#L53",
-        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; 6d19b73edf0f adds it"
+        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; 6d19b73edf0f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 163,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L163"
+        }
       }
     },
     "cli.commands.codex logout.options.--config": {
@@ -3430,7 +3990,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.15.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; 6d19b73edf0f adds it"
+        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; 6d19b73edf0f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex logout.options.--disable": {
@@ -3451,7 +4018,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex logout.options.--enable": {
@@ -3472,7 +4046,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex logout.options.--help": {
@@ -3493,7 +4074,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 114,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.15.0/codex-rs/cli/src/main.rs#L114",
-        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; 6d19b73edf0f adds it"
+        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; 6d19b73edf0f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 566,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L566"
+        }
       }
     },
     "cli.commands.codex marketplace": {
@@ -3580,7 +4168,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 37,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505141337/codex-rs/cli/src/main.rs#L37",
-        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 497c5396c05a adds it"
+        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 497c5396c05a adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 166,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L166"
+        }
       }
     },
     "cli.commands.codex mcp add": {
@@ -3601,7 +4196,14 @@
         "file": "codex-rs/cli/src/mcp_cmd.rs",
         "line": 46,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/mcp_cmd.rs#L46",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 77,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L77"
+        }
       }
     },
     "cli.commands.codex mcp get": {
@@ -3622,7 +4224,14 @@
         "file": "codex-rs/cli/src/mcp_cmd.rs",
         "line": 43,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/mcp_cmd.rs#L43",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 76,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L76"
+        }
       }
     },
     "cli.commands.codex mcp list": {
@@ -3643,7 +4252,14 @@
         "file": "codex-rs/cli/src/mcp_cmd.rs",
         "line": 40,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/mcp_cmd.rs#L40",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 75,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L75"
+        }
       }
     },
     "cli.commands.codex mcp login": {
@@ -3664,7 +4280,14 @@
         "file": "codex-rs/cli/src/mcp_cmd.rs",
         "line": 51,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.45.0/codex-rs/cli/src/mcp_cmd.rs#L51",
-        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 1d17ca1fa3f4 adds it"
+        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 1d17ca1fa3f4 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 79,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L79"
+        }
       }
     },
     "cli.commands.codex mcp logout": {
@@ -3685,7 +4308,14 @@
         "file": "codex-rs/cli/src/mcp_cmd.rs",
         "line": 55,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.45.0/codex-rs/cli/src/mcp_cmd.rs#L55",
-        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 1d17ca1fa3f4 adds it"
+        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 1d17ca1fa3f4 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 80,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L80"
+        }
       }
     },
     "cli.commands.codex mcp remove": {
@@ -3706,7 +4336,14 @@
         "file": "codex-rs/cli/src/mcp_cmd.rs",
         "line": 49,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/mcp_cmd.rs#L49",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 6a8e743d578c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 78,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L78"
+        }
       }
     },
     "cli.commands.codex mcp-server": {
@@ -3843,7 +4480,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505291458/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.0.2505270918, present at rust-v0.0.2505291458; d60f350cf8b7 adds it"
+        "verified": "absent at rust-v0.0.2505270918, present at rust-v0.0.2505291458; d60f350cf8b7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex mcp.options.--disable": {
@@ -3864,7 +4508,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex mcp.options.--enable": {
@@ -3885,7 +4536,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex mcp.options.--help": {
@@ -3906,7 +4564,14 @@
         "file": "",
         "line": 0,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505141337/#L0",
-        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 497c5396c05a adds it"
+        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 497c5396c05a adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/mcp_cmd.rs",
+          "line": 65,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/mcp_cmd.rs#L65"
+        }
       }
     },
     "cli.commands.codex migrate-nfs-db": {
@@ -4565,7 +5230,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 80,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/main.rs#L80",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 205,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L205"
+        }
       }
     },
     "cli.commands.codex resume.options.--add-dir": {
@@ -4586,7 +5258,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 77,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.48.0/codex-rs/tui/src/cli.rs#L77",
-        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; 4f46360aa493 adds it"
+        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; 4f46360aa493 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 75,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L75"
+        }
       }
     },
     "cli.commands.codex resume.options.--all": {
@@ -4607,7 +5286,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 138,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/cli/src/main.rs#L138",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 526eb3ff82b7 adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 526eb3ff82b7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 366,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L366"
+        }
       }
     },
     "cli.commands.codex resume.options.--approve-for-me": {
@@ -4639,7 +5325,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 50,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L50",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 70,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L70"
+        }
       }
     },
     "cli.commands.codex resume.options.--cd": {
@@ -4660,7 +5353,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 68,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L68",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 67,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L67"
+        }
       }
     },
     "cli.commands.codex resume.options.--config": {
@@ -4681,7 +5381,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex resume.options.--dangerously-bypass-approvals-and-sandbox": {
@@ -4702,7 +5409,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 60,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L60",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 55,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L55"
+        }
       }
     },
     "cli.commands.codex resume.options.--dangerously-bypass-hook-trust": {
@@ -4734,7 +5448,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex resume.options.--enable": {
@@ -4755,7 +5476,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex resume.options.--full-auto": {
@@ -4797,7 +5525,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 95,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/main.rs#L95",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 355,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L355"
+        }
       }
     },
     "cli.commands.codex resume.options.--image": {
@@ -4818,7 +5553,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 14,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L14",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 13,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L13"
+        }
       }
     },
     "cli.commands.codex resume.options.--include-non-interactive": {
@@ -4850,7 +5592,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 102,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/main.rs#L102",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; a30e5e40ee44 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 362,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L362"
+        }
       }
     },
     "cli.commands.codex resume.options.--local-provider": {
@@ -4871,7 +5620,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 46,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/tui/src/cli.rs#L46",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L31"
+        }
       }
     },
     "cli.commands.codex resume.options.--model": {
@@ -4892,7 +5648,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 32,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L32",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 23,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L23"
+        }
       }
     },
     "cli.commands.codex resume.options.--no-alt-screen": {
@@ -4913,7 +5676,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 110,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L110",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 7daaabc795d5 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 7daaabc795d5 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 80,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L80"
+        }
       }
     },
     "cli.commands.codex resume.options.--no-daemon": {
@@ -4945,7 +5715,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 37,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L37",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 26,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L26"
+        }
       }
     },
     "cli.commands.codex resume.options.--profile": {
@@ -4966,7 +5743,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 41,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L41",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 35,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L35"
+        }
       }
     },
     "cli.commands.codex resume.options.--profile-v2": {
@@ -5020,7 +5804,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 46,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L46",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 40,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L40"
+        }
       }
     },
     "cli.commands.codex resume.options.--search": {
@@ -5041,7 +5832,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 72,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/tui/src/cli.rs#L72",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 74,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L74"
+        }
       }
     },
     "cli.commands.codex resume.options.--strict-config": {
@@ -5073,7 +5871,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 95,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/cli/src/main.rs#L95",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 2d52e3b40a07 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 355,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L355"
+        }
       }
     },
     "cli.commands.codex resume.options.--worktree": {
@@ -5105,7 +5910,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 78,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/cli/src/main.rs#L78",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 157,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L157"
+        }
       }
     },
     "cli.commands.codex review.options.--base": {
@@ -5126,7 +5938,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 127,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/exec/src/cli.rs#L127",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 308,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L308"
+        }
       }
     },
     "cli.commands.codex review.options.--commit": {
@@ -5147,7 +5966,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 135,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/exec/src/cli.rs#L135",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 316,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L316"
+        }
       }
     },
     "cli.commands.codex review.options.--config": {
@@ -5168,7 +5994,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex review.options.--disable": {
@@ -5189,7 +6022,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 364,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/cli/src/main.rs#L364",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex review.options.--enable": {
@@ -5210,7 +6050,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 360,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/cli/src/main.rs#L360",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex review.options.--help": {
@@ -5231,7 +6078,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 116,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/exec/src/cli.rs#L116",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 317,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L317"
+        }
       }
     },
     "cli.commands.codex review.options.--strict-config": {
@@ -5263,7 +6117,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 142,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/exec/src/cli.rs#L142",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 323,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L323"
+        }
       }
     },
     "cli.commands.codex review.options.--uncommitted": {
@@ -5284,7 +6145,14 @@
         "file": "codex-rs/exec/src/cli.rs",
         "line": 119,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.65.0/codex-rs/exec/src/cli.rs#L119",
-        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it"
+        "verified": "absent at rust-v0.64.0, present at rust-v0.65.0; 4b78e2ab0938 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/exec/src/cli.rs",
+          "line": 300,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/exec/src/cli.rs#L300"
+        }
       }
     },
     "cli.commands.codex sandbox": {
@@ -5305,7 +6173,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 81,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.45.0/codex-rs/cli/src/main.rs#L81",
-        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 77a8b7fdeb4f adds it"
+        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 77a8b7fdeb4f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 191,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L191"
+        }
       }
     },
     "cli.commands.codex sandbox linux": {
@@ -5422,7 +6297,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.45.0/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 77a8b7fdeb4f adds it"
+        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 77a8b7fdeb4f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex sandbox.options.--disable": {
@@ -5443,7 +6325,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex sandbox.options.--enable": {
@@ -5464,7 +6353,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex sandbox.options.--help": {
@@ -5485,7 +6381,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 125,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.45.0/codex-rs/cli/src/main.rs#L125",
-        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 77a8b7fdeb4f adds it"
+        "verified": "absent at rust-v0.44.0, present at rust-v0.45.0; 77a8b7fdeb4f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 465,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L465"
+        }
       }
     },
     "cli.commands.codex sandbox.options.--include-managed-config": {
@@ -5869,7 +6772,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 77,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.48.0/codex-rs/tui/src/cli.rs#L77",
-        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; 4f46360aa493 adds it"
+        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; 4f46360aa493 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 75,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L75"
+        }
       }
     },
     "cli.commands.codex.options.--approve-for-me": {
@@ -5912,7 +6822,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 32,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505061740/codex-rs/tui/src/cli.rs#L32",
-        "verified": "absent at rust-v0.0.2505021951, present at rust-v0.0.2505061740; 421e159888c7 adds it"
+        "verified": "absent at rust-v0.0.2505021951, present at rust-v0.0.2505061740; 421e159888c7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 67,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L67"
+        }
       }
     },
     "cli.commands.codex.options.--config": {
@@ -5933,7 +6850,14 @@
         "file": "codex-rs/common/src/config_override.rs",
         "line": 31,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505291458/codex-rs/common/src/config_override.rs#L31",
-        "verified": "absent at rust-v0.0.2505270918, present at rust-v0.0.2505291458; d60f350cf8b7 adds it"
+        "verified": "absent at rust-v0.0.2505270918, present at rust-v0.0.2505291458; d60f350cf8b7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/config_override.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/config_override.rs#L31"
+        }
       }
     },
     "cli.commands.codex.options.--dangerously-bypass-approvals-and-sandbox": {
@@ -5954,7 +6878,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 35,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506261603/codex-rs/tui/src/cli.rs#L35",
-        "verified": "absent at rust-v0.0.2506060849, present at rust-v0.0.2506261603; 50924101d285 adds it"
+        "verified": "absent at rust-v0.0.2506060849, present at rust-v0.0.2506261603; 50924101d285 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 55,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L55"
+        }
       }
     },
     "cli.commands.codex.options.--dangerously-bypass-hook-trust": {
@@ -5986,7 +6917,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L272",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 964,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L964"
+        }
       }
     },
     "cli.commands.codex.options.--enable": {
@@ -6007,7 +6945,14 @@
         "file": "codex-rs/cli/src/main.rs",
         "line": 268,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/cli/src/main.rs#L268",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/cli/src/main.rs",
+          "line": 960,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/cli/src/main.rs#L960"
+        }
       }
     },
     "cli.commands.codex.options.--full-auto": {
@@ -6071,7 +7016,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 46,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/tui/src/cli.rs#L46",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 31,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L31"
+        }
       }
     },
     "cli.commands.codex.options.--model": {
@@ -6103,7 +7055,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 110,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/tui/src/cli.rs#L110",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 7daaabc795d5 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 7daaabc795d5 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 80,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L80"
+        }
       }
     },
     "cli.commands.codex.options.--no-daemon": {
@@ -6135,7 +7094,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 23,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.13.0/codex-rs/tui/src/cli.rs#L23",
-        "verified": "absent at rust-v0.12.0, present at rust-v0.13.0; 9285350842fc adds it"
+        "verified": "absent at rust-v0.12.0, present at rust-v0.13.0; 9285350842fc adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 26,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L26"
+        }
       }
     },
     "cli.commands.codex.options.--profile": {
@@ -6156,7 +7122,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 21,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505141337/codex-rs/tui/src/cli.rs#L21",
-        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it"
+        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 35,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L35"
+        }
       }
     },
     "cli.commands.codex.options.--profile-v2": {
@@ -6210,7 +7183,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 26,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.3.0/codex-rs/tui/src/cli.rs#L26",
-        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it"
+        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/utils/cli/src/shared_options.rs",
+          "line": 40,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/utils/cli/src/shared_options.rs#L40"
+        }
       }
     },
     "cli.commands.codex.options.--search": {
@@ -6231,7 +7211,14 @@
         "file": "codex-rs/tui/src/cli.rs",
         "line": 58,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.24.0/codex-rs/tui/src/cli.rs#L58",
-        "verified": "absent at rust-v0.23.0, present at rust-v0.24.0; 363636f5eb5c adds it"
+        "verified": "absent at rust-v0.23.0, present at rust-v0.24.0; 363636f5eb5c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/tui/src/cli.rs",
+          "line": 74,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/cli.rs#L74"
+        }
       }
     },
     "cli.commands.codex.options.--strict-config": {
@@ -8640,7 +9627,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 7,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L7",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f1c961d5f7a0 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f1c961d5f7a0 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 5172,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L5172"
+        }
       }
     },
     "config.options.agents.<name>": {
@@ -8825,7 +9819,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 358,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.79.0/codex-rs/core/src/config/mod.rs#L358",
-        "verified": "absent at rust-v0.78.0, present at rust-v0.79.0; 915352b10cf7 adds it"
+        "verified": "absent at rust-v0.78.0, present at rust-v0.79.0; 915352b10cf7 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 816,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L816"
+        }
       }
     },
     "config.options.analytics.enabled": {
@@ -9517,7 +10518,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 139,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.6.0/codex-rs/core/src/config.rs#L139",
-        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it"
+        "verified": "absent at rust-v0.5.0, present at rust-v0.6.0; bfeb8c92a591 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 825,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L825"
+        }
       }
     },
     "config.options.check_for_update_on_startup": {
@@ -9538,7 +10546,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 273,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.64.0/codex-rs/core/src/config/mod.rs#L273",
-        "verified": "absent at rust-v0.63.0, present at rust-v0.64.0; 3741f387e94c adds it"
+        "verified": "absent at rust-v0.63.0, present at rust-v0.64.0; 3741f387e94c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 7456,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L7456"
+        }
       }
     },
     "config.options.cli_auth_credentials_store": {
@@ -9559,7 +10574,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 562,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.51.0/codex-rs/core/src/config/mod.rs#L562",
-        "verified": "absent at rust-v0.50.0, present at rust-v0.51.0; 4a42c4e1420e adds it"
+        "verified": "absent at rust-v0.50.0, present at rust-v0.51.0; 4a42c4e1420e adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 7460,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L7460"
+        }
       }
     },
     "config.options.cloud": {
@@ -9624,7 +10646,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 132,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.51.0/codex-rs/core/src/config/mod.rs#L132",
-        "verified": "absent at rust-v0.50.0, present at rust-v0.51.0; f4f9695978c2 adds it"
+        "verified": "absent at rust-v0.50.0, present at rust-v0.51.0; f4f9695978c2 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 7477,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L7477"
+        }
       }
     },
     "config.options.computer_use": {
@@ -9887,7 +10916,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 132,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.53.0/codex-rs/core/src/config/mod.rs#L132",
-        "verified": "absent at rust-v0.52.0, present at rust-v0.53.0; 9572cfc78286 adds it"
+        "verified": "absent at rust-v0.52.0, present at rust-v0.53.0; 9572cfc78286 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 7498,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L7498"
+        }
       }
     },
     "config.options.disable_paste_burst": {
@@ -9908,7 +10944,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 187,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.26.0/codex-rs/core/src/config.rs#L187",
-        "verified": "absent at rust-v0.25.0, present at rust-v0.26.0; c9ca63dc1e7f adds it"
+        "verified": "absent at rust-v0.25.0, present at rust-v0.26.0; c9ca63dc1e7f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 5140,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L5140"
+        }
       }
     },
     "config.options.experimental_compact_prompt_file": {
@@ -9929,7 +10972,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 652,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.51.0/codex-rs/core/src/config/mod.rs#L652",
-        "verified": "absent at rust-v0.50.0, present at rust-v0.51.0; f4f9695978c2 adds it"
+        "verified": "absent at rust-v0.50.0, present at rust-v0.51.0; f4f9695978c2 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 828,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L828"
+        }
       }
     },
     "config.options.experimental_realtime_start_instructions": {
@@ -10092,7 +11142,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 692,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/core/src/config.rs#L692",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; c09ed74a163e adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; c09ed74a163e adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 831,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L831"
+        }
       }
     },
     "config.options.features": {
@@ -10113,7 +11170,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 21,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/core/src/config.rs#L21",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; f7b4e296093b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 834,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L834"
+        }
       }
     },
     "config.options.features.agent_message_board": {
@@ -10705,7 +11769,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 84,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L84",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f72f87fbeeea adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f72f87fbeeea adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 963,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L963"
+        }
       }
     },
     "config.options.features.compaction_image_budget": {
@@ -10759,7 +11830,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 156,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.90.0/codex-rs/core/config.schema.json#L156",
-        "verified": "absent at rust-v0.89.0, present at rust-v0.90.0; a2c829a80803 adds it"
+        "verified": "absent at rust-v0.89.0, present at rust-v0.90.0; a2c829a80803 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 975,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L975"
+        }
       }
     },
     "config.options.features.content_item_kinds": {
@@ -12793,7 +13871,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 120,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L120",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; 527b7b4c02af adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; 527b7b4c02af adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1284,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1284"
+        }
       }
     },
     "config.options.features.responses_websockets_v2": {
@@ -13770,7 +14855,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 147,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/core/config.schema.json#L147",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 5b5a5b92b5a6 adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; 5b5a5b92b5a6 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8199,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8199"
+        }
       }
     },
     "config.options.feedback.enabled": {
@@ -13802,7 +14894,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 90,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505161708/codex-rs/core/src/config.rs#L90",
-        "verified": "absent at rust-v0.0.2505151627, present at rust-v0.0.2505161708; 1e3918939379 adds it"
+        "verified": "absent at rust-v0.0.2505151627, present at rust-v0.0.2505161708; 1e3918939379 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8207,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8207"
+        }
       }
     },
     "config.options.forced_chatgpt_workspace_id": {
@@ -13823,7 +14922,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 214,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.48.0/codex-rs/core/src/config.rs#L214",
-        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; d87f87e25b67 adds it"
+        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; d87f87e25b67 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8215,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8215"
+        }
       }
     },
     "config.options.forced_login_method": {
@@ -13844,7 +14950,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 217,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.48.0/codex-rs/core/src/config.rs#L217",
-        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; d87f87e25b67 adds it"
+        "verified": "absent at rust-v0.47.0, present at rust-v0.48.0; d87f87e25b67 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8224,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8224"
+        }
       }
     },
     "config.options.ghost_snapshot": {
@@ -13865,7 +14978,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 272,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.73.0/codex-rs/core/src/config/mod.rs#L272",
-        "verified": "absent at rust-v0.72.0, present at rust-v0.73.0; 4274e6189a7c adds it"
+        "verified": "absent at rust-v0.72.0, present at rust-v0.73.0; 4274e6189a7c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8233,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8233"
+        }
       }
     },
     "config.options.ghost_snapshot.disable_warnings": {
@@ -13941,7 +15061,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 48,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505302325/codex-rs/core/src/config.rs#L48",
-        "verified": "absent at rust-v0.0.2505301630, present at rust-v0.0.2505302325; e81327e5f4ad adds it"
+        "verified": "absent at rust-v0.0.2505301630, present at rust-v0.0.2505302325; e81327e5f4ad adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8250,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8250"
+        }
       }
     },
     "config.options.history": {
@@ -13962,7 +15089,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 86,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505151627/codex-rs/core/src/config.rs#L86",
-        "verified": "absent at rust-v0.0.2505141652, present at rust-v0.0.2505151627; ce2ecbe72f2a adds it"
+        "verified": "absent at rust-v0.0.2505141652, present at rust-v0.0.2505151627; ce2ecbe72f2a adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8255,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8255"
+        }
       }
     },
     "config.options.history.max_bytes": {
@@ -16326,7 +17460,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 203,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.81.0/codex-rs/core/config.schema.json#L203",
-        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; d5562983d9cf adds it"
+        "verified": "absent at rust-v0.80.0, present at rust-v0.81.0; d5562983d9cf adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8324,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8324"
+        }
       }
     },
     "config.options.mcp_oauth_callback_url": {
@@ -16358,7 +17499,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 745,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.46.0/codex-rs/core/src/config.rs#L745",
-        "verified": "absent at rust-v0.45.0, present at rust-v0.46.0; 496cb801e114 adds it"
+        "verified": "absent at rust-v0.45.0, present at rust-v0.46.0; 496cb801e114 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8334,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8334"
+        }
       }
     },
     "config.options.mcp_optional_startup_grace_ms": {
@@ -16390,7 +17538,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 63,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505061740/codex-rs/core/src/config.rs#L63",
-        "verified": "absent at rust-v0.0.2505021951, present at rust-v0.0.2505061740; 147a94044983 adds it"
+        "verified": "absent at rust-v0.0.2505021951, present at rust-v0.0.2505061740; 147a94044983 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 4049,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L4049"
+        }
       }
     },
     "config.options.mcp_servers.<name>": {
@@ -17126,7 +18281,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 68,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/core/src/config.rs#L68",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; ea225df22e44 adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; ea225df22e44 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8369,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8369"
+        }
       }
     },
     "config.options.model_auto_compact_token_limit_scope": {
@@ -17169,7 +18331,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 35,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506261603/codex-rs/core/src/config.rs#L35",
-        "verified": "absent at rust-v0.0.2506060849, present at rust-v0.0.2506261603; fcfe43c7df46 adds it"
+        "verified": "absent at rust-v0.0.2506060849, present at rust-v0.0.2506261603; fcfe43c7df46 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8390,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8390"
+        }
       }
     },
     "config.options.model_instructions_file": {
@@ -17190,7 +18359,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 246,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L246",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f4d55319d147 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f4d55319d147 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1514,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1514"
+        }
       }
     },
     "config.options.model_personality": {
@@ -17243,7 +18419,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 33,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505101753/codex-rs/core/src/config.rs#L33",
-        "verified": "absent at rust-v0.0.2505061740, present at rust-v0.0.2505101753; 86022f097e5f adds it"
+        "verified": "absent at rust-v0.0.2505061740, present at rust-v0.0.2505101753; 86022f097e5f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1522,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1522"
+        }
       }
     },
     "config.options.model_providers": {
@@ -17264,7 +18447,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 79,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505101753/codex-rs/core/src/config.rs#L79",
-        "verified": "absent at rust-v0.0.2505061740, present at rust-v0.0.2505101753; 86022f097e5f adds it"
+        "verified": "absent at rust-v0.0.2505061740, present at rust-v0.0.2505101753; 86022f097e5f adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8414,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8414"
+        }
       }
     },
     "config.options.model_providers.<name>": {
@@ -17791,7 +18981,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 120,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506030956/codex-rs/core/src/config.rs#L120",
-        "verified": "absent at rust-v0.0.2505302325, present at rust-v0.0.2506030956; 0f3cc8f8420e adds it"
+        "verified": "absent at rust-v0.0.2505302325, present at rust-v0.0.2506030956; 0f3cc8f8420e adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1526,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1526"
+        }
       }
     },
     "config.options.model_reasoning_summary": {
@@ -17812,7 +19009,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 124,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2506030956/codex-rs/core/src/config.rs#L124",
-        "verified": "absent at rust-v0.0.2505302325, present at rust-v0.0.2506030956; 0f3cc8f8420e adds it"
+        "verified": "absent at rust-v0.0.2505302325, present at rust-v0.0.2506030956; 0f3cc8f8420e adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1529,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1529"
+        }
       }
     },
     "config.options.model_supports_reasoning_summaries": {
@@ -17854,7 +19058,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 156,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.24.0/codex-rs/core/src/config.rs#L156",
-        "verified": "absent at rust-v0.23.0, present at rust-v0.24.0; 80b00a193eee adds it"
+        "verified": "absent at rust-v0.23.0, present at rust-v0.24.0; 80b00a193eee adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1532,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1532"
+        }
       }
     },
     "config.options.notice": {
@@ -17875,7 +19086,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 930,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.47.0/codex-rs/core/src/config.rs#L930",
-        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; 78f278559533 adds it"
+        "verified": "absent at rust-v0.46.0, present at rust-v0.47.0; 78f278559533 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8436,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8436"
+        }
       }
     },
     "config.options.notice.external_config_migration_prompts": {
@@ -18072,7 +19290,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 54,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505021951/codex-rs/core/src/config.rs#L54",
-        "verified": "absent at rust-v0.0.2504301327, present at rust-v0.0.2505021951; a180ed44e8cf adds it"
+        "verified": "absent at rust-v0.0.2504301327, present at rust-v0.0.2505021951; a180ed44e8cf adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8444,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8444"
+        }
       }
     },
     "config.options.openai_base_url": {
@@ -18159,7 +19384,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 717,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/core/src/config/mod.rs#L717",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 837bc98a1dcc adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1535,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1535"
+        }
       }
     },
     "config.options.otel": {
@@ -18180,7 +19412,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 208,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.43.0/codex-rs/core/src/config.rs#L208",
-        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 04c1782e5242 adds it"
+        "verified": "absent at rust-v0.42.0, present at rust-v0.43.0; 04c1782e5242 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8468,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8468"
+        }
       }
     },
     "config.options.otel.environment": {
@@ -18971,7 +20210,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 124,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505141337/codex-rs/core/src/config.rs#L124",
-        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it"
+        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 3044,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L3044"
+        }
       }
     },
     "config.options.profiles": {
@@ -18992,7 +20238,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 128,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505141337/codex-rs/core/src/config.rs#L128",
-        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it"
+        "verified": "absent at rust-v0.0.2505121726, present at rust-v0.0.2505141337; 3c03c25e56e3 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8509,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8509"
+        }
       }
     },
     "config.options.profiles.<name>": {
@@ -19584,7 +20837,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 84,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L84",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f72f87fbeeea adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f72f87fbeeea adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 963,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L963"
+        }
       }
     },
     "config.options.profiles.<name>.features.compaction_image_budget": {
@@ -19638,7 +20898,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 156,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.90.0/codex-rs/core/config.schema.json#L156",
-        "verified": "absent at rust-v0.89.0, present at rust-v0.90.0; a2c829a80803 adds it"
+        "verified": "absent at rust-v0.89.0, present at rust-v0.90.0; a2c829a80803 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 975,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L975"
+        }
       }
     },
     "config.options.profiles.<name>.features.content_item_kinds": {
@@ -20825,7 +22092,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 120,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L120",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; 527b7b4c02af adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; 527b7b4c02af adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1284,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1284"
+        }
       }
     },
     "config.options.profiles.<name>.features.responses_websockets_v2": {
@@ -21692,7 +22966,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 666,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L666",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f4d55319d147 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; f4d55319d147 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1514,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1514"
+        }
       }
     },
     "config.options.profiles.<name>.model_personality": {
@@ -21932,7 +23213,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 398,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.82.0/codex-rs/core/config.schema.json#L398",
-        "verified": "absent at rust-v0.81.0, present at rust-v0.82.0; 5e426ac27030 adds it"
+        "verified": "absent at rust-v0.81.0, present at rust-v0.82.0; 5e426ac27030 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8662,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8662"
+        }
       }
     },
     "config.options.profiles.<name>.windows": {
@@ -22008,7 +23296,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 145,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.44.0/codex-rs/core/src/config.rs#L145",
-        "verified": "absent at rust-v0.43.0, present at rust-v0.44.0; 400a5a90bfef adds it"
+        "verified": "absent at rust-v0.43.0, present at rust-v0.44.0; 400a5a90bfef adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8517,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8517"
+        }
       }
     },
     "config.options.project_doc_max_bytes": {
@@ -22029,7 +23324,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 82,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505101753/codex-rs/core/src/config.rs#L82",
-        "verified": "absent at rust-v0.0.2505061740, present at rust-v0.0.2505101753; 2b122da087e5 adds it"
+        "verified": "absent at rust-v0.0.2505061740, present at rust-v0.0.2505101753; 2b122da087e5 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8525,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8525"
+        }
       }
     },
     "config.options.project_root_markers": {
@@ -22050,7 +23352,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 804,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.78.0/codex-rs/core/src/config/mod.rs#L804",
-        "verified": "absent at rust-v0.77.0, present at rust-v0.78.0; 314937fb1194 adds it"
+        "verified": "absent at rust-v0.77.0, present at rust-v0.78.0; 314937fb1194 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8532,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8532"
+        }
       }
     },
     "config.options.projects": {
@@ -22071,7 +23380,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 406,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.15.0/codex-rs/core/src/config.rs#L406",
-        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; bc28b87c7bbb adds it"
+        "verified": "absent at rust-v0.14.0, present at rust-v0.15.0; bc28b87c7bbb adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1756,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1756"
+        }
       }
     },
     "config.options.projects.<name>": {
@@ -22202,7 +23518,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 57,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.35.0/codex-rs/core/src/config.rs#L57",
-        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 90a0fd342f5d adds it"
+        "verified": "absent at rust-v0.34.0, present at rust-v0.35.0; 90a0fd342f5d adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8562,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8562"
+        }
       }
     },
     "config.options.sandbox_mode": {
@@ -22223,7 +23546,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 259,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.3.0/codex-rs/core/src/config.rs#L259",
-        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it"
+        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1549,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1549"
+        }
       }
     },
     "config.options.sandbox_workspace_write": {
@@ -22244,7 +23574,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 262,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.3.0/codex-rs/core/src/config.rs#L262",
-        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it"
+        "verified": "absent at rust-v0.2.0, present at rust-v0.3.0; e0c08cea4fcf adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8574,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8574"
+        }
       }
     },
     "config.options.sandbox_workspace_write.exclude_slash_tmp": {
@@ -22320,7 +23657,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 42,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505220956/codex-rs/core/src/config.rs#L42",
-        "verified": "absent at rust-v0.0.2505212314, present at rust-v0.0.2505220956; cb379d779744 adds it"
+        "verified": "absent at rust-v0.0.2505212314, present at rust-v0.0.2505220956; cb379d779744 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8586,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8586"
+        }
       }
     },
     "config.options.shell_environment_policy.exclude": {
@@ -22440,7 +23784,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 66,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.13.0/codex-rs/core/src/config.rs#L66",
-        "verified": "absent at rust-v0.12.0, present at rust-v0.13.0; e0303dbac06b adds it"
+        "verified": "absent at rust-v0.12.0, present at rust-v0.13.0; e0303dbac06b adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8602,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8602"
+        }
       }
     },
     "config.options.skills": {
@@ -22461,7 +23812,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 398,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L398",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 681,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L681"
+        }
       }
     },
     "config.options.skills.bundled": {
@@ -22504,7 +23862,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 1373,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L1373",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 4826,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L4826"
+        }
       }
     },
     "config.options.skills.config[].enabled": {
@@ -22525,7 +23890,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 489,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L489",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 4848,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L4848"
+        }
       }
     },
     "config.options.skills.config[].name": {
@@ -22557,7 +23929,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 1364,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.88.0/codex-rs/core/config.schema.json#L1364",
-        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it"
+        "verified": "absent at rust-v0.87.0, present at rust-v0.88.0; ad8bf59cbfb6 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 7591,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L7591"
+        }
       }
     },
     "config.options.skills.include_instructions": {
@@ -22633,7 +24012,14 @@
         "file": "codex-rs/core/src/config/mod.rs",
         "line": 199,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.59.0/codex-rs/core/src/config/mod.rs#L199",
-        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 3de879071446 adds it"
+        "verified": "absent at rust-v0.58.0, present at rust-v0.59.0; 3de879071446 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 8632,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L8632"
+        }
       }
     },
     "config.options.tool_suggest": {
@@ -22731,7 +24117,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 487,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.24.0/codex-rs/core/src/config.rs#L487",
-        "verified": "absent at rust-v0.23.0, present at rust-v0.24.0; 363636f5eb5c adds it"
+        "verified": "absent at rust-v0.23.0, present at rust-v0.24.0; 363636f5eb5c adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 178,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L178"
+        }
       }
     },
     "config.options.tools.experimental_request_user_input": {
@@ -22895,7 +24288,14 @@
         "file": "codex-rs/core/src/config.rs",
         "line": 93,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.0.2505161708/codex-rs/core/src/config.rs#L93",
-        "verified": "absent at rust-v0.0.2505151627, present at rust-v0.0.2505161708; 7ca84087e691 adds it"
+        "verified": "absent at rust-v0.0.2505151627, present at rust-v0.0.2505161708; 7ca84087e691 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1559,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1559"
+        }
       }
     },
     "config.options.tui.agents_overview_grouping": {
@@ -25346,7 +26746,14 @@
         "file": "codex-rs/core/config.schema.json",
         "line": 135,
         "permalink": "https://github.com/openai/codex/blob/rust-v0.82.0/codex-rs/core/config.schema.json#L135",
-        "verified": "absent at rust-v0.81.0, present at rust-v0.82.0; 5e426ac27030 adds it"
+        "verified": "absent at rust-v0.81.0, present at rust-v0.82.0; 5e426ac27030 adds it",
+        "current": {
+          "tag": "rust-v0.167.0",
+          "version": "0.167.0",
+          "file": "codex-rs/core/config.schema.json",
+          "line": 1461,
+          "permalink": "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json#L1461"
+        }
       }
     },
     "config.options.windows": {

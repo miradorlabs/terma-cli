@@ -15,7 +15,7 @@
       "from": "2.1.318",
       "to": "2.1.319",
       "at": "2026-11-07T05:31:09Z",
-      "released_at": null,
+      "released_at": "2026-11-06T00:58:56.366Z",
       "changes": 0,
       "categories": {}
     }
@@ -23,7 +23,7 @@
   "versions": [
     {
       "version": "2.1.319",
-      "released_at": null,
+      "released_at": "2026-11-06T00:58:56.366Z",
       "captured_at": "2026-11-07T05:31:09Z",
       "platforms": [
         "darwin/arm64",

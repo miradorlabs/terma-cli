@@ -7,13 +7,117 @@
     "homepage": "https://github.com/github/copilot-cli",
     "source": null,
     "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-    "latest": "1.0.105",
+    "latest": "1.0.108",
     "support": "untested",
-    "versions_tracked": 1,
+    "versions_tracked": 4,
     "first_tracked": "2026-10-28",
-    "last_change": null
+    "last_change": {
+      "from": "1.0.107",
+      "to": "1.0.108",
+      "at": "2026-11-09T17:38:10.676342852Z",
+      "released_at": "2026-11-09T16:20:23.734Z",
+      "changes": 13,
+      "categories": {
+        "cli": 2,
+        "config": 4,
+        "prompt": 2,
+        "storage": 1,
+        "tools": 4
+      }
+    }
   },
   "versions": [
+    {
+      "version": "1.0.108",
+      "released_at": "2026-11-09T16:20:23.734Z",
+      "captured_at": "2026-11-09T17:38:10.676342852Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.107",
+      "changes": 13,
+      "categories": {
+        "cli": 2,
+        "config": 4,
+        "prompt": 2,
+        "storage": 1,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 7
+      },
+      "undocumented": 9,
+      "highlights": [
+        "System prompt changed (+289 −271 chars)",
+        "System prompt changed (+652 −464 chars)",
+        "fetch_copilot_cli_documentation tool description changed (+217 −116 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "1.0.107",
+      "released_at": "2026-11-06T20:39:04.353Z",
+      "captured_at": "2026-11-09T17:38:10.676342852Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.106",
+      "changes": 1,
+      "categories": {
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [
+        "On-disk logs path changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "1.0.106",
+      "released_at": "2026-11-06T01:46:11.22Z",
+      "captured_at": "2026-11-09T17:38:10.676342852Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.105",
+      "changes": 76,
+      "categories": {
+        "binary": 1,
+        "caching": 3,
+        "cli": 19,
+        "config": 17,
+        "hooks": 23,
+        "prompt": 5,
+        "storage": 1,
+        "telemetry": 3,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 5,
+        "informational": 55,
+        "notable": 16
+      },
+      "undocumented": 27,
+      "highlights": [
+        "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.cache_read.input_tokens",
+        "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.cache_write.input_tokens",
+        "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.reasoning.output_tokens"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "1.0.105",
       "released_at": "2026-10-28T00:44:26.688Z",

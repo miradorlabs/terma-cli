@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "harness": "copilot",
+  "from": "1.0.107",
+  "to": "1.0.108",
+  "generated_at": "2026-11-09T17:38:10.676342852Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "text": "- Add `sandbox.userPolicy.filesystem.enumeratePaths` in `settings.json` for Windows enumerate-only directory grants\n- Add /index commands and enable managed shared tgrep indexing by default for eligible repositories\n- PDF attachments on Grok 4.7 and Grok 4.6 fall back to file references instead of failing the turn\n- With the sandbox on, a running local MCP server is now restarted after `/cd`, so it follows the new directory's denied paths instead of keeping those of the directory the session left.\n- A file attachment sent through the SDK that points at a named pipe, socket or device is now tagged as an error instead of stalling the turn until something writes to the pipe.\n- The canvas tools now tell the model which instance IDs `open_canvas` accepts, instead of calling them free-form.\n- /model now lists models when Copilot answers the model list request with 421 Misdirected Request, for example after a plan change, by re-resolving your account's endpoint as chat turns already do instead of showing \"Error loading model list\".\n- Requests to OpenAI-compatible chat-completions providers no longer include an internal message field on skill and tool messages.\n- Ctrl+C now stops a running /compact, as Esc Esc does, instead of only arming the exit hint and quitting the CLI on a second press.\n- The /config help no longer shows literal backticks or uses a model outside the model list as its example.\n- Your defaultMode setting now applies when you close the startup session picker while the session is still loading its model, instead of the session staying in its previous mode.\n- A disabledSkills entry, skills.disable and skills.enable now match a skill name in any letter case, as invoking the skill does, instead of silently doing nothing when the case differs.\n- Creating or resuming an SDK session, or replacing its tools, with two custom tools of the same name is now an error. Before, the model was offered the first definition while some SDKs ran the handler of the last one.\n- Copilot no longer crashes with an unhandled exception at startup when it cannot save its first-launch timestamp, for example because the disk holding the Copilot home directory is full. The failure is logged and startup continues.\n- The Getting started box no longer suggests /init in a folder where you ran /init suppress, in a repository that already has Copilot instructions, or outside a git repository.\n- `copilot help config` now names the `.claude/rules` instruction files and the `.claude/settings.json` repository settings the CLI reads.\n- copilot help input now says that esc esc also stops a running /compact, and that in shell mode a single esc or ctrl+c on an empty prompt leaves shell mode\n- `/help` now describes `ctrl+d` (exits only on an empty prompt, otherwise deletes the next character) and `ctrl+z` on Windows correctly, and lists `ctrl+j`, `ctrl+v`, `ctrl+y` and the voice input keys.\n- copilot help limits now quotes the rate-limit prompt as local sessions show it, \"Switch to Copilot Fusion mode?\", instead of \"Switch to auto mode?\".\n- copilot help mcp now says that a directory's .github/mcp.json is ignored when the same directory has a .mcp.json, instead of implying the two files are merged\n- copilot help monitoring now describes the github.copilot.sandbox.operation.count metric as counting every sandbox decision by kind, not only deduplicated posture changes.\n- Pasting an image path again after clearing its `[image: ...]` label with Ctrl+U, Ctrl+K, Ctrl+W or an Up-arrow history recall attaches the image again instead of inserting the plain path.\n- Backspace, an arrow key, Ctrl+U or Shift+Enter pressed right after a paste now acts after the pasted text instead of on the text in front of it.\n- Picking an MCP server type by its number in the add or edit form now moves focus to the next field for that type.\n- /permissions default in Autopilot now asks again how to handle permissions on the next prompt, as /permissions manual does, instead of leaving Autopilot to deny every tool request.\n- A queued `/ask` or `/btw` that runs while another side answer is open now shows that it is still thinking, instead of showing the previous answer as its own finished answer for Ctrl+Y to copy.\n- copilot --resume <name> and /resume <name> now find a session whose name has an accent typed precomposed or decomposed, whichever spelling the session was saved with.\n- In /search, Up, Down and Enter bring a single match back into view after you scroll away, and a shorter terminal no longer leaves the current match off screen.\n- /security-review help now says it reviews the branch diff when the working tree is clean, not only staged and unstaged changes\n- Escape sequences in checkpoint titles, file names, Copilot home paths and generated agent names no longer restyle /session info or the /agent wizard.\n- Long values in `/session info`, such as the log and session file paths, now wrap under their own column instead of back under the label\n- Switching to another session no longer occasionally replaces that session's model with Auto while the model list reloads.\n- `/share` usage no longer implies that `/share` alone exports a markdown file; it shows that a bare path must contain `/`, `.` or `~`.\n- A path or URL route in a prompt, such as /docs/setup.md, no longer loads a skill named after its first segment (docs) as if you had invoked that skill.\n- Subcommands of `/pr`, `/lsp`, `/skills`, `/plugin`, `/user` and `/collect-debug-logs` now match in any letter case, so `/lsp TEST my-server` runs the test instead of showing usage text.\n- Help for `/experimental` and `/theme` now marks `/experimental on|off` and `/theme <mode>` as deprecated and points at `/settings`, and `/mcp disable` is no longer described as temporary: it is saved across sessions.\n- A repository `sessionStart` prompt hook that runs `/clear <prompt>` or `/new` now starts one new session instead of starting another one in every session it creates.\n- The duration shown on a sub-agent no longer counts the time its tool calls spent at permission prompts.\n- The `/subagents` help no longer promises a default subagent model. It now says the command configures each subagent's model and settings and turns subagents on or off.\n- Tab characters in replies, error messages, agent names and other text are now shown as spaces instead of being dropped, so tab-separated words no longer run together.\n- The duration shown on a tool call no longer counts the time spent at its permission prompt, and it does not tick while the prompt is open.\n- The `/update` channel choices now say that picking `stable` or `prerelease` also saves it as your update channel for future updates.\n- Preserve input queued behind a paste when resizing the terminal\n- Memory import reports malformed repository scopes without a false unsupported host error\n- Show a warning when a selected custom agent's configured skills are missing or cannot be loaded\n- Include session start, resume, and model-change events in `-p --output-format json` output\n- Keep built-in agents selected with --agent active when opening /agent or refreshing available agents\n- Interactive CLI sessions pass local MCP server environment values literally; use ${NAME} to reference a host environment variable\n- Allow semantic code search to find renamed repositories when the checkout still uses the old name\n- Use Ctrl+T to show and hide First Pass reasoning when Fusion is selected through a routing profile\n- Keep the selected match in view when opening /search or /find instead of jumping to the bottom of the conversation.\n- Allow the system to sleep again after a background MCP reload finishes when using /keep-alive busy.\n- Keep the footer's plan hint visible when a nonempty plan is available\n- Interactive Autopilot waits for your response to MCP input and consent requests instead of automatically declining them\n- /mcp enable now respects repository settings that disable an MCP server\n- Renaming files with the patch tool now succeeds without requiring changes to their contents\n- File diffs in the concise transcript show terminal escape sequences as visible characters and preserve added and removed line colors\n- Reduce CPU usage during builds in large worktrees when language servers watch for file changes\n- Headless runs now report an error when resuming a session in use by another Copilot process, keeping its history intact.\n- MCP deny rules now block a tool named the way its MCP server advertises it (for example `server(weather.lookup)`), not only its sanitized name, even with --allow-all-tools\n- On Linux, language servers are no longer told that the files in a directory were deleted when the directory is renamed away and straight back.\n- On Linux, language servers are now told when a directory is renamed (the old files deleted, the new ones created) while other directories in the workspace are being created and removed, such as during a package install.\n- A canvas that was open when a session was resumed is now restored even if its extension restarts while the canvas is being reopened, instead of staying unavailable.\n- When a preToolUse hook asks about several parallel tool calls, each call gets its own confirmation again: answering No with feedback to one no longer denies the others without asking.\n- Attaching an empty PDF or Office document no longer fails the turn on models that read documents natively; the empty file is passed as a file reference instead.\n- Connect to an already running /voice server even when its PID file is missing\n- /limits unset now clears session AI credit caps for subsequent requests\n- `/plugin install` from a repository, URL or local path now shows the same deprecation warning that `copilot plugin install` prints.\n- Automatic updates are no longer skipped for a launch when signing in takes more than about a second\n- /changelog <version> can retrieve release notes for versions not bundled with the CLI\n- A turn that ends while the session event log cannot be written now still ends with `session.idle`, so `sendAndWait` no longer times out on a turn that completed.\n- The grep and glob tools now return the matches they found when a file or directory under the search path cannot be read, with a note naming what was skipped, instead of failing with only the permission error.\n- Apply reasoning effort changes made during a tool call to the next model request on supported models, without waiting for another prompt\n- Since 1.0.104, Assisted Permissions judge calls are sent as agent requests and no longer count as separate premium requests\n- Answer questions about Copilot CLI behavior from this build's own documentation and clearly say when docs do not cover a question.\n- Keep successful command output and file diffs collapsed in concise transcript mode until expanded, while keeping running output and failure details visible.\n- Show MCP form validation errors beside inputs, focus the first invalid field, and improve screen-reader labels and cursor positioning\n- Since 1.0.106, Autopilot with Assisted Permissions no longer stops for permission prompts; the agent tries another approach and reports the actions it could not take\n- Managed plugin assignments with state \"defaultEnabled\" now install and activate plugins by default while preserving user overrides."
+  },
+  "summary": {
+    "changes": 13,
+    "categories": {
+      "cli": 2,
+      "config": 4,
+      "prompt": 2,
+      "storage": 1,
+      "tools": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 6,
+      "notable": 7
+    },
+    "undocumented": 9
+  },
+  "changes": [
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+289 −271 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -50,7 +50,7 @@\n </code_change_instructions>\n \n <self_documentation>\n-For questions about your capabilities, features, or usage (for example \"What can you do?\" or \"How do I...?\"), always call **fetch_copilot_cli_documentation** first, then answer helpfully and accurately from its authoritative reference and help results—not memory alone.\n+For questions about your capabilities, features, or usage (for example \"What can you do?\" or \"How do I...?\"), always call **fetch_copilot_cli_documentation** first with the question as `query` (or exact entry `ids`), then answer from the entries it returns for this build, not from memory.\n </self_documentation>\n \n <tips_and_tricks>\n",
+      "stats": {
+        "added_chars": 289,
+        "removed_chars": 271
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "prompt.system.1.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "1",
+        "text"
+      ],
+      "title": "System prompt changed (+652 −464 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -100,7 +100,10 @@\n </example>\n </edit>\n <fetch_copilot_cli_documentation>\n-For questions about your capabilities, CLI usage (including slash commands), or a specific CLI feature, call `fetch_copilot_cli_documentation` before answering and base the answer on its reference and help results. Do not call it for unrelated coding questions.\n+For questions about your capabilities, CLI usage (including slash commands, settings and shortcuts), or a specific CLI feature, call `fetch_copilot_cli_documentation` with the user's question as `query` before answering, then pass `ids` for entries you need in full.\n+Answer only from the entries it returns; when none answers, say the documentation does not cover it rather than guessing.\n+Your own tools are not commands the user can run.\n+Do not call it for unrelated coding questions.\n </fetch_copilot_cli_documentation>\n <skill>\n <available_skills>\n@@ -125,7 +128,7 @@\n </available_skills>\n </skill>\n <sql>\n-**Session database** (`database: \"session\"`, default): persists for this session and is isolated from other sessions. Use it for structured operational data such as todos, test cases, batches, and state.\n+**Session database**: persists for this session and is isolated from other sessions. Use it for structured operational data such as todos, test cases, batches, and state.\n \n **Built-in tables:**\n - `todos`: id, title, description, status (pending/in_progress/done/blocked), created_at, updated_at\n",
+      "stats": {
+        "added_chars": 652,
+        "removed_chars": 464
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.fetch_copilot_cli_documentation.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "fetch_copilot_cli_documentation",
+        "description"
+      ],
+      "title": "fetch_copilot_cli_documentation tool description changed (+217 −116 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Fetch authoritative GitHub Copilot CLI reference and help for questions about your capabilities, usage, or features.\n+Look up this Copilot CLI build's own documentation: settings, slash commands, command line flags, keyboard shortcuts and guides. Pass the user's question as `query`, or exact entry ids from an earlier result as `ids`.\n",
+      "stats": {
+        "added_chars": 217,
+        "removed_chars": 116
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.fetch_copilot_cli_documentation.input_schema.additionalProperties",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "fetch_copilot_cli_documentation",
+        "input_schema",
+        "additionalProperties"
+      ],
+      "title": "fetch_copilot_cli_documentation tool parameters added",
+      "impact": "notable",
+      "before": null,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.fetch_copilot_cli_documentation.input_schema.properties.ids",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "fetch_copilot_cli_documentation",
+        "input_schema",
+        "properties",
+        "ids"
+      ],
+      "title": "fetch_copilot_cli_documentation tool parameter ids added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Exact entry ids from a previous result, such as setting:showReasoning or topic:config.\n\n{minItems: 1, maxItems: 8}",
+        "items": {
+          "description": "{minLength: 1, maxLength: 128}",
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "tools.fetch_copilot_cli_documentation.input_schema.properties.query",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "fetch_copilot_cli_documentation",
+        "input_schema",
+        "properties",
+        "query"
+      ],
+      "title": "fetch_copilot_cli_documentation tool parameter query added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "The user's question in their own words, plus any Copilot CLI terms that may apply.\n\n{minLength: 1, maxLength: 400}",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+78 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -261,12 +261,15 @@\n   commands     Interactive Mode Commands\n   config       Configuration Settings\n   environment  Environment Variables\n+  input        Input and Keys\n   limits       Session Limits Controls\n   logging      Logging\n+  mcp          MCP Servers\n   monitoring   Monitoring with OpenTelemetry\n   permissions  Permissions\n   providers    Custom Model Providers (BYOK)\n   sandbox      Command Sandboxing\n+  sessions     Sessions\n \n Examples:\n   # Start interactive mode\n",
+      "stats": {
+        "added_chars": 78,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.help environment",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "help environment"
+      ],
+      "title": "Full help text of `help environment` changed (+8580 −648 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,6 +4,8 @@\n Accepts \"true\", \"1\", \"yes\", \"on\", or \"y\", case-insensitively and ignoring surrounding whitespace; \"false\", \"0\", \"no\", \"off\", \"n\", or an empty value turn it off.\n Setting it to exactly \"true\" additionally trusts the working directory without prompting, which loads that directory's skills, plugins, MCP servers, and hooks, including hooks that run shell commands; the other truthy spellings only auto-approve tools.\n \n+  `COPILOT_ASSISTED_APPROVAL`: set to \"true\" (or \"1\", \"yes\", \"on\") to review tool permission requests with the assisted-approval safety judge, like --assisted-approval. Supported only in non-interactive prompt mode (-p); an interactive session refuses to start while it is set.\n+\n   `COPILOT_AUTO_TIER`: optionally set the Auto routing profile to \"efficiency\", \"balance\", or \"intelligence\", or a server-advertised profile in local sessions.\n \"fast\" is ignored with a notice, because the CLI cannot run on that profile.\n Requires the effective model to be Auto and is overridden by --auto-tier or persisted configuration.\n@@ -15,20 +17,52 @@\n `COPILOT_CLI_DIST_DIR` selects an explicit package but does not enable updates for a development-identity package.\n On other standalone-binary installations, disabling it this way or with --no-auto-update also makes launches ignore any newer version already in the package cache and run the version built into the installed binary.\n \n+  `COPILOT_BACKGROUND_COMPACTION_THRESHOLD`: fraction of the model's context window (for example \"0.7\") at which the CLI starts compacting the conversation in the background; defaults to 0.8 (a few models have their own default).\n+\n+  `COPILOT_BASH_PATH`: path of the bash executable used for the agent's shell commands and for command hooks. By default the first executable of /bin/bash, /usr/bin/bash, /usr/local/bin/bash, and /run/current-system/sw/bin/bash is used, then bash from PATH; on Windows, bash from PATH.\n+\n+  `COPILOT_BUFFER_EXHAUSTION_THRESHOLD`: fraction of the model's context window at which compaction blocks the conversation until it finishes; defaults to 0.95.\n+\n+  `COPILOT_CACHE_HOME`: directory for cached data that can be deleted and re-created, such as downloaded CLI versions. Not affected by COPILOT_HOME. Defaults to `~/Library/Caches/copilot` on macOS, `%LOCALAPPDATA%\\copilot` on Windows, and `$XDG_CACHE_HOME/copilot` or `~/.cache/copilot` elsewhere.\n+\n+  `COPILOT_CHILD_OOM_SCORE_ADJ`: Linux only.\n+The `oom_score_adj` given to shell processes the CLI starts, so that under memory pressure the kernel ends those before the CLI.\n+An integer from -1000 to 1000, or \"off\" to leave it unchanged; defaults to 300.\n+A child never gets a lower score than the CLI itself.\n+\n   `COPILOT_CLI_VERSION`: override the CLI version used for update comparisons.\n On standalone development builds, a canonical semantic version also opts into release-style cached-package selection and CLI updates, but does not pin cache selection to that exact version or change the version displayed by `--version`.\n An empty or non-canonical value is treated as unset for package selection and updates.\n \n   `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`: comma-separated list of additional directories to search for custom instructions files (in addition to git root and current working directory).\n \n+  `COPILOT_DISABLE_DESKTOP_NOTIFICATIONS`: set to \"1\" to suppress desktop notifications, even when the `notifications` setting is on.\n+\n+  `COPILOT_DISABLE_LOGIN_SHELL_ENV`: set to \"1\" or \"true\" to stop re-reading your login-shell environment for the agent's shell commands.\n+By default, on macOS and Linux, the CLI runs bash once as a login shell (`bash -l`, which reads /etc/profile and ~/.bash_profile, ~/.bash_login, or ~/.profile, but not ~/.bashrc) and applies the PATH and variables it exports, so tools your profile activates (conda, nvm, Homebrew) are found.\n+\n+  `COPILOT_DISABLE_RESUME_AUTO_CD`: set to \"1\" or \"true\" so that --resume does not switch to the working directory recorded for the resumed session.\n+\n   `COPILOT_EDITOR`, `VISUAL`, `EDITOR` (in order of precedence): command used to interactively edit a file (e.g., the plan).\n \n   `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN` (in order of precedence): an authentication token that takes precedence over previously stored credentials.\n Exception: in Codespaces, the auto-injected `GITHUB_TOKEN` (a user-to-server token) does not take precedence over a `/login` account.\n An explicitly exported `GITHUB_TOKEN`, `COPILOT_GITHUB_TOKEN`, or `GH_TOKEN` still takes precedence.\n \n-  `COPILOT_HOME`: override the directory where configuration and state files are stored; defaults to `$HOME/.copilot`.\n+  `COPILOT_HOME`: override the directory where configuration and state files are stored; defaults to `$HOME/.copilot`. See \"Files and directories\" in `copilot help config` for what it holds.\n \n+  `COPILOT_HOOK_ALLOW_HTTP_AUTH_HOOKS`: set to \"1\" to let preToolUse, preMcpToolCall, and permissionRequest HTTP hooks use plain http:// URLs; otherwise they must use https://.\n+\n+  `COPILOT_HOOK_ALLOW_LOCALHOST`: set to \"1\" to let HTTP hooks post to localhost and other loopback addresses, which are otherwise blocked; plain http:// is then also accepted for those addresses.\n+\n+  `COPILOT_INLINE_IMAGES_TMUX`: set to \"0\" to stop forwarding inline images through tmux. Forwarding also requires `allow-passthrough on` in tmux.\n+\n+  `COPILOT_LOGIN_SHELL_ENV_TIMEOUT_MS`: time limit in milliseconds for reading the login-shell environment (see COPILOT_DISABLE_LOGIN_SHELL_ENV); defaults to 4000.\n+Values that are not positive integers log a warning and use the default.\n+If the capture fails or times out, the inherited environment is used.\n+\n+  `COPILOT_MASCOT_BLINK`: set to \"0\" to turn off the mascot's blink animation in the header.\n+\n   `COPILOT_MODEL`: optionally set the agent model. Can be overridden by the --model command line option or the /model command.\n \n   `COPILOT_MULTIPLEXER`: override which terminal multiplexer the CLI believes it is running directly inside.\n@@ -39,6 +73,10 @@\n \n   `COPILOT_OFFLINE`: set to \"true\" to enable offline mode. When active, the CLI skips all network access: GitHub authentication, telemetry, web tools, GitHub MCP server, and auto-update are disabled. Requires a local model provider (COPILOT_PROVIDER_BASE_URL).\n \n+  `COPILOT_PLUGIN_DIR_ONLY`: set to \"true\" to turn off automatic plugin discovery, so that only plugins passed with --plugin-dir are loaded.\n+\n+  `COPILOT_PROVIDERS_CONFIG`: path of the custom model providers file; defaults to `$COPILOT_HOME/providers.json`.\n+\n   `COPILOT_PROVIDER_BASE_URL`: API endpoint URL for a custom model provider (BYOK).\n When set, the CLI uses this provider instead of GitHub Copilot's model routing.\n GitHub authentication is not required.\n@@ -70,6 +108,16 @@\n \n   `COPILOT_PROVIDER_HEADERS`: custom HTTP headers sent only to the BYOK provider endpoint (not to GitHub Copilot services). Newline-separated \"Name: Value\" pairs; a literal \"\\n\" also separates entries in a double-quoted shell string. Useful for gateway keys, tenant IDs, or routing headers.\n \n+  `COPILOT_PROXY_KERBEROS`: set to \"0\", \"false\", \"off\", or \"no\" to turn off automatic Kerberos/Negotiate authentication with proxies that ask for it.\n+\n+  `COPILOT_SKILLS_DIRS`: comma-separated list of additional directories to search for skills, used together with the `skillDirectories` setting. A leading `~` stands for your home directory.\n+\n+  `COPILOT_SYSTEM_PROXY`: set to \"0\" or \"false\" to ignore the operating system's proxy configuration; requests then go direct unless a proxy is set with HTTP_PROXY/HTTPS_PROXY or the `proxyUrl` setting.\n+\n+  `COPILOT_TASK_WAIT_TIMEOUT_SECONDS`: in non-interactive prompt mode (-p, including -p --autopilot), how many seconds to wait for background agents and shell commands to finish before exiting; defaults to 600. \"0\" stops waiting at once; empty, negative, or non-numeric values use the default.\n+\n+  `COPILOT_WEB_FETCH_ALLOW_LOCALHOST`: set to \"1\" to let the web_fetch tool fetch from hosts that resolve only to loopback addresses, such as localhost. When the sandbox is on, its `network.allowLocalNetwork` setting grants the same access.\n+\n   `GH_HOST`: GitHub hostname for authentication and API requests; defaults to \"github.com\". Set this to your GitHub Enterprise Cloud with data residency hostname (e.g., \"mycompany.ghe.com\"). Use when both GitHub CLI and Copilot CLI should target the same host.\n \n   `COPILOT_GH_HOST`: GitHub hostname used only by Copilot CLI for authentication and API requests, overriding GH_HOST when set.\n@@ -96,12 +144,36 @@\n Separate repositories beneath these directories remain eligible, with or without a Git remote.\n `USE_TGREP=true` explicitly permits indexing these otherwise-excluded roots.\n \n-  Copilot processes sharing a cache directory admit only one managed tgrep server at a time.\n-Sessions on the same worktree can reuse its running server; other worktrees use ripgrep without waiting for the slot.\n-`USE_TGREP=true` does not bypass this limit.\n-The slot is released when the owning server shuts down; already-running sessions that skipped startup are not queued to acquire it.\n-Servers launched manually or by older Copilot versions do not participate in this limit, and borrowing one does not reserve a managed-server slot.\n+  Git worktrees from the same repository share one tgrep daemon, identified by their canonical Git common directory.\n+Sessions starting at the same committed tree share an immutable base index, even on different branches, while edits, untracked files, and deletions remain private to each worktree.\n+Managed-v2 is enabled by default for eligible repositories, with bounded retention and adaptive advancement to the worktree's own committed HEAD when overlay-cost thresholds are met.\n+Unrelated clones never share a base.\n+Non-Git folders and repositories without a commit retain single-root indexing.\n \n+  The built-in managed policy admits two repository daemons and two work slots per cache, with a 64 GiB aggregate storage budget, a 16 GiB allocation per repository, and an 8 GiB retention target per repository.\n+Each daemon uses one indexing worker; staging and private-work reservations are each capped at 16 GiB in aggregate and 8 GiB per repository.\n+These are accounting limits, not upfront allocations or hard process-memory limits.\n+Admission and maintenance run in the background; searches scan until their view is ready.\n+Shared bases live outside disposable worktrees under `tgrep-shared/tgrep-managed-v2`.\n+Runtime shutdown reaps owned daemons after local session teardown; peers reconnect using authoritative pins.\n+External servers are not killed or covered by the managed-daemon cap.\n+\n+  `USE_TGREP_MANAGED`: set to \"false\" to opt out of managed-v2 and restore v1 fixed-pin/retain-all compatibility, including its one-server limit.\n+This overrides `TGREP_SHARED_CONFIG` without reading that file.\n+Unset or \"true\" selects managed-v2; other values are rejected.\n+This flag does not force indexing or bypass eligibility.\n+`USE_TGREP=false` disables all tgrep indexing and runtime cache maintenance.\n+\n+  `TGREP_SHARED_CONFIG`: optional path to a complete managed-v2 JSON configuration overriding the built-in defaults.\n+Durations are milliseconds and sizes are bytes; missing fields and invalid files are rejected, not merged with defaults.\n+All managed processes sharing a cache must use the same effective configuration.\n+Use `/index status`, `/index advance <commit>`, and `/index policy <version> <file>` to inspect or change authoritative state.\n+`/index collect` only previews; `/index collect --run` authorizes collection.\n+Before removing a worktree, require `/index release` to acknowledge `root_handles_released: true`; a busy response is not permission to delete.\n+Scheduled tgrep-owned reclamation includes deleted repositories while an eligible Copilot host runs; no operating-system service is installed.\n+Opting out does not convert or delete existing managed storage.\n+See `copilot-runtime-requirements.md` in the runtime repository for configuration and rollout details.\n+\n   `TGREP_FILE_COUNT_THRESHOLD`: minimum file count for automatic tgrep indexed search.\n Accepts a non-negative integer, ignoring surrounding whitespace.\n Defaults to 10,000 on Windows and 50,000 on other platforms.\n@@ -111,6 +183,24 @@\n `USE_TGREP=true` bypasses this threshold, and `USE_TGREP=false` still disables tgrep.\n \n   `USE_TGREP_WARM_START`: when set to \"true\", blocks Copilot CLI startup until the tgrep index is ready when tgrep starts. It does not enable tgrep on its own; pair with `USE_TGREP=true` to force indexing and wait for readiness. Useful for evaluating tgrep search against a warm index.\n+\n+  Set by Copilot CLI for processes it starts:\n+\n+  `COPILOT_CLI`: \"1\" in the agent's shell commands and in hooks, so scripts such as git hooks can tell they run under Copilot CLI.\n+\n+  `COPILOT_AGENT_SESSION_ID`: the current session's ID, in the agent's shell commands.\n+\n+  `COPILOT_PROJECT_DIR`: the repository root, or the working directory outside a repository, in hooks (also as `CLAUDE_PROJECT_DIR`).\n+\n+  `COPILOT_PLUGIN_ROOT`, `COPILOT_PLUGIN_DATA`: a plugin's installation directory and its data directory, in that plugin's hooks (also as `PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`, and `CLAUDE_PLUGIN_DATA`).\n+\n+  `COPILOT_HOOK_DIR`: in a command hook, the directory of the file that defines it.\n+\n+  `COPILOT_HOOK_DEPTH`: in a command hook, how many hook launches lead to it (\"1\" when the CLI was not itself started from a hook), so a hook can stop sessions that keep launching each other.\n+\n+  `COPILOT_TRACEPARENT`, `COPILOT_TRACESTATE`: in a command hook, the W3C trace context of the operation that ran it, when there is one.\n+\n+  `COPILOT_SESSION_CWD`: the session's working directory, for `${COPILOT_SESSION_CWD}` references in LSP and local MCP server configs.\n \n   OpenTelemetry / Monitoring:\n \n",
+      "stats": {
+        "added_chars": 8580,
+        "removed_chars": 648
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.userPolicy.filesystem.enumeratePaths",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "sandbox.userPolicy.filesystem.enumeratePaths"
+      ],
+      "title": "New setting: sandbox.userPolicy.filesystem.enumeratePaths",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Windows only: absolute directories sandboxed commands can list and query attributes of, without reading file contents (for example a drive root like C:\\). Ignored, with a log, on Windows builds without filesystem enumeration support and on other platforms.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.transcriptView",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "transcriptView"
+      ],
+      "title": "Setting no longer read: transcriptView",
+      "impact": "notable",
+      "before": {
+        "description": "Choose concise to show a focused work transcript, or default to show the full native transcript.",
+        "enum": [
+          "default",
+          "concise"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.VSCODE_EXECUTABLE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "VSCODE_EXECUTABLE"
+      ],
+      "title": "New environment variable: VSCODE_EXECUTABLE",
+      "impact": "informational",
+      "before": null,
+      "after": "VSCODE_EXECUTABLE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_DEBUG_DEVICE_CODE_OFFER_TIMEOUT_MS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_DEBUG_DEVICE_CODE_OFFER_TIMEOUT_MS"
+      ],
+      "title": "Environment variable no longer read: COPILOT_DEBUG_DEVICE_CODE_OFFER_TIMEOUT_MS",
+      "impact": "informational",
+      "before": "COPILOT_DEBUG_DEVICE_CODE_OFFER_TIMEOUT_MS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed",
+      "impact": "informational",
+      "before": "<home>/.copilot/logs/process-<n>-7301.log",
+      "after": "<home>/.copilot/logs/process-<n>-7933.log",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

@@ -1,5 +1,744 @@
 {
   "schema_version": 1,
   "harness": "copilot",
-  "steps": []
+  "steps": [
+    {
+      "version": "1.0.108",
+      "previous": "1.0.107",
+      "changes": [
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+289 −271 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "prompt.system.1.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+652 −464 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.fetch_copilot_cli_documentation.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "fetch_copilot_cli_documentation tool description changed (+217 −116 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.fetch_copilot_cli_documentation.input_schema.additionalProperties",
+          "category": "tools",
+          "op": "added",
+          "title": "fetch_copilot_cli_documentation tool parameters added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.fetch_copilot_cli_documentation.input_schema.properties.ids",
+          "category": "tools",
+          "op": "added",
+          "title": "fetch_copilot_cli_documentation tool parameter ids added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.fetch_copilot_cli_documentation.input_schema.properties.query",
+          "category": "tools",
+          "op": "added",
+          "title": "fetch_copilot_cli_documentation tool parameter query added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+78 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+8580 −648 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.enumeratePaths",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sandbox.userPolicy.filesystem.enumeratePaths",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.transcriptView",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: transcriptView",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.VSCODE_EXECUTABLE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: VSCODE_EXECUTABLE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_DEBUG_DEVICE_CODE_OFFER_TIMEOUT_MS",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_DEBUG_DEVICE_CODE_OFFER_TIMEOUT_MS",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
+      "version": "1.0.107",
+      "previous": "1.0.106",
+      "changes": [
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
+      "version": "1.0.106",
+      "previous": "1.0.105",
+      "changes": [
+        {
+          "id": "prompt.context.0.cache",
+          "category": "prompt",
+          "op": "removed",
+          "title": "Injected context removed",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "prompt.context.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+282 −56 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "prompt.context.1",
+          "category": "prompt",
+          "op": "added",
+          "title": "Injected context block added",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+761 −391 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "prompt.system.1.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+2318 −2630 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "tools.bash.input_schema.properties.detach.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "bash tool parameter detach: description changed (+873 −258 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "tools.fetch_copilot_cli_documentation.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "fetch_copilot_cli_documentation tool description changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.session_store_sql.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "session_store_sql tool description changed (+1499 −1165 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "tools.skill.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "skill tool description changed (+468 −299 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "caching.across_turns",
+          "category": "caching",
+          "op": "added",
+          "title": "Caching across_turns: none → {\"breakpoints\":[[\"messages[0].content[1]\",\"system[0]\",\"sy…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "caching.breakpoints.messages[0].content[0]",
+          "category": "caching",
+          "op": "removed",
+          "title": "Cache breakpoint messages[0].content[0] removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "caching.breakpoints.messages[0].content[1]",
+          "category": "caching",
+          "op": "added",
+          "title": "Cache breakpoint messages[0].content[1] added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.inference.usage.cache_read.input_tokens",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.cache_read.input_tokens",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.inference.usage.cache_write.input_tokens",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.cache_write.input_tokens",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.inference.usage.reasoning.output_tokens",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.reasoning.output_tokens",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.agentStop.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "agentStop hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.agentStop.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "agentStop hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.permissionRequest.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "permissionRequest hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.permissionRequest.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "permissionRequest hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.postToolUse.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "postToolUse hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.postToolUse.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "postToolUse hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.postToolUse.keys.toolCallId",
+          "category": "hooks",
+          "op": "added",
+          "title": "postToolUse hook payload field toolCallId added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.postToolUseFailure.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "postToolUseFailure hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.postToolUseFailure.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "postToolUseFailure hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.postToolUseFailure.keys.toolCallId",
+          "category": "hooks",
+          "op": "added",
+          "title": "postToolUseFailure hook payload field toolCallId added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.preToolUse.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "preToolUse hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.preToolUse.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "preToolUse hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.preToolUse.keys.toolCallId",
+          "category": "hooks",
+          "op": "added",
+          "title": "preToolUse hook payload field toolCallId added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.sessionEnd.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "sessionEnd hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.sessionEnd.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "sessionEnd hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.sessionStart.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "sessionStart hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.sessionStart.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "sessionStart hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.userPromptSubmitted.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "userPromptSubmitted hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.userPromptSubmitted.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "userPromptSubmitted hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.events.userPromptTransformed.env.COPILOT_CLI_PATH",
+          "category": "hooks",
+          "op": "added",
+          "title": "userPromptTransformed hook environment variable COPILOT_CLI_PATH added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "hooks.events.userPromptTransformed.env.COPILOT_HOOK_DEPTH",
+          "category": "hooks",
+          "op": "added",
+          "title": "userPromptTransformed hook environment variable COPILOT_HOOK_DEPTH added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "hooks.supported.postResult",
+          "category": "hooks",
+          "op": "removed",
+          "title": "Hook event no longer supported: postResult",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "hooks.supported.prePRDescription",
+          "category": "hooks",
+          "op": "removed",
+          "title": "Hook event no longer supported: prePRDescription",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.copilot.options.--add-github-mcp-toolset.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --add-github-mcp-toolset`: description changed (+192 −141 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--allow-all-tools.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --allow-all-tools`: description changed (+269 −188 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--auto-tier.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --auto-tier`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--disable-client-telemetry.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --disable-client-telemetry`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--host-compute-id",
+          "category": "cli",
+          "op": "removed",
+          "title": "Flag removed: `copilot --host-compute-id`",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--host-environment",
+          "category": "cli",
+          "op": "removed",
+          "title": "Flag removed: `copilot --host-environment`",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--no-ask-user.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --no-ask-user`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--reasoning-effort.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --reasoning-effort`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--secret-env-vars.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --secret-env-vars`: description changed (+304 −159 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot init.options.--disable-client-telemetry.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot init --disable-client-telemetry`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot login.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `copilot login` changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot login.options.--device-code.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot login --device-code`: description changed (+125 −90 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+1471 −1219 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+1763 −928 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help providers",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help providers` changed (+379 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.init --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `init --help` changed (+124 −92 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.init -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `init -h` changed (+184 −152 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.login --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `login --help` changed (+332 −269 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.login -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `login -h` changed (+88 −53 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.aiSecretDetection",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: aiSecretDetection",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.askUser.description",
+          "category": "config",
+          "op": "changed",
+          "title": "askUser description changed (+117 −44 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.fusionTier",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: fusionTier",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.ide.codeProduct",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: ide.codeProduct",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.inlineImages.description",
+          "category": "config",
+          "op": "changed",
+          "title": "inlineImages description changed (+101 −82 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.sandboxExtensions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sandbox.sandboxExtensions",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.network.allowLocalNetwork.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.network.allowLocalNetwork description changed (+112 −64 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.network.allowOutbound.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.network.allowOutbound description changed (+77 −50 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sessionManagementTools.close",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sessionManagementTools.close",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sessionManagementTools.create",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sessionManagementTools.create",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sessionManagementTools.enabled",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sessionManagementTools.enabled",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sessionManagementTools.list",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sessionManagementTools.list",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sessionManagementTools.message",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sessionManagementTools.message",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sessionManagementTools.scope",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sessionManagementTools.scope",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sidebar.ctrlCClosesSession",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sidebar.ctrlCClosesSession",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sidebar.exitClosesSession",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sidebar.exitClosesSession",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +8 −21",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "binary.size_bytes",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary size: 181,873,376 → 191,788,640 bytes (181.9 MB → 191.8 MB)",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    }
+  ]
 }

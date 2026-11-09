@@ -1,7 +1,152 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-07T05:31:09Z",
+  "generated_at": "2026-11-09T17:38:10.676342852Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.108",
+      "released_at": "2026-11-09T16:20:23.734Z",
+      "captured_at": "2026-11-09T17:38:10.676342852Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.107",
+      "changes": 13,
+      "categories": {
+        "cli": 2,
+        "config": 4,
+        "prompt": 2,
+        "storage": 1,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 6,
+        "notable": 7
+      },
+      "undocumented": 9,
+      "highlights": [
+        "System prompt changed (+289 −271 chars)",
+        "System prompt changed (+652 −464 chars)",
+        "fetch_copilot_cli_documentation tool description changed (+217 −116 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.107",
+      "released_at": "2026-11-06T20:39:04.353Z",
+      "captured_at": "2026-11-09T17:38:10.676342852Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.106",
+      "changes": 1,
+      "categories": {
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [
+        "On-disk logs path changed"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.106",
+      "released_at": "2026-11-06T01:46:11.22Z",
+      "captured_at": "2026-11-09T17:38:10.676342852Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.105",
+      "changes": 76,
+      "categories": {
+        "binary": 1,
+        "caching": 3,
+        "cli": 19,
+        "config": 17,
+        "hooks": 23,
+        "prompt": 5,
+        "storage": 1,
+        "telemetry": 3,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 5,
+        "informational": 55,
+        "notable": 16
+      },
+      "undocumented": 27,
+      "highlights": [
+        "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.cache_read.input_tokens",
+        "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.cache_write.input_tokens",
+        "Telemetry surface no longer sent: metrics/gen_ai.client.inference.usage.reasoning.output_tokens"
+      ],
+      "signing": "valid"
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.167.0",
+      "released_at": "2026-11-06T01:46:01.347Z",
+      "captured_at": "2026-11-07T05:31:09Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.166.0",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.319",
+      "released_at": "2026-11-06T00:58:56.366Z",
+      "captured_at": "2026-11-07T05:31:09Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.318",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
     {
       "harness": "gemini",
       "name": "Gemini CLI",
@@ -22,6 +167,29 @@
         "notable": 0
       },
       "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "harness": "dsh",
+      "name": "DeepSeek Harness",
+      "version": "0.2.2-rc.1",
+      "released_at": "2026-11-04T09:20:32.31Z",
+      "captured_at": "2026-11-07T05:31:09Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.1-rc.5",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
       "highlights": [],
       "signing": null
     },
@@ -6082,209 +6250,6 @@
         "Injected context changed (+152 −2940 chars)",
         "Injected context block removed",
         "System prompt block added"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.114.0",
-      "released_at": "2026-03-11T00:29:28.692Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.113.0",
-      "changes": 21,
-      "categories": {
-        "config": 8,
-        "filesystem": 11,
-        "hooks": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 17,
-        "notable": 4
-      },
-      "undocumented": 9,
-      "highlights": [
-        "New hook event: SessionStart",
-        "New hook event: Stop",
-        "New setting: approval_policy.reject.request_permissions"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.113.0",
-      "released_at": "2026-03-10T05:25:37.995Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.112.0",
-      "changes": 67,
-      "categories": {
-        "behavior": 2,
-        "binary": 1,
-        "caching": 1,
-        "cli": 1,
-        "config": 31,
-        "filesystem": 29,
-        "prompt": 1,
-        "request": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 41,
-        "notable": 26
-      },
-      "undocumented": 59,
-      "highlights": [
-        "Injected context changed (+0 −430 chars)",
-        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
-        "Behaviour: sandbox removed"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.112.0",
-      "released_at": "2026-03-08T20:44:58.047Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.111.0",
-      "changes": 6,
-      "categories": {
-        "behavior": 2,
-        "caching": 1,
-        "cli": 1,
-        "model": 1,
-        "prompt": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 5
-      },
-      "undocumented": 4,
-      "highlights": [
-        "Model parameter reasoning.summary: auto → none",
-        "System prompt changed (+184 −144 chars)",
-        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.111.0",
-      "released_at": "2026-03-05T19:13:00.697Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.110.0",
-      "changes": 27,
-      "categories": {
-        "behavior": 2,
-        "caching": 1,
-        "config": 2,
-        "filesystem": 21,
-        "prompt": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 23,
-        "notable": 4
-      },
-      "undocumented": 25,
-      "highlights": [
-        "Injected context changed (+430 −0 chars)",
-        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
-        "Behaviour: sandbox removed"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.110.0",
-      "released_at": "2026-03-05T02:23:39.861Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.107.0",
-      "changes": 64,
-      "categories": {
-        "behavior": 1,
-        "binary": 1,
-        "config": 21,
-        "filesystem": 40,
-        "prompt": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 53,
-        "notable": 11
-      },
-      "undocumented": 44,
-      "highlights": [
-        "System prompt changed (+73 −48 chars)",
-        "Behaviour: sandbox sandbox changed",
-        "Setting no longer read: memories.max_raw_memories_for_global"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.107.0",
-      "released_at": "2026-03-02T18:00:55.212Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.106.0",
-      "changes": 23,
-      "categories": {
-        "config": 9,
-        "filesystem": 13,
-        "prompt": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 18,
-        "notable": 5
-      },
-      "undocumented": 9,
-      "highlights": [
-        "Injected context changed (+70 −0 chars)",
-        "New setting: mcp_servers.<name>.oauth_resource",
-        "`/usr/libexec/path_helper -s` now runs as the build's own doing (was both the build's own and the tool call's) (darwin/arm64)"
       ],
       "signing": "revoked"
     }

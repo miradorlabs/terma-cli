@@ -21859,6 +21859,7 @@
       "CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
       "CLAUDE_CODE_CONNECT_TIMEOUT_MS",
       "CLAUDE_CODE_DISABLE_ARTIFACT",
+      "CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL",
       "CLAUDE_CODE_ENABLE_AUTO_MODE",
       "CLAUDE_CODE_ENABLE_OPUS_4_7_FAST_MODE",
       "CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION",
@@ -22278,6 +22279,10 @@
         "description": "Passphrase for encrypted CLAUDE\\_CODE\\_CLIENT\\_KEY (optional)",
         "read": true
       },
+      "CLAUDE_CODE_CONFIG_LOCK_WAIT_MS": {
+        "description": "Milliseconds that a command adding or removing a `user` or `local` scope MCP server, such as `claude mcp add`, keeps trying for the lock on `~/.claude.json` before it fails. With it unset, the command waits about 10 to 20 seconds, and a shorter value changes nothing. Requires Claude Code v2.1.318 or later",
+        "read": true
+      },
       "CLAUDE_CODE_CONNECT_TIMEOUT_MS": {
         "description": "Removed in v2.1.186 and now a no-op. Previously set a separate timeout for the connect, TLS, and response-header phase of a streaming API request. Use `API_TIMEOUT_MS` instead. For the response-header phase of a streaming request, see `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS`",
         "read": false
@@ -22502,6 +22507,10 @@
         "description": "Set to `1` to disable workflows. Equivalent to the `disableWorkflows` setting",
         "read": true
       },
+      "CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL": {
+        "description": "Set to `1` to drop a deferred tool call whose tool isn't available when you resume with `-p`. Without this variable, the call stays pending and a prompt you send doesn't reach Claude. Requires Claude Code v2.1.319 or later",
+        "read": false
+      },
       "CLAUDE_CODE_EFFORT_LEVEL": {
         "description": "Set the effort level for supported models. Values: `low`, `medium`, `high`, `xhigh`, or `max`. Available levels depend on the model. Takes precedence over `--effort`, `/effort`, and the `modelSettings` and `effortLevel` settings. A `maxEffortLevel` cap still applies. Set it to `auto` or `unset` to have Claude Code send no effort level, so that the API applies its own default for the model. See Adjust effort level",
         "read": true
@@ -22575,7 +22584,7 @@
         "read": true
       },
       "CLAUDE_CODE_EXTRA_BODY": {
-        "description": "JSON object to merge into the top level of every API request body. Useful for passing provider-specific parameters that Claude Code doesn't expose directly. A value exported in your shell also applies to the background sessions you dispatch with `claude agents` or `--bg`. Before v2.1.206, background sessions ignored a shell-exported value and used whatever copy the background supervisor process inherited",
+        "description": "JSON object to merge into the top level of model request bodies except on some requests outside the conversation, such as `/model` checks. Useful for passing provider-specific parameters that Claude Code doesn't expose directly. A value exported in your shell also applies to the background sessions you dispatch with `claude agents` or `--bg`. Before v2.1.206, background sessions ignored a shell-exported value and used whatever copy the background supervisor process inherited",
         "read": true
       },
       "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS": {
@@ -22647,7 +22656,7 @@
         "read": true
       },
       "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": {
-        "description": "Set to `1` to stop `/ide` from installing the IDE extension. Equivalent to setting `autoInstallIdeExtension` to `false`",
+        "description": "Set to `1` to stop `/ide` from installing the IDE extension. Equivalent to setting `autoInstallIdeExtension` to `false`. Claude Code versions before v2.1.318 also install or update the extension when you start `claude` in a VS Code, Cursor, or Devin Desktop terminal. This variable stops that too",
         "read": true
       },
       "CLAUDE_CODE_IDE_SKIP_VALID_CHECK": {
@@ -23339,7 +23348,7 @@
         "read": true
       },
       "MCP_PROTOCOL_NEGOTIATION": {
-        "description": "On the v2 MCP client runtime only, controls whether Claude Code probes servers for MCP protocol revision 2026-07-28. Set `legacy` to skip the probe, so that every server connects with the handshake from before that revision. Set `auto` to probe the server kinds that support the probe: HTTP and stdio servers, claude.ai connectors, and the connectors of cloud and Remote Control sessions. With the variable unset, Claude Code probes those same kinds by default; see MCP client runtimes. Any other value is ignored with a warning in the debug log. Requires Claude Code v2.1.221 or later",
+        "description": "On the v2 MCP client runtime only, controls whether Claude Code probes servers for MCP protocol revision 2026-07-28. Set `legacy` to keep every server on the earlier handshake, or `auto` to probe the server kinds that support it. Unset, Claude Code probes them but can skip some servers. Any other value is ignored with a warning in the debug log. Requires Claude Code v2.1.221 or later",
         "read": true
       },
       "MCP_REMOTE_SERVER_CONNECTION_BATCH_SIZE": {
@@ -23511,7 +23520,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-05T11:56:08.292632Z",
+    "fetched_at": "2026-11-09T17:38:10.676342852Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -23531,7 +23540,7 @@
       },
       "agentPushNotifEnabled": {
         "default": "`false`",
-        "description": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. Claude can send one while Remote Control is connected. Appears in `/config` as **Push when Claude decides**. When you change it there, Claude Code also saves the value to your account.",
+        "description": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. In a local session, Claude can send one while Remote Control is connected. Appears in `/config` as **Push when Claude decides**. When you change it there, Claude Code also saves the value to your account.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Claude Code also reads a value left in `~/.claude.json` by older versions.",
@@ -23714,7 +23723,7 @@
       },
       "autoInstallIdeExtension": {
         "default": "`true`",
-        "description": "Let `/ide` install the Claude Code IDE extension in a running VS Code, Cursor, or Devin Desktop when you run the command from an external terminal. Claude Code doesn't install the extension when you start it. Appears in `/config` as **Auto-install IDE extension** when you run Claude Code inside a VS Code or JetBrains terminal.",
+        "description": "Let `/ide` install the Claude Code IDE extension in a running VS Code, Cursor, or Devin Desktop when you run the command from an external terminal. Claude Code doesn't install or update the extension when you start `claude`. Before v2.1.318, Claude Code installs or updates the extension when you start `claude` in one of those editors' terminals, unless this key is `false`.",
         "read": false,
         "scope": "Global config",
         "topic": "Global config settings",
@@ -24022,7 +24031,7 @@
       },
       "disableBrowserExternalNavigation": {
         "default": "unset, so external browsing is on",
-        "description": "Turn off external browsing in the desktop app's Browser pane for people and Claude alike. Localhost dev server previews keep working. The desktop app reads this key; the terminal CLI ignores it.",
+        "description": "Turn off external browsing in the desktop app's Browser pane for people and Claude alike. Localhost dev server previews keep working. HTML previews in SSH and WSL sessions still open, but they don't run scripts. The desktop app reads this key; the terminal CLI ignores it.",
         "read": false,
         "scope": "Managed",
         "topic": "Tools",
@@ -24228,7 +24237,7 @@
       },
       "fastMode": {
         "default": "unset, so fast mode is off",
-        "description": "Turn fast mode on for sessions where it's available, for interactive work like rapid iteration or live debugging where you want speed at a higher cost per token. You don't usually edit this key by hand: running `/fast` writes `fastMode: true` to `~/.claude/settings.json`, and running it again to turn fast mode off removes the key. Fast mode runs only on Opus 5.5, Opus 5, and Opus 4.8: turning it on from another model switches you to Opus, and switching to an unsupported model turns it off. See Switch models while fast mode is on.",
+        "description": "Turn fast mode on for sessions where it's available, for interactive work such as rapid iteration or live debugging where you want speed at a higher cost per token. You don't usually edit this key yourself. Running `/fast` writes `fastMode: true` to `~/.claude/settings.json`, and running it again to turn fast mode off removes the key.",
         "read": true,
         "scope": "Any file",
         "topic": "Model and responses",
@@ -24236,7 +24245,7 @@
       },
       "fastModePerSessionOptIn": {
         "default": "`false`",
-        "description": "Normally, running `/fast` saves `fastMode` to a person's user settings, so fast mode is on at the start of every later session. Set this key to `true` to stop that: a saved `fastMode: true` no longer turns fast mode on at session start, and each person has to run `/fast` in each session they want it. Claude Code leaves the `fastMode` key in their file, so turning this key off restores the old behavior.",
+        "description": "Normally, running `/fast` saves `fastMode` to a person's user settings, so new sessions on a supported model start with fast mode on. Set this key to `true` to stop that: a saved `fastMode: true` no longer turns fast mode on at session start, and each person runs `/fast` in each session they want it. Claude Code leaves `fastMode` in their file, so turning this key off restores the old behavior.",
         "read": true,
         "scope": "Any file",
         "topic": "Model and responses",
@@ -24306,7 +24315,7 @@
         "description": "From a managed source, require claude.ai account logins to belong to one Anthropic organization, given as a single UUID, or to any of several organizations, given as an array. From any settings file, Claude Code also uses a single UUID to pre-select that organization during a claude.ai or Claude Console login, and pre-selects nothing for an array. If you set the key in any settings file, Claude Code also stops offering the keyless Console sign-in in the sessions that file applies to and creates an API key instead.",
         "read": true,
         "scope": "Any file",
-        "scope_note": "Only a managed source enforces the restriction; a single UUID in any other settings file pre-selects the organization during login without restricting it.",
+        "scope_note": "In a settings file that isn't a managed source, Claude Code doesn't check which organization a login belongs to, and a single UUID pre-selects the organization during login.",
         "topic": "Authentication and providers",
         "type": "string, one UUID, or array of strings, several UUIDs"
       },
@@ -24380,7 +24389,7 @@
       },
       "inputNeededNotifEnabled": {
         "default": "`false`",
-        "description": "Get a push notification on your phone when a permission prompt or question is waiting for your input. Claude Code sends these only while Remote Control is connected. Appears in `/config` as **Push when actions required**.",
+        "description": "Get a push notification on your phone when a permission prompt or question is waiting for your input. In a local session, Claude Code sends these only while Remote Control is connected. Appears in `/config` as **Push when actions required**.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Claude Code also reads a value left in `~/.claude.json` by older versions.",
@@ -25822,7 +25831,6 @@
       "CLAUDE_CODE_CLIENT_DATA_URL",
       "CLAUDE_CODE_COLD_COMPACT",
       "CLAUDE_CODE_COMPILED_ACORN",
-      "CLAUDE_CODE_CONFIG_LOCK_WAIT_MS",
       "CLAUDE_CODE_CONFIG_PROBE",
       "CLAUDE_CODE_CONFIG_WATCH_EVENTS",
       "CLAUDE_CODE_CONSENT_POINTERLESS",

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-07T05:31:09Z",
+  "generated_at": "2026-11-09T17:38:10.676342852Z",
   "harnesses": [
     {
       "id": "claude",
@@ -17,7 +17,7 @@
         "from": "2.1.318",
         "to": "2.1.319",
         "at": "2026-11-07T05:31:09Z",
-        "released_at": null,
+        "released_at": "2026-11-06T00:58:56.366Z",
         "changes": 0,
         "categories": {}
       }
@@ -53,7 +53,7 @@
         "from": "0.166.0",
         "to": "0.167.0",
         "at": "2026-11-07T05:31:09Z",
-        "released_at": null,
+        "released_at": "2026-11-06T01:46:01.347Z",
         "changes": 0,
         "categories": {}
       }
@@ -77,11 +77,24 @@
       "homepage": "https://github.com/github/copilot-cli",
       "source": null,
       "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-      "latest": "1.0.105",
+      "latest": "1.0.108",
       "support": "untested",
-      "versions_tracked": 1,
+      "versions_tracked": 4,
       "first_tracked": "2026-10-28",
-      "last_change": null
+      "last_change": {
+        "from": "1.0.107",
+        "to": "1.0.108",
+        "at": "2026-11-09T17:38:10.676342852Z",
+        "released_at": "2026-11-09T16:20:23.734Z",
+        "changes": 13,
+        "categories": {
+          "cli": 2,
+          "config": 4,
+          "prompt": 2,
+          "storage": 1,
+          "tools": 4
+        }
+      }
     },
     {
       "id": "dsh",
@@ -102,7 +115,7 @@
         "from": "0.2.1-rc.5",
         "to": "0.2.2-rc.1",
         "at": "2026-11-07T05:31:09Z",
-        "released_at": null,
+        "released_at": "2026-11-04T09:20:32.31Z",
         "changes": 0,
         "categories": {}
       }
