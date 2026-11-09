@@ -291,3 +291,11 @@ council invariant:
 - **The fixture copy precedes the desktop's.** `internal/account/auth/testdata/delegated_grant.json` is written from this
   plan's and the desktop plan's definition of `delegatedGrant`; copy the desktop's section over it once it lands and
   rerun `go test ./internal/account/auth/`.
+- **install.ps1 rides the release like install.sh.** GoReleaser attaches it to every release, so
+  `https://terma.ai/install.ps1` can redirect to `releases/latest/download/install.ps1` as install.sh's does; that
+  redirect lives with the website, outside this repository. It runs in Windows PowerShell 5.1 and PowerShell 7, follows
+  redirects itself so each hop is checked for https, keeps the user PATH's unexpanded entries and kind, and moves a
+  running `terma.exe` aside as `terma update` does. The `install-script-windows` CI job parses it under both and runs
+  `scripts/test-install.ps1` (no PowerShell on the machine that wrote it, so CI is its first run).
+- **winget (task 8) is a follow-up**, as section 6 recommends: it needs a fork of `microsoft/winget-pkgs` and a token
+  for the release workflow, and every release then waits on Microsoft's review.
