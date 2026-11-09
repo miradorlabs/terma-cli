@@ -146,6 +146,10 @@ func TestDesktopGrantSignsInAndSetsUp(t *testing.T) {
 	if err != nil || cfg.OrganizationID != personalOrg().ID || cfg.Team != personalTeam() || !cfg.Policy.Validated() {
 		t.Fatalf("profile = org %s team %s policy %+v, %v", cfg.OrganizationID, cfg.Team, cfg.Policy, err)
 	}
+	// Doctor tells this sign-in from a browser one.
+	if probed, err := testApp.doctorProbes(cfg).Credential(); err != nil || !probed.ViaDesktop {
+		t.Fatalf("doctor's credential = %+v, %v; want it signed in through Terma Desktop", probed, err)
+	}
 	for _, want := range []string{"Signed in     dev@example.com (Beta Labs)", "Agents", "Collects"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("setup's own output does not say %q:\n%s", want, stdout)
@@ -173,6 +177,14 @@ func TestDesktopGrantReusesTheSameUsersSignIn(t *testing.T) {
 	}
 	if gateway.exchanges.Load() != 0 || gateway.revokes.Load() != 0 {
 		t.Fatalf("a reuse exchanges and ends nothing: %d exchanges, %d revokes", gateway.exchanges.Load(), gateway.revokes.Load())
+	}
+	// A sign-in made in the browser stays one, reused or not.
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if probed, err := testApp.doctorProbes(cfg).Credential(); err != nil || probed.ViaDesktop {
+		t.Fatalf("doctor's credential = %+v, %v; want a browser sign-in", probed, err)
 	}
 }
 

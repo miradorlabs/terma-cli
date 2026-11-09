@@ -71,7 +71,8 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				return doctor.Credential{}, err
 			}
 			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cred.OrganizationID,
-				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName)}, nil
+				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName),
+				ViaDesktop: strings.HasSuffix(cred.Label, auth.DesktopLabelSuffix)}, nil
 		},
 		Keys: app.storedKeys,
 	}
