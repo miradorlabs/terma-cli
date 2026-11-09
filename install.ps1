@@ -138,9 +138,13 @@
       if (-not $env:LOCALAPPDATA) { Fail 'LOCALAPPDATA is not set (set TERMA_INSTALL_DIR to install elsewhere)' }
       $dest = Join-Path $env:LOCALAPPDATA 'Programs\terma'
     }
-    # Absolute, against this session's location, as a PATH entry must be.
+    # Absolute, against this session's location, as a PATH entry must be, with no trailing
+    # separator but a drive root's: "D:" alone is that drive's current folder, not its root.
     $dest = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($dest).TrimEnd('\')
-    try { New-Item -ItemType Directory -Force -Path $dest | Out-Null } catch { Fail "cannot create $dest (set TERMA_INSTALL_DIR to install elsewhere)" }
+    if ($dest -match '^[A-Za-z]:$') { $dest += '\' }
+    if (-not (Test-Path -LiteralPath $dest -PathType Container)) {
+      try { New-Item -ItemType Directory -Force -Path $dest | Out-Null } catch { Fail "cannot create $dest (set TERMA_INSTALL_DIR to install elsewhere)" }
+    }
     $exe = Join-Path $dest 'terma.exe'
     # Staged beside the binary and renamed into place, so nothing ever runs a half-written
     # terma. Windows will not replace a running file but lets it be renamed, so a terma
@@ -185,7 +189,7 @@
     if (-not $raw) { return $false }
     foreach ($entry in $raw.Split(';')) {
       $e = [Environment]::ExpandEnvironmentVariables($entry.Trim()).TrimEnd('\')
-      if ($e -and $e -ieq $dir) { return $true }
+      if ($e -and $e -ieq $dir.TrimEnd('\')) { return $true }
     }
     return $false
   }

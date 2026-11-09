@@ -52,6 +52,9 @@ const DesktopLabelSuffix = " (via Terma Desktop)"
 // DesktopLabel is the session label a desktop grant asks for.
 func DesktopLabel() string { return DefaultLabel() + DesktopLabelSuffix }
 
+// ViaDesktop says whether Terma Desktop delegated this sign-in, from its label.
+func (c *Credential) ViaDesktop() bool { return strings.HasSuffix(c.Label, DesktopLabelSuffix) }
+
 // GrantError is a failed desktop grant: Code is what the desktop reads, Message what a
 // person reads. Neither ever carries the code, a token or the verifier.
 type GrantError struct {
@@ -79,7 +82,8 @@ type GrantIdentity struct {
 var grantUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // ReadGrantIdentity reads the desktop's identity line: two ids, no secret. timeout 0 is
-// GrantTimeout.
+// GrantTimeout. After an error in is not to be read again: a read still blocked on it may
+// take the next line.
 func ReadGrantIdentity(ctx context.Context, in io.Reader, timeout time.Duration) (GrantIdentity, error) {
 	line, err := readGrantLine(ctx, in, timeout)
 	if err != nil {
@@ -119,7 +123,8 @@ type GrantOptions struct {
 // LoginWithGrant signs in with a code Terma Desktop obtains for this process: it makes a
 // PKCE pair, prints the challenge and the label as one JSON line, reads the code back as
 // one, and redeems it with the verifier, which never leaves the process. No listener, no
-// browser. Every failure is a *GrantError.
+// browser. Every failure is a *GrantError, and none quotes the code or the verifier. After
+// an error opts.In is not to be read again, as for ReadGrantIdentity.
 func LoginWithGrant(ctx context.Context, exchanger TokenExchanger, opts GrantOptions) (*Credential, error) {
 	pkce, err := NewPKCE()
 	if err != nil {
@@ -154,9 +159,25 @@ func LoginWithGrant(ctx context.Context, exchanger TokenExchanger, opts GrantOpt
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, &GrantError{Code: GrantRejected, Message: "Terma did not accept the code from Terma Desktop", Err: err}
+		return nil, &GrantError{Code: GrantRejected, Message: "Terma did not accept the code from Terma Desktop",
+			Err: redacted(err, *reply.Code, pkce.Verifier)}
 	}
 	return cred, nil
+}
+
+// redacted is err with every secret in its text replaced, for a cause that may quote what
+// was sent: an auth host's refusal is printed, and the code and the verifier never are.
+func redacted(err error, secrets ...string) error {
+	text := err.Error()
+	for _, secret := range secrets {
+		if secret = strings.TrimSpace(secret); secret != "" {
+			text = strings.ReplaceAll(text, secret, "[redacted]")
+		}
+	}
+	if text == err.Error() {
+		return err
+	}
+	return errors.New(text)
 }
 
 func writeGrantLine(out io.Writer, v any) error {

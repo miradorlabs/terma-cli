@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
@@ -283,6 +284,34 @@ func TestGrantIdentityIsLowercase(t *testing.T) {
 	}
 	if want := (GrantIdentity{UserID: "0f8fad5b-d9cb-469f-a165-70867728950e", OrgID: "7c9e6679-7425-40de-944b-e07fc1f90ae7"}); id != want {
 		t.Fatalf("identity = %+v, want %+v", id, want)
+	}
+}
+
+// echoingExchanger is an auth host whose refusal quotes what it was sent.
+type echoingExchanger struct{ verifier string }
+
+func (e *echoingExchanger) ExchangeCode(context.Context, string, string, int) (*Credential, error) {
+	return nil, errors.New("not a delegated exchange")
+}
+
+func (e *echoingExchanger) ExchangeDelegatedCode(_ context.Context, code, verifier string) (*Credential, error) {
+	e.verifier = verifier
+	return nil, fmt.Errorf("code %q with verifier %s: invalid or expired authorization code", code, verifier)
+}
+
+// A refusal that quotes the code or the verifier is printed with neither: the cause keeps
+// the rest, so a person still reads why.
+func TestGrantRejectionNeverQuotesTheSecrets(t *testing.T) {
+	const code = "dc-1/x+y="
+	exchanger := &echoingExchanger{}
+	_, err := LoginWithGrant(t.Context(), exchanger, GrantOptions{In: strings.NewReader(`{"code":"` + code + `"}` + "\n"), Out: io.Discard, Timeout: time.Second})
+	failure, ok := errors.AsType[*GrantError](err)
+	if !ok || failure.Code != GrantRejected {
+		t.Fatalf("err = %v, want %s", err, GrantRejected)
+	}
+	if msg := err.Error(); strings.Contains(msg, code) || exchanger.verifier == "" || strings.Contains(msg, exchanger.verifier) ||
+		!strings.Contains(msg, "invalid or expired authorization code") {
+		t.Fatalf("the failure printed %q", msg)
 	}
 }
 

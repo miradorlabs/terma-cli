@@ -62,7 +62,7 @@ type Credential struct {
 	// "" for a developer's login.
 	ServerKey string
 	// ViaDesktop is a login Terma Desktop delegated to this CLI (its label ends
-	// auth.DesktopLabelSuffix), not one approved in the browser.
+	// auth.Credential.ViaDesktop), not one approved in the browser.
 	ViaDesktop bool
 }
 

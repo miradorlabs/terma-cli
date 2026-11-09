@@ -120,7 +120,8 @@ try {
 
   Write-Host '== a reinstall over a terma that is running moves it aside, twice'
   # Start-Running starts bin1's terma.exe as a terma that stays running: setup --desktop-grant
-  # waits on stdin for its identity line.
+  # waits on stdin for its identity line, for auth.GrantTimeout (2 minutes), far longer than
+  # these installs take. A shorter timeout, or flags that change, would end it early.
   function Start-Running {
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = Join-Path $bin1 'terma.exe'
@@ -185,6 +186,25 @@ try {
   $sub = Join-Path $work 'sub'
   New-Item -ItemType Directory -Path $sub | Out-Null
   Assert-Installed (Join-Path $work 'rel\bin') (Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = '..\rel\bin'; TERMA_NO_MODIFY_PATH = '1' } $sub)
+
+  Write-Host '== a drive root stays the root, and goes on the user PATH as one'
+  # subst lends a free letter to a folder. Trimmed to "T:", the root would go on PATH as that
+  # drive's current folder.
+  $driveRoot = Join-Path $work 'driveroot'
+  New-Item -ItemType Directory -Path $driveRoot | Out-Null
+  $letter = 'T', 'U', 'V', 'W', 'X', 'Y' | Where-Object { -not (Test-Path -LiteralPath "${_}:\") } | Select-Object -First 1
+  if (-not $letter) { Fail 'no free drive letter to subst' }
+  $drive = "${letter}:"
+  & subst.exe $drive $driveRoot
+  if ($LASTEXITCODE) { Fail "subst $drive $driveRoot failed" }
+  try {
+    Assert-Installed $driveRoot (Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = "$drive\" })
+    $entries = (Get-UserPath).Split(';')
+    if ($entries -notcontains "$drive\" -or $entries -contains $drive) { Fail "user PATH = $(Get-UserPath), want $drive\ on it" }
+  } finally {
+    & subst.exe $drive /d | Out-Null
+    $envKey.SetValue('Path', "$keep;$default", [Microsoft.Win32.RegistryValueKind]::ExpandString)
+  }
 
   Write-Host '== refuses a checksum that does not match'
   $sums = Join-Path $pinnedDir 'checksums.txt'

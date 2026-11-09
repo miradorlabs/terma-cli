@@ -284,7 +284,8 @@ council invariant:
   grant's. Flag misuse (`-y`, `--org`, `--team` ids, `--no-browser`, `--managed-config`, `TERMA_API_KEY`) is an ordinary
   error before anything is read or printed.
 - **A code that signs in someone else is also ended.** Besides failing with `grant_identity_mismatch` and storing
-  nothing, the CLI revokes that session (best effort) so it does not linger on the web.
+  nothing, the CLI revokes that session (best effort) so it does not linger on the web. So does any sign-in, browser or
+  grant, that cannot be stored (`storeLogin`).
 - **The label is kept on the credential.** The credential did not record its label, so doctor could not tell a desktop
   sign-in apart. `Credential.Label` (in `credentials.json`, no secret, no new file) is set by the grant only and survives
   refreshes; a browser sign-in for the same organization replaces it. A reused sign-in keeps the label it has, so a
