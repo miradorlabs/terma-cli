@@ -1,0 +1,111 @@
+{
+  "$comment": "A copy of terma-desktop shared/fixtures/auth.json delegatedGrant: the lines `terma setup --desktop-grant` reads on stdin and prints on stdout. The CLI does not read the desktop's fixtures, so copy the section here again whenever it changes. stdin lists the lines the desktop writes, in order, after which it closes stdin, or keeps it open when holdOpen is set. stdout lists what the CLI prints first: \"request\" is {\"challenge\": a 43-character base64url S256 challenge, \"label\": label}. A desktop-side case is one only the desktop's reader can fail; the CLI's tests check it never prints such a line. error is the code of the {\"error\": {\"code\", \"message\"}} line the CLI prints on stdout before it exits 1.",
+  "delegatedGrant": {
+    "identity": "{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}",
+    "challengePattern": "^[A-Za-z0-9_-]{43}$",
+    "label": "box (via Terma Desktop)",
+    "maxLine": 8192,
+    "timeoutSeconds": 120,
+    "errorCodes": ["grant_no_code", "grant_bad_input", "grant_rejected", "grant_identity_mismatch"],
+    "cases": [
+      {
+        "name": "a valid exchange",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"the-code\"}"],
+        "stdout": ["request"],
+        "exchanged": "the-code"
+      },
+      {
+        "name": "a reuse",
+        "stored": true,
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
+        "stdout": [{"reused": true}]
+      },
+      {
+        "name": "anything after the code line is never read",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"the-code\"}", "{\"code\":\"another\"}"],
+        "stdout": ["request"],
+        "exchanged": "the-code"
+      },
+      {
+        "name": "a last line without a newline still counts",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"the-code\"}"],
+        "noFinalNewline": true,
+        "stdout": ["request"],
+        "exchanged": "the-code"
+      },
+      {
+        "name": "EOF before the code",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
+        "stdout": ["request"],
+        "error": "grant_no_code"
+      },
+      {
+        "name": "no code before the timeout",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
+        "holdOpen": true,
+        "stdout": ["request"],
+        "error": "grant_no_code"
+      },
+      {
+        "name": "a code line that is not JSON",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "the-code"],
+        "stdout": ["request"],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "an empty code",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"\"}"],
+        "stdout": ["request"],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "a code line over the bound",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
+        "oversizedCodeLine": true,
+        "stdout": ["request"],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "an identity line that is not JSON",
+        "stdin": ["user 33333333-3333-4333-8333-333333333333"],
+        "stdout": [],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "an identity without an organization",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\"}"],
+        "stdout": [],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "an identity whose ids are not UUIDs",
+        "stdin": ["{\"user_id\":\"me\",\"org_id\":\"personal\"}"],
+        "stdout": [],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "no identity line",
+        "stdin": [],
+        "stdout": [],
+        "error": "grant_bad_input"
+      },
+      {
+        "name": "the auth host refuses the code",
+        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"spent\"}"],
+        "exchangeRefused": true,
+        "stdout": ["request"],
+        "error": "grant_rejected"
+      },
+      {
+        "name": "a malformed out line",
+        "side": "desktop",
+        "stdout": ["{\"challenge\":"]
+      },
+      {
+        "name": "a second out line",
+        "side": "desktop",
+        "stdout": ["request", "request"]
+      }
+    ]
+  }
+}
