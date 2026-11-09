@@ -51,7 +51,7 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 		return nil, err
 	}
 	if desktop.OrgID != orgID {
-		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "the identity's org_id is not --org"}
+		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "org_id does not match --org"}
 	}
 
 	// The user is the one the auth host answers for: whoami fills it for a credential saved

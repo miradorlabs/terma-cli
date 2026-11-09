@@ -288,9 +288,13 @@ council invariant:
 - **The label is kept on the credential.** The credential did not record its label, so doctor could not tell a desktop
   sign-in apart. `Credential.Label` (in `credentials.json`, no secret, no new file) is set by the grant only and survives
   refreshes; a browser sign-in for the same organization replaces it.
-- **The fixture copy precedes the desktop's.** `internal/account/auth/testdata/delegated_grant.json` is written from this
-  plan's and the desktop plan's definition of `delegatedGrant`; copy the desktop's section over it once it lands and
-  rerun `go test ./internal/account/auth/`.
+- **Two fixture files.** `internal/account/auth/testdata/delegated_grant.json` is a verbatim copy of terma-desktop's
+  `auth.json` `delegatedGrant` and `tokenRequests.delegated`, taken from the desktop's onboarding branch while it was
+  still uncommitted there: copy it again once that lands, and rerun `go test ./internal/account/... ./internal/cli/`.
+  The auth, api and setup tests read it (the identity and code lines, the error codes, the reuse line, the pinned error
+  lines, the token body). Its cases are mostly the desktop reader's, so the CLI's own input cases (EOF, timeout,
+  malformed or over-long lines, text after the code) live beside it in `grant_input.json`. The CLI's messages for a
+  missing code and a wrong `org_id` are the fixture's ("no code on stdin", "org_id does not match --org").
 - **install.ps1 rides the release like install.sh.** GoReleaser attaches it to every release, so
   `https://terma.ai/install.ps1` can redirect to `releases/latest/download/install.ps1` as install.sh's does; that
   redirect lives with the website, outside this repository. It runs in Windows PowerShell 5.1 and PowerShell 7, follows

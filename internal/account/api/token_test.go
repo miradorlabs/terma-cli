@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -37,17 +38,33 @@ func tokenBodies(t *testing.T) (*Client, *[]map[string]any) {
 
 // A delegated code is redeemed at the same endpoint as a browser one, with redirect_port 0
 // sent, not left out: the auth host tells the two apart by its own record of the code, and
-// takes 0 only for a delegated one (terma-desktop shared/fixtures/auth.json
-// tokenRequests.delegated).
+// takes 0 only for a delegated one. The body is terma-desktop's shared/fixtures/auth.json
+// tokenRequests.delegated, copied beside the grant's lines.
 func TestExchangeDelegatedCodeSendsRedirectPortZero(t *testing.T) {
 	t.Parallel()
-	client, bodies := tokenBodies(t)
-	cred, err := client.ExchangeDelegatedCode(context.Background(), "the-code", "v1")
+	raw, err := os.ReadFile("../auth/testdata/delegated_grant.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"grant_type": "authorization_code", "code": "the-code", "code_verifier": "v1", "redirect_port": float64(0)}
-	if len(*bodies) != 1 || !reflect.DeepEqual((*bodies)[0], want) {
+	var fixture struct {
+		TokenRequests struct {
+			Delegated struct {
+				Input struct{ Code, Verifier string }
+				Body  map[string]any
+			}
+		} `json:"tokenRequests"`
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	pinned := fixture.TokenRequests.Delegated
+	client, bodies := tokenBodies(t)
+	cred, err := client.ExchangeDelegatedCode(context.Background(), pinned.Input.Code, pinned.Input.Verifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := pinned.Body
+	if len(want) == 0 || len(*bodies) != 1 || !reflect.DeepEqual((*bodies)[0], want) {
 		t.Fatalf("token bodies = %v, want %v", *bodies, want)
 	}
 	if cred.OrganizationID != "org-1" || cred.UserID != "user-1" || cred.SessionID != "s-1" || cred.AuthURL == "" {

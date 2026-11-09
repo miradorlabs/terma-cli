@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -107,15 +108,52 @@ func TestDesktopGrantTakesOnlyIdsAndNeverAsks(t *testing.T) {
 	}
 }
 
-// The desktop's identity names the organization it delegates for, which must be --org.
+// desktopGrantJSON is the auth package's copy of terma-desktop's delegatedGrant, read before
+// any test moves the working directory.
+var desktopGrantJSON, desktopGrantErr = os.ReadFile("../account/auth/testdata/delegated_grant.json")
+
+// desktopLines are the lines terma-desktop's auth.json delegatedGrant pins, by case or run
+// name: what the CLI prints, as the desktop's tests feed it to the app.
+func desktopLines(t *testing.T) map[string]string {
+	t.Helper()
+	raw, err := desktopGrantJSON, desktopGrantErr
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f struct {
+		DelegatedGrant struct {
+			Cases []struct{ Name, Out string }
+			Runs  []struct {
+				Name     string
+				CLIError string `json:"cliError"`
+			}
+		} `json:"delegatedGrant"`
+	}
+	if err := json.Unmarshal(raw, &f); err != nil {
+		t.Fatal(err)
+	}
+	lines := map[string]string{}
+	for _, c := range f.DelegatedGrant.Cases {
+		lines[c.Name] = c.Out
+	}
+	for _, r := range f.DelegatedGrant.Runs {
+		if r.CLIError != "" {
+			lines[r.Name] = r.CLIError
+		}
+	}
+	return lines
+}
+
+// The desktop's identity names the organization it delegates for, which must be --org; the
+// failure is the line the desktop's fixture pins.
 func TestDesktopGrantIdentityForAnotherOrganizationIsBadInput(t *testing.T) {
 	gateway := grantSandbox(t)
 	stdout, _, err := desktopSetup(t, identityLine(deskUser, orgA().ID), personalOrg().ID, personalTeam())
 	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
 		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
 	}
-	if strings.Count(stdout, "\n") != 1 || gateway.exchanges.Load() != 0 {
-		t.Fatalf("no request may be printed for a refused identity:\n%s", stdout)
+	if want := desktopLines(t)["the CLI's own error"]; stdout != want+"\n" || gateway.exchanges.Load() != 0 {
+		t.Fatalf("stdout = %q, want only the desktop's pinned line %q", stdout, want)
 	}
 }
 
@@ -260,6 +298,10 @@ func TestDesktopGrantFailures(t *testing.T) {
 			}
 			if !strings.Contains(stderr, tc.want) || strings.Contains(stdout+stderr, "spent") {
 				t.Fatalf("stderr names the code and nothing quotes what was sent:\n%s\n%s", stdout, stderr)
+			}
+			if pinned := desktopLines(t)["no code to give: stdin closes, and the CLI exits 1 with grant_no_code"]; tc.want == auth.GrantNoCode &&
+				!strings.HasSuffix(stdout, "\n"+pinned+"\n") {
+				t.Fatalf("stdout = %q, want it to end with the desktop's pinned line %q", stdout, pinned)
 			}
 			if _, _, n := selected(t); n != 0 {
 				t.Fatalf("%d sign-ins stored after a failed grant", n)

@@ -138,7 +138,7 @@ func LoginWithGrant(ctx context.Context, exchanger TokenExchanger, opts GrantOpt
 	case errors.Is(err, errGrantLineTooLong):
 		return nil, &GrantError{Code: GrantBadInput, Message: "the code line on stdin is too long"}
 	default:
-		return nil, &GrantError{Code: GrantNoCode, Message: "Terma Desktop sent no code on stdin", Err: err}
+		return nil, &GrantError{Code: GrantNoCode, Message: "no code on stdin", Err: err}
 	}
 	var reply struct {
 		Code *string `json:"code"`

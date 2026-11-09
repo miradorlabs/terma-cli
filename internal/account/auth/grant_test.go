@@ -15,22 +15,20 @@ import (
 	"time"
 )
 
-// grantFixture is testdata/delegated_grant.json, terma-desktop's delegatedGrant section.
+// grantFixture is testdata/grant_input.json, the CLI's own cases for what it reads.
 type grantFixture struct {
 	DelegatedGrant struct {
-		Identity         string   `json:"identity"`
-		ChallengePattern string   `json:"challengePattern"`
-		Label            string   `json:"label"`
-		MaxLine          int      `json:"maxLine"`
-		TimeoutSeconds   int      `json:"timeoutSeconds"`
-		ErrorCodes       []string `json:"errorCodes"`
+		Identity         string `json:"identity"`
+		ChallengePattern string `json:"challengePattern"`
+		Label            string `json:"label"`
+		MaxLine          int    `json:"maxLine"`
+		TimeoutSeconds   int    `json:"timeoutSeconds"`
 		Cases            []grantCase
-	} `json:"delegatedGrant"`
+	}
 }
 
 type grantCase struct {
 	Name              string            `json:"name"`
-	Side              string            `json:"side"`
 	Stored            bool              `json:"stored"`
 	Stdin             []string          `json:"stdin"`
 	NoFinalNewline    bool              `json:"noFinalNewline"`
@@ -44,29 +42,127 @@ type grantCase struct {
 
 func loadGrantFixture(t *testing.T) grantFixture {
 	t.Helper()
-	raw, err := os.ReadFile("testdata/delegated_grant.json")
+	raw, err := os.ReadFile("testdata/grant_input.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var f grantFixture
-	if err := json.Unmarshal(raw, &f); err != nil {
+	if err := json.Unmarshal(raw, &f.DelegatedGrant); err != nil {
 		t.Fatal(err)
 	}
 	return f
 }
 
-// The constants the CLI keeps are the fixture's.
+// desktopGrantFixture is testdata/delegated_grant.json, the verbatim copy of terma-desktop's
+// shared/fixtures/auth.json delegatedGrant, the lines both sides keep to.
+type desktopGrantFixture struct {
+	In1 struct {
+		UserID string `json:"user_id"`
+		OrgID  string `json:"org_id"`
+		Line   string `json:"line"`
+	} `json:"in1"`
+	In2 struct {
+		Code string `json:"code"`
+		Line string `json:"line"`
+	} `json:"in2"`
+	ErrorCodes []string `json:"errorCodes"`
+	// Cases are first stdout lines and what the desktop makes of them; nil, it fails the run.
+	Cases []struct {
+		Name    string          `json:"name"`
+		Out     string          `json:"out"`
+		Request json.RawMessage `json:"request"`
+	} `json:"cases"`
+	Runs []struct {
+		Name     string `json:"name"`
+		CLIError string `json:"cliError"`
+		Exit     int    `json:"exit"`
+	} `json:"runs"`
+}
+
+func loaddesktopGrantFixture(t *testing.T) desktopGrantFixture {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/delegated_grant.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f struct {
+		DelegatedGrant desktopGrantFixture `json:"delegatedGrant"`
+	}
+	if err := json.Unmarshal(raw, &f); err != nil {
+		t.Fatal(err)
+	}
+	return f.DelegatedGrant
+}
+
+// The constants the CLI keeps are the fixtures'.
 func TestGrantConstantsAreTheFixtures(t *testing.T) {
 	g := loadGrantFixture(t).DelegatedGrant
 	if g.MaxLine != maxGrantLine || time.Duration(g.TimeoutSeconds)*time.Second != GrantTimeout {
 		t.Fatalf("bounds: fixture %d bytes %ds, CLI %d bytes %s", g.MaxLine, g.TimeoutSeconds, maxGrantLine, GrantTimeout)
 	}
 	codes := []string{GrantNoCode, GrantBadInput, GrantRejected, GrantIdentityMismatch}
-	if strings.Join(g.ErrorCodes, ",") != strings.Join(codes, ",") {
-		t.Fatalf("error codes: fixture %v, CLI %v", g.ErrorCodes, codes)
+	if desk := loaddesktopGrantFixture(t); strings.Join(desk.ErrorCodes, ",") != strings.Join(codes, ",") {
+		t.Fatalf("error codes: desktop %v, CLI %v", desk.ErrorCodes, codes)
 	}
 	if !strings.HasSuffix(g.Label, DesktopLabelSuffix) || !strings.HasSuffix(DesktopLabel(), DesktopLabelSuffix) {
 		t.Fatalf("label %q, suffix %q", g.Label, DesktopLabelSuffix)
+	}
+}
+
+// The desktop's contract, from the CLI's side: it reads the desktop's two lines as they are
+// written there, the code passed on byte for byte, and prints only lines the desktop's
+// reader takes, the reuse exactly as pinned.
+func TestGrantMeetsTheDesktopsContract(t *testing.T) {
+	desk := loaddesktopGrantFixture(t)
+	in := strings.NewReader(desk.In1.Line + "\n" + desk.In2.Line + "\n")
+	id, err := ReadGrantIdentity(t.Context(), in, time.Second)
+	if err != nil || id.UserID != desk.In1.UserID || id.OrgID != desk.In1.OrgID {
+		t.Fatalf("in1 = %+v, %v", id, err)
+	}
+	var out bytes.Buffer
+	exchanger := &recordingExchanger{}
+	if _, err := LoginWithGrant(t.Context(), exchanger, GrantOptions{Label: "box" + DesktopLabelSuffix, In: in, Out: &out, Timeout: time.Second}); err != nil {
+		t.Fatal(err)
+	}
+	if exchanger.code != desk.In2.Code {
+		t.Fatalf("exchanged %q, want in2's %q verbatim", exchanger.code, desk.In2.Code)
+	}
+	accepted := map[string]json.RawMessage{}
+	for _, c := range desk.Cases {
+		accepted[c.Name] = c.Request
+	}
+	// The request has the shape of the desktop's "a grant": challenge and label, nothing else.
+	var want, got map[string]string
+	if err := json.Unmarshal(accepted["a grant"], &want); err != nil {
+		t.Fatalf("the desktop's \"a grant\" case: %v", err)
+	}
+	if err := json.Unmarshal(bytes.TrimSuffix(out.Bytes(), []byte("\n")), &got); err != nil || len(got) != len(want) ||
+		!regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`).MatchString(got["challenge"]) || got["label"] != "box"+DesktopLabelSuffix ||
+		!strings.HasSuffix(want["label"], DesktopLabelSuffix) {
+		t.Fatalf("request %q, want the shape of %v", out.String(), want)
+	}
+	var reused bytes.Buffer
+	if err := WriteGrantReused(&reused); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range desk.Cases {
+		if c.Name == "a stored sign-in for the same user and organization" && reused.String() != c.Out+"\n" {
+			t.Fatalf("reuse line %q, want %q", reused.String(), c.Out)
+		}
+	}
+	// The message the desktop's run shows for a missing code.
+	for _, r := range desk.Runs {
+		var line struct {
+			Error struct{ Code, Message string }
+		}
+		if json.Unmarshal([]byte(r.CLIError), &line) != nil || line.Error.Code != GrantNoCode {
+			continue
+		}
+		_, err := LoginWithGrant(t.Context(), exchanger, GrantOptions{In: strings.NewReader(""), Out: io.Discard, Timeout: time.Second})
+		var ge *GrantError
+		if !errors.As(err, &ge) || ge.Code != line.Error.Code || ge.Message != line.Error.Message {
+			t.Fatalf("%s: err = %v, want %s %q", r.Name, err, line.Error.Code, line.Error.Message)
+		}
 	}
 }
 
@@ -76,9 +172,6 @@ func TestGrantProtocolFixture(t *testing.T) {
 	g := loadGrantFixture(t).DelegatedGrant
 	challenge := regexp.MustCompile(g.ChallengePattern)
 	for _, tc := range g.Cases {
-		if tc.Side == "desktop" {
-			continue // only the desktop's reader can fail it; TestGrantPrintsOneWellFormedLine covers the CLI's side
-		}
 		t.Run(tc.Name, func(t *testing.T) {
 			in := desktopPipe(t, tc)
 			var out bytes.Buffer

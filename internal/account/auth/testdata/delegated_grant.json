@@ -1,111 +1,162 @@
 {
-  "$comment": "A copy of terma-desktop shared/fixtures/auth.json delegatedGrant: the lines `terma setup --desktop-grant` reads on stdin and prints on stdout. The CLI does not read the desktop's fixtures, so copy the section here again whenever it changes. stdin lists the lines the desktop writes, in order, after which it closes stdin, or keeps it open when holdOpen is set. stdout lists what the CLI prints first: \"request\" is {\"challenge\": a 43-character base64url S256 challenge, \"label\": label}. A desktop-side case is one only the desktop's reader can fail; the CLI's tests check it never prints such a line. error is the code of the {\"error\": {\"code\", \"message\"}} line the CLI prints on stdout before it exits 1.",
+  "$comment": "A verbatim copy of terma-desktop shared/fixtures/auth.json: its delegatedGrant section and tokenRequests.delegated. terma-cli does not read the desktop's fixtures, so copy both again whenever they change there. grant_input.json beside it holds the CLI's own cases for what it reads on stdin.",
   "delegatedGrant": {
-    "identity": "{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}",
-    "challengePattern": "^[A-Za-z0-9_-]{43}$",
-    "label": "box (via Terma Desktop)",
-    "maxLine": 8192,
-    "timeoutSeconds": 120,
-    "errorCodes": ["grant_no_code", "grant_bad_input", "grant_rejected", "grant_identity_mismatch"],
+    "$comment": "terma setup -y --env <env> --harness <agents> --org <id> --team <id> --desktop-grant. The app writes in1 (the desktop's identity: ids, no secret) and reads the first stdout line. {\"reused\":true}: the CLI kept a sign-in for the same user and organization; the app closes stdin. {\"challenge\",\"label\"}: the app calls delegate with that challenge and label, writes in2 with the code, and closes stdin. Every later stdout line is setup's own output, shown as usual. A first line that is neither (or a challenge that is not 43 base64url characters) fails the run, and so does a second request. When the app has no code to give it closes stdin; the CLI then exits 1 with {\"error\":{\"code\":\"grant_no_code\"}}. The challenge and the code are never shown. terma-cli copies these cases.",
+    "in1": {
+      "user_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+      "org_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "line": "{\"user_id\":\"0f8fad5b-d9cb-469f-a165-70867728950e\",\"org_id\":\"7c9e6679-7425-40de-944b-e07fc1f90ae7\"}"
+    },
+    "in2": {
+      "code": "dc-1/x+y=",
+      "line": "{\"code\":\"dc-1/x+y=\"}"
+    },
+    "errorCodes": [
+      "grant_no_code",
+      "grant_bad_input",
+      "grant_rejected",
+      "grant_identity_mismatch"
+    ],
     "cases": [
       {
-        "name": "a valid exchange",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"the-code\"}"],
-        "stdout": ["request"],
-        "exchanged": "the-code"
+        "name": "a grant",
+        "out": "{\"challenge\":\"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM\",\"label\":\"box (via Terma Desktop)\"}",
+        "request": {
+          "challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+          "label": "box (via Terma Desktop)"
+        }
       },
       {
-        "name": "a reuse",
-        "stored": true,
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
-        "stdout": [{"reused": true}]
+        "name": "a stored sign-in for the same user and organization",
+        "out": "{\"reused\":true}",
+        "request": "reused"
       },
       {
-        "name": "anything after the code line is never read",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"the-code\"}", "{\"code\":\"another\"}"],
-        "stdout": ["request"],
-        "exchanged": "the-code"
+        "name": "keys in another order, and a space",
+        "out": "{\"label\": \"x\", \"challenge\": \"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM\"}",
+        "request": {
+          "challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+          "label": "x"
+        }
       },
       {
-        "name": "a last line without a newline still counts",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"the-code\"}"],
-        "noFinalNewline": true,
-        "stdout": ["request"],
-        "exchanged": "the-code"
+        "name": "the CLI's own error",
+        "out": "{\"error\":{\"code\":\"grant_bad_input\",\"message\":\"org_id does not match --org\"}}",
+        "request": {
+          "error": "grant_bad_input",
+          "message": "org_id does not match --org"
+        }
       },
       {
-        "name": "EOF before the code",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
-        "stdout": ["request"],
-        "error": "grant_no_code"
+        "name": "setup's output before the request is malformed",
+        "out": "Setting up terma",
+        "request": null
       },
       {
-        "name": "no code before the timeout",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
-        "holdOpen": true,
-        "stdout": ["request"],
-        "error": "grant_no_code"
+        "name": "a challenge that is not 43 base64url characters",
+        "out": "{\"challenge\":\"short\",\"label\":\"x\"}",
+        "request": null
       },
       {
-        "name": "a code line that is not JSON",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "the-code"],
-        "stdout": ["request"],
-        "error": "grant_bad_input"
+        "name": "a challenge with a character outside base64url",
+        "out": "{\"challenge\":\"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw+cM\",\"label\":\"x\"}",
+        "request": null
       },
       {
-        "name": "an empty code",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"\"}"],
-        "stdout": ["request"],
-        "error": "grant_bad_input"
+        "name": "reused must be true",
+        "out": "{\"reused\":false}",
+        "request": null
       },
       {
-        "name": "a code line over the bound",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}"],
-        "oversizedCodeLine": true,
-        "stdout": ["request"],
-        "error": "grant_bad_input"
+        "name": "not JSON",
+        "out": "{challenge}",
+        "request": null
       },
       {
-        "name": "an identity line that is not JSON",
-        "stdin": ["user 33333333-3333-4333-8333-333333333333"],
-        "stdout": [],
-        "error": "grant_bad_input"
+        "name": "an oversized line",
+        "outRepeat": {
+          "prefix": "{\"challenge\":\"",
+          "char": "a",
+          "count": 9000
+        },
+        "request": null
+      }
+    ],
+    "runs": [
+      {
+        "name": "a grant: the code goes in, the run carries on, nothing secret is shown",
+        "out": [
+          "{\"challenge\":\"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM\",\"label\":\"box (via Terma Desktop)\"}",
+          "Signed in as person@example.test",
+          "Done."
+        ],
+        "delegates": 1,
+        "writesCode": true,
+        "shown": [
+          "Signed in as person@example.test",
+          "Done."
+        ],
+        "exit": 0
       },
       {
-        "name": "an identity without an organization",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\"}"],
-        "stdout": [],
-        "error": "grant_bad_input"
+        "name": "a reuse: no delegate, stdin closed after the identity",
+        "out": [
+          "{\"reused\":true}",
+          "Done."
+        ],
+        "delegates": 0,
+        "writesCode": false,
+        "shown": [
+          "Done."
+        ],
+        "exit": 0
       },
       {
-        "name": "an identity whose ids are not UUIDs",
-        "stdin": ["{\"user_id\":\"me\",\"org_id\":\"personal\"}"],
-        "stdout": [],
-        "error": "grant_bad_input"
+        "name": "a second request fails the run",
+        "out": [
+          "{\"reused\":true}",
+          "{\"challenge\":\"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM\",\"label\":\"x\"}"
+        ],
+        "delegates": 0,
+        "writesCode": false,
+        "fails": true
       },
       {
-        "name": "no identity line",
-        "stdin": [],
-        "stdout": [],
-        "error": "grant_bad_input"
+        "name": "a malformed first line fails the run",
+        "out": [
+          "Setting up terma"
+        ],
+        "delegates": 0,
+        "writesCode": false,
+        "fails": true
       },
       {
-        "name": "the auth host refuses the code",
-        "stdin": ["{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"44444444-4444-4444-8444-444444444444\"}", "{\"code\":\"spent\"}"],
-        "exchangeRefused": true,
-        "stdout": ["request"],
-        "error": "grant_rejected"
-      },
-      {
-        "name": "a malformed out line",
-        "side": "desktop",
-        "stdout": ["{\"challenge\":"]
-      },
-      {
-        "name": "a second out line",
-        "side": "desktop",
-        "stdout": ["request", "request"]
+        "name": "no code to give: stdin closes, and the CLI exits 1 with grant_no_code",
+        "out": [
+          "{\"challenge\":\"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM\",\"label\":\"x\"}"
+        ],
+        "delegateFails": true,
+        "delegates": 1,
+        "writesCode": false,
+        "cliError": "{\"error\":{\"code\":\"grant_no_code\",\"message\":\"no code on stdin\"}}",
+        "exit": 1,
+        "fails": true
       }
     ]
+  },
+  "tokenRequests": {
+    "delegated": {
+      "$comment": "Sent by terma-cli alone, with the code the desktop wrote to its stdin and its own verifier: redirect_port 0. The auth host decides from its own record of the code that it is delegated; a delegated code with any other port, and a browser code with port 0, are refused. The desktop never sends this.",
+      "input": {
+        "code": "dc-1",
+        "verifier": "v1"
+      },
+      "body": {
+        "grant_type": "authorization_code",
+        "code": "dc-1",
+        "code_verifier": "v1",
+        "redirect_port": 0
+      }
+    }
   }
 }
