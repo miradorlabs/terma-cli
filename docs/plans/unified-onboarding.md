@@ -299,3 +299,10 @@ council invariant:
   `scripts/test-install.ps1` (no PowerShell on the machine that wrote it, so CI is its first run).
 - **winget (task 8) is a follow-up**, as section 6 recommends: it needs a fork of `microsoft/winget-pkgs` and a token
   for the release workflow, and every release then waits on Microsoft's review.
+- **The e2e case runs against the e2e account fixture, not dev yet.** `test/e2e/account.go` is a fake account service
+  (there is no real-backend sign-in or browser helper in `test/e2e`), so `TestDesktopGrant` extends it with
+  `/v1/auth/cli/delegate` and the delegated `/v1/auth/cli/token` as the platform plan specifies them (refresh rotation,
+  a single-use code bound to the challenge, `redirect_port` 0, the S256 check), drives the real binary over pipes as the
+  desktop does, runs `terma doctor`, and checks a second run reuses the sign-in. It runs in CI's e2e job. The leg against
+  dev, with a desktop session minted through the desktop approval, is a follow-up once platform tasks 11 to 16 are on
+  dev and the suite has a way to mint that session.

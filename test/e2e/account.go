@@ -1,6 +1,9 @@
 package e2e
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,7 +29,16 @@ type Account struct {
 	withholdContent atomic.Bool
 	mu              sync.Mutex
 	keys            map[string]string // project → minted key
+	// desktopRefresh is Terma Desktop's refresh token, which /v1/auth/cli/delegate rotates;
+	// delegated are its unredeemed codes, each bound to the CLI's challenge, and delegations
+	// counts its calls.
+	desktopRefresh string
+	delegated      map[string]delegatedCode
+	delegations    atomic.Int32
 }
+
+// delegatedCode is a code the delegate endpoint made for a CLI's challenge and label.
+type delegatedCode struct{ challenge, label string }
 
 // accountOrg is the organization the fake account signs the developer in to, and
 // accountUser the developer it signs in.
@@ -40,8 +52,17 @@ func (sb *Sandbox) StartAccount() *Account {
 	if sb.account != nil {
 		return sb.account
 	}
-	a := &Account{token: "ter_cli_" + accountOrg, keys: map[string]string{}}
+	a := &Account{token: "ter_cli_" + accountOrg, keys: map[string]string{}, desktopRefresh: "ter_clr_desktop_0", delegated: map[string]delegatedCode{}}
 	a.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The two sign-in endpoints take no bearer: the body is the credential.
+		switch r.URL.Path {
+		case "/v1/auth/cli/delegate":
+			a.serveDelegate(w, r)
+			return
+		case "/v1/auth/cli/token":
+			a.serveDelegatedExchange(w, r)
+			return
+		}
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid token"}`)
@@ -130,6 +151,77 @@ func (sb *Sandbox) SignIn(profile string) {
 	p["auth_url"], p["api_url"], p["app_url"] = a.srv.URL, a.srv.URL, a.srv.URL
 	data, _ = json.Marshal(file)
 	sb.writeAbs(path, string(data))
+}
+
+// serveDelegate is the platform's POST /v1/auth/cli/delegate, as Terma Desktop calls it:
+// its refresh token rotates and a 60-second single-use code is bound to the CLI's challenge.
+func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		RefreshToken  string `json:"refresh_token"`
+		CodeChallenge string `json:"code_challenge"`
+		Label         string `json:"label"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if body.RefreshToken != a.desktopRefresh || body.CodeChallenge == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid refresh token"}`)
+		return
+	}
+	n := a.delegations.Add(1)
+	a.desktopRefresh = fmt.Sprintf("ter_clr_desktop_%d", n)
+	code := fmt.Sprintf("ter_cod_delegated_%d", n)
+	a.delegated[code] = delegatedCode{challenge: body.CodeChallenge, label: body.Label}
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": fmt.Sprintf("ter_cli_desktop_%d", n), "refresh_token": a.desktopRefresh,
+		"token_type": "Bearer", "expires_in": 3600, "session_id": "desktop", "code": code, "code_expires_in": 60})
+}
+
+// serveDelegatedExchange is POST /v1/auth/cli/token for a delegated code: redeemed once,
+// with redirect_port 0 and the verifier of the challenge it was made for.
+func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		GrantType    string `json:"grant_type"`
+		Code         string `json:"code"`
+		CodeVerifier string `json:"code_verifier"`
+		RedirectPort *int   `json:"redirect_port"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	a.mu.Lock()
+	grant, ok := a.delegated[body.Code]
+	delete(a.delegated, body.Code)
+	a.mu.Unlock()
+	sum := sha256.Sum256([]byte(body.CodeVerifier))
+	if !ok || body.GrantType != "authorization_code" || body.RedirectPort == nil || *body.RedirectPort != 0 ||
+		base64.RawURLEncoding.EncodeToString(sum[:]) != grant.challenge {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"code":"INVALID_ARGUMENT","message":"invalid grant"}`)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": a.token, "refresh_token": "ter_clr_live", "token_type": "Bearer",
+		"expires_in": 3600, "session_id": "delegated", "organization": map[string]string{"id": accountOrg, "name": "Live"},
+		"user": map[string]string{"id": accountUser, "email": "live@terma.test"}})
+}
+
+// Delegate is what Terma Desktop does with the CLI's challenge: it trades its own refresh
+// token for a rotated pair and a code, and returns the code.
+func (a *Account) Delegate(challenge, label string) (string, error) {
+	a.mu.Lock()
+	refresh := a.desktopRefresh
+	a.mu.Unlock()
+	req, _ := json.Marshal(map[string]string{"refresh_token": refresh, "code_challenge": challenge, "label": label})
+	resp, err := http.Post(a.srv.URL+"/v1/auth/cli/delegate", "application/json", bytes.NewReader(req))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || resp.StatusCode != http.StatusOK || out.Code == "" {
+		return "", fmt.Errorf("delegate: HTTP %d, %v", resp.StatusCode, err)
+	}
+	return out.Code, nil
 }
 
 // KeyFor is the key the account minted for a project, "" if none.

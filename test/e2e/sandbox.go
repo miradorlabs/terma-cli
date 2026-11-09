@@ -113,6 +113,9 @@ func WithClaude(b Binary) Option { return func(sb *Sandbox) { sb.Claude = b } }
 // WithCodex runs the scenario against this Codex build.
 func WithCodex(b Binary) Option { return func(sb *Sandbox) { sb.Codex = b } }
 
+// WithProject is the team setup selects, by id.
+func WithProject(id string) Option { return func(sb *Sandbox) { sb.ProjectID = id } }
+
 // WithRepositories is the team policy's repository list.
 func WithRepositories(repos ...string) Option {
 	return func(sb *Sandbox) { sb.Repositories = repos }
