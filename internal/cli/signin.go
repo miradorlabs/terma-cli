@@ -183,6 +183,16 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 // reuseStoredSession drops a dead credential so it is not tried again; ok false means
 // open the browser.
 func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*signInResult, bool, error) {
+	return app.reuseStoredSessionIf(ctx, cfg, want, nil)
+}
+
+// sessionCheck decides, once the auth host has verified a stored credential, whether it
+// may be reused; whoami is the host's answer about it.
+type sessionCheck func(verified *auth.Credential, whoami identityResponse) bool
+
+// reuseStoredSessionIf is reuseStoredSession for a credential accept, when not nil, takes;
+// one it refuses is left stored and inactive, and ok is false.
+func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, want orgRef, accept sessionCheck) (*signInResult, bool, error) {
 	var cred *auth.Credential
 	var err error
 	switch {
@@ -204,6 +214,9 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 	}
 	if err != nil {
 		return nil, false, err
+	}
+	if accept != nil && !accept(verified, identity) {
+		return nil, false, nil
 	}
 	// A credential saved before terma kept the email and user id learns them from whoami.
 	verified.UserEmail = cmp.Or(verified.UserEmail, identity.Email)

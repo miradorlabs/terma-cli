@@ -271,9 +271,10 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		return err
 	}
 	cred := c.credentialFrom(resp)
-	// A refresh keeps the session and its user.
+	// A refresh keeps the session, its user and its label.
 	cred.SessionID = cmp.Or(cred.SessionID, current.SessionID)
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
+	cred.Label = current.Label
 	// The server has spent current's refresh token, so this pair is the session's only
 	// live one. Hold it before trying to store it.
 	c.replace(cred)
