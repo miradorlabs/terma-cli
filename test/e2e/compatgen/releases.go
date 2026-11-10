@@ -46,6 +46,7 @@ type ReleaseFields struct {
 	Added       int  `json:"added,omitempty"`
 	Removed     int  `json:"removed,omitempty"`
 	Unseen      int  `json:"unseen,omitempty"`
+	Moved       int  `json:"moved,omitempty"`
 	Withheld    int  `json:"withheld,omitempty"`
 }
 
@@ -184,6 +185,9 @@ func (h HarnessDrift) fieldsOf(v string, rows []e2e.FieldRow, ran censusRuns) *R
 		if gone(s.In) {
 			f.Unseen++
 		}
+	}
+	if h.lastJudged() == v {
+		f.Moved = len(h.Moved)
 	}
 	return f
 }
