@@ -113,7 +113,7 @@ var factOrder = []string{factName, factDescription, factStatus, factReleasedAt, 
 	factContextWindow, factMaxInput, factMaxOutput, factInputModalities, factOutputModalities, factReasoning, factThinking,
 	factReasoningEfforts, factDefaultEffort, factToolCalling, factStructuredOutputs, factSampling, factOpenWeights,
 	factFeatures, factUnsupported, factTools, factEndpoints, factBatch, factLatency, factRegions, factAliases, factSnapshots,
-	factPlatformIDs, factDeprecatedAt, factRetiresAt, factRetiresNotBefore}
+	factPlatformIDs, factDeprecatedAt, factRetiresAt, factRetiresNotBefore, factReplacement}
 
 // setFact puts v in facts unless it is empty: a source that does not state a fact leaves it
 // unknown, never zero.

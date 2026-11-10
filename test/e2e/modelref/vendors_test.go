@@ -80,6 +80,7 @@ func TestOpenAIDocs(t *testing.T) {
 		base + "/models.md": "# Models\n\n- [GPT-6.1 Sol](/api/docs/models/gpt-6.1-sol.md): Near-Astra.\n" +
 			"- [GPT-Audio-1.5](/api/docs/models/gpt-audio-1.5.md): Voice.\n- [all models](/api/docs/models/all.md)\n",
 		base + "/models/gpt-6.1-sol.md": testdata(t, "openai/gpt-6.1-sol.md"),
+		base + "/deprecations.md":       testdata(t, "openai/deprecations.md"),
 		base + "/models/gpt-audio-1.5.md": "# GPT-Audio-1.5\n\nModel ID: `gpt-audio-1.5`\n\n## Model details\n\n- Input modalities: text, audio\n" +
 			"- Output modalities: text, audio\n\n## Endpoints\n\n| Endpoint | Route | Support |\n| --- | --- | --- |\n| Chat Completions | `v1/chat/completions` | Supported |\n",
 	})
@@ -254,5 +255,33 @@ func TestParsers(t *testing.T) {
 		if got := isoDate(in); got != want {
 			t.Errorf("isoDate(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestLifecycles(t *testing.T) {
+	now := testNow
+	m := map[string]map[string]any{}
+	for _, o := range openAIDeprecations(testdata(t, "openai/deprecations.md"), "u", now) {
+		m[o.id] = o.facts
+	}
+	// A table cell's escaped pipe names two models, not two cells.
+	wantFacts(t, "gpt-image-2-2026-04-21", m["gpt-image-2-2026-04-21"], map[string]any{
+		factRetiresAt: "2027-02-10", factStatus: "deprecated", factDeprecatedAt: "2026-11-10",
+		factReplacement: "gpt-image-2.6-sunburst or gpt-image-2.6-flare"})
+	wantFacts(t, "gpt-4o-2024-11-20", m["gpt-4o-2024-11-20"], map[string]any{factRetiresAt: "2027-01-14", factReplacement: "gpt-6-luna"})
+	// Past its shutdown date a model is retired.
+	if f := m["gpt-4o-2024-11-20"]; lifecycle(f[factRetiresAt].(string), time.Date(2027, 2, 1, 0, 0, 0, 0, time.UTC)) != "retired" {
+		t.Error("a model past its shutdown is not retired")
+	}
+	m = map[string]map[string]any{}
+	for _, o := range googleDeprecations(testdata(t, "google/deprecations.md.txt"), "u", now) {
+		m[o.id] = o.facts
+	}
+	wantFacts(t, "gemini-3-flash-preview", m["gemini-3-flash-preview"], map[string]any{
+		factStatus: "preview", factReleasedAt: "2025-12-17", factReplacement: "gemini-3.6-flash"})
+	wantFacts(t, "gemini-3-pro-preview", m["gemini-3-pro-preview"], map[string]any{
+		factStatus: "retired", factRetiresAt: "2026-03-09", factReplacement: "gemini-3.1-pro-preview"})
+	if f := m["gemini-3.8-live"]; f[factStatus] != "active" || f[factRetiresAt] != nil {
+		t.Errorf("gemini-3.8-live = %v (no shutdown date announced)", f)
 	}
 }

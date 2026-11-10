@@ -74,7 +74,16 @@ func openAIDocs(ctx context.Context, c *client, now time.Time) ([]observation, e
 			out = append(out, o)
 		}
 	}
-	return out, nil
+	// What is going away, when, and what to use instead.
+	dep := openAIDocsBase + "/api/docs/deprecations"
+	text, err := c.text(ctx, dep+".md")
+	if errors.Is(err, errNotFound) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return append(out, openAIDeprecations(text, dep, now)...), nil
 }
 
 var (

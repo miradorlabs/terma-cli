@@ -95,7 +95,10 @@ func assemble(id, vendorID string, r *run, prev *Snapshot, listed bool) *Snapsho
 				f[k] = v
 			}
 		}
-		s.Sources[o.source] = o.url
+		if _, ok := s.Sources[o.source]; !ok {
+			// A source's first page of the model (its own page, before a list that names it).
+			s.Sources[o.source] = o.url
+		}
 		for name, p := range o.docs {
 			s.Docs[name] = p
 		}

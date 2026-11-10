@@ -153,7 +153,7 @@ var factLabels = map[string]string{
 	factOpenWeights: "Open weights", factFeatures: "Feature", factUnsupported: "Unsupported feature", factTools: "Built-in tool",
 	factEndpoints: "Endpoint", factBatch: "Batch API", factLatency: "Latency", factRegions: "Region", factAliases: "Alias",
 	factSnapshots: "Snapshot", factPlatformIDs: "Platform id", factDeprecatedAt: "Deprecated", factRetiresAt: "Retires",
-	factRetiresNotBefore: "Retires no sooner than",
+	factRetiresNotBefore: "Retires no sooner than", factReplacement: "Replacement",
 }
 
 var roleLabels = map[string]string{"default": "its default model", "alias": "alias", "subagents": "its subagents' model",

@@ -76,7 +76,16 @@ func googleDocs(ctx context.Context, c *client, now time.Time) ([]observation, e
 			out = append(out, o)
 		}
 	}
-	return out, nil
+	// Every model's release date, lifecycle and replacement.
+	dep := googleDocsBase + "/deprecations"
+	text, err := c.text(ctx, dep+".md.txt")
+	if errors.Is(err, errNotFound) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return append(out, googleDeprecations(text, dep, now)...), nil
 }
 
 // googlePage reads a model's page: one table of properties a model code it lists (a page may

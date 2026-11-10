@@ -70,8 +70,9 @@ The site's pages are `/models` and `/models/<model>`, and `terma.ai/m/<model>` i
 ```
 
 `generated_at` is the time of the newest change the reference holds. `status` is the vendor's
-(`active`, `deprecated`, `retired`; Anthropic's alone for now), or `unlisted` where the vendor no
-longer lists the model; null where unknown. `released_at` and `knowledge_cutoff` are `YYYY-MM-DD`,
+(`active`, `preview`, `deprecated`, `retired`: Anthropic states every model's, Google every Gemini
+model's, OpenAI only its deprecated ones'), or `unlisted` where the vendor no longer lists the
+model; null where unknown. `released_at` and `knowledge_cutoff` are `YYYY-MM-DD`,
 or `YYYY-MM` where the source names no day. `first_seen` is when the reference first listed it.
 `family` is the model's line, its id without versions, dates and release qualifiers
 (`claude-fable`, `gpt-sol`, `gemini-flash-lite`). `predecessor` is the model before it in its family
@@ -109,7 +110,7 @@ has probed its API (a model its key may not use is not probed).
 | fact | value |
 | --- | --- |
 | `name`, `description` | the vendor's name and one-line description |
-| `status`, `deprecated_at`, `retires_at`, `retires_not_before` | lifecycle, as the vendor states it |
+| `status`, `deprecated_at`, `retires_at`, `retires_not_before`, `replacement` | lifecycle, as the vendor states it (Anthropic's status table, OpenAI's and Google's deprecations pages); `replacement` the vendor's recommended replacement, in its words |
 | `released_at`, `knowledge_cutoff`, `training_cutoff` | dates |
 | `context_window`, `max_input`, `max_output` | tokens |
 | `input_modalities`, `output_modalities` | lowercase words (`text`, `image`, `pdf`, `audio`, `video`) |

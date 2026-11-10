@@ -86,9 +86,10 @@ func table(lines []string) [][]string {
 		if !strings.HasPrefix(l, "|") {
 			continue
 		}
-		cells := strings.Split(strings.Trim(l, "|"), "|")
+		// A cell's own pipe is escaped (`a` \| `b`): it splits no cells.
+		cells := strings.Split(strings.Trim(strings.ReplaceAll(l, `\|`, "\x00"), "|"), "|")
 		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
+			cells[i] = strings.TrimSpace(strings.ReplaceAll(cells[i], "\x00", "|"))
 		}
 		if reSeparator.MatchString(l) {
 			continue
