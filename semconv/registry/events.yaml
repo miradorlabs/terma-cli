@@ -642,6 +642,26 @@ events:
       - ref: terma.agent.id
       - ref: gen_ai.agent.name
 
+  - name: terma.turn
+    stability: development
+    requirement_level: recommended
+    brief: >
+      One finished turn of an agent whose hooks are its only export, as the agent's own session
+      API reports it: how it ended and how long it took.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.turn.id
+        requirement_level: required
+      - ref: terma.operation.status
+        note: The agent's word for how the turn ended, such as completed, interrupted or failed.
+      - ref: terma.operation.duration_ms
+      - ref: terma.turn.time_to_first_token_ms
+
   - name: terma.session.title
     stability: development
     requirement_level: recommended

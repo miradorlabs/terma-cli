@@ -39,10 +39,11 @@ func (Agent) Events() map[string]agents.Handler {
 		"muse-subagent-stop":  subagentStop,
 		"muse-stop":           stop,
 		"muse-session-end":    sessionEnd,
+		museFeedEvent:         feed,
 	}
 }
 
-func (Agent) FlushAfter() []string { return []string{"muse-stop", "muse-session-end"} }
+func (Agent) FlushAfter() []string { return []string{"muse-stop", "muse-session-end", museFeedEvent} }
 
 // PayloadSession names a hook's session by the root's id: a subagent's hooks carry the
 // child's as session_id, and Muse sets MUSE_SESSION_ID to the root in every hook.
@@ -86,6 +87,7 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 func (Agent) ContentConsented(c hookrun.Consent) bool { return consented(c) }
 
 var (
+	_ agents.StateKeeper    = Agent{}
 	_ agents.ContentConsent = Agent{}
 	_ agents.Covered        = Agent{}
 	_ agents.PayloadReader  = Agent{}

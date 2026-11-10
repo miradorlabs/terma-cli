@@ -287,6 +287,8 @@ const (
 	TermaToolCallCountKey = "terma.tool_call.count"
 	// TermaTurnIDKey is terma.turn.id: The turn the event belongs to, in the agent's own id.
 	TermaTurnIDKey = "terma.turn.id"
+	// TermaTurnTimeToFirstTokenMsKey is terma.turn.time_to_first_token_ms: Milliseconds from the turn's start to the model's first token, as the agent measured it.
+	TermaTurnTimeToFirstTokenMsKey = "terma.turn.time_to_first_token_ms"
 	// TermaUpdateAutoKey is terma.update.auto: Whether the relay installs new releases of its terma by itself.
 	TermaUpdateAutoKey = "terma.update.auto"
 	// TermaUsageCacheReadTokensKey is terma.usage.cache_read_tokens: Cache-read input tokens as the agent reported them, in a snapshot rather than per call.
@@ -375,6 +377,8 @@ const (
 	TermaSubagentStartEvent = "terma.subagent.start"
 	// TermaToolCallEvent is terma.tool.call: One tool call, keyed on its call id, which is its replay identity.
 	TermaToolCallEvent = "terma.tool.call"
+	// TermaTurnEvent is terma.turn: One finished turn of an agent whose hooks are its only export, as the agent's own session API reports it: how it ended and how long it took.
+	TermaTurnEvent = "terma.turn"
 	// TermaUserMessageEvent is terma.user.message: One prompt to an agent whose hooks are its only export; content as a whole.
 	TermaUserMessageEvent = "terma.user.message"
 )

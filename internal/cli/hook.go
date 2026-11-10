@@ -74,6 +74,9 @@ func (app *App) hookDeps() dispatch.Deps {
 		},
 		Flush:     spawnFlush,
 		AwaitPush: func(path string) { spawnDetached("spool", "await-push", path) },
+		Detach: func(event string, args ...string) {
+			spawnDetached(append([]string{"hook", "--user", event}, args...)...)
+		},
 	}
 }
 

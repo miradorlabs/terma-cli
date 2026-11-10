@@ -73,7 +73,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"dsh-file-edit", "dsh-prompt", "dsh-session-end", "dsh-session-start",
 		"gemini-after-tool", "gemini-prompt", "gemini-session-end", "gemini-session-start",
 		"hermes-file-edit", "hermes-prompt", "hermes-session-end", "hermes-session-start",
-		"muse-post-llm-call", "muse-post-tool-use", "muse-prompt", "muse-session-end", "muse-session-start", "muse-stop",
+		"muse-feed", "muse-post-llm-call", "muse-post-tool-use", "muse-prompt", "muse-session-end", "muse-session-start", "muse-stop",
 		"muse-subagent-start", "muse-subagent-stop",
 		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start",

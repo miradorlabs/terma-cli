@@ -51,6 +51,10 @@ type Env struct {
 	Flush func()
 	// AwaitPush, when set, starts a detached AwaitPush for the push recorded at path.
 	AwaitPush func(path string)
+	// Detach, when set, starts `terma hook <event> args...` detached from this hook: work a
+	// hook may not wait for or must not do itself, such as reading an agent's own session
+	// API, which can reach the network.
+	Detach func(event string, args ...string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
 	// Team is the developer's team from setup, which claims every session they run in a

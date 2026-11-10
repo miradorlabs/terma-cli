@@ -43,6 +43,8 @@ type museFixture struct {
 	sp    *spool.Spool
 	state string
 	agent []string
+	// detached are the readers the hooks started, each its event and arguments.
+	detached [][]string
 }
 
 func newMuseFixture(t *testing.T) *museFixture {
@@ -58,7 +60,8 @@ func (f *museFixture) run(h func(context.Context, hookrun.Env) error, event stri
 	f.t.Helper()
 	var stdout strings.Builder
 	env := hookrun.Env{StateDir: f.state, Now: time.Now(), Cwd: f.root, Policy: hookruntest.Admitting(f.root),
-		Stdin: strings.NewReader(musePayload(f.t, f.root, event, extra)), Stdout: &stdout, Spool: f.sp, Version: "test", Agents: f.agent}
+		Stdin: strings.NewReader(musePayload(f.t, f.root, event, extra)), Stdout: &stdout, Spool: f.sp, Version: "test", Agents: f.agent,
+		Detach: func(event string, args ...string) { f.detached = append(f.detached, append([]string{event}, args...)) }}
 	if err := h(context.Background(), env); err != nil {
 		f.t.Fatal(err)
 	}
@@ -247,5 +250,30 @@ func TestMuseContentConsent(t *testing.T) {
 		if got := (Agent{}).ContentConsented(tc.c); got != tc.want {
 			t.Errorf("ContentConsented(%+v) = %v", tc.c, got)
 		}
+	}
+}
+
+// A turn's end starts the detached reader for its session and turn, the session's end one
+// more; a subagent's stop starts none, and without consent no reader runs.
+func TestMuseStopStartsTheReader(t *testing.T) {
+	t.Setenv(museRootEnv, "")
+	f := newMuseFixture(t)
+	f.run(stop, "Stop", map[string]any{"last_assistant_message": "done"})
+	f.run(sessionEnd, "SessionEnd", map[string]any{"reason": "exit"})
+	t.Setenv(museRootEnv, museSession)
+	f.run(stop, "Stop", map[string]any{"session_id": museChild})
+	want := museFeedEvent + " " + museSession + " " + f.root + " " + museTurn + "|" + museFeedEvent + " " + museSession + " " + f.root + " "
+	var got []string
+	for _, d := range f.detached {
+		got = append(got, strings.Join(d, " "))
+	}
+	if strings.Join(got, "|") != want {
+		t.Fatalf("detached = %q, want %q", got, want)
+	}
+	t.Setenv(museRootEnv, "")
+	f.agent, f.detached = nil, nil
+	f.run(stop, "Stop", nil)
+	if len(f.detached) != 0 {
+		t.Fatalf("a reader ran without consent: %v", f.detached)
 	}
 }
