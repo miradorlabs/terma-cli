@@ -155,7 +155,14 @@ func NoPolicy(organizationID, authURL string) Policy {
 }
 
 // PolicyStub is the offline test override, TERMA_POLICY_STUB, read here and nowhere else.
-func PolicyStub() string { return os.Getenv("TERMA_POLICY_STUB") }
+// A release build (the release build tag, which goreleaser sets) never reads it: there the
+// team's fetched policy is the only one.
+func PolicyStub() string {
+	if !policyStubAllowed {
+		return ""
+	}
+	return os.Getenv("TERMA_POLICY_STUB")
+}
 
 // InForce is the policy hooks apply: p once validated, else NoPolicy.
 func (p Policy) InForce(organizationID, authURL string) Policy {

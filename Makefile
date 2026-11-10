@@ -131,7 +131,8 @@ clean:
 	rm -rf $(BINARY) dist
 
 # Cross-compiled release binaries. CGO is off so each one is a static binary that
-# runs on any machine of its platform without a matching libc.
+# runs on any machine of its platform without a matching libc; the release tag, as
+# goreleaser sets it, leaves out what only development and tests read.
 .PHONY: dist
 dist:
 	@mkdir -p dist
@@ -139,6 +140,6 @@ dist:
 		os=$${target%/*}; arch=$${target#*/}; ext=""; \
 		if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
 		echo "building dist/terma-$$os-$$arch$$ext"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "$(LDFLAGS)" \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -tags release -ldflags "$(LDFLAGS)" \
 			-o dist/terma-$$os-$$arch$$ext ./cmd/terma || exit 1; \
 	done
