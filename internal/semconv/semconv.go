@@ -157,6 +157,10 @@ const (
 	TermaMessageTextKey = "terma.message.text"
 	// TermaMessageTruncatedKey is terma.message.truncated: Whether terma.message.text was cut at terma's bound.
 	TermaMessageTruncatedKey = "terma.message.truncated"
+	// TermaModelFallbackModelKey is terma.model.fallback.model: The model the agent moved the session to, in its own spelling.
+	TermaModelFallbackModelKey = "terma.model.fallback.model"
+	// TermaModelFallbackTriggerKey is terma.model.fallback.trigger: What made the agent move the session to another model, in its own word.
+	TermaModelFallbackTriggerKey = "terma.model.fallback.trigger"
 	// TermaModelCallIDKey is terma.model_call.id: The model call the event is about, in the agent's own id.
 	TermaModelCallIDKey = "terma.model_call.id"
 	// TermaModelParamContextKey is terma.model_param.context: The context setting the developer selected for the model.
@@ -239,6 +243,8 @@ const (
 	TermaRateLimitSpendLimitResetsAtKey = "terma.rate_limit.spend_limit.resets_at"
 	// TermaRateLimitSpendLimitUsedPercentKey is terma.rate_limit.spend_limit.used_percent: How much of the spend limit is used, from 0 to 100.
 	TermaRateLimitSpendLimitUsedPercentKey = "terma.rate_limit.spend_limit.used_percent"
+	// TermaRefusalCategoryKey is terma.refusal.category: The category the API gave for refusing a call, in its own spelling.
+	TermaRefusalCategoryKey = "terma.refusal.category"
 	// TermaRelayAttributionKey is terma.relay.attribution: How the relay found the part's session when the part did not name it.
 	TermaRelayAttributionKey = "terma.relay.attribution"
 	// TermaRelayExitReasonKey is terma.relay.exit.reason: Why the relay stopped, on the heartbeat that says it is stopping.
@@ -333,6 +339,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaModelFallbackEvent is terma.model.fallback: The agent moved the session to another model after the API refused a call.
+	TermaModelFallbackEvent = "terma.model.fallback"
 	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
 	TermaModelCallResponseEvent = "terma.model_call.response"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.

@@ -84,7 +84,7 @@ func claudeSubagent(ctx context.Context, env hookrun.Env, name string) error {
 	}
 	env.EmitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Attrs: attrs})
 	if name == semconv.TermaSubagentEndEvent {
-		captureClaudeCallResponses(env, r, in.SessionID, in.AgentTranscriptPath)
+		captureClaudeTranscriptFacts(env, r, in.SessionID, in.AgentTranscriptPath)
 	}
 	return nil
 }
