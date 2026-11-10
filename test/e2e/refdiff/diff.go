@@ -212,6 +212,9 @@ func keyOf(v any) string {
 			k += " " + model
 		}
 		return k
+	case str("control") != "":
+		// A telemetry route, by what steered it.
+		return str("control")
 	case str("at") != "":
 		return str("at")
 	case str("id") != "":

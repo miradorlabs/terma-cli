@@ -68,6 +68,11 @@ func chatCompletions(r *http.Request) bool { return strings.HasSuffix(r.URL.Path
 func anthropicMessages(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, "/v1/messages") && !strings.Contains(r.URL.Path, "count_tokens")
 }
+
+// museMainCall is a request of Muse's main thread, not one of the reminder agents beside it.
+func museMainCall(r *http.Request) bool {
+	return strings.HasSuffix(r.URL.Path, "/responses") && r.Header.Get("X-Tbh-Agent-Role") == "main"
+}
 func geminiGenerate(r *http.Request) bool { return strings.Contains(r.URL.Path, "enerateContent") }
 
 // shellStep is the one Messages API tool call of cmd in a shell tool named tool.
@@ -185,6 +190,19 @@ var harnessDrivers = []harnessDriver{
 		configure: func(sb *Sandbox, url string) []string { sb.UseDsh(url); return nil },
 		args: func(_ *Sandbox, prompt, _ string, _, _ bool) []string {
 			return []string{"headless", prompt}
+		},
+	},
+	{
+		harness: "muse", each: forEachMuse, modelCall: museMainCall, failures: openAIFailures,
+		provider: func(calls *atomic.Int32, cmd string) http.Handler {
+			if cmd == "" {
+				return museProvider(calls, nil)
+			}
+			return museProvider(calls, []museCall{museBash(cmd)})
+		},
+		configure: func(sb *Sandbox, url string) []string { sb.UseMuse(url); return nil },
+		args: func(sb *Sandbox, prompt, _ string, _, tools bool) []string {
+			return sb.museArgs(prompt, tools)
 		},
 	},
 	{

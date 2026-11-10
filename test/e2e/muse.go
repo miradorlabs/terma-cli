@@ -133,16 +133,17 @@ func forEachMuse(t *testing.T, run func(t *testing.T, b Binary)) {
 	}
 }
 
-// UseMuse gives the sandbox's Muse a synthetic key, and keeps the installed launcher from
-// updating itself.
-func (sb *Sandbox) UseMuse() {
+// UseMuse points the sandbox's Muse at the fixture at url, with a synthetic key, and keeps the
+// installed launcher from updating itself.
+func (sb *Sandbox) UseMuse(url string) {
+	sb.MuseBaseURL = url
 	sb.ExtraEnv = append(sb.ExtraEnv, "META_API_KEY=synthetic", "MUSE_NO_AUTO_UPDATE=1")
 }
 
-// museArgs is one headless turn against the fixture at url, prompt last: tools run without
+// museArgs is one headless turn against the sandbox's fixture, prompt last: tools run without
 // asking (--yolo, as a headless run that is to use them must).
-func museArgs(url, prompt string, tools bool) []string {
-	a := []string{"exec", "--model", museModel, "--base-url", url}
+func (sb *Sandbox) museArgs(prompt string, tools bool) []string {
+	a := []string{"exec", "--model", museModel, "--base-url", sb.MuseBaseURL}
 	if tools {
 		a = append(a, "--yolo")
 	}
@@ -151,26 +152,26 @@ func museArgs(url, prompt string, tools bool) []string {
 
 // UseMuseSetup makes b the `muse` on the sandbox's PATH, which terma's hooks start `muse
 // serve` from, and sets the machine up again with Muse chosen.
-func (sb *Sandbox) UseMuseSetup(b Binary) {
+func (sb *Sandbox) UseMuseSetup(b Binary, url string) {
 	t := sb.T
 	t.Helper()
 	if err := os.Symlink(b.Path, filepath.Join(strings.TrimSuffix(sb.binDir(), ":"), "muse")); err != nil {
 		t.Fatal(err)
 	}
-	sb.UseMuse()
+	sb.UseMuse(url)
 	sb.SetupAgents = append(sb.SetupAgents, "muse")
 	sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
 	sb.Receiver.Reset()
 }
 
-// MuseRun runs one headless turn of the `muse` on the sandbox's PATH in dir against the fixture
-// at url, and returns what it printed.
-func (sb *Sandbox) MuseRun(dir, url, prompt string) string {
+// MuseRun runs one headless turn of the `muse` on the sandbox's PATH in dir, tools allowed, and
+// returns what it printed.
+func (sb *Sandbox) MuseRun(dir, prompt string) string {
 	t := sb.T
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, filepath.Join(strings.TrimSuffix(sb.binDir(), ":"), "muse"), museArgs(url, prompt, true)...)
+	cmd := exec.CommandContext(ctx, filepath.Join(strings.TrimSuffix(sb.binDir(), ":"), "muse"), sb.museArgs(prompt, true)...)
 	cmd.Dir = dir
 	cmd.Env = sb.termaEnv()
 	cmd.Stdin = nil

@@ -204,13 +204,11 @@ const copilotModel = "claude-sonnet-4.5"
 func TestMuseProfile(t *testing.T) {
 	forEachMuse(t, func(t *testing.T, b Binary) {
 		var calls atomic.Int32
-		var url string
-		harnessProfile(t, b, museProvider(&calls, nil), func(sb *Sandbox, u string) []string {
-			url = u
-			sb.UseMuse()
+		harnessProfile(t, b, museProvider(&calls, nil), func(sb *Sandbox, url string) []string {
+			sb.UseMuse(url)
 			return nil
-		}, func(*Sandbox) []string {
-			return museArgs(url, profilePrompt, false)
+		}, func(sb *Sandbox) []string {
+			return sb.museArgs(profilePrompt, false)
 		}, []string{"--help"}, []string{"exec", "--help"})
 		requireCalls(t, b, &calls)
 	})

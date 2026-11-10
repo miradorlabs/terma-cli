@@ -242,3 +242,15 @@ func TestHookRecorderCommandOffline(t *testing.T) {
 		t.Errorf("command = %s", cmd)
 	}
 }
+
+// A Muse build's hook events are its session protocol's HookEventName enum, as its settings
+// name them.
+func TestMuseHookEventsInOffline(t *testing.T) {
+	schema := []byte(`{"$defs":{"HookEventName":{"enum":["sessionStart","postLLMCall","postToolUseFailure","stop"],"type":"string"}}}`)
+	if got := strings.Join(MuseHookEventsIn(schema), " "); got != "PostLLMCall PostToolUseFailure SessionStart Stop" {
+		t.Errorf("events = %s", got)
+	}
+	if got := MuseHookEventsIn([]byte(`{"$defs":{}}`)); len(got) != 0 {
+		t.Errorf("a schema with no hook events named %v", got)
+	}
+}

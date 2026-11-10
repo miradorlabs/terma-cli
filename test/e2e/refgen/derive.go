@@ -565,6 +565,17 @@ func deriveOutOfBand(s *Snapshot, p e2e.Profile) {
 			s.Network["telemetry"] = t
 		}
 	}
+	// Where the build's own telemetry can be sent, and what goes with it (Muse's telemetry
+	// routing probe): beside what it sends.
+	if raw, ok := p.Probes["telemetry-routing"]; ok {
+		var v map[string]any
+		if json.Unmarshal(raw, &v) == nil && v["routes"] != nil {
+			if s.Network == nil {
+				s.Network = map[string]any{}
+			}
+			s.Network["telemetry_routing"] = v["routes"]
+		}
+	}
 	if len(p.Files) > 0 {
 		s.Storage = map[string]any{}
 		for kind, raw := range p.Files {

@@ -123,7 +123,7 @@ func deriveBehavior(s *Snapshot, p e2e.Profile) {
 					s.Hooks = m
 				}
 			}
-		case "telemetry", "signing", "across-turns", "filesystem", "launch", "app-server":
+		case "telemetry", "telemetry-routing", "signing", "across-turns", "filesystem", "launch", "app-server":
 			// Merged with the census in deriveTelemetry; the binary's in deriveOutOfBand; the
 			// caching's from the requests.
 		default:

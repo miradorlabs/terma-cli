@@ -21,15 +21,15 @@ and a live run (step 5).
 
 | Question | Why it matters |
 |---|---|
-| Does it export OpenTelemetry? Which signals, which session key, with prompts and tool content or behind a flag? Can the endpoint point at `127.0.0.1`? | The richest channel: tokens, cost, model, every call. Muse's switches itself off unless it goes to Meta, and carries no content: unusable. |
+| Does it export OpenTelemetry? Which signals, which session key, with prompts and tool content or behind a flag? Can the endpoint point at `127.0.0.1`? | The richest channel: tokens, cost, model, every call. Check every way to move it: Muse's moves with its settings file's `telemetry.endpoint` (and sends its Meta credential along), but turns itself off when `OTEL_EXPORTER_OTLP_ENDPOINT` names another host. |
 | Does it read its exporter from a settings file, or only from its environment? | A settings file gets `ConfigureRelay`. An environment-only exporter needs the `terma launch` shell function (`agents.Launched`; the Copilot CLI). |
 | Does it run lifecycle hooks? Which events, what JSON on stdin, user-level or repository-level, trusted without approval? | Hooks claim the session, attribute commits and, for hooks-only harnesses, are the whole export. |
 | Does it have a plugin or extension API that sees prompts, messages and tool calls? | A terma plugin can export through the relay (OpenCode, Pi, omp, Hermes, dsh). Check what it receives, such as images and data URLs. |
 | How does a subagent appear? | Child sessions, an `agent_id`, or a root id in the environment (Muse's `MUSE_SESSION_ID`). Records must land in the root session. |
 | Are there hidden side threads (titles, summaries, reminders)? | They fire hooks and make calls. They are real cost, but must not read as the person's work. |
 | Where do sessions live? | For completeness only: terma never reads them to fill a gap. The documented exceptions are Codex's rollout (replies, images) and Claude Code's transcript (call responses, titles, images). |
-| How is a build fetched by version, and is the download gated? | The e2e suite and the Harness Reference need per-version installs. Muse's download needs a Meta login, so CI cannot fetch it. |
-| Does it have an offline or echo provider? | It lets the live check run with no account. Muse has `--provider echo`. Otherwise use the fixture provider in `test/e2e`. |
+| How is a build fetched by version, and is the download gated? | The e2e suite and the Harness Reference need per-version installs. Muse's builds download without a login by their full build string, but only the current one is named anywhere, so its history starts when the reference first saw it. |
+| Does it have an offline or echo provider? | It lets the live check run with no account. Muse has `--provider echo`, and its Meta provider takes `--base-url` to the Responses fixture in `test/e2e` (`museProvider`). |
 | Desktop app: how does it pin and start its agent? | `desktop.go` reads the pin from the app bundle. The pin's shape changes between releases (Claude Desktop 4.23118.1 moved to release candidates). |
 
 ## 2. Choose the channels
@@ -151,8 +151,13 @@ Every event and attribute terma sends is in `semconv/registry` (Weaver). Add new
     (`reference.yml`) captures new builds and runs their contracts.
   - `refgen/meta.go`: its name, vendor, homepage, changelog and source.
   - A desktop app also needs its feed (`desktop_feeds.go`) and pin.
-- **Gated downloads** (Muse): no CI capture. Say so in the harness's coverage, and keep a
-  local e2e test that runs against the installed build.
+  - A feed that names only the current build (Muse's channel): an entry in `new-builds.sh`'s
+    feed list, and `lastN` resolving to that one build.
+  - Its own telemetry, where it is not JSON with an `event_name` (Muse's OTLP protobuf):
+    `refgen/vendortelemetry.go`. Where a user can move it, a routing probe like
+    `TestMuseProbeTelemetryRouting` records each control's outcome (`network.telemetry_routing`).
+- **Gated downloads:** no CI capture. Say so in the harness's coverage, and keep a local e2e
+  test that runs against the installed build.
 
 ## 5. mirador-platform
 

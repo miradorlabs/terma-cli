@@ -358,19 +358,15 @@ func TestGeminiProfileTelemetry(t *testing.T) {
 // points anywhere else.
 func TestMuseProfileEgress(t *testing.T) {
 	forEachMuse(t, func(t *testing.T, b Binary) {
-		var url string
 		profileOtherOutOfBand(t, b, otherProfile{
 			program: "muse",
 			isModelCall: func(r *http.Request) bool {
 				return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/responses")
 			},
 			provider: func(calls *atomic.Int32) http.Handler { return museProvider(calls, nil) },
-			setup: func(sb *Sandbox, u string) {
-				url = u
-				sb.UseMuse()
-			},
+			setup:    func(sb *Sandbox, url string) { sb.UseMuse(url) },
 			run: func(t *testing.T, sb *Sandbox, b Binary) []string {
-				args := museArgs(url, profilePrompt, false)
+				args := sb.museArgs(profilePrompt, false)
 				runProfileCommand(t, b, sb.Repo, sb.termaEnv(), args...)
 				return args[:len(args)-1]
 			},

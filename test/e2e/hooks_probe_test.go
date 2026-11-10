@@ -1564,3 +1564,70 @@ func TestCopilotProbeHooks(t *testing.T) {
 		t.Logf("hooks probe of %s %s: %d events fired of %d, %v", b.Harness, b.Version, firedCount(probe), len(probe.Supported), time.Since(start).Round(time.Second))
 	})
 }
+
+// museHookReasons are why a Muse event does not fire in the probe's run.
+var museHookReasons = map[string]string{
+	"PermissionRequest": "fires when a tool asks for approval; the probe's run is --yolo",
+	"PreCompact":        "fires before the conversation is compacted; the probe's one turn compacts nothing",
+	"PostCompact":       "fires after the conversation is compacted; the probe's one turn compacts nothing",
+	"Notification":      "fires for an interactive session's notifications; the probe's run is exec",
+	"StopFailure":       "fires when a turn ends in an error; the probe's turn succeeds",
+	"Interrupt":         "fires when the user interrupts a turn; the probe's run is not interrupted",
+	"SessionFork":       "fires when a session is forked; the probe forks none",
+}
+
+// TestMuseProbeHooks: every hook event each Muse build knows (MuseHookEventsIn, from the session
+// protocol schema it exports), a recording hook for each in its user-level settings.json (where
+// terma's setup puts terma's), and one `muse exec --yolo` turn against the Responses fixture that
+// runs a shell command and reads a file that does not exist. No control pass. Seconds a build.
+func TestMuseProbeHooks(t *testing.T) {
+	skipUnlessProbe(t, "hooks")
+	forEachMuse(t, func(t *testing.T, b Binary) {
+		track(t)
+		profileOf(t, b)
+		start := time.Now()
+		sb := New(t, Isolated)
+		PlaceSandbox(t, b, sb)
+		supported, source := supportedHookEvents(t, b)
+		events := supported
+		if len(events) == 0 {
+			events = hookSeeds["muse"]
+		}
+		var calls atomic.Int32
+		provider := httptest.NewServer(museProvider(&calls, []museCall{
+			museBash("printf hooks-ok"),
+			{"muse.read_file", map[string]any{"path": filepath.Join(sb.Repo, "missing.txt")}},
+		}))
+		t.Cleanup(provider.Close)
+		sb.UseMuse(provider.URL)
+		Placeholder(t, b, provider.URL, "<provider>")
+		Placeholder(t, b, hooksPrompt, "<prompt>")
+		rec := filepath.Join(sb.Dir, "hook-recorder")
+		hooks := map[string]any{}
+		for _, e := range events {
+			hooks[e] = hookGroups(t, rec, e, "", false)
+		}
+		data, _ := json.Marshal(map[string]any{"schema_version": 1, "hooks": hooks})
+		sb.writeAbs(filepath.Join(sb.Home, ".config", "muse", "settings.json"), string(data)+"\n")
+		args := sb.museArgs(hooksPrompt, true)
+		RecordCommand(t, b, args[:len(args)-1])
+		env := sb.termaEnv()
+		ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, b.Path, args...)
+		cmd.Dir, cmd.Env = sb.Repo, env
+		cmd.WaitDelay = 5 * time.Second
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Logf("muse exec: %v\n%s", err, tail(string(out), 3000))
+		}
+		if calls.Load() == 0 {
+			t.Errorf("Muse sent its provider no model request")
+		}
+		hookCalls := HookCallsIn(rec)
+		t.Logf("hooks run: %s", hookSequence(hookCalls))
+		probe := HooksProbeOf(supported, source, hookCalls, env, sb.Dir)
+		notFired(&probe, museHookReasons)
+		RecordProbe(t, b, "hooks", probe)
+		t.Logf("hooks probe of %s %s: %d events fired of %d, %v", b.Harness, b.Version, firedCount(probe), len(probe.Supported), time.Since(start).Round(time.Second))
+	})
+}

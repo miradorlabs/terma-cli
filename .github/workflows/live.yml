@@ -36,6 +36,8 @@ jobs:
       TERMA_E2E_OPENCODE_VERSIONS: checked
       TERMA_E2E_GEMINI_VERSIONS: checked
       TERMA_E2E_DSH_VERSIONS: last3
+      # Meta names Muse's current build alone.
+      TERMA_E2E_MUSE_VERSIONS: last1
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
       # A field the relay has not classified is a note here, not a failure: the digest says
       # what is new to classify, and a harness sending it still sends what terma expects.
