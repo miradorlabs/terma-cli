@@ -3,8 +3,8 @@
   "harness": "claude-desktop",
   "window": {
     "oldest": "4.16336.0",
-    "newest": "4.16336.0",
-    "builds": 1
+    "newest": "5.1231.0",
+    "builds": 2
   },
   "items": {
     "cli.commands.claude agents": {
@@ -765,6 +765,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "cli.commands.claude plugin restore-set-aside": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "cli.commands.claude plugin tag": {
       "kind": "subcommand",
@@ -3263,6 +3274,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_BG_DISPATCH_ENTRYPOINT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_BG_GATEWAY_WITHHELD": {
       "kind": "env_var",
       "ranges": [
@@ -4825,6 +4847,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_BRIDGE_CHILD_START_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_BRIDGE_MCP_CARRIER": {
       "kind": "env_var",
       "ranges": [
@@ -4879,6 +4912,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_BRIDGE_SETTINGS_BINDING": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_BRIEF": {
       "kind": "env_var",
@@ -5056,6 +5100,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_CCR_REQUESTS_BY_FETCH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_CCR_SKIP_FRESH_MIGRATIONS": {
       "kind": "env_var",
       "ranges": [
@@ -5066,6 +5121,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH": {
       "kind": "env_var",
@@ -5221,6 +5287,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_CONFIG_LOCK_WAIT_MS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_CONFIG_PROBE": {
       "kind": "env_var",
       "ranges": [
@@ -5342,6 +5419,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_COWORK_PLUGIN_SKILL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_COZY_TEAPOT": {
       "kind": "env_var",
       "ranges": [
@@ -5352,6 +5440,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_CRYPTIC_HORIZON": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_CURRIED_TRINKET": {
       "kind": "env_var",
@@ -5529,6 +5628,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_DESKTOP_WORKFLOW_LIMIT_WAIT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DIAGNOSTICS_FILE": {
       "kind": "env_var",
       "ranges": [
@@ -5594,6 +5704,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_DISABLE_AGENT_VIEW": {
       "kind": "env_var",
@@ -5858,6 +5979,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_DISABLE_FEATURE_FLAGS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": {
       "kind": "env_var",
@@ -6343,6 +6475,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP": {
       "kind": "env_var",
       "ranges": [
@@ -6364,6 +6507,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_DISABLE_STOP_OF_HELD_MESSAGES": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS": {
       "kind": "env_var",
@@ -6419,6 +6573,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_DISABLE_TRANSCRIPT_READ_AHEAD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_DISABLE_TURN_HANDOFF": {
       "kind": "env_var",
@@ -6585,6 +6750,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_EAGER_FLUSH": {
       "kind": "env_var",
       "ranges": [
@@ -6722,8 +6898,8 @@
       "ranges": [
         {
           "since": "4.16336.0",
-          "until": null,
-          "removed": null
+          "until": "4.16336.0",
+          "removed": "5.1231.0"
         }
       ],
       "since_bounded": false
@@ -7069,6 +7245,39 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE_RESTART": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE_RESTARTED_FROM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_EXPERIMENTAL_OBSERVER_AGENTS": {
       "kind": "env_var",
       "ranges": [
@@ -7410,6 +7619,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_GIT_CHECK_ONLY_IN_REPOSITORY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_GLOB_HIDDEN": {
       "kind": "env_var",
       "ranges": [
@@ -7728,6 +7948,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_HOST_OWNED_CONFIG_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_HOST_PLATFORM": {
       "kind": "env_var",
@@ -8070,6 +8301,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_MAIN_REPLY_HOLD_MS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_MANAGED_CONFIG_PREFETCH": {
       "kind": "env_var",
       "ranges": [
@@ -8323,6 +8565,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_MCP_SERVE_GARBAGE_COLLECTIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_MCP_SERVE_INTERFACE_MIN_VERSION": {
       "kind": "env_var",
       "ranges": [
@@ -8356,6 +8609,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_MCP_SERVE_TUNNEL_BINARY_FRAMES": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_MCP_SERVE_WORKSPACE_ROOT": {
       "kind": "env_var",
       "ranges": [
@@ -8372,8 +8636,8 @@
       "ranges": [
         {
           "since": "4.16336.0",
-          "until": null,
-          "removed": null
+          "until": "4.16336.0",
+          "removed": "5.1231.0"
         }
       ],
       "since_bounded": false
@@ -8510,6 +8774,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_NATIVE_APP_BUNDLE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_NATIVE_CURSOR": {
       "kind": "env_var",
       "ranges": [
@@ -8553,6 +8828,39 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_NORMALIZE_PREFIX_CACHE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_NORMALIZE_PREFIX_CACHE_VERIFY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_NOTIFICATIONS_HOST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_NO_FLICKER": {
       "kind": "env_var",
@@ -9170,6 +9478,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_PROGRAM_USE_CASE_STAMPED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_PROJECTS_SESSION": {
       "kind": "env_var",
       "ranges": [
@@ -9654,6 +9973,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_REPLY_GATE_POLICY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_REPORT_FINDINGS": {
       "kind": "env_var",
       "ranges": [
@@ -9708,6 +10038,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_RESUME_CACHE_WARM": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_RESUME_FROM_SESSION": {
       "kind": "env_var",
@@ -10545,6 +10886,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_SPAWNED_BY_SERVER": {
       "kind": "env_var",
       "ranges": [
@@ -10665,6 +11017,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_STREAM_TIMER_SLACK_MS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_STRICT_INLINE_SHELL_RM_PROMPT": {
       "kind": "env_var",
@@ -11018,6 +11392,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_TELEPORT_MOVE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_TERMINAL_MCP_TOOLS": {
       "kind": "env_var",
       "ranges": [
@@ -11083,6 +11468,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_THREAD_CPU_ONE_IN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_THRIFTY_SONIC": {
       "kind": "env_var",
@@ -11205,6 +11601,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_TOOL_PICTURE_SERVERS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_TOTAL_TOKENS_REMINDER": {
       "kind": "env_var",
       "ranges": [
@@ -11260,6 +11667,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_TRANSCRIPT_TAIL_LOAD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_TRIGGER_ID": {
       "kind": "env_var",
       "ranges": [
@@ -11304,6 +11722,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_LAUNCH_RECORD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE": {
       "kind": "env_var",
       "ranges": [
@@ -11314,6 +11743,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_PR_AS_MERGED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE": {
       "kind": "env_var",
@@ -11347,6 +11787,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_USER_DELEGATED_SESSION_ALLOWED_CHECK_MODELS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_USER_DELEGATED_SESSION_DIRECT_API": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_USER_DIALOG_TIMEOUT_MS": {
       "kind": "env_var",
@@ -11920,6 +12382,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_GATEWAY_LOG_FORMAT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_GATEWAY_LOG_LEVEL": {
       "kind": "env_var",
       "ranges": [
@@ -12228,6 +12701,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_RUNNER_DISABLE_RENEWAL_WARNING": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_RUNNER_DISABLE_TURN_BEGAN_BEFORE_INIT": {
       "kind": "env_var",
       "ranges": [
@@ -12464,8 +12948,8 @@
       "ranges": [
         {
           "since": "4.16336.0",
-          "until": null,
-          "removed": null
+          "until": "4.16336.0",
+          "removed": "5.1231.0"
         }
       ],
       "since_bounded": false
@@ -14131,13 +14615,24 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.NODE_ENVfunctionSource": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.NODE_ENVfunctionSourceallowCodeFromDisklocaleslogoutputsBundle": {
       "kind": "env_var",
       "ranges": [
         {
           "since": "4.16336.0",
-          "until": null,
-          "removed": null
+          "until": "4.16336.0",
+          "removed": "5.1231.0"
         }
       ],
       "since_bounded": false
@@ -15417,6 +15912,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.TZ": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.USER": {
       "kind": "env_var",
@@ -17431,6 +17937,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.disableReplyCheck": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.disableSideloadFlags": {
       "kind": "setting",
       "ranges": [
@@ -17452,6 +17969,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.disableWindowsBashCommandSplit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.disableWorkflows": {
       "kind": "setting",
@@ -18635,6 +19163,138 @@
       "ranges": [
         {
           "since": "4.16336.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.additionalDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.allow": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.ask": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.blockReadsExemptPaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.blockReadsOutsideWorkingDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.blockWritesOutsideWorkingDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.defaultMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.deny": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.denyInsteadOfPrompting": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.disableAutoMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.disableBypassPermissionsMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.workingDirectoriesAsGiven": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "5.1231.0",
           "until": null,
           "removed": null
         }

@@ -1,7 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T16:28:47.066235728Z",
+  "generated_at": "2026-11-10T16:47:46.966590707Z",
   "versions": [
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "5.1231.0",
+      "released_at": "2026-11-10T07:14:38.847Z",
+      "captured_at": "2026-11-10T16:47:46.966590707Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "4.16336.0",
+      "changes": 136,
+      "categories": {
+        "binary": 4,
+        "cli": 7,
+        "config": 10,
+        "network": 84,
+        "prompt": 3,
+        "request": 1,
+        "side_requests": 5,
+        "tools": 22
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 121
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+1013 −924 chars)",
+        "System prompt changed",
+        "System prompt changed (+1506 −1414 chars)"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6224,37 +6260,6 @@
         "view_image tool parameter detail added",
         "New flag `codex app-server --ws-token-sha256`",
         "Description of `codex exec-server` changed"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.120.0",
-      "released_at": "2026-04-11T02:54:37.375Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.119.0",
-      "changes": 6,
-      "categories": {
-        "binary": 1,
-        "filesystem": 5
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 5
-      },
-      "undocumented": 5,
-      "highlights": [
-        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --sandbox-policy {\"type\":\"works …` (linux/amd64)",
-        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --sandbox-policy {\"type\":\"works …` (linux/amd64)",
-        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --sandbox-policy {\"type\":\"works …` (linux/amd64)"
       ],
       "signing": "revoked"
     }

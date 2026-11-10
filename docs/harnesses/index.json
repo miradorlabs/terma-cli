@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T16:28:47.066235728Z",
+  "generated_at": "2026-11-10T16:47:46.966590707Z",
   "harnesses": [
     {
       "id": "claude",
@@ -30,11 +30,27 @@
       "vendor": "Anthropic",
       "homepage": "https://claude.ai/download",
       "source": null,
-      "latest": "4.16336.0",
-      "support": "supported",
-      "versions_tracked": 1,
+      "latest": "5.1231.0",
+      "support": "untested",
+      "versions_tracked": 2,
       "first_tracked": "2026-11-03",
-      "last_change": null
+      "last_change": {
+        "from": "4.16336.0",
+        "to": "5.1231.0",
+        "at": "2026-11-10T16:47:46.966590707Z",
+        "released_at": "2026-11-10T07:14:38.847Z",
+        "changes": 136,
+        "categories": {
+          "binary": 4,
+          "cli": 7,
+          "config": 10,
+          "network": 84,
+          "prompt": 3,
+          "request": 1,
+          "side_requests": 5,
+          "tools": 22
+        }
+      }
     },
     {
       "id": "codex",

@@ -6,13 +6,63 @@
     "vendor": "Anthropic",
     "homepage": "https://claude.ai/download",
     "source": null,
-    "latest": "4.16336.0",
-    "support": "supported",
-    "versions_tracked": 1,
+    "latest": "5.1231.0",
+    "support": "untested",
+    "versions_tracked": 2,
     "first_tracked": "2026-11-03",
-    "last_change": null
+    "last_change": {
+      "from": "4.16336.0",
+      "to": "5.1231.0",
+      "at": "2026-11-10T16:47:46.966590707Z",
+      "released_at": "2026-11-10T07:14:38.847Z",
+      "changes": 136,
+      "categories": {
+        "binary": 4,
+        "cli": 7,
+        "config": 10,
+        "network": 84,
+        "prompt": 3,
+        "request": 1,
+        "side_requests": 5,
+        "tools": 22
+      }
+    }
   },
   "versions": [
+    {
+      "version": "5.1231.0",
+      "released_at": "2026-11-10T07:14:38.847Z",
+      "captured_at": "2026-11-10T16:47:46.966590707Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "4.16336.0",
+      "changes": 136,
+      "categories": {
+        "binary": 4,
+        "cli": 7,
+        "config": 10,
+        "network": 84,
+        "prompt": 3,
+        "request": 1,
+        "side_requests": 5,
+        "tools": 22
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 121
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+1013 −924 chars)",
+        "System prompt changed",
+        "System prompt changed (+1506 −1414 chars)"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "4.16336.0",
       "released_at": "2026-11-03T07:13:41.864Z",

@@ -1,5 +1,1100 @@
 {
   "schema_version": 1,
   "harness": "claude-desktop",
-  "steps": []
+  "steps": [
+    {
+      "version": "5.1231.0",
+      "previous": "4.16336.0",
+      "changes": [
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+1013 −924 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.system.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+1506 −1414 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__clean_up_worktrees.input_schema.properties._consent.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_host__clean_up_worktrees tool parameter _consent: description changed (+492 −30 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__open_in_editor.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_host__open_in_editor tool description changed (+214 −188 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__open_in_editor.input_schema.properties.path.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_host__open_in_editor tool parameter path: description changed (+234 −71 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__reveal_path.input_schema.properties.path.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_host__reveal_path tool parameter path: description changed (+246 −83 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_pr__set_monitor.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_pr__set_monitor tool description changed (+272 −163 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session__start_session.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_session__start_session tool description changed (+1071 −1039 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session__start_session.input_schema.properties.proposal_id.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_session__start_session tool parameter proposal_id: description changed (+230 −193 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_sidebar__list_sections.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_sidebar__list_sections tool description changed (+242 −209 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_sidebar__rename_section.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_sidebar__rename_section tool description changed (+159 −189 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_sidebar__set_view.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_sidebar__set_view tool description changed (+433 −310 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_turn__wrap_up.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_turn__wrap_up tool description changed (+421 −402 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_turn__wrap_up.input_schema.properties.actions.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_turn__wrap_up tool parameter actions: description changed (+170 −0 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_turn__wrap_up.input_schema.properties.actions.items.properties.action.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_turn__wrap_up tool parameter actions: items.properties.action.description changed (+354 −273 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_turn__wrap_up.input_schema.properties.actions.items.properties.label.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__ccd_turn__wrap_up tool parameter actions: items.properties.label.description changed (+297 −285 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__scheduled-tasks__list_scheduled_tasks.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__scheduled-tasks__list_scheduled_tasks tool description changed (+568 −0 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__scheduled-tasks__list_task_runs.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__scheduled-tasks__list_task_runs tool description changed (+169 −172 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__scheduled-tasks__run_scheduled_task.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__scheduled-tasks__run_scheduled_task tool description changed (+508 −507 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__terminal__list_terminal_tabs",
+          "category": "tools",
+          "op": "removed",
+          "title": "Tool removed: mcp__terminal__list_terminal_tabs",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__terminal__open_terminal_tab",
+          "category": "tools",
+          "op": "removed",
+          "title": "Tool removed: mcp__terminal__open_terminal_tab",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__terminal__read_terminal.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__terminal__read_terminal tool description changed (+0 −107 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__terminal__run_in_terminal",
+          "category": "tools",
+          "op": "removed",
+          "title": "Tool removed: mcp__terminal__run_in_terminal",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__terminal__stop_terminal_tab",
+          "category": "tools",
+          "op": "removed",
+          "title": "Tool removed: mcp__terminal__stop_terminal_tab",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: claude-cli/2.1.317 (external, claude-desktop-3p, agent-sd… → claude-cli/2.1.321 (external, claude-desktop-3p, agent-sd…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude plugin restore-set-aside",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `claude plugin restore-set-aside`",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.plugin --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `plugin --help` changed (+3887 −3555 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_DESKTOP_MESSAGE_CARD",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CODE_DESKTOP_MESSAGE_CARD",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_AGENT_SDK_VERSION",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's CLAUDE_AGENT_SDK_VERSION: 0.3.317 → 0.3.321",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_DESKTOP_MESSAGE_CARD",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CODE_DESKTOP_MESSAGE_CARD: none → 1",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-99b90eb7d94b0358 → <hex>-9639c2a7d6ff93ba",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.attributionProject.description",
+          "category": "config",
+          "op": "changed",
+          "title": "attributionProject description changed (+179 −139 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.attributionProjectPolicy.default.description",
+          "category": "config",
+          "op": "changed",
+          "title": "attributionProjectPolicy.default description changed (+185 −145 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.cleanupPeriodDays.description",
+          "category": "config",
+          "op": "changed",
+          "title": "cleanupPeriodDays description changed (+276 −198 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.desktopSessionCleanupPeriodDays.description",
+          "category": "config",
+          "op": "changed",
+          "title": "desktopSessionCleanupPeriodDays description changed (+77 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableReplyCheck",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: disableReplyCheck",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableWindowsBashCommandSplit",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: disableWindowsBashCommandSplit",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.description",
+          "category": "config",
+          "op": "changed",
+          "title": "forceLoginMethod description changed (+188 −141 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.pluginSuggestionMarketplaces.description",
+          "category": "config",
+          "op": "changed",
+          "title": "pluginSuggestionMarketplaces description changed (+129 −127 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.sshHostCommands.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sshHostCommands description changed (+561 −318 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +45 −4",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.317/darwin-arm64/claude.app.tar.zst",
+          "category": "network",
+          "op": "removed",
+          "title": "Network request no longer made: GET downloads.claude.ai/claude-code-releases/2.1.317/darwin-arm64/claude.app.tar.zst",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.321/darwin-arm64/claude.app.tar.zst",
+          "category": "network",
+          "op": "added",
+          "title": "New network request: GET downloads.claude.ai/claude-code-releases/2.1.321/darwin-arm64/claude.app.tar.zst",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_agent_name_set.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_agent_name_set telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_after_normalize.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_api_after_normalize telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_before_normalize.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_api_before_normalize telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_cache_breakpoints.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_api_cache_breakpoints telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_query.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_api_query telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_success.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_api_success telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_artifact_toolset.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_artifact_toolset telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_attachment_compute_duration.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_attachment_compute_duration telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_attachments.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_attachments telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_auto_compact_window_in_force.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_auto_compact_window_in_force telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_bg_classify.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_bg_classify telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_claudeai_mcp_eligibility.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_claudeai_mcp_eligibility telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_claudemd__initial_load.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_claudemd__initial_load telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_cli_flags.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_cli_flags telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_config_cache_stats.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_config_cache_stats telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_announcement.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_context_announcement telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_rendering_recorded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_context_rendering_recorded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_size.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_context_size telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_dir_search.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_dir_search telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_bad.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_feature_bad telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_ok.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_feature_ok telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_sad.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_feature_sad telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_file_history_snapshot_success.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_file_history_snapshot_success telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_fork_subagent_enabled.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_fork_subagent_enabled telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_mcp_first_turn_join.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_headless_mcp_first_turn_join telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_mcp_prewait.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_headless_mcp_prewait telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_plugin_install.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_headless_plugin_install telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_init.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_init telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_input_prompt.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_input_prompt telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_managed_config_ready.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_managed_config_ready telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_managed_settings_loaded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_managed_settings_loaded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_managed_settings_os_read.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_managed_settings_os_read telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_mcp_registry_fetch.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_mcp_registry_fetch telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_mcp_sdk_generation.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_mcp_sdk_generation telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_mcp_tools_listed.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_mcp_tools_listed telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_memdir_loaded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_memdir_loaded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_org_config_gate_shadow.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_org_config_gate_shadow telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_enabled_for_session.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_plugin_enabled_for_session telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_name_collision.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_plugin_name_collision telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_skills_dir_loaded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_plugin_skills_dir_loaded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_prompt_suggestion",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_prompt_suggestion",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_prompt_suggestion_init.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_prompt_suggestion_init telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_reminder_fold_recorded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_reminder_fold_recorded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_reminder_fold_replayed.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_reminder_fold_replayed telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_repl_hook_finished.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_repl_hook_finished telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_retention_sweep.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_retention_sweep telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_run_hook.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_run_hook telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_init_handshake.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_sdk_init_handshake telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_result.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_sdk_result telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_ttft.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_sdk_ttft telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_session_renamed.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_session_renamed telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shell_allow_rules_at_init.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_shell_allow_rules_at_init telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shell_set_cwd.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_shell_set_cwd telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shutdown_pending_state.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_shutdown_pending_state telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_skill_loaded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_skill_loaded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_started.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_started telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sysprompt_block.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_sysprompt_block telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_timer.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_timer telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_tool_schema_sizes.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_tool_schema_sizes telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_tool_search_mode_decision.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_tool_search_mode_decision telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_end.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_turn_end telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_end_classifier_hold.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_turn_end_classifier_hold telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_first_text.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_turn_first_text telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_uds_startup_bind.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_uds_startup_bind telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_shape_recorded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_wire_shape_recorded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_tool_input_echo_recorded.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_wire_tool_input_echo_recorded telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_tool_input_echo_replayed.fields.rh",
+          "category": "network",
+          "op": "added",
+          "title": "tengu_wire_tool_input_echo_replayed telemetry event field rh added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.code.session.first_text",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.code.session.first_text",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.code.session.ttft",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.code.session.ttft",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.desktop.code.flint.evaluated",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.desktop.code.flint.evaluated",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.desktop.code.landing.session_created",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.desktop.code.landing.session_created",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.epitaxy.session.meta_resolved",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.epitaxy.session.meta_resolved",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.epitaxy.session.opened",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.epitaxy.session.opened",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.epitaxy.session_rail.docked_at_session_open",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.epitaxy.session_rail.docked_at_session_open",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.claudeai.perf.web_vital",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: claudeai.perf.web_vital",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_list_loaded.fields.auth.account_uuid",
+          "category": "network",
+          "op": "removed",
+          "title": "desktop_ccd_session_list_loaded telemetry event field auth.account_uuid removed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_terminal_spawned",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_ccd_terminal_spawned",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_low_data_mode_state",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_low_data_mode_state",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_main_event_loop_stall",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_main_event_loop_stall",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_session_title_set",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_session_title_set",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_update_check_started.fields.auth.account_uuid",
+          "category": "network",
+          "op": "added",
+          "title": "desktop_update_check_started telemetry event field auth.account_uuid added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_update_not_available.fields.auth.account_uuid",
+          "category": "network",
+          "op": "added",
+          "title": "desktop_update_not_available telemetry event field auth.account_uuid added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.download",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.download: https://downloads.claude.ai/claude-code-releases/2.1.317/… → https://downloads.claude.ai/claude-code-releases/2.1.321/…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.sdk",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.sdk: @anthropic-ai/claude-agent-sdk 0.3.317 → @anthropic-ai/claude-agent-sdk 0.3.321",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.version",
+          "category": "binary",
+          "op": "changed",
+          "title": "Runs its agent's build 2.1.321 (was 2.1.317)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "binary.signing.certificate",
+          "category": "binary",
+          "op": "changed",
+          "title": "Signed with a different certificate",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
+    }
+  ]
 }
