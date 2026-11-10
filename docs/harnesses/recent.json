@@ -1,7 +1,38 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T16:47:46.966590707Z",
+  "generated_at": "2026-11-10T17:17:30.953104486Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.109",
+      "released_at": "2026-11-10T17:01:16.753Z",
+      "captured_at": "2026-11-10T17:17:30.953104486Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.108",
+      "changes": 56,
+      "categories": {
+        "cli": 13,
+        "config": 42,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 56,
+        "notable": 0
+      },
+      "undocumented": 6,
+      "highlights": [
+        "`copilot --allow-all`: description changed",
+        "`copilot --usage-output-file`: description changed (+237 −58 chars)",
+        "Description of `copilot update` changed"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "claude-desktop",
       "name": "Claude Desktop (Code)",
@@ -6226,40 +6257,6 @@
         "New hook event: PermissionRequest",
         "Default of `codex app --download-url`: https://persistent.oaistatic.com/codex-app-prod/Codex.dmg → none",
         "Command removed: `codex marketplace`"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.121.0",
-      "released_at": "2026-04-15T20:46:45.517Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.120.0",
-      "changes": 36,
-      "categories": {
-        "binary": 1,
-        "cli": 14,
-        "config": 16,
-        "filesystem": 4,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 35,
-        "notable": 1
-      },
-      "undocumented": 19,
-      "highlights": [
-        "view_image tool parameter detail added",
-        "New flag `codex app-server --ws-token-sha256`",
-        "Description of `codex exec-server` changed"
       ],
       "signing": "revoked"
     }

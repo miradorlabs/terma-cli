@@ -24205,7 +24205,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-10T16:47:46.966590707Z",
+    "fetched_at": "2026-11-10T17:17:30.953104486Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -26067,7 +26067,7 @@
       },
       "syntaxHighlightingDisabled": {
         "default": "`false`",
-        "description": "Claude Code colors code by language in the diffs, code blocks, and file previews it shows in the terminal, with its built-in highlighter; no plugin or language server is involved. Set this key to `true` to show them as plain text instead, for example if the colors clash with your terminal theme or slow a screen reader.",
+        "description": "Claude Code colors code by language in the diffs, code blocks, and file previews it shows in the terminal, with its built-in highlighter. Set this key to `true` to show them as plain text instead, for example if the colors clash with your terminal theme or slow a screen reader.",
         "read": true,
         "scope": "Any file",
         "topic": "Interface and terminal",

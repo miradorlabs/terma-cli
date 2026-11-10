@@ -3,6 +3,460 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.109",
+      "previous": "1.0.108",
+      "changes": [
+        {
+          "id": "cli.commands.copilot.options.--allow-all.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --allow-all`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--usage-output-file.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --usage-output-file`: description changed (+237 −58 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot update.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `copilot update` changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+9364 −8788 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.config --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `config --help` changed (+319 −319 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.config -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `config -h` changed (+268 −268 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+3026 −1257 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help providers",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help providers` changed (+1596 −5902 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.init --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `init --help` changed (+120 −120 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.init -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `init -h` changed (+167 −167 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.login --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `login --help` changed (+132 −132 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.login -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `login -h` changed (+122 −122 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.update --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `update --help` changed (+608 −46 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.autoUpdate.description",
+          "category": "config",
+          "op": "changed",
+          "title": "autoUpdate description changed (+412 −44 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.beep.description",
+          "category": "config",
+          "op": "changed",
+          "title": "beep description changed (+145 −37 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.beepOnSchedule.description",
+          "category": "config",
+          "op": "changed",
+          "title": "beepOnSchedule description changed (+163 −35 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.companyAnnouncements.description",
+          "category": "config",
+          "op": "changed",
+          "title": "companyAnnouncements description changed (+107 −50 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.disabledSkills.description",
+          "category": "config",
+          "op": "changed",
+          "title": "disabledSkills description changed (+390 −33 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.effortLevel.description",
+          "category": "config",
+          "op": "changed",
+          "title": "effortLevel description changed (+307 −44 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.enabledPlugins.description",
+          "category": "config",
+          "op": "changed",
+          "title": "enabledPlugins description changed (+409 −51 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces description changed (+438 −54 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.footer.showCustom.description",
+          "category": "config",
+          "op": "changed",
+          "title": "footer.showCustom description changed (+188 −28 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.footer.showModelEffort.description",
+          "category": "config",
+          "op": "changed",
+          "title": "footer.showModelEffort description changed (+163 −46 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.ide.openDiffOnEdit.description",
+          "category": "config",
+          "op": "changed",
+          "title": "ide.openDiffOnEdit description changed (+218 −37 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.inlineImages.description",
+          "category": "config",
+          "op": "changed",
+          "title": "inlineImages description changed (+174 −101 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.memory.description",
+          "category": "config",
+          "op": "changed",
+          "title": "memory description changed (+444 −50 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.mergeStrategy.description",
+          "category": "config",
+          "op": "changed",
+          "title": "mergeStrategy description changed (+421 −51 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.model.description",
+          "category": "config",
+          "op": "changed",
+          "title": "model description changed (+306 −32 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.powershellFlags.description",
+          "category": "config",
+          "op": "changed",
+          "title": "powershellFlags description changed (+409 −45 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.auth.git.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.auth.git description changed (+388 −157 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.network.proxy.url.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.network.proxy.url description changed (+162 −177 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.scrollbar.description",
+          "category": "config",
+          "op": "changed",
+          "title": "scrollbar description changed (+262 −39 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.showTimestamps.description",
+          "category": "config",
+          "op": "changed",
+          "title": "showTimestamps description changed (+145 −60 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.statusLine.command.description",
+          "category": "config",
+          "op": "changed",
+          "title": "statusLine.command description changed (+436 −146 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.stream.description",
+          "category": "config",
+          "op": "changed",
+          "title": "stream description changed (+192 −27 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.subagents.agents.description",
+          "category": "config",
+          "op": "changed",
+          "title": "subagents.agents description changed (+257 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.subagents.maxConcurrency.description",
+          "category": "config",
+          "op": "changed",
+          "title": "subagents.maxConcurrency description changed (+108 −97 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.subagents.maxDepth.description",
+          "category": "config",
+          "op": "changed",
+          "title": "subagents.maxDepth description changed (+85 −74 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.tabs.enabled.description",
+          "category": "config",
+          "op": "changed",
+          "title": "tabs.enabled description changed (+262 −29 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.tabs.hide.description",
+          "category": "config",
+          "op": "changed",
+          "title": "tabs.hide description changed (+145 −43 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.tabs.sort.description",
+          "category": "config",
+          "op": "changed",
+          "title": "tabs.sort description changed (+168 −33 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.terminalProgress.description",
+          "category": "config",
+          "op": "changed",
+          "title": "terminalProgress description changed (+179 −42 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.voice.enabled.description",
+          "category": "config",
+          "op": "changed",
+          "title": "voice.enabled description changed (+327 −31 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.maxAiCredits.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.maxAiCredits description changed (+370 −240 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.maxConcurrentSubagents.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.maxConcurrentSubagents description changed (+380 −250 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.maxTotalSubagents.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.maxTotalSubagents description changed (+361 −231 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.timeoutSeconds.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.timeoutSeconds description changed (+343 −213 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.logPhaseNames.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.logPhaseNames description changed (+201 −67 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.maxConcurrentRuns.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.maxConcurrentRuns description changed (+227 −93 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.COPILOT_EXTENSION_INITIALIZATION",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: COPILOT_EXTENSION_INITIALIZATION",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_ASSISTED_APPROVAL",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_ASSISTED_APPROVAL",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_E2E_AZUREML_CATALOG",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_E2E_AZUREML_CATALOG",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_E2E_GPU_MEMORY_BYTES",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_E2E_GPU_MEMORY_BYTES",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_ENABLE_INTERRUPTED_SESSION_RESTORE",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_ENABLE_INTERRUPTED_SESSION_RESTORE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_ENTRA_DISABLE_ONEAUTH",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_ENTRA_DISABLE_ONEAUTH",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.0.108",
       "previous": "1.0.107",
       "changes": [

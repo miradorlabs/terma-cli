@@ -1,0 +1,1272 @@
+{
+  "schema_version": 1,
+  "harness": "copilot",
+  "from": "1.0.108",
+  "to": "1.0.109",
+  "generated_at": "2026-11-10T17:17:30.953104486Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "text": "- Add IPv4/IPv6 CIDR support for sandbox host allow and deny rules in settings.\n- Add support for Claude Fable 5.2 in the model picker under New models\n- copilot help input now says that Backspace at the start of shell input leaves shell mode and keeps the typed text, not only on an empty prompt\n- /subagents keeps its Overridden and Status columns readable on narrow terminals and aligns agent names with wide characters\n- Removing a built-in MCP server with `copilot mcp remove` or `/mcp delete` explains how to disable it instead\n- Selecting a directory next to your home directory in `/cd ~` or `/add-dir ~` uses the correct full path\n- Trusted-folder and worktree confirmations keep Windows path separators\n- Hide empty assistant reply bullets when a response contains only whitespace\n- Choosing \"don't ask again\" for parallel file operations approves all covered requests without prompting again\n- Make /terminal-setup configure Shift+Enter in the correct location for VS Code, Cursor, and Windsurf on Linux when XDG_CONFIG_HOME is set\n- The footer's AI credits now update as soon as `/compact` finishes instead of after the next turn\n- Prompt mode with --output-format json emits a final result record with an exit status even when a run fails early\n- Rate-limit errors now name the same mode as the switch dialog (Copilot Fusion mode or auto mode) instead of \"auto model\"\n- In a multi-line prompt, Up and Down now start from the cursor after Left, Right, Backspace, Delete or a similar key that had nothing to act on at the start or end of the text, instead of jumping to the column of the previous Up/Down run\n- Number keys keep working in shell and URL approval dialogs after pressing the number of the \"No, and tell Copilot\" option and moving back up\n- `/cd .` and `/add-dir .` now keep the current directory in a git repository instead of selecting `.git`; the directory picker lists `./` first and still offers hidden directories below it\n- In ACP mode, a preToolUse hook that answers ask now asks the ACP client to allow or deny the tool call instead of denying it as host policy\n- /voice immediately reports an overly long socket path and how to fix it, instead of waiting before showing a generic error.\n- File move permission prompts show both source and destination paths, and pure renames no longer show an empty diff.\n- Session history keeps every turn when a second window works on a session another window still has open\n- The `beepOnSchedule` setting description now says it controls the beep when a scheduled `/every` or `/after` turn finishes, and only while `beep` is on, instead of a beep when the prompt fires\n- The `companyAnnouncements` setting description now says one message, picked at random, appears in the timeline as a Company announcement notice, not in the startup banner\n- `copilot help config` no longer says turning off `compactPaste` shows every paste in full; pastes over 20 KB are still saved to a workspace file\n- `copilot help config` now names the home screen tabs as they appear, Current and Sessions, instead of Session and Agents\n- The `ctrl+h` entry in the keyboard shortcut help now says it deletes the previous word in local Windows terminals, where the terminal sends the same key for `ctrl+h` and `ctrl+backspace`\n- The `footer.showModelEffort` setting description now says it toggles only the reasoning effort label next to the model name, which always shows, and that the effort shows briefly after it changes when the setting is unset\n- `copilot help config` no longer names staff-only and internal settings, such as `taskbarPresence`, `showTipsOnStartup` and `streamerMode`\n- The `ide.openDiffOnEdit` setting description now says the IDE diff opens for a file edit waiting for your approval, and that accepting or rejecting it answers that prompt, instead of a diff on every edit\n- Text typed after /init now reaches the model as extra guidance for the generated instructions file and appears in the timeline, instead of being silently dropped.\n- The `/init` usage hint now shows `[suppress|<instructions>]`, since text after `/init` guides what it writes, instead of listing only `suppress`\n- The `inlineImages` setting description no longer says images render with Sixel graphics by default; Sixel is used only with experimental features on\n- MCP tool results that return text as a base64 `blob` resource with a text MIME type, such as `text/plain` or `application/json`, now reach the model instead of arriving as an empty result\n- `copilot help providers-env` and `copilot help environment` no longer say `COPILOT_PROVIDER_BEARER_TOKEN` always takes precedence over `COPILOT_PROVIDER_API_KEY`: it does for openai and azure, but anthropic sends both\n- `copilot help providers-env` and `copilot help environment` now say `COPILOT_PROVIDER_MODEL_ID` and `COPILOT_PROVIDER_WIRE_MODEL` default to the `--model` value before `COPILOT_MODEL`, and that the wire model falls back to `COPILOT_PROVIDER_MODEL_ID`\n- `copilot help providers-env` and `copilot help environment` now say `COPILOT_PROVIDER_TRANSPORT=websockets` works only with provider type openai and the responses wire API, instead of implying it works for azure and anthropic too\n- `copilot help providers-env` no longer says COPILOT_PROVIDER_API_KEY_COMMAND output is always sent: it says the command does not run when COPILOT_PROVIDER_BEARER_TOKEN is set, and that a custom credential header's precedence depends on the provider type\n- `copilot help providers-env` and `copilot help environment` now say that `COPILOT_PROVIDER_*` variables take precedence over a saved `providers.json`, unless `COPILOT_PROVIDERS_CONFIG` names the file\n- `copilot help providers-local` now says Copilot looks for Ollama only on this machine, and that an `OLLAMA_HOST` on another machine is ignored\n- Running /research again on the same topic, or on a topic that starts with the same words, now saves a new report instead of trying to write over the earlier one.\n- The `sandbox.auth.git` setting description now says sandboxed git gets a masked credential that the sandbox proxy swaps for the real one only at that HTTPS origin, and that hosts other than GitHub use your own git credential helper, instead of saying the GitHub token is injected\n- The `sandbox.userPolicy.network.proxy.url` setting description now says sandboxed traffic always reaches the configured proxy through the built-in local proxy, which keeps proxy credentials away from sandboxed commands, instead of saying traffic without host rules uses the proxy directly\n- Sessions closed or disposed outside the sessions API no longer stay in memory in the CLI's embedded SDK server\n- A collapsed grep or glob row now counts only the files or lines a search found, not the summary lines of a large result or an appended warning, which made an empty search read \"3 files found\".\n- The search subagent's semantic_search tool now tells the model it returns up to 5 excerpts from GitHub's code index for the repository, instead of claiming to search the local workspace and return its full contents when small.\n- The `/settings` value column, the footer's model name and the startup warning for an invalid `allowedUrls` or `deniedUrls` entry no longer pass control characters from settings.json to the terminal.\n- The `subagents.maxConcurrency` and `subagents.maxDepth` setting descriptions now say the settings are ignored on Copilot plans without usage-based billing, instead of saying they apply only to usage-based billing users\n- `copilot update --help` no longer calls stable the default update channel: with no channel argument and no `autoUpdatesChannel` setting, a prerelease build stays on prerelease\n- A mistyped server in your own mcp-config.json is now reported at startup and in mcp list, and an mcp-config.json that cannot be used names the file and the real problem.\n- On Windows, memory the runtime frees after a turn, a session resume or a closed session is now returned to the system instead of staying committed to the process\n- copilot workflow run now explains that dynamic workflows need experimental features (or a non-disabled extension mode) and exits with status 2, instead of failing with an internal error\n- Cancelled, denied, or failed memory votes now show \"Memory update failed\" in the timeline\n- Unquoted prompts get accurate quoting guidance without suggestions that turn CLI options into prompt text.\n- Keep selected skill problems visible while navigating long /skills problem lists\n- Show parser errors for mistyped --prompt/--interactive options, and shell-neutral guidance instead of an unsafe -i suggestion for prompts with shell-sensitive characters\n- Repository settings warnings point to the actual syntax error in files with comments or trailing commas\n- Preserve file names, globs, and links in expanded JSON tool results instead of interpreting them as Markdown\n- Display search patterns and tool errors in the concise transcript without letting escape sequences alter terminal colors or formatting.\n- Preserve settings saved by other sessions when changing nested settings in /settings or /config\n- Pressing Esc after reopening /help over another full-screen view returns to the prompt without leaving the CLI blank and unresponsive\n- MCP dashboard now keeps runtime-only servers read-only on local sessions\n- Warn when a collected debug bundle has missing or empty process logs\n- /rubber-duck is offered on the default model from the start of a session, on Auto once a model has been picked, and after switching to an eligible model with /model\n- Backspace at the start of shell input exits shell mode and keeps the typed text, so a prompt that enters shell mode while editing is no longer stuck there\n- Clear the compaction indicator when background summarization finishes, even while a tool is still running\n- Show an error when a selected or saved model is unavailable instead of silently switching to another model\n- Sandbox denied paths on Linux now block access to developer-tool configuration files inside those paths.\n- Use custom agents added to .github/agents/ during a session without reloading\n- Start sessions faster with --session-id when you have a large local session history\n- Preserve settings changes when another CLI session saves a different setting at the same time\n- Prevent duplicate shell commands from staying pending when parallel sub-agents request approval, including after resuming a session\n- IDE discovery and auto-connect work when the CLI cannot signal the IDE process, including across sandbox boundaries\n- Connect to MCP servers that omit optional discovery cache hints, making their tools available to Copilot\n- MCP servers can use stored secrets in the default profile without requiring --config-dir\n- Resume sessions saved by earlier CLI versions with unreadable code-change line counts\n- Ensure post-checkout hooks run Git commands against the intended repository when using --worktree\n- Ctrl+C dismisses dialogs or exits reverse search without cancelling an ongoing /compact\n- Resume sessions by name with --resume or /resume even when names contain special characters\n- Repository scans skip nested filesystems, avoiding stalled-mount exit delays on Linux when statx is available\n- Built-in file and text searches work on ARM64 Linux systems with 16 KiB or 64 KiB memory pages\n- Canceling the Autopilot confirmation leaves picker-submitted slash commands unexecuted, and confirming runs them only once\n- MCP servers disabled by repository settings now stop when you trust the folder, removing their tools from the session.\n- The /mcp screen respects repository-disabled servers and no longer labels them as session-disabled\n- Show error details when expanding failed search or diagnostics calls with Ctrl+O\n- Continuing from the session credit limit dialog no longer shows a false \"Session limit reached\" notice.\n- Hide inaccurate context percentages in /context and the footer when Auto uses Copilot Fusion High or Max.\n- Preserve file contents when renaming files with case-only changes or moving them through symlinked directories\n- Markdown session exports keep later transcript entries visible when task summaries, notifications, or handoff summaries contain HTML-like text\n- Pressing Ctrl+C again after stopping a ! shell command shows the exit warning instead of immediately quitting the CLI\n- Make `copilot mcp list` and `copilot mcp get` honor `--additional-mcp-config` and `--plugin-dir`, matching the servers used in a session\n- Stopping a background agent from /tasks also stops attached background shells started by it and its subagents, while leaving detached shells running\n- Plugin hooks, MCP servers, and extensions work when COPILOT_HOME or --config-dir is a relative path\n- Show policy guidance, a settings link, and a request ID when access to the model catalog is denied at startup\n- Keep repository-disabled skills disabled in /skills when trusting a folder for the current session only\n- Esc and Ctrl+C cancel a pending prompt immediately while an MCP server's authentication refresh is still running\n- CLI colors stay in sync when your terminal follows an OS light or dark theme change\n- MCP servers start even when an unrelated setting in config.json has an invalid value\n- Resuming an interactive session with --context now applies the requested context window tier instead of keeping the saved tier\n- Repaint the Windows terminal at the correct size after rapid window resizing\n- Keep images attached when editing text around image labels whose filenames contain `]`\n- Declining folder trust after /new worktree keeps the CLI open in the original folder instead of exiting\n- /rename without a name shows an error when the generated session name cannot be applied\n- Include cross-file edits and references in the first LSP rename or reference search when a language server loads its project lazily\n- Render Markdown in expanded subagent replies and prevent quoted terminal escape sequences from changing their appearance\n- Preserve saved MCP server settings when editing a server overridden by --additional-mcp-config\n- Completed sessions show Done instead of staying stuck on Working in the sidebar after switching sessions\n- MCP allow rules now approve a tool named the way its MCP server advertises it (for example `--allow-tool 'server(weather.lookup)'` or a tool name longer than 64 characters), matching how deny rules already work\n- Preserve long responses in session history and resumed sessions, even if a later continuation fails\n- Recover instruction scoping when malformed frontmatter wraps list values over lines or quotes scoping keys\n- A `sessionStart` or `preToolUse` hook that returns `\"additionalContext\": null` no longer sends the text `null` to the model; `null` is treated as absent, as it already was for `userPromptSubmitted`\n- The session.usage_info event now reports isInitial as true only for the session's first usage report, as documented, instead of for the first model request of every message.\n- Copying wrapped values from dialogs such as /session info preserves paths without inserting extra line breaks\n- HydraFusion review and repair phases no longer fail instantly when an SDK app resumes the session with the same token while the turn is running.\n- In-session /resume now explains why a cloud history session ID cannot be resumed\n- Progress messages on client-owned background tasks are now capped at the 20 most recent, so a long-running SDK task no longer makes session.tasks.getProgress grow without bound or each progress update slower.\n- Listing models before any session exists no longer keeps failing with 421 Misdirected Request after a plan change; the account's endpoint is re-resolved and the list is retried once.\n- Local models with `persist: true` reuse their running server across runs when the CLI is launched without `HOME` or `COPILOT_HOME`, instead of starting a new server every time\n- /mcp commands that take a server name (enable, disable, get, edit, remove, auth and add) now use the whole name typed after the subcommand, so a mistyped multi-word name reports that the server was not found instead of acting on a server named after its first word.\n- Collapsed grep and glob rows no longer count the lines of the warning about unreadable files as results when part of the searched tree cannot be read.\n- On Linux, language servers are now told about files created in a workspace directory that was deleted and recreated in one quick step, such as a build or code generator regenerating its output directories.\n- Pasted text drops terminal color codes and invisible control characters so the model receives the text shown in the prompt\n- The packaged CLI ignores its embedded Node.js flags, such as --no-warnings, when they are passed back to it as arguments, instead of failing with an unexpected argument error\n- On Linux, a build writing many files into a large workspace no longer keeps a CPU core busy for seconds while language servers are watching files.\n- Ctrl+G in a question from the agent opens your typed or \"Other\" answer in your editor again, instead of cancelling the question.\n- In /sandbox, a path or host rule that settings.json lists twice now shows as one row, so deleting it no longer leaves the deleted row on screen or makes the next delete remove a different entry.\n- /pr shows every reviewer when a team name contains | or Markdown characters, instead of cutting the Reviews row off at the first |.\n- /lsp test no longer reports working stdio language servers as exiting immediately: the startup check keeps the server's input open while it watches, as a real client does.\n- A repository whose remote uses GitHub's SSH-over-443 host (ssh.github.com) is now recognised as its github.com repository, so the session knows its repository instead of treating the folder as outside GitHub.\n- /keep-alive busy restores sleep prevention on the next turn or session switch if its helper exits while a background session is working.\n- Installing a plugin from a GitHub or git repository that uses Git LFS now downloads only the LFS files inside the plugin's own folder, so an LFS file elsewhere in the repository that the server cannot provide no longer makes the install fail.\n- Selecting a custom agent with /agent no longer fails with \"Agent discovery inputs were superseded\" when something else refreshes the agent list at the same moment\n- `web_fetch` returns a JSON or plain-text response as the server sent it when `<html` appears near its start, instead of stripping the markup or decoding it with an encoding that a quoted `<meta>` element names\n- Indexed search now deletes the per-repository indexes it left in the cache for repositories and worktrees that no longer exist, including those written before version 1.0.108, which could grow to tens of gigabytes\n- `web_fetch` rejects a negative `start_index` and a `max_length` below 1 with a validation error, instead of reading them from the end of the page past the 20000-character cap or naming continuations that skip the last page\n- Pressing Ctrl+C right after pasting now clears the pasted text along with the rest of the prompt, instead of the paste showing up in the cleared prompt a moment later.\n- Turning a language server on or off no longer erases the settings of other servers disabled by hand with \"disabled\": true in lsp-config.json, so re-enabling one later no longer breaks every user language server.\n- A device Policy Helper's policy is applied again when a session without a GitHub sign-in is resumed, so settings it locks, such as repository hooks, stay locked\n- Staff settings are saved to your own `~/.copilot/config.json` when the CLI starts without `HOME` or `COPILOT_HOME`, instead of a `.copilot` folder in the working directory\n- When a model provider rejects a request with a generic error such as \"invalid request body\" or \"Bad Request\" and one attached image is corrupt, the corrupt image is now omitted and the turn retried with the readable images instead of failing.\n- A prompt queued while the agent is working keeps its place in the queue when a model switch or queued command follows it quickly, so it runs on the model that was selected when it was submitted\n- Subagent rows in the timeline draw the agent type and model as plain text on one line, so escape sequences or line breaks in them no longer restyle the row, turn part of it into a hidden link or split it.\n- Changing directory with /cd from one indexed folder to another no longer leaves indexed search disabled for the rest of the session while the previous folder's index server is still stopping.\n- Adding an OAuth MCP server with /mcp add no longer says \"Server Saved\" before anything is saved, and if saving the config fails after you sign in, the form now shows why instead of reporting success and losing the server.\n- Changing the screen reader setting in /settings or /config now restarts the CLI or asks for a restart, and starting with --screen-reader offers to remember screen reader mode\n- Sessions no longer fail to start when the environment holds a variable whose name or value is not valid UTF-8; such variables are skipped instead of crashing the CLI.\n- Image and file labels remain whole when navigating or deleting them after an unfinished attachment label in the prompt\n- `copilot instruction list` run from a repository subdirectory lists each plugin rule once instead of twice\n- Interrupted `--worktree` checkouts stay intact, with manual recovery guidance that reminds you to preserve local changes and confirm Git has stopped.\n- Indexed search no longer stops for the rest of a session after one transient shared-index error, such as another process briefly holding the shared index cache\n- Resuming a session now restores its selected custom agent in /resume and prompt mode.\n- Resuming a session with no name from the Sessions sidebar no longer appears to rename it to \"Session 1\"\n- Keep your latest mode choice when switching sessions, instead of reverting to Plan mode\n- Completed subagent rows in the timeline show the model name instead of a hashed model identifier.\n- After /research, follow-up requests use normal session tool permissions.\n- Sandbox path settings support environment variables while preserving authored expressions in settings and the editor.\n- Use cache-aware background wait timeouts by default in interactive sessions\n- Ask for confirmation before /share or /export follows symlinks when saving local files\n- URL permission prompts let you approve every subdomain for the current session\n- Read-only shell scripts ask for permission less often, while scripts that change git refs or read files through hidden paths now always get reviewed"
+  },
+  "summary": {
+    "changes": 56,
+    "categories": {
+      "cli": 13,
+      "config": 42,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 56,
+      "notable": 0
+    },
+    "undocumented": 6
+  },
+  "changes": [
+    {
+      "id": "cli.commands.copilot.options.--allow-all.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--allow-all",
+        "description"
+      ],
+      "title": "`copilot --allow-all`: description changed",
+      "impact": "informational",
+      "before": "Enable all permissions (equivalent to --allow-all-tools --allow-all-paths --allow-all-urls)",
+      "after": "Enable all permissions (equivalent to --allow-all-tools",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.copilot.options.--usage-output-file.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--usage-output-file",
+        "description"
+      ],
+      "title": "`copilot --usage-output-file`: description changed (+237 −58 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Write final usage statistics as JSON to the specified file\n+Write final usage statistics as JSON to the specified file when the session ends, also for -p and --silent runs: AI credits, premium requests, and input, output, cache and reasoning tokens per model and per agent (main and each subagent)\n",
+      "stats": {
+        "added_chars": 237,
+        "removed_chars": 58
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.copilot update.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot update",
+        "description"
+      ],
+      "title": "Description of `copilot update` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,10 @@\n Download the latest version.\n Checks for a newer release and downloads it.\n-The CLI supports two update channels: \"stable\" (default) and \"prerelease\".\n+The CLI supports two update channels: \"stable\" and \"prerelease\".\n+When you pass no channel and have not set autoUpdatesChannel, a prerelease build stays on prerelease.\n+Other builds use stable, except staff with experimental mode enabled use prerelease.\n By default, the CLI also checks for updates automatically on startup, and on standalone-binary installations a downloaded version applies at your next launch of the CLI, as long as auto-update is still enabled then.\n Auto-update is disabled in CI environments (detected via CI, BUILD_NUMBER, RUN_ID, or SYSTEM_COLLECTIONURI environment variables).\n Use --no-auto-update or set COPILOT_AUTO_UPDATE=false to disable it manually.\n+To downgrade (roll back to an earlier release) or install a specific version, run npm install -g @github/copilot@<version>, or download that release from https://github.com/github/copilot-cli/releases.\n+Then launch the CLI with --no-auto-update or COPILOT_AUTO_UPDATE=false: otherwise a newer version already in its package cache can run instead, and auto-update can download the latest again.\n",
+      "stats": {
+        "added_chars": 640,
+        "removed_chars": 74
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+9364 −8788 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -28,125 +28,23 @@\n   completion   Generate a shell completion script\n \n Options:\n-  -v, --version\n-          show version information\n-  -i, --interactive <prompt>\n-          Start interactive mode and automatically execute this prompt\n-      --fleet\n-          Run the prompt in fleet mode (parallel subagent\n-          orchestration); combine with -i, -p, or piped stdin\n-  -p, --prompt <text>\n-          Execute a prompt in non-interactive mode (exits after\n-          completion)\n-      --trust-folder\n-          Trust the resolved working directory's configuration for\n-          one new prompt-mode session only (no saved trust or tool,\n-          path, or URL approvals)\n-  -s, --silent\n-          Output only the agent response (no stats), useful for\n-          scripting with -p\n-      --disable-client-telemetry\n-          Disable Copilot-owned GitHub and Entra telemetry\n-          (does not affect OpenTelemetry or server-side telemetry)\n-      --enable-memory\n-          Enable memory in prompt mode (disabled by default)\n-      --model <model>\n-          Set the AI model to use (use 'auto' to let Copilot pick\n-          automatically)\n-      --reasoning-effort <level>\n-          Set the reasoning effort level; supported levels depend on the model [possible values: none, minimal, low, medium, high, xhigh, max]\n-      --context <tier>\n-          Set the context window tier (overrides persisted setting) [possible values: default, long_context]\n-      --auto-tier <preference>\n-          Set the Auto routing profile by its exact advertised ID\n-          (validated against the available catalog)\n-      --agent <agent>\n-          Specify a custom agent to use\n-  -r, --resume [<value>]\n-          Resume from a previous session (optionally specify existing\n-          session ID, task ID, ID prefix, or name; name matching is\n-          exact, case-insensitive)\n-      --continue\n-          Resume the most recent session\n-  -n, --name <name>\n-          Set a name for the new session\n-      --session-id <id>\n-          Resume an existing session or task by ID, or set the UUID\n-          for a new session\n-      --connect [<sessionId>]\n-          Connect directly to a remote session (optionally specify\n-          session ID or task ID)\n-      --allow-all-tools\n-          Allow all tools to run automatically without confirmation.\n-          Non-interactive mode cannot ask, so it denies tool requests\n-          that no allow rule (or `--assisted-approval`) approves.\n-          Run `copilot help environment` for what COPILOT_ALLOW_ALL\n-          accepts and what exact \"true\" grants [env: COPILOT_ALLOW_ALL=]\n-      --allow-all-paths\n-          Disable file path verification and allow access to any path\n-      --disallow-temp-dir\n-          Prevent automatic access to the system temporary directory\n-      --banner\n-          Show the startup banner\n-      --screen-reader\n-          Enable screen reader optimizations\n-      --plain-diff\n-          Disable rich diff rendering (syntax highlighting via diff\n-          tool specified by git config)\n-  -C <directory>\n-          Change working directory before doing anything else\n-      --log-dir <directory>\n-          Set log file directory (default: ~/.copilot/logs/)\n-      --extension-sdk-path <directory>\n-          Override the bundled @github/copilot-sdk injected into\n-          extension subprocesses with a local `copilot-sdk/` folder.\n-          Invalid paths fall back to the bundled SDK.\n-      --log-level <level>\n-          Set the log level [possible values: none, error, warning, info, debug, all, default]\n-      --stream <mode>\n-          Enable or disable streaming mode [possible values: on, off]\n-      --output-format <format>\n-          Output format: 'text' (default) or 'json' (JSONL, one JSON\n-          object per line) [possible values: text, json]\n-      --share [<path>]\n-          Share session to markdown file after completion in\n-          non-interactive mode (default: ./copilot-session-<id>.md)\n-      --share-gist\n-          Share session to a secret GitHub gist after completion in\n-          non-interactive mode\n+      --acp\n+          Start as Agent Client Protocol server\n       --add-dir <directory>\n           Allow file access to a directory and load its .github/skills\n           and .github/agents as trusted configuration (can be used\n           multiple times). A relative path resolves against the\n           session working directory (the --resume/--worktree/-C\n           directory), whatever order the options appear in\n-      --attachment <path>\n-          Attach a file (image or native document) to the initial\n-          prompt; only valid in non-interactive mode (can be used\n-          multiple times)\n-      --disable-mcp-server <server-name>\n-          Disable a specific MCP server (can be used multiple times)\n-      --disable-builtin-mcps\n-          Disable all built-in MCP servers (currently:\n-          github-mcp-server, githubiq)\n-      --enable-all-github-mcp-tools\n-          Enable all GitHub MCP server tools instead of the default\n-          CLI subset. Overrides --add-github-mcp-toolset and\n-          --add-github-mcp-tool options.\n+      --add-github-mcp-tool <tool>\n+          Add a tool to enable for the GitHub MCP server instead of\n+          the default CLI subset (can be used multiple times). Use \"*\"\n+          for all tools.\n       --add-github-mcp-toolset <toolset>\n           Add a toolset to enable for the GitHub MCP server in addition\n           to the default CLI subset (can be used multiple times). Use\n           \"default\" for the server's default toolsets or \"all\" for all\n           toolsets.\n-      --add-github-mcp-tool <tool>\n-          Add a tool to enable for the GitHub MCP server instead of\n-          the default CLI subset (can be used multiple times). Use \"*\"\n-          for all tools.\n-      --plugin-dir <directory>\n-          Load a plugin from a local directory (can be used multiple\n-          times). A relative path resolves against the session working\n-          directory (the --resume/--worktree/-C directory), whatever\n-          order the options appear in\n       --additional-mcp-config <json>\n           Additional MCP servers configuration as JSON string or file\n           path (prefix with @) (can be used multiple times; augments\n@@ -154,122 +52,235 @@\n           relative @ path resolves against the session working\n           directory (the --resume/--worktree/-C directory) and a\n           leading ~/ expands to your home directory\n-      --mcp-github-auth <server=origin>\n-          Send the signed-in GitHub account credential only to this\n-          explicit --additional-mcp-config server and approved origin.\n-          HTTPS is required except for literal loopback HTTP. Never\n-          put a token in this argument. Can be used multiple times.\n+      --agent <agent>\n+          Specify a custom agent to use\n+      --allow-all\n+          Enable all permissions (equivalent to --allow-all-tools\n+          --allow-all-paths --allow-all-urls)\n       --allow-all-mcp-server-instructions\n           Include initialization instructions from all MCP servers in\n           the system prompt instead of only allowlisted servers\n+      --allow-all-paths\n+          Disable file path verification and allow access to any path\n+      --allow-all-tools\n+          Allow all tools to run automatically without confirmation.\n+          Non-interactive mode cannot ask, so it denies tool requests\n+          that no allow rule (or `--assisted-approval`) approves.\n+          Run `copilot help environment` for what COPILOT_ALLOW_ALL\n+          accepts and what exact \"true\" grants [env: COPILOT_ALLOW_ALL=]\n+      --allow-all-urls\n+          Allow access to all URLs without confirmation\n       --allow-tool [<tools>...]\n           Tools the CLI has permission to use; will not prompt for\n           permission\n-      --deny-tool [<tools>...]\n-          Tools the CLI does not have permission to use; will not\n-          prompt for permission\n-      --available-tools [<tools>...]\n-          Only these tools will be available to the model\n-      --excluded-tools [<tools>...]\n-          These tools will not be available to the model\n-      --secret-env-vars [<vars>...]\n-          Environment variable names to remove from shell and MCP\n-          server environments. Their values are also masked in some\n-          output, such as --output-format json, but a value that\n-          reaches a tool result another way still goes to the model\n-          and is saved in the session history\n-          (e.g., --secret-env-vars=MY_KEY,OTHER_KEY)\n       --allow-url [<urls>...]\n           Allow access to specific URLs or domains\n-      --deny-url [<urls>...]\n-          Deny access to specific URLs or domains, takes precedence\n-          over --allow-url\n-      --allow-all-urls\n-          Allow access to all URLs without confirmation\n-      --allow-all\n-          Enable all permissions (equivalent to --allow-all-tools\n-          --allow-all-paths --allow-all-urls)\n-      --yolo\n-          Enable all permissions (equivalent to --allow-all-tools\n-          --allow-all-paths --allow-all-urls)\n-      --max-autopilot-continues <count>\n-          Maximum number of continuation messages in autopilot mode [default: 5]\n-      --mode <mode>\n-          Set the initial agent mode [possible values: interactive, plan, autopilot]\n+      --assisted-approval\n+          Review tool permission requests with the assisted-approval\n+          safety judge instead of approving them outright. The judge\n+          is probabilistic and not a security boundary. Equivalent\n+          to the `assisted` mode of /permissions. Takes precedence\n+          over --allow-all-tools when the judge engages. Ignored, with\n+          a warning, when AUTO_APPROVAL is explicitly disabled or\n+          managed policy blocks it. (env: COPILOT_ASSISTED_APPROVAL)\n+      --attachment <path>\n+          Attach a file (image or native document) to the initial\n+          prompt; only valid in non-interactive mode (can be used\n+          multiple times)\n+      --auto-tier <preference>\n+          Set the Auto routing profile by its exact advertised ID\n+          (validated against the available catalog)\n       --autopilot\n           Start in autopilot mode\n-      --plan\n-          Start in plan mode (combine with --mode autopilot to\n-          auto-approve the plan and implement it autonomously)\n-      --experimental\n-          Enable experimental features\n+      --available-tools [<tools>...]\n+          Only these tools will be available to the model\n+      --banner\n+          Show the startup banner\n       --bash-env [<value>]\n           Enable BASH_ENV support for bash shells (on|off)\n-      --mouse [<value>]\n-          Enable mouse support in alt screen mode (on|off)\n-      --acp\n-          Start as Agent Client Protocol server\n-      --sync-session[=<on|off>]\n-          Enable or disable read-only account history sync for this\n-          run only (omitted: use configured/default behavior).\n-          Without a value, enables sync; does not enable incoming control. [possible values: on, off]\n+  -C <directory>\n+          Change working directory before doing anything else\n+      --connect [<sessionId>]\n+          Connect directly to a remote session (optionally specify\n+          session ID or task ID)\n+      --context <tier>\n+          Set the context window tier (overrides persisted setting) [possible values: default, long_context]\n+      --continue\n+          Resume the most recent session\n+      --deny-tool [<tools>...]\n+          Tools the CLI does not have permission to use; will not\n+          prompt for permission\n+      --deny-url [<urls>...]\n+          Deny access to specific URLs or domains, takes precedence\n+          over --allow-url\n+      --disable-builtin-mcps\n+          Disable all built-in MCP servers (currently:\n+          github-mcp-server, githubiq)\n+      --disable-client-telemetry\n+          Disable Copilot-owned GitHub and Entra telemetry\n+          (does not affect OpenTelemetry or server-side telemetry)\n+      --disable-mcp-server <server-name>\n+          Disable a specific MCP server (can be used multiple times)\n+      --disallow-temp-dir\n+          Prevent automatic access to the system temporary directory\n       --dynamic-retrieval <category=on|off>\n           Enable or disable embeddings-based dynamic retrieval per\n           category and persist the choice (category: skills).\n           Repeatable, e.g. --dynamic-retrieval skills=off\n+      --enable-all-github-mcp-tools\n+          Enable all GitHub MCP server tools instead of the default\n+          CLI subset. Overrides --add-github-mcp-toolset and\n+          --add-github-mcp-tool options.\n       --enable-mcp-server <server-name>\n           Enable an MCP server disabled in settings for this run only;\n           nothing is persisted (can be used multiple times)\n+      --enable-memory\n+          Enable memory in prompt mode (disabled by default)\n+      --excluded-tools [<tools>...]\n+          These tools will not be available to the model\n+      --experimental\n+          Enable experimental features\n+      --extension-sdk-path <directory>\n+          Override the bundled @github/copilot-sdk injected into\n+          extension subprocesses with a local `copilot-sdk/` folder.\n+          Invalid paths fall back to the bundled SDK.\n+      --fleet\n+          Run the prompt in fleet mode (parallel subagent\n+          orchestration); combine with -i, -p, or piped stdin\n+  -h, --help\n+          Print help\n+  -i, --interactive <prompt>\n+          Start interactive mode and automatically execute this prompt\n+      --log-dir <directory>\n+          Set log file directory (default: ~/.copilot/logs/)\n+      --log-level <level>\n+          Set the log level [possible values: none, error, warning, info, debug, all, default]\n       --max-ai-credits <credits>\n           Set max AI credits for this session\n-      --assisted-approval\n-          Review tool permission requests with the assisted-approval\n-          safety judge instead of approving them outright. The judge\n-          is probabilistic and not a security boundary. Equivalent\n-          to the `assisted` mode of /permissions. Takes precedence\n-          over --allow-all-tools when the judge engages. Ignored, with\n-          a warning, when AUTO_APPROVAL is explicitly disabled or\n-          managed policy blocks it. (env: COPILOT_ASSISTED_APPROVAL)\n-      --usage-output-file <file>\n-          Write final usage statistics as JSON to the specified file\n-      --no-custom-instructions\n-          Disable loading of custom instructions from AGENTS.md and\n-          related files\n+      --max-autopilot-continues <count>\n+          Maximum number of continuation messages in autopilot mode [default: 5]\n+      --mcp-github-auth <server=origin>\n+          Send the signed-in GitHub account credential only to this\n+          explicit --additional-mcp-config server and approved origin.\n+          HTTPS is required except for literal loopback HTTP. Never\n+          put a token in this argument. Can be used multiple times.\n+      --mode <mode>\n+          Set the initial agent mode [possible values: interactive, plan, autopilot]\n+      --model <model>\n+          Set the AI model to use (use 'auto' to let Copilot pick\n+          automatically)\n+      --mouse [<value>]\n+          Enable mouse support in alt screen mode (on|off)\n+  -n, --name <name>\n+          Set a name for the new session\n+      --no-ask-user\n+          Disable the ask_user tool (the agent can still ask in its\n+          replies, but not through the question form)\n       --no-auto-update\n           Disable downloading CLI updates automatically. Copilot then\n           runs the version bundled in the executable you launched\n           rather than a newer previously downloaded one\n-      --no-ask-user\n-          Disable the ask_user tool (the agent can still ask in its\n-          replies, but not through the question form)\n+      --no-bash-env\n+          Disable BASH_ENV support for bash shells\n       --no-color\n           Disable all color output\n+      --no-custom-instructions\n+          Disable loading of custom instructions from AGENTS.md and\n+          related files\n+      --no-eager-powershell-resolution\n+          Disable background PowerShell prompt resolution on Windows\n       --no-experimental\n           Disable experimental features\n-      --no-bash-env\n-          Disable BASH_ENV support for bash shells\n       --no-mouse\n           Disable mouse support in alt screen mode\n-      --no-eager-powershell-resolution\n-          Disable background PowerShell prompt resolution on Windows\n-  -h, --help\n-          Print help\n+      --output-format <format>\n+          Output format: 'text' (default) or 'json' (JSONL, one JSON\n+          object per line) [possible values: text, json]\n+      --plain-diff\n+          Disable rich diff rendering (syntax highlighting via diff\n+          tool specified by git config)\n+      --plan\n+          Start in plan mode (combine with --mode autopilot to\n+          auto-approve the plan and implement it autonomously)\n+      --plugin-dir <directory>\n+          Load a plugin from a local directory (can be used multiple\n+          times). A relative path resolves against the session working\n+          directory (the --resume/--worktree/-C directory), whatever\n+          order the options appear in\n+  -p, --prompt <text>\n+          Execute a prompt in non-interactive mode (exits after\n+          completion)\n+      --reasoning-effort <level>\n+          Set the reasoning effort level; supported levels depend on the model [possible values: none, minimal, low, medium, high, xhigh, max]\n+  -r, --resume [<value>]\n+          Resume from a previous session (optionally specify existing\n+          session ID, task ID, ID prefix, or name; name matching is\n+          exact, case-insensitive)\n+      --screen-reader\n+          Enable screen reader optimizations\n+      --secret-env-vars [<vars>...]\n+          Environment variable names to remove from shell and MCP\n+          server environments. Their values are also masked in some\n+          output, such as --output-format json, but a value that\n+          reaches a tool result another way still goes to the model\n+          and is saved in the session history\n+          (e.g., --secret-env-vars=MY_KEY,OTHER_KEY)\n+      --session-id <id>\n+          Resume an existing session or task by ID, or set the UUID\n+          for a new session\n+      --share [<path>]\n+          Share session to markdown file after completion in\n+          non-interactive mode (default: ./copilot-session-<id>.md)\n+      --share-gist\n+          Share session to a secret GitHub gist after completion in\n+          non-interactive mode\n+  -s, --silent\n+          Output only the agent response (no stats), useful for\n+          scripting with -p\n+      --stream <mode>\n+          Enable or disable streaming mode [possible values: on, off]\n+      --sync-session[=<on|off>]\n+          Enable or disable read-only account history sync for this\n+          run only (omitted: use configured/default behavior).\n+          Without a value, enables sync; does not enable incoming control. [possible values: on, off]\n+      --trust-folder\n+          Trust the resolved working directory's configuration for\n+          one new prompt-mode session only (no saved trust or tool,\n+          path, or URL approvals)\n+      --usage-output-file <file>\n+          Write final usage statistics as JSON to the specified file\n+          when the session ends, also for -p and --silent runs: AI\n+          credits, premium requests, and input, output, cache and\n+          reasoning tokens per model and per agent (main and each\n+          subagent)\n+  -v, --version\n+          show version information\n+      --yolo\n+          Enable all permissions (equivalent to --allow-all-tools\n+          --allow-all-paths --allow-all-urls)\n \n Help Topics:\n-  acp          Agent Client Protocol and foreground activity\n-  billing      AI credit usage\n-  commands     Interactive Mode Commands\n-  config       Configuration Settings\n-  environment  Environment Variables\n-  input        Input and Keys\n-  limits       Session Limits Controls\n-  logging      Logging\n-  mcp          MCP Servers\n-  monitoring   Monitoring with OpenTelemetry\n-  permissions  Permissions\n-  providers    Custom Model Providers (BYOK)\n-  sandbox      Command Sandboxing\n-  sessions     Sessions\n+  acp              Agent Client Protocol and foreground activity\n+  billing          AI credit usage\n+  commands         Interactive Mode Commands\n+  config           Configuration Settings\n+  environment      Environment Variables\n+  extensions       Extensions\n+  input            Input and Keys\n+  limits           Session Limits Controls\n+  logging          Logging\n+  lsp              Language Servers\n+  mcp              MCP Servers\n+  monitoring       Monitoring with OpenTelemetry\n+  network          Corporate proxies and certificates\n+  parallel-work    Working in Parallel\n+  permissions      Permissions\n+  providers        Models and providers (BYOK)\n+  providers-env    Provider environment variables (legacy)\n+  providers-local  Models you bring or run yourself\n+  sandbox          Command Sandboxing\n+  sessions         Sessions\n+  timeline         Timeline and Tool Output\n \n Examples:\n   # Start interactive mode\n",
+      "stats": {
+        "added_chars": 9364,
+        "removed_chars": 8788
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.config --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "config --help"
+      ],
+      "title": "Full help text of `config --help` changed (+319 −319 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -30,27 +30,27 @@\n           Value to set, append, or remove from a list with --rm\n \n Options:\n-      --list\n-          List settings as key=value lines\n+      --global\n+          Use your user settings file (the default)\n \n-      --rm\n-          Remove the key, or only the given item from a list\n+  -h, --help\n+          Print help (see a summary with '-h')\n \n       --json\n           Output --list as JSON\n \n-      --global\n-          Use your user settings file (the default)\n-\n-      --repo\n-          Use the repository's .github/copilot/settings.json\n+      --list\n+          List settings as key=value lines\n \n       --local\n           Use the repository's\n           .github/copilot/settings.local.json\n \n-  -h, --help\n-          Print help (see a summary with '-h')\n+      --repo\n+          Use the repository's .github/copilot/settings.json\n+\n+      --rm\n+          Remove the key, or only the given item from a list\n \n Examples:\n   # Print a setting\n",
+      "stats": {
+        "added_chars": 319,
+        "removed_chars": 319
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.config -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "config -h"
+      ],
+      "title": "Full help text of `config -h` changed (+268 −268 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,14 +7,14 @@\n   [value]  Value to set, append, or remove from a list with --rm\n \n Options:\n-      --list    List settings as key=value lines\n-      --rm      Remove the key, or only the given item from a list\n-      --json    Output --list as JSON\n       --global  Use your user settings file (the default)\n-      --repo    Use the repository's .github/copilot/settings.json\n+  -h, --help    Print help (see more with '--help')\n+      --json    Output --list as JSON\n+      --list    List settings as key=value lines\n       --local   Use the repository's\n                 .github/copilot/settings.local.json\n-  -h, --help    Print help (see more with '--help')\n+      --repo    Use the repository's .github/copilot/settings.json\n+      --rm      Remove the key, or only the given item from a list\n \n Examples:\n   # Print a setting\n",
+      "stats": {
+        "added_chars": 268,
+        "removed_chars": 268
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.help environment",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "help environment"
+      ],
+      "title": "Full help text of `help environment` changed (+3026 −1257 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -10,8 +10,8 @@\n \"fast\" is ignored with a notice, because the CLI cannot run on that profile.\n Requires the effective model to be Auto and is overridden by --auto-tier or persisted configuration.\n \n-  `COPILOT_AUTO_UPDATE`: set to \"false\" to disable downloading updated CLI versions automatically.\n-Can also be disabled with the --no-auto-update flag.\n+  `COPILOT_AUTO_UPDATE`: set to \"false\" to disable downloading updated CLI versions and the plugin updates run when a session starts.\n+The --no-auto-update flag disables the CLI download only.\n Auto-update is enabled by default, except in CI environments (detected via `CI`, `BUILD_NUMBER`, `RUN_ID`, or `SYSTEM_COLLECTIONURI` environment variables), where it is disabled by default.\n Standalone development builds run their bundled package by default and do not offer or install CLI updates unless release-style package behavior is selected with a canonical semantic version in `COPILOT_CLI_VERSION`.\n `COPILOT_CLI_DIST_DIR` selects an explicit package but does not enable updates for a development-identity package.\n@@ -61,9 +61,15 @@\n Values that are not positive integers log a warning and use the default.\n If the capture fails or times out, the inherited environment is used.\n \n+  `COPILOT_LLM_RESPONSE_MAX_BYTES`: maximum decoded/decompressed HTTP LLM response body (including streaming and error responses), or complete incoming WebSocket message, in bytes.\n+Defaults to 134217728 (128 MiB).\n+Larger responses fail the request without retrying; exactly the limit is accepted.\n+Set before starting the process.\n+Invalid or non-positive integers log a warning and use the default.\n+\n   `COPILOT_MASCOT_BLINK`: set to \"0\" to turn off the mascot's blink animation in the header.\n \n-  `COPILOT_MODEL`: optionally set the agent model. Can be overridden by the --model command line option or the /model command.\n+  `COPILOT_MODEL`: optionally set the agent model, including a model for a provider set with COPILOT_PROVIDER_* variables. Can be overridden by the --model command line option or the /model command.\n \n   `COPILOT_MULTIPLEXER`: override which terminal multiplexer the CLI believes it is running directly inside.\n One of \"tmux\", \"herdr\", or \"none\"; unrecognized values are ignored.\n@@ -71,14 +77,22 @@\n Detection is otherwise automatic from the environment.\n Set this when it guesses wrong — most often `COPILOT_MULTIPLEXER=tmux` for tmux running nested inside a herdr pane, because herdr panes inherit whatever `TMUX` the herdr server itself was started with.\n \n-  `COPILOT_OFFLINE`: set to \"true\" to enable offline mode. When active, the CLI skips all network access: GitHub authentication, telemetry, web tools, GitHub MCP server, and auto-update are disabled. Requires a local model provider (COPILOT_PROVIDER_BASE_URL).\n+  `COPILOT_NOTIFICATION_BATCH_MAX_WAIT_SECONDS`: maximum wait in seconds for batching completed background notifications while other notifying work runs.\n+Accepts non-negative numbers, including fractions; 0 removes the intentional wait.\n+Defaults to 60 for missing or invalid values.\n+Online experiment assignments take precedence over this local value.\n \n+  `COPILOT_OFFLINE`: set to \"true\" to enable offline mode.\n+When active, the CLI skips all network access: GitHub authentication, telemetry, web tools, GitHub MCP server, and auto-update are disabled.\n+Requires a local model provider, either one you added in /model or one set with COPILOT_PROVIDER_BASE_URL.\n+Refer to `copilot help providers`.\n+\n   `COPILOT_PLUGIN_DIR_ONLY`: set to \"true\" to turn off automatic plugin discovery, so that only plugins passed with --plugin-dir are loaded.\n \n   `COPILOT_PROVIDERS_CONFIG`: path of the custom model providers file; defaults to `$COPILOT_HOME/providers.json`.\n \n-  `COPILOT_PROVIDER_BASE_URL`: API endpoint URL for a custom model provider (BYOK).\n-When set, the CLI uses this provider instead of GitHub Copilot's model routing.\n+  `COPILOT_PROVIDER_BASE_URL`: API endpoint URL for a custom model provider (BYOK), for providers you can't add in /model and for scripts.\n+When set, the CLI uses this provider instead of GitHub Copilot's model routing and ignores a saved `providers.json`, unless COPILOT_PROVIDERS_CONFIG names a providers file, which then wins.\n GitHub authentication is not required.\n For type \"azure\", use a host URL or a full project URL, including its `/api/projects/<project>` path.\n \n@@ -88,17 +102,17 @@\n \n   `COPILOT_PROVIDER_API_KEY_COMMAND`: shell command that prints a fresh API key for each provider request. Takes precedence over COPILOT_PROVIDER_API_KEY.\n \n-  `COPILOT_PROVIDER_BEARER_TOKEN`: bearer token for custom provider authentication. Takes precedence over COPILOT_PROVIDER_API_KEY.\n+  `COPILOT_PROVIDER_BEARER_TOKEN`: bearer token for custom provider authentication. For \"openai\" and \"azure\" it takes precedence over COPILOT_PROVIDER_API_KEY; \"anthropic\" sends both.\n \n   `COPILOT_PROVIDER_WIRE_API`: API format for the custom provider. One of \"completions\" (default) or \"responses\". Use \"responses\" for GPT-5 series models.\n \n-  `COPILOT_PROVIDER_TRANSPORT`: transport for the custom provider. One of \"http\" (default) or \"websockets\". Use with `COPILOT_PROVIDER_WIRE_API=responses` to use OpenAI Responses over WebSocket.\n+  `COPILOT_PROVIDER_TRANSPORT`: transport for the custom provider. One of \"http\" (default) or \"websockets\". \"websockets\" works only with `COPILOT_PROVIDER_TYPE=openai` and `COPILOT_PROVIDER_WIRE_API=responses`, to use OpenAI Responses over WebSocket.\n \n   `COPILOT_PROVIDER_AZURE_API_VERSION`: Azure API version when using type \"azure\". When omitted, uses the GA versionless v1 route. Set explicitly (e.g. \"<date>\") to use the legacy versioned deployment route.\n \n-  `COPILOT_PROVIDER_MODEL_ID`: well-known model ID used for agent configuration and token limits. Defaults to COPILOT_MODEL.\n+  `COPILOT_PROVIDER_MODEL_ID`: well-known model ID used for agent configuration and token limits. Defaults to the --model value, else COPILOT_MODEL.\n \n-  `COPILOT_PROVIDER_WIRE_MODEL`: model name sent to the provider API for inference. Defaults to COPILOT_MODEL.\n+  `COPILOT_PROVIDER_WIRE_MODEL`: model name sent to the provider API for inference. Defaults to the --model value, else COPILOT_MODEL, else COPILOT_PROVIDER_MODEL_ID.\n \n   `COPILOT_PROVIDER_MAX_PROMPT_TOKENS`: maximum prompt tokens for the BYOK model. Overrides both catalog and default values.\n \n@@ -235,4 +249,15 @@\n   `OTEL_LOG_LEVEL`: OTel diagnostic log level (not the CLI --log-level). One of: NONE, ERROR, WARN, INFO, DEBUG, VERBOSE, ALL.\n \n   See `copilot help monitoring` for detailed configuration and examples.\n+\n+XDG base directories:\n+\n+  XDG_CONFIG_HOME and XDG_STATE_HOME do not move Copilot CLI's files: settings, skills, sessions and\n+  other state live in `$COPILOT_HOME` (default `~/.copilot`); set COPILOT_HOME to move them.\n+\n+  Older versions used the XDG variables: when COPILOT_HOME is unset, the CLI moves their `.copilot`\n+  data into `~/.copilot` at startup.\n+\n+  Cached data such as downloaded CLI versions is kept apart, in COPILOT_CACHE_HOME, which uses\n+  XDG_CACHE_HOME outside macOS and Windows.\n \n",
+      "stats": {
+        "added_chars": 3026,
+        "removed_chars": 1257
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.help providers",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "help providers"
+      ],
+      "title": "Full help text of `help providers` changed (+1596 −5902 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,118 +1,39 @@\n-Custom Model Providers (BYOK):\n-\n-  Use your own model provider instead of GitHub Copilot's model routing.\n-  Set the COPILOT_PROVIDER_BASE_URL environment variable to activate BYOK mode.\n-  GitHub authentication is not required when using a custom provider.\n-\n-Environment Variables:\n-\n-  COPILOT_PROVIDER_BASE_URL          API endpoint URL (required to activate BYOK)\n-  COPILOT_PROVIDER_TYPE              \"openai\" (default), \"azure\", or \"anthropic\"\n-  COPILOT_PROVIDER_API_KEY           API key (optional for local providers like Ollama)\n-  COPILOT_PROVIDER_API_KEY_COMMAND   Command that prints a fresh API key per request\n-  COPILOT_PROVIDER_BEARER_TOKEN      Bearer token (takes precedence over API key)\n-  COPILOT_PROVIDER_WIRE_API          \"completions\" (default) or \"responses\"\n-  COPILOT_PROVIDER_TRANSPORT         \"http\" (default) or \"websockets\"\n-  COPILOT_PROVIDER_AZURE_API_VERSION Azure API version (default: versionless v1)\n-  COPILOT_PROVIDER_HEADERS           Custom HTTP headers sent only to the provider\n-                                     (newline-separated \"Name: Value\" pairs)\n-\n-Model Configuration:\n-\n-  COPILOT_MODEL                             Model name (sets both model ID and wire model)\n-  COPILOT_PROVIDER_MODEL_ID                 Well-known model ID for agent config and token limits\n-  COPILOT_PROVIDER_WIRE_MODEL               Model name sent to the provider API for inference\n-  COPILOT_PROVIDER_MAX_PROMPT_TOKENS        Maximum prompt tokens\n-  COPILOT_PROVIDER_MAX_OUTPUT_TOKENS        Maximum output tokens\n-  COPILOT_PROVIDER_VISION                   \"true\" if the model accepts image input\n-\n-  A model is required for BYOK. Set COPILOT_MODEL, COPILOT_PROVIDER_MODEL_ID, or --model.\n-\n-  COPILOT_MODEL is the simplest option: it sets both the model ID (used internally for\n-  agent configuration and token limits) and the wire model (sent to the provider).\n-\n-  When the wire model differs from the base model (e.g., a fine-tuned variant or\n-  Azure deployment), set COPILOT_PROVIDER_MODEL_ID to a well-known base model name\n-  (like \"gpt-5.4\" or \"claude-sonnet-4\") and COPILOT_PROVIDER_WIRE_MODEL to the\n-  name your provider expects. Matching a well-known model ID lets the agent use\n-  model-specific configuration such as tool support, token limits, and prompting\n-  strategies. Without a recognized model ID, the agent falls back to safe defaults.\n-  Both default to COPILOT_MODEL when not set explicitly.\n+Models and providers:\n \n-  Token limits are resolved in order: manual env vars → built-in model catalog → defaults.\n+  GitHub Copilot CLI works with models hosted by GitHub, custom models from\n+  your enterprise, and models you bring yourself. Using your own models is\n+  also known as bring your own key (BYOK).\n \n-  BYOK models are treated as text-only, so images that tools return are not sent\n-  to the model. If your model accepts image input, set COPILOT_PROVIDER_VISION=true.\n-  For a model defined in $COPILOT_HOME/providers.json, add\n-  \"capabilities\": { \"supports\": { \"vision\": true } } to its entry instead.\n+  The goal is one experience wherever a model runs. You can use models from\n+  GitHub, your enterprise, or your own machine and switch between them\n+  without leaving Copilot CLI.\n \n-  Use \"openai\" type for any OpenAI-compatible endpoint, including Ollama, vLLM,\n-  and Foundry Local. Use \"responses\" wire API for GPT-5 series models.\n-  Add COPILOT_PROVIDER_TRANSPORT=websockets to use websockets for the responses API.\n+Find your models:\n \n-Examples:\n+  Run /model to see every model you can use, then select one. Run /model again\n+  any time to switch. Your choice applies to the current session. To change\n+  the default for future sessions, use /config model.\n \n-  # Ollama (local, no API key required)\n-  $ COPILOT_PROVIDER_BASE_URL=http://<local>/v1 \\\n-    COPILOT_MODEL=deepseek-coder-v2:16b \\\n-    copilot\n+  You can switch while the agent is working, too: the running turn finishes on\n+  the model it started with, and the new model is queued to apply after it.\n+  Changing only the reasoning effort applies from the agent's next model request,\n+  unless a model switch is already queued: then it waits behind that switch.\n \n-  # Custom OpenAI-compatible endpoint\n-  $ COPILOT_PROVIDER_BASE_URL=https://my-api.example.com/v1 \\\n-    COPILOT_PROVIDER_API_KEY=sk-... \\\n-    COPILOT_MODEL=gpt-4 \\\n-    copilot\n+Models hosted by GitHub:\n \n-  # Azure OpenAI with a custom wire model\n-  $ COPILOT_PROVIDER_TYPE=azure \\\n-    COPILOT_PROVIDER_BASE_URL=https://my-resource.openai.azure.com \\\n-    COPILOT_PROVIDER_API_KEY=your-key-here \\\n-    COPILOT_PROVIDER_MODEL_ID=gpt-4 \\\n-    COPILOT_PROVIDER_WIRE_MODEL=my-gpt4-deployment \\\n-    copilot\n+  These models need a Copilot subscription. Your organization or enterprise\n+  administrators may also limit which models you can use. GitHub doesn't\n+  charge for custom models from your enterprise or models you bring yourself.\n \n-  # Anthropic\n-  $ COPILOT_PROVIDER_TYPE=anthropic \\\n-    COPILOT_PROVIDER_BASE_URL=https://api.anthropic.com \\\n-    COPILOT_PROVIDER_API_KEY=sk-ant-... \\\n-    COPILOT_MODEL=claude-sonnet-4-20250514 \\\n-    copilot\n+More help:\n \n-  # Short-lived API key refreshed before every request\n-  $ COPILOT_PROVIDER_TYPE=azure \\\n-    COPILOT_PROVIDER_BASE_URL=https://my-resource.openai.azure.com \\\n-    COPILOT_PROVIDER_API_KEY_COMMAND='az keyvault secret show --vault-name my-vault --name azure-openai-api-key --query value -o tsv' \\\n-    COPILOT_MODEL=gpt-5.1 \\\n-    copilot\n+  copilot help providers-local   Models you bring or run yourself\n+  copilot help providers-env     Environment variables (legacy)\n \n-  # Endpoint behind a gateway that needs custom headers\n-  $ COPILOT_PROVIDER_BASE_URL=https://gateway.example.com/v1 \\\n-    COPILOT_PROVIDER_API_KEY=sk-... \\\n-    COPILOT_PROVIDER_HEADERS=\"X-Gateway-Key: abc123\n-  X-Tenant-Id: mai\" \\\n-    COPILOT_MODEL=mai-code-1 \\\n-    copilot\n+Learn more:\n \n-Notes:\n-  - For Azure endpoints, use type \"azure\" (not \"openai\") and set\n-    COPILOT_PROVIDER_BASE_URL to a host URL (e.g.,\n-    https://my-resource.openai.azure.com) or a full project URL (e.g.,\n-    https://my-resource.services.ai.azure.com/api/projects/my-project).\n-    The project path is preserved when the API path is constructed.\n-  - COPILOT_PROVIDER_HEADERS are sent only to the provider endpoint, never to\n-    GitHub Copilot services. Use newline-separated \"Name: Value\" pairs; in a\n-    double-quoted shell string a literal \"\\n\" also separates entries. If a custom\n-    header here collides with the matching credential the provider derives from\n-    COPILOT_PROVIDER_API_KEY or COPILOT_PROVIDER_BEARER_TOKEN, your primary\n-    session's model requests apply the custom header last so it wins, but\n-    background utility requests (prompt refinement, session and branch naming)\n-    send it as a static header, so the derived credential can win there instead.\n-    COPILOT_PROVIDER_API_KEY_COMMAND is the exception: its output is injected\n-    after the custom headers and replaces the matching credential header, so a\n-    colliding custom header never wins and the command output is always sent.\n-    The bearer token is\n-    always sent as Authorization; the API key (including command output) is sent as\n-    Authorization for openai, api-key for azure, and x-api-key for anthropic.\n-    Set only one credential source to avoid ambiguity.\n-  - See `copilot help environment` for quick reference of all environment variables.\n+  Add your own model to Copilot CLI:\n+    https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models\n+  Enable custom models for your enterprise:\n+    https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-for-enterprise/enable-custom-models\n \n",
+      "stats": {
+        "added_chars": 1596,
+        "removed_chars": 5902
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.init --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "init --help"
+      ],
+      "title": "Full help text of `init --help` changed (+120 −120 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -18,14 +18,14 @@\n           Disable Copilot-owned GitHub and Entra telemetry\n           (does not affect OpenTelemetry or server-side telemetry)\n \n-      --no-experimental\n-          Disable experimental features\n+  -h, --help\n+          Print help (see a summary with '-h')\n \n       --no-eager-powershell-resolution\n           Disable background PowerShell prompt resolution on Windows\n \n-  -h, --help\n-          Print help (see a summary with '-h')\n+      --no-experimental\n+          Disable experimental features\n \n Examples:\n   # Initialize instructions in the current repository\n",
+      "stats": {
+        "added_chars": 120,
+        "removed_chars": 120
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.init -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "init -h"
+      ],
+      "title": "Full help text of `init -h` changed (+167 −167 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -5,9 +5,9 @@\n Options:\n       --disable-client-telemetry        Disable Copilot-owned GitHub and Entra telemetry\n                                         (does not affect OpenTelemetry or server-side telemetry)\n-      --no-experimental                 Disable experimental features\n-      --no-eager-powershell-resolution  Disable background PowerShell prompt resolution on Windows\n   -h, --help                            Print help (see more with '--help')\n+      --no-eager-powershell-resolution  Disable background PowerShell prompt resolution on Windows\n+      --no-experimental                 Disable experimental features\n \n Examples:\n   # Initialize instructions in the current repository\n",
+      "stats": {
+        "added_chars": 167,
+        "removed_chars": 167
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.login --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login --help"
+      ],
+      "title": "Full help text of `login --help` changed (+132 −132 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -33,22 +33,22 @@\n residency (e.g., https://example.ghe.com).\n \n Options:\n-      --host <host>\n-          GitHub host URL (default: https://github.com)\n-\n       --device-code\n           Authenticate using the OAuth device code flow (default in\n           remote environments, CI, and non-interactive Linux with no display)\n \n+  -h, --help\n+          Print help (see a summary with '-h')\n+\n+      --host <host>\n+          GitHub host URL (default: https://github.com)\n+\n       --web-flow\n           Authenticate using the browser (web) flow (default on local\n           desktops)\n \n       --with-token\n           Read an authentication token from standard input\n-\n-  -h, --help\n-          Print help (see a summary with '-h')\n \n Examples:\n   # Authenticate with github.com\n",
+      "stats": {
+        "added_chars": 132,
+        "removed_chars": 132
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.login -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "login -h"
+      ],
+      "title": "Full help text of `login -h` changed (+122 −122 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,13 +3,13 @@\n Authenticate with Copilot\n \n Options:\n-      --host <host>  GitHub host URL (default: https://github.com)\n       --device-code  Authenticate using the OAuth device code flow (default in\n                      remote environments, CI, and non-interactive Linux with no display)\n+  -h, --help         Print help (see more with '--help')\n+      --host <host>  GitHub host URL (default: https://github.com)\n       --web-flow     Authenticate using the browser (web) flow (default on local\n                      desktops)\n       --with-token   Read an authentication token from standard input\n-  -h, --help         Print help (see more with '--help')\n \n Examples:\n   # Authenticate with github.com\n",
+      "stats": {
+        "added_chars": 122,
+        "removed_chars": 122
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.update --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "update --help"
+      ],
+      "title": "Full help text of `update --help` changed (+608 −46 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,7 +3,9 @@\n Download the latest version.\n \n Checks for a newer release and downloads it. The CLI supports two update\n-channels: \"stable\" (default) and \"prerelease\".\n+channels: \"stable\" and \"prerelease\". When you pass no channel and have not set\n+autoUpdatesChannel, a prerelease build stays on prerelease. Other builds use\n+stable, except staff with experimental mode enabled use prerelease.\n \n By default, the CLI also checks for updates automatically on startup, and on\n standalone-binary installations a downloaded version applies at your next\n@@ -13,6 +15,13 @@\n RUN_ID, or SYSTEM_COLLECTIONURI environment variables).\n \n Use --no-auto-update or set COPILOT_AUTO_UPDATE=false to disable it manually.\n+\n+To downgrade (roll back to an earlier release) or install a specific version,\n+run npm install -g @github/copilot@<version>, or download that release from\n+https://github.com/github/copilot-cli/releases. Then launch the CLI with\n+--no-auto-update or COPILOT_AUTO_UPDATE=false: otherwise a newer version\n+already in its package cache can run instead, and auto-update can download\n+the latest again.\n \n Arguments:\n   [channel]\n",
+      "stats": {
+        "added_chars": 608,
+        "removed_chars": 46
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.autoUpdate.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "autoUpdate",
+        "description"
+      ],
+      "title": "autoUpdate description changed (+412 −44 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Automatically download updated CLI versions.\n+Automatically download updated CLI versions, and when a session starts, update plugins from auto-updating marketplaces: the built-in awesome-copilot and any marketplace added in your user settings or your organization's managed settings with \"autoUpdate\": true (repository settings do not count).\n+On by default, except in CI.\n+Set to false to stop both; COPILOT_AUTO_UPDATE=false does the same from the environment.\n",
+      "stats": {
+        "added_chars": 412,
+        "removed_chars": 44
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.beep.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "beep",
+        "description"
+      ],
+      "title": "beep description changed (+145 −37 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Beep when user attention is required.\n+Ring the terminal bell when the agent finishes a turn and whenever it waits on you, such as a permission prompt, a question or a plan to approve.\n",
+      "stats": {
+        "added_chars": 145,
+        "removed_chars": 37
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.beepOnSchedule.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "beepOnSchedule",
+        "description"
+      ],
+      "title": "beepOnSchedule description changed (+163 −35 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Beep when a scheduled prompt fires.\n+Beep when a turn started by a scheduled /every or /after prompt finishes. Applies only when beep is on; on by default, set to false to keep scheduled turns silent.\n",
+      "stats": {
+        "added_chars": 163,
+        "removed_chars": 35
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.companyAnnouncements.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "companyAnnouncements",
+        "description"
+      ],
+      "title": "companyAnnouncements description changed (+107 −50 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Messages randomly displayed in the startup banner.\n+Messages shown at startup. One, picked at random, appears in the timeline as a Company announcement notice.\n",
+      "stats": {
+        "added_chars": 107,
+        "removed_chars": 50
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.disabledSkills.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "disabledSkills",
+        "description"
+      ],
+      "title": "disabledSkills description changed (+390 −33 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Skills discovered but not loaded.\n+Names of skills to turn off, so the agent cannot use them and they get no slash command.\n+`/skills` and `copilot skill disable <name>` add a name and `copilot skill enable <name>` removes it; names match in any letter case, and a plugin's skill can be written `plugin:skill`.\n+A trusted repository's `.github/copilot/settings.json` can add names too, and a skill named in either list stays off.\n",
+      "stats": {
+        "added_chars": 390,
+        "removed_chars": 33
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.effortLevel.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "effortLevel",
+        "description"
+      ],
+      "title": "effortLevel description changed (+307 −44 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Reasoning effort for models that support it.\n+Reasoning effort for models that support it: none, minimal, low, medium, high, xhigh or max.\n+Which levels a model offers depends on the model; in the /model picker, left and right arrows step through the highlighted model's levels.\n+When unset, the model's own default is used, which is medium for most models.\n",
+      "stats": {
+        "added_chars": 307,
+        "removed_chars": 44
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.enabledPlugins.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enabledPlugins",
+        "description"
+      ],
+      "title": "enabledPlugins description changed (+409 −51 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Per-plugin enabled/disabled state for auto-install.\n+Plugins to turn on or off, keyed `name@marketplace`; `false` turns one off without uninstalling it.\n+In a repository's `.github/copilot/settings.json` it shares plugins with everyone on the project: when they trust the folder, the plugins are installed if missing and turned on in that repository, not in their other projects.\n+Put a marketplace that is not built in into the same file's `extraKnownMarketplaces`.\n",
+      "stats": {
+        "added_chars": 409,
+        "removed_chars": 51
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces description changed (+438 −54 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,2 @@\n-Additional trusted plugin marketplaces, keyed by name.\n+Plugin marketplaces beyond the built-in awesome-copilot, keyed by name; `/plugin marketplace add` saves each one here as `{\"source\": {...}}`.\n+While auto-update is on, installed plugins update by themselves at session start only from awesome-copilot and from entries you give `\"autoUpdate\": true` in your user or managed settings (a repository's settings cannot opt one in); update the others with `copilot plugin update <name>` or `--all`.\n",
+      "stats": {
+        "added_chars": 438,
+        "removed_chars": 54
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.footer.showCustom.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "footer.showCustom",
+        "description"
+      ],
+      "title": "footer.showCustom description changed (+188 −28 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Show the custom footer slot.\n+Show your custom status line, the output of `statusLine.command`, in the footer. On by default; `/statusline` toggles it as the `custom` item, and while it is off the command does not run.\n",
+      "stats": {
+        "added_chars": 188,
+        "removed_chars": 28
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.footer.showModelEffort.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "footer.showModelEffort",
+        "description"
+      ],
+      "title": "footer.showModelEffort description changed (+163 −46 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Show the model and effort level in the footer.\n+Show the reasoning effort level next to the model name in the footer; the model name always shows. When unset, the effort shows for a few seconds after it changes.\n",
+      "stats": {
+        "added_chars": 163,
+        "removed_chars": 46
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.ide.openDiffOnEdit.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "ide.openDiffOnEdit",
+        "description"
+      ],
+      "title": "ide.openDiffOnEdit description changed (+218 −37 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Open a diff in the IDE on every edit.\n+When connected to an IDE, show a file edit that is waiting for your approval as a diff in the IDE; accepting the diff approves that edit once and rejecting it rejects the edit. Edits that need no approval open no diff.\n",
+      "stats": {
+        "added_chars": 218,
+        "removed_chars": 37
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.inlineImages.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "inlineImages",
+        "description"
+      ],
+      "title": "inlineImages description changed (+174 −101 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Render images inline using the Kitty graphics protocol, or Sixel graphics (supported terminals only).\n+Render images inline using the Kitty graphics protocol (supported terminals only). With experimental features on, Sixel graphics are also used in terminals that support them.\n",
+      "stats": {
+        "added_chars": 174,
+        "removed_chars": 101
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.memory.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "memory",
+        "description"
+      ],
+      "title": "memory description changed (+444 −50 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Enable agentic memory (cross-session fact recall).\n+Enable agentic memory, so the agent remembers facts across sessions with Copilot Memory where your account has it.\n+What it learns about a repository is kept on GitHub for everyone using Copilot Memory there; where available, your own preferences are kept for you alone.\n+The agent cannot delete a memory: view or remove repository memories in the repository's Settings > Copilot > Memory and your own at https://github.com/settings/copilot/memory.\n",
+      "stats": {
+        "added_chars": 444,
+        "removed_chars": 50
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.mergeStrategy.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "mergeStrategy",
+        "description"
+      ],
+      "title": "mergeStrategy description changed (+421 −51 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Default git integration strategy (rebase or merge).\n+How /pr fix conflicts, /pr fix all, /pr auto and /pr agentmerge bring the base branch into your pull request branch: rebase rebases onto it and force-pushes with --force-with-lease; merge merges it in and pushes a merge commit.\n+When unset, /pr fix conflicts and /pr fix all ask each time and can save your choice here, and /pr auto and /pr agentmerge let the agent choose.\n+Repository settings can set it for one repository.\n",
+      "stats": {
+        "added_chars": 421,
+        "removed_chars": 51
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.model.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "model",
+        "description"
+      ],
+      "title": "model description changed (+306 −32 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-AI model to use for Copilot CLI.\n+Default AI model for new sessions.\n+/model <id> changes only the current session; save a default with /model --global <id> or /config model <id>.\n+In a trusted folder a repository default (/model --repo or --local) overrides it, --model overrides both for one launch, and a resumed session keeps its own model.\n",
+      "stats": {
+        "added_chars": 306,
+        "removed_chars": 32
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.powershellFlags.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "powershellFlags",
+        "description"
+      ],
+      "title": "powershellFlags description changed (+409 −45 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Flags passed to PowerShell (pwsh) on startup.\n+Startup flags for the PowerShell that runs shell commands on Windows; when unset, -NoProfile -NoLogo.\n+Copilot runs PowerShell 7 (pwsh.exe) when it is on PATH and otherwise Windows PowerShell 5.1 (powershell.exe); no setting picks the executable, so to use PowerShell 7, install it and restart Copilot.\n+Sandboxed commands cannot start a Microsoft Store install of PowerShell 7 and use Windows PowerShell instead.\n",
+      "stats": {
+        "added_chars": 409,
+        "removed_chars": 45
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.auth.git.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.auth.git",
+        "description"
+      ],
+      "title": "sandbox.auth.git description changed (+388 −157 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,2 @@\n-When sandboxing is enabled, inject the GitHub token as an http.extraheader so authenticated HTTPS git works without the credential helper the sandbox blocks.\n+When sandboxing is enabled, give sandboxed git a masked credential as an http.extraheader so authenticated HTTPS git works without the credential helper the sandbox blocks: the GitHub token for GitHub, and the answer from your own git credential helper for other hosts.\n+The sandbox proxy substitutes the real credential only for requests to that HTTPS origin, so the command never sees it.\n",
+      "stats": {
+        "added_chars": 388,
+        "removed_chars": 157
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.sandbox.userPolicy.network.proxy.url.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.userPolicy.network.proxy.url",
+        "description"
+      ],
+      "title": "sandbox.userPolicy.network.proxy.url description changed (+162 −177 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,4 @@\n HTTP(S) proxy for sandboxed traffic (e.g.\n http://proxy.example.com:8080).\n-With host rules, the built-in local proxy uses this endpoint as its upstream, keeping credentials out of child processes.\n-Without host rules, traffic uses this endpoint directly.\n+The built-in local proxy forwards sandboxed traffic to this endpoint as its upstream and applies any host rules, so proxy credentials never reach child processes.\n Configure authentication in the separate username/password fields.\n",
+      "stats": {
+        "added_chars": 162,
+        "removed_chars": 177
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.scrollbar.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "scrollbar",
+        "description"
+      ],
+      "title": "scrollbar description changed (+262 −39 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Show the scrollbar in scrollable views.\n+Show a scrollbar at the right edge of the timeline and other scrollable views when their content is longer than the screen; in the timeline you can drag it with the mouse to scroll. Set it to false to hide the scrollbar and give its two columns back to the text.\n",
+      "stats": {
+        "added_chars": 262,
+        "removed_chars": 39
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.showTimestamps.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "showTimestamps",
+        "description"
+      ],
+      "title": "showTimestamps description changed (+145 −60 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Show HH:mm timestamps next to user messages in the timeline.\n+Show the time (HH:mm) next to each message you send in the timeline. Only your messages get a timestamp; assistant replies and tool calls do not.\n",
+      "stats": {
+        "added_chars": 145,
+        "removed_chars": 60
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.statusLine.command.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "statusLine.command",
+        "description"
+      ],
+      "title": "statusLine.command description changed (+436 −146 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Path to the script or shell command to execute for generating the status line content. Supports ~ and environment variables (e.g. $HOME, ${HOME}).\n+Script or shell command that prints your custom status line; each line it prints becomes one row.\n+It receives the session status as JSON on stdin with the fields cwd, session_id, session_name, transcript_path, model (id, display_name), workspace, username, remote, version, cost, context_window (token totals, context_window_size, used_percentage), ai_used and allow_all_enabled.\n+Supports ~ and environment variables (e.g.\n+$HOME, ${HOME}).\n",
+      "stats": {
+        "added_chars": 436,
+        "removed_chars": 146
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.stream.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "stream",
+        "description"
+      ],
+      "title": "stream description changed (+192 −27 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Enable streaming responses.\n+Show each reply as the model writes it, token by token. Set to false to show each reply all at once when it is complete, including in `copilot -p` output; `--stream off` does this for one run.\n",
+      "stats": {
+        "added_chars": 192,
+        "removed_chars": 27
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.subagents.agents.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "subagents.agents",
+        "description"
+      ],
+      "title": "subagents.agents description changed (+257 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,2 @@\n Per-subagent model, model policy, effort level, context tier, and auto-invoke overrides, keyed by agent name (configured via /subagents).\n+autoInvoke applies only to rubber-duck and is off by default; turn on Proactive invocation for it in /subagents (autoInvoke: true) to have the agent ask this critic to review its plan before implementing non-trivial work, or run /rubber-duck to ask for one.\n",
+      "stats": {
+        "added_chars": 257,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.subagents.maxConcurrency.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "subagents.maxConcurrency",
+        "description"
+      ],
+      "title": "subagents.maxConcurrency description changed (+108 −97 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum number of subagents that can run concurrently. Only applies to usage-based billing users.\n+Maximum number of subagents that can run concurrently. Ignored on Copilot plans without usage-based billing.\n",
+      "stats": {
+        "added_chars": 108,
+        "removed_chars": 97
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.subagents.maxDepth.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "subagents.maxDepth",
+        "description"
+      ],
+      "title": "subagents.maxDepth description changed (+85 −74 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum subagent nesting depth. Only applies to usage-based billing users.\n+Maximum subagent nesting depth. Ignored on Copilot plans without usage-based billing.\n",
+      "stats": {
+        "added_chars": 85,
+        "removed_chars": 74
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tabs.enabled.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tabs.enabled",
+        "description"
+      ],
+      "title": "tabs.enabled description changed (+262 −29 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Show the home screen tab bar.\n+Show the home screen tab bar: Current (this session), Sessions, Issues, Pull requests and Gists (your GitHub gists). Press tab to move to the next tab. Issues and Pull requests are grayed out outside a GitHub repository. On by default; set false to hide the bar.\n",
+      "stats": {
+        "added_chars": 262,
+        "removed_chars": 29
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tabs.hide.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tabs.hide",
+        "description"
+      ],
+      "title": "tabs.hide description changed (+145 −43 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tab identifiers to hide on the home screen.\n+Tabs to hide on the home screen, as tab identifiers: agents (Sessions), issues, pull-requests, gists. The copilot (Current) tab cannot be hidden.\n",
+      "stats": {
+        "added_chars": 145,
+        "removed_chars": 43
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.tabs.sort.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tabs.sort",
+        "description"
+      ],
+      "title": "tabs.sort description changed (+168 −33 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Order of tabs on the home screen.\n+Order of tabs on the home screen, as tab identifiers: copilot (Current), agents (Sessions), issues, pull-requests, gists. Tabs not listed follow in their default order.\n",
+      "stats": {
+        "added_chars": 168,
+        "removed_chars": 33
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.terminalProgress.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "terminalProgress",
+        "description"
+      ],
+      "title": "terminalProgress description changed (+179 −42 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Emit OSC 9;4 terminal progress indicators.\n+Show a busy indicator while the agent works, in terminals that support OSC 9;4 progress (Windows Terminal shows it on the tab and the taskbar button). Set to false to turn it off.\n",
+      "stats": {
+        "added_chars": 179,
+        "removed_chars": 42
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.voice.enabled.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "voice.enabled",
+        "description"
+      ],
+      "title": "voice.enabled description changed (+327 −31 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-Enable voice input (dictation).\n+Voice mode: dictate prompts with your microphone instead of typing, transcribed on your machine by a downloaded speech model.\n+`/voice on` and `/voice off` save this, so voice mode comes back at the next launch (it is turned off if it then fails to start).\n+Available on Windows x64 and arm64, Linux x64 and macOS on Apple silicon.\n",
+      "stats": {
+        "added_chars": 327,
+        "removed_chars": 31
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.workflows.defaultLimits.maxAiCredits.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "workflows.defaultLimits.maxAiCredits",
+        "description"
+      ],
+      "title": "workflows.defaultLimits.maxAiCredits description changed (+370 −240 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Fallback soft post-paid AI-credit ceiling for a workflow run. Workflow declarations and per-run overrides take precedence. If every source is unset, AI credits are unlimited. The value must round to a safe positive integer nano-AIU ceiling.\n+Fallback soft post-paid AI-credit ceiling for a workflow run.\n+Workflow declarations and per-run overrides take precedence.\n+If every source is unset, AI credits are unlimited.\n+The value must round to a safe positive integer nano-AIU ceiling.\n+Dynamic workflows need experimental mode and either usage-based billing or a custom model provider (BYOK) while signed out of GitHub.\n",
+      "stats": {
+        "added_chars": 370,
+        "removed_chars": 240
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.workflows.defaultLimits.maxConcurrentSubagents.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "workflows.defaultLimits.maxConcurrentSubagents",
+        "description"
+      ],
+      "title": "workflows.defaultLimits.maxConcurrentSubagents description changed (+380 −250 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Fallback maximum number of concurrently active subagents per workflow run. Workflow declarations and per-run overrides take precedence. If unset, maxTotalSubagents supplies the bound or concurrency is unlimited. Values above 4096 are clamped to 4096.\n+Fallback maximum number of concurrently active subagents per workflow run.\n+Workflow declarations and per-run overrides take precedence.\n+If unset, maxTotalSubagents supplies the bound or concurrency is unlimited.\n+Values above 4096 are clamped to 4096.\n+Dynamic workflows need experimental mode and either usage-based billing or a custom model provider (BYOK) while signed out of GitHub.\n",
+      "stats": {
+        "added_chars": 380,
+        "removed_chars": 250
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.workflows.defaultLimits.maxTotalSubagents.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "workflows.defaultLimits.maxTotalSubagents",
+        "description"
+      ],
+      "title": "workflows.defaultLimits.maxTotalSubagents description changed (+361 −231 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Fallback maximum number of subagents created over a workflow run's lifetime. Workflow declarations and per-run overrides take precedence. If every source is unset, the total is unlimited. Range: positive integer through 4294967295.\n+Fallback maximum number of subagents created over a workflow run's lifetime.\n+Workflow declarations and per-run overrides take precedence.\n+If every source is unset, the total is unlimited.\n+Range: positive integer through 4294967295.\n+Dynamic workflows need experimental mode and either usage-based billing or a custom model provider (BYOK) while signed out of GitHub.\n",
+      "stats": {
+        "added_chars": 361,
+        "removed_chars": 231
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.workflows.defaultLimits.timeoutSeconds.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "workflows.defaultLimits.timeoutSeconds",
+        "description"
+      ],
+      "title": "workflows.defaultLimits.timeoutSeconds description changed (+343 −213 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Fallback active-time limit in seconds for a workflow run. Workflow declarations and per-run overrides take precedence. If every source is unset, active time is unlimited. Range: greater than 0 through 2147483.647.\n+Fallback active-time limit in seconds for a workflow run.\n+Workflow declarations and per-run overrides take precedence.\n+If every source is unset, active time is unlimited.\n+Range: greater than 0 through 2147483.647.\n+Dynamic workflows need experimental mode and either usage-based billing or a custom model provider (BYOK) while signed out of GitHub.\n",
+      "stats": {
+        "added_chars": 343,
+        "removed_chars": 213
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.workflows.logPhaseNames.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "workflows.logPhaseNames",
+        "description"
+      ],
+      "title": "workflows.logPhaseNames description changed (+201 −67 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Emit workflow phase names to the session transcript. Default: true.\n+Emit workflow phase names to the session transcript. Default: true. Dynamic workflows need experimental mode and either usage-based billing or a custom model provider (BYOK) while signed out of GitHub.\n",
+      "stats": {
+        "added_chars": 201,
+        "removed_chars": 67
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.workflows.maxConcurrentRuns.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "workflows.maxConcurrentRuns",
+        "description"
+      ],
+      "title": "workflows.maxConcurrentRuns description changed (+227 −93 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum number of top-level workflow runs that can run concurrently. Default: 4. Range: 1-16.\n+Maximum number of top-level workflow runs that can run concurrently. Default: 4. Range: 1-16. Dynamic workflows need experimental mode and either usage-based billing or a custom model provider (BYOK) while signed out of GitHub.\n",
+      "stats": {
+        "added_chars": 227,
+        "removed_chars": 93
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.COPILOT_EXTENSION_INITIALIZATION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_EXTENSION_INITIALIZATION"
+      ],
+      "title": "New environment variable: COPILOT_EXTENSION_INITIALIZATION",
+      "impact": "informational",
+      "before": null,
+      "after": "COPILOT_EXTENSION_INITIALIZATION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_ASSISTED_APPROVAL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_ASSISTED_APPROVAL"
+      ],
+      "title": "Environment variable no longer read: COPILOT_ASSISTED_APPROVAL",
+      "impact": "informational",
+      "before": "COPILOT_ASSISTED_APPROVAL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_E2E_AZUREML_CATALOG",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_E2E_AZUREML_CATALOG"
+      ],
+      "title": "Environment variable no longer read: COPILOT_E2E_AZUREML_CATALOG",
+      "impact": "informational",
+      "before": "COPILOT_E2E_AZUREML_CATALOG",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_E2E_GPU_MEMORY_BYTES",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_E2E_GPU_MEMORY_BYTES"
+      ],
+      "title": "Environment variable no longer read: COPILOT_E2E_GPU_MEMORY_BYTES",
+      "impact": "informational",
+      "before": "COPILOT_E2E_GPU_MEMORY_BYTES",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_ENABLE_INTERRUPTED_SESSION_RESTORE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_ENABLE_INTERRUPTED_SESSION_RESTORE"
+      ],
+      "title": "Environment variable no longer read: COPILOT_ENABLE_INTERRUPTED_SESSION_RESTORE",
+      "impact": "informational",
+      "before": "COPILOT_ENABLE_INTERRUPTED_SESSION_RESTORE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_ENTRA_DISABLE_ONEAUTH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_ENTRA_DISABLE_ONEAUTH"
+      ],
+      "title": "Environment variable no longer read: COPILOT_ENTRA_DISABLE_ONEAUTH",
+      "impact": "informational",
+      "before": "COPILOT_ENTRA_DISABLE_ONEAUTH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed",
+      "impact": "informational",
+      "before": "<home>/.copilot/logs/process-<n>-<n>.log",
+      "after": "<home>/.copilot/logs/process-<n>-3461.log",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}
