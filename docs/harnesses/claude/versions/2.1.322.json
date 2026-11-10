@@ -21751,11 +21751,11 @@
         "read": true
       },
       "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": {
-        "description": "Set to `false` to exclude account UUID from metrics attributes (default: included). See Monitoring",
+        "description": "Set to `false` to exclude account UUID from metric and event attributes (default: included). See Monitoring",
         "read": false
       },
       "OTEL_METRICS_INCLUDE_ENTRYPOINT": {
-        "description": "Set to `true` to include the session entrypoint in metrics attributes (default: excluded). Added in v2.1.152. See Monitoring",
+        "description": "Set to `true` to include the session entrypoint in metric and event attributes (default: excluded). Added in v2.1.152. See Monitoring",
         "read": false
       },
       "OTEL_METRICS_INCLUDE_REPOSITORY": {
@@ -21767,11 +21767,11 @@
         "read": false
       },
       "OTEL_METRICS_INCLUDE_SESSION_ID": {
-        "description": "Set to `false` to exclude session ID from metrics attributes (default: included). See Monitoring",
+        "description": "Set to `false` to exclude session ID from metric and event attributes (default: included). See Monitoring",
         "read": false
       },
       "OTEL_METRICS_INCLUDE_VERSION": {
-        "description": "Set to `true` to include Claude Code version in metrics attributes (default: excluded). See Monitoring",
+        "description": "Set to `true` to include Claude Code version in metric and event attributes (default: excluded). See Monitoring",
         "read": false
       },
       "SLASH_COMMAND_TOOL_CHAR_BUDGET": {
@@ -21871,7 +21871,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-10T02:58:35.970156031Z",
+    "fetched_at": "2026-11-10T03:19:20.566119825Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -22280,7 +22280,7 @@
       },
       "crossSessionInbound": {
         "default": "unset, so Claude Code decides per message",
-        "description": "Choose what this session does with messages arriving from your other Claude Code sessions. When no value applies, Claude Code decides per message from the two sessions' permission-mode classes. Requires Claude Code v2.1.224 or later.",
+        "description": "Choose what this session does with messages arriving from your other Claude Code sessions. When no value applies, Claude Code decides per message from the two sessions' permission-mode classes.",
         "read": true,
         "scope": "Any file",
         "scope_note": "A project or local value applies only when it's stricter than the value managed settings, the `--settings` flag, or user settings give.",
