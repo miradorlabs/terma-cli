@@ -15,7 +15,7 @@ import (
 )
 
 // The desktop's user, a UUID as Terma Desktop sends it. Beta Labs, with its one team, plays
-// the PERSONAL organization onboarding passes; Acme, with two, a TEAM organization.
+// the PERSONAL organization onboarding passes; Acme, with two, a SHARED organization.
 const deskUser = "33333333-3333-4333-8333-333333333333"
 
 func personalOrg() organization { return orgB() }
@@ -330,8 +330,8 @@ func TestDesktopGrantFailures(t *testing.T) {
 	}
 }
 
-// Switching from the desktop: to a TEAM organization by grant, to Personal by another, and
-// back to the TEAM one, which reuses the sign-in kept for it. Both stay stored.
+// Switching from the desktop: to a SHARED organization by grant, to Personal by another, and
+// back to the SHARED one, which reuses the sign-in kept for it. Both stay stored.
 func TestDesktopGrantSwitchesOrganizationsAndBack(t *testing.T) {
 	gateway := grantSandbox(t)
 	gateway.grant("to-team", orgA().ID, deskUser)

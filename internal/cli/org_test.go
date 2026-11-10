@@ -304,11 +304,12 @@ func TestMatchOrganization(t *testing.T) {
 	}
 }
 
-// /v1/organizations' type tells the person's own workspace from a team, whatever the
-// names: the picker says "personal" beside it, and a team's role beside a team.
+// /v1/organizations' type tells the person's own workspace from a shared organization,
+// whatever the names: the picker says "personal" beside it, and the role beside a shared
+// one.
 func TestOrganizationTypeNamesThePersonalWorkspace(t *testing.T) {
 	var list listOrganizationsResponse
-	body := `{"organizations":[{"id":"t","name":"Personal","role":"admin","type":"team"},` +
+	body := `{"organizations":[{"id":"s","name":"Personal","role":"admin","type":"shared"},` +
 		`{"id":"p","name":"Personal","role":"admin","type":"personal"},{"id":"o","name":"Old","role":"member"}]}`
 	if err := json.Unmarshal([]byte(body), &list); err != nil {
 		t.Fatal(err)

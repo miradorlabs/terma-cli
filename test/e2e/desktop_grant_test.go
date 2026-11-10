@@ -51,6 +51,25 @@ func TestDesktopGrant(t *testing.T) {
 		return code
 	}
 
+	// A desktop whose session may not delegate (NOT_DELEGABLE: approve again; or
+	// ORG_NOT_ACCESSIBLE: signed out of that organization) has no code to give and closes
+	// stdin: the CLI ends with grant_no_code, as the desktop's fixture pins it.
+	for _, reason := range []string{"NOT_DELEGABLE", "ORG_NOT_ACCESSIBLE"} {
+		sb.account.RefuseDelegation(reason)
+		_, rest, err := sb.desktopSetup(accountUser, func(request map[string]any) string {
+			challenge, _ := request["challenge"].(string)
+			label, _ := request["label"].(string)
+			if _, err := sb.account.Delegate(challenge, label); err == nil || !strings.Contains(err.Error(), "403 PERMISSION_DENIED "+reason) {
+				t.Fatalf("delegate for a session refused with %s: %v", reason, err)
+			}
+			return ""
+		})
+		if code, ok := exitCode(err); !ok || code != 1 || !strings.Contains(rest, `{"error":{"code":"grant_no_code"`) {
+			t.Fatalf("%s: exit %v, output:\n%s", reason, err, rest)
+		}
+	}
+	sb.account.RefuseDelegation("")
+
 	// A code that signs in someone other than the desktop's user is refused as the desktop
 	// reads it, stored nowhere, and that session is signed out.
 	first, rest, err := sb.desktopSetup(anotherUser, delegate)
@@ -135,10 +154,12 @@ func (sb *Sandbox) desktopSetup(user string, grant func(request map[string]any) 
 		_ = cmd.Wait()
 		t.Fatalf("stdout's first line %q is not JSON (%v); stderr:\n%s", line, err, stderr.String())
 	}
+	// A grant with no code to give writes none: closing stdin says so.
 	if _, asked := first["challenge"]; asked {
-		code := grant(first)
-		if _, err := io.WriteString(stdin, `{"code":"`+code+`"}`+"\n"); err != nil {
-			t.Fatal(err)
+		if code := grant(first); code != "" {
+			if _, err := io.WriteString(stdin, `{"code":"`+code+`"}`+"\n"); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	_ = stdin.Close()

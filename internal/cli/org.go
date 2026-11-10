@@ -6,9 +6,9 @@ type organization struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Role string `json:"role,omitempty"`
-	// Type is "personal" for a person's own workspace and "team" for every other
+	// Type is "personal" for a person's own workspace and "shared" for every other
 	// organization, empty from a server that predates it. Only Type tells them apart: a
-	// team may be named like the personal one.
+	// shared organization may be named like the personal one.
 	Type string `json:"type,omitempty"`
 }
 

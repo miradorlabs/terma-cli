@@ -468,7 +468,7 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	gateway.scopedPolicies = true
 	teamA, personal := teamOrgTeam(), personalTeam()
 	gateway.policyBodies = map[string]string{
-		// The TEAM organization's team: one repository, no prompts, no tool content.
+		// The SHARED organization's team: one repository, no prompts, no tool content.
 		teamA: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"git_hooks":false,"capture":{"exclude_prompts":true,"exclude_tool_content":true}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
 		// Personal's starts on Collect All: every session, all content.
 		personal: `{"policy":{"version":"1.1","terma":{"global":{},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
@@ -517,7 +517,7 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 		return ingest.take()
 	}
 
-	// On the TEAM organization: events queued for team A, and a session claimed for it.
+	// On the SHARED organization: events queued for team A, and a session claimed for it.
 	setupFor(orgA(), teamA, "to-team")
 	keyA := keyOf(teamA)
 	s := spoolForTest(t)
@@ -560,7 +560,7 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	}
 	pol, err := resolve("in-flight")
 	if err != nil || pol.Key != keyA || pol.IncludePrompts || pol.IncludeToolContent || pol.Unadmitted || pol.Signals != nil {
-		t.Fatalf("back on the TEAM organization the claim resolves to %+v, %v; want team A's key and restrictions", pol, err)
+		t.Fatalf("back on the SHARED organization the claim resolves to %+v, %v; want team A's key and restrictions", pol, err)
 	}
 	appendEvent(t, s, teamA, time.Now())
 	sent = flush()

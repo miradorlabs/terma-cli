@@ -37,6 +37,9 @@ type Account struct {
 	delegations    atomic.Int32
 	// revokes counts the sessions signed out at /v1/auth/cli/revoke.
 	revokes atomic.Int32
+	// refuseDelegation, when set, is the error.reason delegate refuses the desktop's
+	// session with: NOT_DELEGABLE or ORG_NOT_ACCESSIBLE.
+	refuseDelegation string
 }
 
 // delegatedCode is a code the delegate endpoint made for a CLI's challenge and label.
@@ -67,7 +70,7 @@ func (sb *Sandbox) StartAccount() *Account {
 			}
 		}
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
-			writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid token")
+			writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "", "invalid token")
 			return
 		}
 		switch r.URL.Path {
@@ -159,24 +162,36 @@ func (sb *Sandbox) SignIn(profile string) {
 }
 
 // The auth gateway's answers, as mirador-platform's gateways/auth/spec/openapi.yaml has
-// them: the organization (with its type) and user a sign-in is for, and an error, whose
-// optional error.reason no answer here needs (only a delegate refusal for a session that
-// cannot delegate carries one, NOT_DELEGABLE, and this account's desktop always can).
+// them: the organization (with its type, personal or shared) and user a sign-in is for,
+// and an error, {"error":{"code","reason","message"}}, its reason only where the spec
+// gives one.
 var (
 	accountOrganization = map[string]string{"id": accountOrg, "name": "Live", "type": "personal"}
 	accountUserInfo     = map[string]string{"id": accountUser, "email": "live@terma.test"}
 )
 
-func writeAuthError(w http.ResponseWriter, status int, code, message string) {
+func writeAuthError(w http.ResponseWriter, status int, code, reason, message string) {
+	body := map[string]string{"code": code, "message": message}
+	if reason != "" {
+		body["reason"] = reason
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message}})
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": body})
+}
+
+// RefuseDelegation makes delegate refuse the desktop's session with reason (403
+// PERMISSION_DENIED), "" to delegate again.
+func (a *Account) RefuseDelegation(reason string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.refuseDelegation = reason
 }
 
 // serveDelegate is the platform's POST /v1/auth/cli/delegate, as Terma Desktop calls it:
 // its refresh token rotates and a 60-second single-use code is bound to the CLI's challenge.
 // A challenge that is not 43 characters is 400, a refresh token that is not the desktop's
-// live one 401.
+// live one 401, and a session that may not delegate 403 with its reason.
 func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken  string `json:"refresh_token"`
@@ -185,13 +200,17 @@ func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	if len(body.CodeChallenge) != 43 {
-		writeAuthError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "code_challenge must be 43 characters")
+		writeAuthError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "", "code_challenge must be 43 characters")
 		return
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if body.RefreshToken != a.desktopRefresh {
-		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid or expired refresh token")
+		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "", "invalid or expired refresh token")
+		return
+	}
+	if a.refuseDelegation != "" {
+		writeAuthError(w, http.StatusForbidden, "PERMISSION_DENIED", a.refuseDelegation, "this session cannot delegate")
 		return
 	}
 	n := a.delegations.Add(1)
@@ -228,7 +247,7 @@ func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request)
 	// refused it for.
 	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 ||
 		base64.RawURLEncoding.EncodeToString(sum[:]) != grant.challenge {
-		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid or expired credentials")
+		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "", "invalid or expired credentials")
 		return true
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -250,10 +269,14 @@ func (a *Account) Delegate(challenge, label string) (string, error) {
 	}
 	defer resp.Body.Close()
 	var out struct {
-		Code string `json:"code"`
+		Code  string `json:"code"`
+		Error struct {
+			Code   string `json:"code"`
+			Reason string `json:"reason"`
+		} `json:"error"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || resp.StatusCode != http.StatusOK || out.Code == "" {
-		return "", fmt.Errorf("delegate: HTTP %d, %v", resp.StatusCode, err)
+		return "", fmt.Errorf("delegate: HTTP %d %s %s, %v", resp.StatusCode, out.Error.Code, out.Error.Reason, err)
 	}
 	return out.Code, nil
 }
