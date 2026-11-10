@@ -208,8 +208,14 @@ func (Agent) LaunchEnv(cfg agents.RelayConfig) (set map[string]string, unset []s
 	}, unset
 }
 
+// ExportsFromEnvironment marks that Copilot's exporters take OTEL_EXPORTER_OTLP_* from the
+// environment they started with: the CLI from it alone, and VS Code's agent host over its
+// own settings.
+func (Agent) ExportsFromEnvironment() {}
+
 var (
 	_ agents.RelayExporter = Agent{}
 	_ agents.RelayChecker  = Agent{}
 	_ agents.Launched      = Agent{}
+	_ agents.EnvExporter   = Agent{}
 )

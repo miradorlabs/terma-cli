@@ -239,7 +239,7 @@ func TestRelayRunRecordsItsEnvironment(t *testing.T) {
 	}
 	facts := testApp.relayFacts()
 	if facts.Environment != "dev" || !facts.HookStarted {
-		t.Fatalf("doctor's facts = %+v", facts)
+		t.Fatalf("doctor's facts: environment %q, hook-started %v", facts.Environment, facts.HookStarted)
 	}
 	if c := doctor.RelayCheck(testApp.agents, facts, testApp.storedKeys, "proj_x", "prod", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "dev environment") {
 		t.Fatalf("a relay in another environment passed doctor: %+v", c)

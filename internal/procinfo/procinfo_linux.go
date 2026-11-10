@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func parentOf(pid int) (int, bool) {
@@ -98,4 +99,21 @@ func procAddr(s string) (netip.AddrPort, bool) {
 	}
 	addr, _ := netip.AddrFromSlice(raw)
 	return netip.AddrPortFrom(addr, uint16(port)), true
+}
+
+// environ reads /proc/<pid>/environ, the environment the process was started with.
+func environ(pid int) ([]string, bool) {
+	dir := filepath.Join("/proc", strconv.Itoa(pid))
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, false
+	}
+	if st, ok := info.Sys().(*syscall.Stat_t); !ok || int(st.Uid) != os.Getuid() {
+		return nil, false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "environ"))
+	if err != nil {
+		return nil, false
+	}
+	return splitEnv(data), true
 }

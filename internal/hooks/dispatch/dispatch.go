@@ -121,6 +121,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Now:       time.Now(),
 		Cwd:       r.Cwd,
 		Args:      r.Args,
+		AgentHook: tool != "",
 		Stdin:     io.TeeReader(r.Stdin, payload),
 		OnClaim:   func(root string) { claimed, claimedIn = true, root },
 		Flush:     func() { flushed = true; d.Flush() },

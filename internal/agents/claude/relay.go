@@ -24,6 +24,12 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 
 var _ agents.RelayExporter = Agent{}
 
+// ExportsFromEnvironment marks that Claude Code's exporter takes OTEL_EXPORTER_OTLP_* from
+// the environment it started with, where an IDE or agent host that starts it may set them.
+func (Agent) ExportsFromEnvironment() {}
+
+var _ agents.EnvExporter = Agent{}
+
 // Tool is the label Claude Code's hooks and trailers carry.
 func (Agent) Tool() string { return "claude-code" }
 
