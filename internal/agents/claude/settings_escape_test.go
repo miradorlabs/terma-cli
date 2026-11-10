@@ -45,7 +45,7 @@ func TestSaveLeavesShellOperatorsReadable(t *testing.T) {
 // The pre-encoded status line entry stays unescaped too.
 func TestStatusLineCommandIsWrittenUnescaped(t *testing.T) {
 	t.Parallel()
-	encoded, err := hookmgr.MarshalJSON(statusLineCommand("my-line --flag"), "", "")
+	encoded, err := hookmgr.MarshalJSON(statusLineCommand(testTerma, "my-line --flag"), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,6 +40,10 @@ type Exporter struct {
 	// HelperPath, when set, is a 0700 script that prints the Authorization header, so the
 	// settings file holds a path instead of the key. Empty means inline delivery.
 	HelperPath string
+
+	// HookCommand is how an extension terma writes reaches `terma hook`: terma by its
+	// absolute path, then "hook". Empty writes no hook command, and the extension calls none.
+	HookCommand []string
 }
 
 // An Exporter carries no content switch: every agent sends prompts and tool content to

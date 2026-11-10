@@ -29,6 +29,7 @@ const CONFIG: TermaConfig | null = null /* terma:config */
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
+import { isAbsolute } from "node:path"
 
 type TermaConfig = {
   version: 1
@@ -153,9 +154,10 @@ function record(session: string, event: string, body: string, a: Record<string, 
 // --- terma hook ----------------------------------------------------------------------
 
 // termaHook hands an event to `terma hook pi-*`, detached: attribution is best-effort
-// and never delays the agent.
+// and never delays the agent. terma is run by the absolute path CONFIG names, never
+// looked up on the PATH: with none, no hook runs.
 function termaHook(event: string, payload: Record<string, unknown>) {
-  if (!CONFIG) return
+  if (!CONFIG || !Array.isArray(CONFIG.hookCommand) || !isAbsolute(String(CONFIG.hookCommand[0] ?? ""))) return
   try {
     const [cmd, ...args] = CONFIG.hookCommand
     const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })

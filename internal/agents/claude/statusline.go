@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -21,14 +22,20 @@ import (
 // The status-line payload carries the plan's rate-limit windows, and the only way to see it is to
 // be the statusLine command, so terma puts `terma hook statusline` in front of the configured one
 // (statusline_hook.go), copies every other option, falls back to the previous command when terma
-// is not on the PATH, and restores the entry only while the file still holds what terma wrote.
+// is gone, and restores the entry only while the file still holds what terma wrote.
 
 const (
 	claudeStatusLineKey = "statusLine"
 	statusLineMarker    = "terma hook statusline"
+	// legacyStatusLineGuard is how an earlier build found terma: on the PATH, which Claude Code
+	// runs the command under in the session's directory. A refresh rewrites it.
+	legacyStatusLineGuard = "command -v terma >/dev/null 2>&1 && exec " + statusLineMarker + " || "
 	// statusLineRecordFile keeps, per config path, the entry terma installed and the one it replaced.
 	statusLineRecordFile = "claude-statusline.json"
 )
+
+// statusLineGuard is statusLineCommand's lead for any terma path: the same quoted path twice.
+var statusLineGuard = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+') \] && exec ('(?:[^']|'\\'')+') hook statusline \|\| `)
 
 type statusLineRecord struct {
 	Installed json.RawMessage `json:"installed"`
@@ -36,25 +43,30 @@ type statusLineRecord struct {
 	Previous json.RawMessage `json:"previous"`
 }
 
-// statusLineCommand is the installed command; previous is its fallback when terma is not installed.
-func statusLineCommand(previous string) string {
-	// /bin/sh by absolute path: the fallback runs precisely when the PATH is not what it was.
+// statusLineCommand is the installed command: terma by its absolute path, as every hook entry
+// names it, never looked up on the PATH; previous is its fallback when terma is not there.
+func statusLineCommand(terma, previous string) string {
+	// /bin/sh by absolute path too: the fallback runs precisely when terma has gone.
 	fallback := "exit 0"
 	if strings.TrimSpace(previous) != "" {
 		fallback = "exec /bin/sh -c " + shellSingleQuote(previous)
 	}
-	return "command -v terma >/dev/null 2>&1 && exec " + statusLineMarker + " || " + fallback
+	q := shellSingleQuote(terma)
+	return "[ -x " + q + " ] && exec " + q + " hook statusline || " + fallback
 }
 
 func shellSingleQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// isStatusLineCommand recognizes the installed guard and direct invocations, never a substring:
-// a renderer may print terma's command name.
+// isStatusLineCommand recognizes the installed guard, an earlier build's and direct invocations,
+// never a substring: a renderer may print terma's command name.
 func isStatusLineCommand(command string) bool {
 	command = strings.TrimSpace(command)
-	if strings.HasPrefix(command, "command -v terma >/dev/null 2>&1 && exec "+statusLineMarker+" || ") {
+	if strings.HasPrefix(command, legacyStatusLineGuard) {
+		return true
+	}
+	if m := statusLineGuard.FindStringSubmatch(command); m != nil && m[1] == m[2] {
 		return true
 	}
 	fields := strings.Fields(command)
@@ -96,11 +108,15 @@ func parseStatusLine(raw json.RawMessage) (*statusLineEntry, error) {
 	return e, nil
 }
 
-// InstallStatusLine puts terma's command in front of the configured one in the user settings,
-// idempotently, and reports whether the file changed.
-func (c exporter) InstallStatusLine() (bool, error) {
+// InstallStatusLine puts terma's command, terma by its absolute path, in front of the configured
+// one in the user settings, idempotently, and reports whether the file changed. A wrap already
+// there is brought up to date, as a refresh would.
+func (c exporter) InstallStatusLine(terma string) (bool, error) {
 	if c.root != "" {
 		return false, errors.New("the status line is a user setting; Terma does not write it into a repository")
+	}
+	if !filepath.IsAbs(terma) {
+		return false, fmt.Errorf("terma's own path %q is not absolute", terma)
 	}
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -119,7 +135,8 @@ func (c exporter) InstallStatusLine() (bool, error) {
 		return false, fmt.Errorf("%s: statusLine.type %q is not one Terma can wrap", path, prev.Type)
 	}
 	if prev != nil && isStatusLineOurs(prev.Command) {
-		return false, nil
+		_, changed, err := c.RefreshStatusLine(terma)
+		return changed, err
 	}
 
 	entry := map[string]json.RawMessage{}
@@ -129,7 +146,7 @@ func (c exporter) InstallStatusLine() (bool, error) {
 		previousCommand = prev.Command
 	}
 	entry["type"] = json.RawMessage(`"command"`)
-	cmdJSON, _ := hookmgr.MarshalJSON(statusLineCommand(previousCommand), "", "")
+	cmdJSON, _ := hookmgr.MarshalJSON(statusLineCommand(terma, previousCommand), "", "")
 	entry["command"] = cmdJSON
 	installed, err := hookmgr.MarshalJSON(entry, "", "")
 	if err != nil {
@@ -151,11 +168,15 @@ func (c exporter) InstallStatusLine() (bool, error) {
 	return true, nil
 }
 
-// RefreshStatusLine rewrites an older form of terma's command and never installs one; it returns
-// the settings path and whether the file changed.
-func (c exporter) RefreshStatusLine() (string, bool, error) {
+// RefreshStatusLine rewrites an older form of terma's command, one that found terma on the PATH
+// among them, to run terma at its absolute path terma, and never installs one; it returns the
+// settings path and whether the file changed.
+func (c exporter) RefreshStatusLine(terma string) (string, bool, error) {
 	if c.root != "" {
 		return "", false, nil
+	}
+	if !filepath.IsAbs(terma) {
+		return "", false, fmt.Errorf("terma's own path %q is not absolute", terma)
 	}
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -181,7 +202,7 @@ func (c exporter) RefreshStatusLine() (string, bool, error) {
 	if prev != nil {
 		previousCommand = prev.Command
 	}
-	want := statusLineCommand(previousCommand)
+	want := statusLineCommand(terma, previousCommand)
 	if cur.Command == want {
 		return path, false, nil
 	}

@@ -85,7 +85,7 @@ func TestOpenCodeConnectWritesPluginAndHelper(t *testing.T) {
 	if cfg.ResourceAttributes[semconv.MiradorProjectIDKey] != "proj_123" || cfg.ResourceAttributes[harness.AttrEnduserID] != "dev@example.com" {
 		t.Errorf("resource attributes = %v", cfg.ResourceAttributes)
 	}
-	if !reflect.DeepEqual(cfg.HookCommand, []string{"terma", "hook"}) {
+	if !reflect.DeepEqual(cfg.HookCommand, []string{testTerma, "hook"}) {
 		t.Errorf("hook command = %v", cfg.HookCommand)
 	}
 	// No secret in the file, so it is readable like any other plugin.
@@ -268,7 +268,7 @@ func TestOpenCodeDetectDoesNotFailWhenAbsent(t *testing.T) {
 // its file mode; an absent or inert one is left alone.
 func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
 	h, path := opencodeIn(t)
-	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
+	if _, changed, err := h.RefreshPlugin(testTerma); err != nil || changed {
 		t.Fatalf("absent plugin: changed=%v err=%v", changed, err)
 	}
 	if err := h.Connect(opencodeExporter(t, h, false), false); err != nil {
@@ -285,7 +285,7 @@ func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, changed, err := h.RefreshPlugin(); err != nil || !changed {
+	if _, changed, err := h.RefreshPlugin(testTerma); err != nil || !changed {
 		t.Fatalf("refresh: changed=%v err=%v", changed, err)
 	}
 	got, _ := os.ReadFile(path)
@@ -298,7 +298,7 @@ func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
 	if after, _ := os.Stat(path); after.Mode().Perm() != info.Mode().Perm() {
 		t.Fatalf("mode %v, want %v", after.Mode().Perm(), info.Mode().Perm())
 	}
-	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
+	if _, changed, err := h.RefreshPlugin(testTerma); err != nil || changed {
 		t.Fatalf("second refresh: changed=%v err=%v", changed, err)
 	}
 
@@ -306,13 +306,41 @@ func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
 	if err := os.WriteFile(path, inert, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
+	if _, changed, err := h.RefreshPlugin(testTerma); err != nil || changed {
 		t.Fatalf("inert plugin: changed=%v err=%v", changed, err)
+	}
+}
+
+// testTerma is where the tests' plugin runs terma.
+const testTerma = "/opt/terma/bin/terma"
+
+// An earlier build's plugin ran whichever terma the PATH found; a refresh has it run terma
+// by its path, and only ever an absolute one.
+func TestRefreshPluginRunsTermaByItsPath(t *testing.T) {
+	h, path := opencodeIn(t)
+	e := opencodeExporter(t, h, false)
+	e.HookCommand = []string{"terma", "hook"}
+	if err := h.Connect(e, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, terma := range []string{"terma", "bin/terma", ""} {
+		if _, _, err := h.RefreshPlugin(terma); err == nil {
+			t.Errorf("refreshed with terma at %q", terma)
+		}
+	}
+	if _, changed, err := h.RefreshPlugin(testTerma); err != nil || !changed {
+		t.Fatalf("refresh: changed=%v err=%v", changed, err)
+	}
+	data, _ := os.ReadFile(path)
+	cfg, ok := readPluginConfig(data)
+	if !ok || !reflect.DeepEqual(cfg.HookCommand, []string{testTerma, "hook"}) || cfg.Endpoint != e.Endpoint {
+		t.Fatalf("refreshed configuration %+v", cfg)
 	}
 }
 
 func baseExporter() harness.Exporter {
 	return harness.Exporter{Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef", ProjectID: "proj_123", Signals: harness.AllSignals,
+		HookCommand:        []string{testTerma, "hook"},
 		ResourceAttributes: map[string]string{harness.AttrServiceName: "opencode", harness.AttrEnduserID: "dev@example.com", semconv.MiradorProjectIDKey: "proj_123"}}
 }
 

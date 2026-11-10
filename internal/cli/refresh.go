@@ -12,7 +12,8 @@ import (
 )
 
 func (app *App) refresher() refresh.Refresher {
-	return refresh.Refresher{StateDir: app.stateDir, Agents: app.agents, Version: app.version, RelayService: app.refreshRelayService}
+	return refresh.Refresher{StateDir: app.stateDir, Agents: app.agents, Version: app.version, Terma: app.hookExecutable,
+		RelayService: app.refreshRelayService}
 }
 
 // refreshRelayService rewrites a relay service an earlier terma (or another binary) wrote,

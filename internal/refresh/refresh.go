@@ -18,6 +18,8 @@ type Refresher struct {
 	StateDir string
 	Agents   *agents.Registry
 	Version  string
+	// Terma locates terma, by the absolute path the refreshed files run it at; required.
+	Terma func() (string, error)
 	// RelayService rewrites the relay's service when it is not what this build would
 	// install, returning its path and whether it did; nil leaves the service alone.
 	RelayService func(ctx context.Context) (path string, changed bool, err error)
@@ -41,10 +43,18 @@ func (r Refresher) machine(ctx context.Context) ([]string, error) {
 
 // Machine rewrites each agent's home-directory files, carrying on past a failure.
 func (r Refresher) Machine() ([]string, error) {
+	refreshers := r.Agents.With[agents.MachineRefresher]()
+	if len(refreshers) == 0 {
+		return nil, nil
+	}
+	terma, err := r.Terma()
+	if err != nil {
+		return nil, fmt.Errorf("locate terma: %w", err)
+	}
 	var changed []string
 	var errs []error
-	for _, a := range r.Agents.With[agents.MachineRefresher]() {
-		if path, ok, err := a.RefreshMachine(); err != nil {
+	for _, a := range refreshers {
+		if path, ok, err := a.RefreshMachine(terma); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", a.Name(), err))
 		} else if ok {
 			changed = append(changed, path)

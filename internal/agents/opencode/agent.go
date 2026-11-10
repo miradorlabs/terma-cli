@@ -40,8 +40,10 @@ func (Agent) FlushAfter() []string { return []string{"opencode-session-end"} }
 // Harness is how terma configures the agent's exporter.
 func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 
-// RefreshMachine rewrites the plugin.
-func (Agent) RefreshMachine() (string, bool, error) { return exporter{}.RefreshPlugin() }
+// RefreshMachine rewrites the plugin, calling terma at its absolute path terma.
+func (Agent) RefreshMachine(terma string) (string, bool, error) {
+	return exporter{}.RefreshPlugin(terma)
+}
 
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {

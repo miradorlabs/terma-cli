@@ -189,6 +189,28 @@ test("session and file events reach terma hook with the session attached", async
   expect(edits).toContainEqual({ session_id: "ses_9", cwd: dir, file: "/repo/src/b.go" })
 })
 
+test("terma runs only by an absolute path, never found on the PATH", async () => {
+  const path = process.env.PATH
+  const cwd = process.cwd()
+  // The fake terma is on the PATH and in the working directory: a hook command naming it
+  // bare or relative, or none at all, still runs nothing.
+  process.env.PATH = `${dir}:${path}`
+  process.chdir(dir)
+  try {
+    for (const hookCommand of [["terma", "hook"], ["./terma", "hook"], undefined, []]) {
+      for (const f of readdirSync(hookLog)) rmSync(join(hookLog, f))
+      const hooks = await load(baseConfig({ hookCommand }), dir)
+      await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_path", directory: "/repo" } } } })
+      await hooks.dispose()
+      await new Promise((r) => setTimeout(r, 300))
+      expect(readdirSync(hookLog)).toEqual([])
+    }
+  } finally {
+    process.env.PATH = path
+    process.chdir(cwd)
+  }
+})
+
 test("a session the task tool opened names its parent", async () => {
   received = []
   for (const f of readdirSync(hookLog)) rmSync(join(hookLog, f))

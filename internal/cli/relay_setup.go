@@ -12,20 +12,10 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
-
-// termaHookCommand is how an extension terma writes reaches `terma hook`: by this binary's
-// absolute path, since a desktop-started agent has the system PATH.
-func termaHookCommand() []string {
-	if exe, err := procinfo.AbsExecutable(); err == nil {
-		return []string{exe, "hook"}
-	}
-	return []string{"terma", "hook"}
-}
 
 func (app *App) newRelaySetupCommand() *cobra.Command {
 	var addr, agents string
@@ -76,7 +66,16 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 }
 
 func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
-	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand()}
+	// An extension terma writes reaches `terma hook` by this binary's absolute path, never
+	// the PATH: a desktop-started agent has the system's, and a session's may name its checkout.
+	terma, err := app.hookExecutable()
+	if err == nil && !filepath.IsAbs(terma) {
+		err = fmt.Errorf("%q is not an absolute path", terma)
+	}
+	if err != nil {
+		return fmt.Errorf("locate terma: %w", err)
+	}
+	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: []string{terma, "hook"}}
 	for _, name := range selected {
 		integration, ok := app.agents.Find[agents.RelayExporter](name)
 		if !ok {

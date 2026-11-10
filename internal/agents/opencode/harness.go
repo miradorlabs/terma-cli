@@ -140,7 +140,7 @@ func (c exporter) config(e harness.Exporter) opencodeConfig {
 			}
 		}
 	}
-	cfg.HookCommand = []string{"terma", "hook"}
+	cfg.HookCommand = e.HookCommand
 	return cfg
 }
 
@@ -293,8 +293,13 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 }
 
 // RefreshPlugin re-splices an installed plugin's configuration into this build's source,
-// leaving an absent or inert plugin, and the file mode, alone.
-func (exporter) RefreshPlugin() (string, bool, error) {
+// leaving an absent or inert plugin, and the file mode, alone. Its hook command becomes
+// terma at its absolute path terma, as Connect writes it: an earlier build's ran whichever
+// terma the PATH found.
+func (exporter) RefreshPlugin(terma string) (string, bool, error) {
+	if !filepath.IsAbs(terma) {
+		return "", false, fmt.Errorf("terma's own path %q is not absolute", terma)
+	}
 	path, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return "", false, err
@@ -314,6 +319,7 @@ func (exporter) RefreshPlugin() (string, bool, error) {
 	if !ok {
 		return path, false, nil
 	}
+	cfg.HookCommand = []string{terma, "hook"}
 	src, err := renderPlugin(*cfg)
 	if err != nil || bytes.Equal(src, data) {
 		return path, false, err

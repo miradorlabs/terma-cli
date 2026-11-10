@@ -20,7 +20,7 @@ const CONFIG = null /* terma:config */
 
 import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { join, resolve as resolvePath } from "node:path"
+import { isAbsolute, join } from "node:path"
 import { execFileSync, spawn } from "node:child_process"
 
 // --- limits -------------------------------------------------------------------------
@@ -38,10 +38,8 @@ const SCOPE = { name: "terma-omp", version: "1" }
 
 // effectiveConfig is CONFIG with the repository's own policy laid over it: a committed
 // .omp/terma.json sets what ships from that repository — signals, and whether prompt
-// and tool content are captured — and nothing else. In per-repo mode the shared global
-// extension captures no content by default, so a repository that wants prompt or
-// tool-content capture opts in through its own committed overlay; no repository's
-// install can turn capture on for another.
+// and tool content are captured — and nothing else. The destination and the key are
+// CONFIG's alone: nothing in a repository names a helper for this file to run.
 function effectiveConfig(worktree) {
   const cfg = { ...(CONFIG ?? {}) }
   cfg.signals = Array.isArray(cfg.signals) ? cfg.signals : []
@@ -49,18 +47,6 @@ function effectiveConfig(worktree) {
   cfg.includeToolContent = cfg.includeToolContent === true
   cfg.resourceAttributes = { ...(cfg.resourceAttributes ?? {}) }
   if (!worktree) return cfg
-  // Per-repo routing: point this session's export at whatever Terma project the
-  // repository is bound to. The key for that project lives in its own helper script;
-  // an unbound repository has no project, so the export stays inert (no endpoint).
-  if (cfg.perRepo) {
-    const projectID = readProjectID(worktree)
-    if (!projectID) {
-      cfg.endpoint = ""
-      return cfg
-    }
-    cfg.headersHelper = join(cfg.helpersDir || "", (cfg.helperPrefix || "") + projectID)
-    if (cfg.projectAttribute) cfg.resourceAttributes[cfg.projectAttribute] = projectID
-  }
   try {
     const local = JSON.parse(readFileSync(join(worktree, ".omp", "terma.json"), "utf8"))
     if (Array.isArray(local.signals)) cfg.signals = local.signals
@@ -70,25 +56,6 @@ function effectiveConfig(worktree) {
     // No local policy, or one this extension cannot read: the global settings stand.
   }
   return cfg
-}
-
-// readProjectID walks up from a worktree to the first Terma binding and returns its
-// project id, or "" when the repository is not bound to a Terma project.
-function readProjectID(start) {
-  let dir = resolvePath(start)
-  for (;;) {
-    try {
-      const raw = readFileSync(join(dir, ".terma", "settings.json"), "utf8")
-      const doc = JSON.parse(raw)
-      const id = doc && doc.project && typeof doc.project.id === "string" ? doc.project.id : ""
-      if (id) return id
-    } catch {
-      // No binding here; try the parent.
-    }
-    const parent = resolvePath(dir, "..")
-    if (parent === dir) return ""
-    dir = parent
-  }
 }
 
 // --- credentials --------------------------------------------------------------------
@@ -144,9 +111,10 @@ function applyEnv(cfg, headers) {
 
 // termaHook hands an event to `terma hook omp-*`, asynchronously: the hook is not on
 // the agent loop's critical path, and a terma that hangs or is absent must never slow
-// or fail the session. Errors are swallowed on purpose.
+// or fail the session. Errors are swallowed on purpose. terma is run by the absolute
+// path CONFIG names, never looked up on the PATH.
 function termaHook(hookCommand, event, payload) {
-  if (!Array.isArray(hookCommand) || hookCommand.length === 0) return
+  if (!Array.isArray(hookCommand) || hookCommand.length === 0 || !isAbsolute(String(hookCommand[0]))) return
   try {
     const child = spawn(hookCommand[0], [...hookCommand.slice(1), event], {
       stdio: ["pipe", "ignore", "ignore"],
