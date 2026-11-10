@@ -32,6 +32,14 @@ type HookTrusting interface {
 // TrustSync is what a SyncHookTrust changed.
 type TrustSync struct{ Approved, Withdrawn int }
 
+// CleanHookEnv is an agent that runs its hooks in an environment of its own, without the
+// developer's: its machine-wide hook entries name terma's directories themselves
+// (hookmgr.UserHookCommandIn), or a developer who moved them would collect nothing.
+type CleanHookEnv interface {
+	UserHooks
+	HooksRunInCleanEnv()
+}
+
 // ManagedHooks is an agent whose machine-wide hooks an organization can deploy.
 type ManagedHooks interface {
 	Agent

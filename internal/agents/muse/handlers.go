@@ -145,6 +145,8 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Announce(r, env.NewSession(r, root, museTool, in.model()), nil)
+	// A session closed with no SessionEnd is read once Muse is used again.
+	catchUp(env, root)
 	return nil
 }
 

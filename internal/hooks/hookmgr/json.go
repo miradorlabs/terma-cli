@@ -12,8 +12,9 @@ import (
 	"strings"
 )
 
-// userHookShape is UserHookCommand's and ManagedHookCommand's output for any path and event.
-var userHookShape = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") \] && ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") hook --user [a-z0-9-]+ \|\| true$`)
+// userHookShape is UserHookCommand's, UserHookCommandIn's and ManagedHookCommand's output
+// for any path, directories and event.
+var userHookShape = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") \] && (?:TERMA_[A-Z_]+='(?:[^']|'\\'')*' )*('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") hook --user [a-z0-9-]+ \|\| true$`)
 
 // CallsTerma reports whether an entry contains a command terma generated.
 func CallsTerma(entry json.RawMessage) bool {

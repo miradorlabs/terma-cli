@@ -48,7 +48,7 @@ func (app *App) policies() policy.Source {
 
 // globalMode is this machine as setup writes it.
 func (app *App) globalMode() globalmode.Machine {
-	return globalmode.Machine{ConfigDir: app.dir, Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
+	return globalmode.Machine{ConfigDir: app.dir, StateDir: app.stateDir, Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }
 
 func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {

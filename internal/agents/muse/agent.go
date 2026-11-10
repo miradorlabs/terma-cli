@@ -82,6 +82,10 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 	return planHooks(dir, command, install)
 }
 
+// HooksRunInCleanEnv: Muse hands a hook only HOME, PATH and a few others (measured on
+// 1.4.14), never TERMA_ or XDG_ variables, so its entries name terma's directories.
+func (Agent) HooksRunInCleanEnv() {}
+
 // ContentConsented is delivery asking again, as each prompt and reply leaves, whether the
 // developer chose Muse; the team's policy decides the rest.
 func (Agent) ContentConsented(c hookrun.Consent) bool { return consented(c) }
@@ -92,4 +96,5 @@ var (
 	_ agents.Covered        = Agent{}
 	_ agents.PayloadReader  = Agent{}
 	_ agents.UserHooks      = Agent{}
+	_ agents.CleanHookEnv   = Agent{}
 )

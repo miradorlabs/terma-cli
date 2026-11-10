@@ -11,8 +11,11 @@ import (
 
 // Machine is this machine as setup writes it.
 type Machine struct {
-	// ConfigDir is terma's config directory, where the hooks keep their state.
+	// ConfigDir is terma's config directory, where the hooks keep their state, and StateDir
+	// its state directory; an agent that runs its hooks without the developer's environment
+	// is handed both in its hook entries.
 	ConfigDir string
+	StateDir  string
 	Agents    *agents.Registry
 	// Terma is the executable the hooks call, by absolute path.
 	Terma func() (string, error)

@@ -298,3 +298,39 @@ func TestMuseStopStartsTheReader(t *testing.T) {
 		t.Fatalf("a reader ran without consent: %v", f.detached)
 	}
 }
+
+// A turn's end that the debounce skips leaves its session pending; once that has waited
+// museReadEvery, the next session's start reads it, as when a terminal was closed under it
+// and Muse ran no SessionEnd.
+func TestMuseCatchesUpASessionClosedWithoutEnd(t *testing.T) {
+	t.Setenv(museRootEnv, "")
+	f := newMuseFixture(t)
+	f.run(stop, "Stop", nil)
+	hookruntest.WriteFile(t, filepath.Join(f.state, museFeedDir), hookrun.EvidenceID(museSession)+".json", "{}")
+	f.run(stop, "Stop", nil)
+	pending := filepath.Join(f.state, musePendingDir, hookrun.EvidenceID(museSession)+".json")
+	if _, err := os.Stat(pending); err != nil {
+		t.Fatalf("a skipped read left nothing pending: %v", err)
+	}
+	f.detached = nil
+
+	// Too soon: the next session's start leaves it.
+	other := "019a6c40-1111-7222-8333-444455556666"
+	f.run(sessionStart, "SessionStart", map[string]any{"session_id": other, "source": "startup"})
+	if len(f.detached) != 0 {
+		t.Fatalf("read too soon: %v", f.detached)
+	}
+	past := time.Now().Add(-museReadEvery - time.Second)
+	if err := os.Chtimes(pending, past, past); err != nil {
+		t.Fatal(err)
+	}
+	f.run(sessionStart, "SessionStart", map[string]any{"session_id": other, "source": "startup"})
+	if len(f.detached) != 1 || strings.Join(f.detached[0], " ") != museFeedEvent+" "+museSession+" "+f.root+" " {
+		t.Fatalf("catch-up = %v", f.detached)
+	}
+	// Touched: not read again until it has waited once more.
+	f.run(sessionStart, "SessionStart", map[string]any{"session_id": other, "source": "startup"})
+	if len(f.detached) != 1 {
+		t.Fatalf("read again at once: %v", f.detached)
+	}
+}

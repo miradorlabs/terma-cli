@@ -120,3 +120,31 @@ func TestSetupLeavesGitsConfigurationAlone(t *testing.T) {
 		t.Fatalf("setup wrote hooks into the config directory: %v", names)
 	}
 }
+
+// cleanAgent runs its hooks without the developer's environment.
+type cleanAgent struct{ agentstest.UserHooked }
+
+func (cleanAgent) HooksRunInCleanEnv() {}
+
+// An agent that runs its hooks without the developer's environment is handed terma's
+// directories in each entry, which is still terma's to remove.
+func TestCleanEnvHooksNameTermasDirectories(t *testing.T) {
+	m, _ := sandbox(t)
+	hooks := filepath.Join(t.TempDir(), "settings.json")
+	m.StateDir = filepath.Join(t.TempDir(), "it's state")
+	m.Agents = agents.New(cleanAgent{agentstest.UserHooked{Agent: agentstest.Agent{ID: "clean"}, Path: hooks}})
+	if _, err := m.ApplyUserHooks([]string{"clean"}, true); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(hooks)
+	want := "TERMA_CONFIG_DIR='" + m.ConfigDir + "' TERMA_STATE_DIR='" + strings.ReplaceAll(m.StateDir, "'", `'\\''`) + "' '/opt/terma/bin/terma' hook --user clean-stop"
+	if !strings.Contains(string(data), want) {
+		t.Fatalf("hooks file:\n%s\nwant %s", data, want)
+	}
+	if _, err := m.ApplyUserHooks([]string{"clean"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(hooks); strings.Contains(string(data), "hook --user") {
+		t.Fatalf("machine-wide hooks left:\n%s", data)
+	}
+}

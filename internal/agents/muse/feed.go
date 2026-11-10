@@ -11,6 +11,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -44,11 +45,20 @@ const (
 )
 
 // museFeedDir holds, per session, how far its view has been read, and when the plan's usage
-// was last read.
-var museFeedDir = hookrun.AgentStateDir(name, "feed")
+// was last read; musePendingDir the sessions whose last turns no read has taken up yet.
+var (
+	museFeedDir    = hookrun.AgentStateDir(name, "feed")
+	musePendingDir = hookrun.AgentStateDir(name, "pending-reads")
+)
 
 // StateDirs are the directories the reader keeps state in.
-func (Agent) StateDirs() []string { return []string{museFeedDir} }
+func (Agent) StateDirs() []string { return []string{museFeedDir, musePendingDir} }
+
+// pendingRead is a session a turn's end did not read, for a later hook to.
+type pendingRead struct {
+	Session string `json:"session"`
+	Cwd     string `json:"cwd"`
+}
 
 // viewCursor is how far a session's view has been read, and the tool calls it saw start
 // and not yet finish, whose duration their finish completes.
@@ -59,16 +69,63 @@ type viewCursor struct {
 
 // readLater starts the detached reader for the root session, under the developer's consent:
 // at a turn's end only once museReadEvery has passed since the session's last read, at its
-// end always. Each read rewrites the session's cursor, so its time is the last read's.
+// end always. Each read rewrites the session's cursor, so its time is the last read's. A
+// turn's end it skips leaves the session pending, so a session closed with no end of its own
+// (a terminal closed under it: Muse then runs no SessionEnd) is read by a later hook.
 func readLater(env hookrun.Env, root, cwd, turn string, final bool) {
 	if env.Detach == nil || !consented(env.Consent()) {
 		return
 	}
+	defer catchUp(env, root)
 	cursor := filepath.Join(env.StateDir, museFeedDir, hookrun.EvidenceID(root)+".json")
 	if info, err := os.Stat(cursor); !final && err == nil && env.Time().Sub(info.ModTime()) < museReadEvery {
+		markPending(env, root, cwd)
 		return
 	}
 	env.Detach(museFeedEvent, root, cwd, turn)
+}
+
+// markPending records that the session has turns no read took up; its time is the first
+// skipped turn's, which catchUp waits museReadEvery past.
+func markPending(env hookrun.Env, root, cwd string) {
+	dir := filepath.Join(env.StateDir, musePendingDir)
+	path := filepath.Join(dir, hookrun.EvidenceID(root)+".json")
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+	b, err := json.Marshal(pendingRead{Session: root, Cwd: cwd})
+	if err != nil || os.MkdirAll(dir, 0o700) != nil {
+		return
+	}
+	_ = hookrun.WriteState(path, b)
+}
+
+// catchUp starts a read of each other session pending for museReadEvery, under the
+// developer's consent, and touches its record, so a read that keeps failing is retried no
+// more often than a turn's end would.
+func catchUp(env hookrun.Env, except string) {
+	if env.Detach == nil || !consented(env.Consent()) {
+		return
+	}
+	dir := filepath.Join(env.StateDir, musePendingDir)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	now := env.Time()
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || !strings.HasSuffix(e.Name(), ".json") || now.Sub(info.ModTime()) < museReadEvery {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		var p pendingRead
+		if b, err := os.ReadFile(path); err != nil || json.Unmarshal(b, &p) != nil || p.Session == except || !session.ValidID(p.Session) {
+			continue
+		}
+		_ = os.Chtimes(path, now, now)
+		env.Detach(museFeedEvent, p.Session, p.Cwd, "")
+	}
 }
 
 // feed is the detached reader: `terma hook muse-feed <session> <cwd> [turn]`.
@@ -118,6 +175,8 @@ func feed(ctx context.Context, env hookrun.Env) error {
 	if b, err := json.Marshal(cur); err == nil {
 		_ = hookrun.WriteState(path, b)
 	}
+	// Read: nothing of the session is pending any more.
+	_ = os.Remove(filepath.Join(env.StateDir, musePendingDir, hookrun.EvidenceID(root)+".json"))
 	readQuota(ctx, env, r, root, filepath.Join(dir, "quota"))
 	return nil
 }
