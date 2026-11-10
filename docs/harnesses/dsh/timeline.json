@@ -5,7 +5,936 @@
     {
       "version": "0.2.2-rc.1",
       "previous": "0.2.1-rc.5",
-      "changes": []
+      "changes": [
+        {
+          "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/cordis-plugin-timer.version",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/cordis-plugin-timer.version: 1.1.7 → 1.2.0",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/dsh-fs-observation-policy",
+          "category": "model",
+          "op": "removed",
+          "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-fs-observation-policy: {\"name\":\"@deepseek-ai/dsh-fs-observation-policy\",\"version… → none",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-executor-native",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-executor-native: none → {\"name\":\"@deepseek-ai/dsh-tool-executor-native\",\"version\"…",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.0.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.0.time: 1793875310330 → 1794286016519",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.1.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.1.time: 1793875310332 → 1794286016520",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.2.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.2.time: 1793875310332 → 1794286016521",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.3.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.3.time: 1793875310335 → 1794286016522",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.4.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.4.time: 1793875310336 → 1794286016522",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.5.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.5.time: 1793875310338 → 1794286016522",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.6.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.6.time: 1793875310391 → 1794286016555",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.7.data.message.content.0.text",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.7.data.message.content.0.text: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.7.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.7.time: 1793875310393 → 1794286016557",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.8.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.8.time: 1793875310393 → 1794286016557",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.9.data.content.0.text",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.9.data.content.0.text: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.9.data.source.sections.approval:policy.text",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.9.data.source.sections.approval:policy.text: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.9.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.9.time: 1793875310394 → 1794286016558",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.exit_plan_mode",
+          "category": "model",
+          "op": "removed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.exit_plan_mode: {\"description\":\"Use only in plan mode. Present your plan … → none",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.time: 1793875310395 → 1794286016559",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.11.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.11.time: 1793875310396 → 1794286016560",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.12.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.12.time: 1793875310398 → 1794286016562",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.events.13.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.13.time: 1793875310400 → 1794286016563",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "model.params.dsh_session_log.session.createdAt",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.session.createdAt: 1793875310326 → 1794286016514",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "prompt.context.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+177 −153 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+440 −411 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "tools.exit_plan_mode",
+          "category": "tools",
+          "op": "removed",
+          "title": "Tool removed: exit_plan_mode",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.dsh headless.options.--add-dir",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `dsh headless --add-dir`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.dsh headless.options.--approval-policy",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `dsh headless --approval-policy`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.dsh headless.options.--permission-mode",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `dsh headless --permission-mode`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.headless --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `headless --help` changed (+1039 −369 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-agent-instructions.maxBytes.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-agent-instructions.maxBytes description changed (+227 −103 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-agent-loop.agents.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-agent-loop.agents description changed (+123 −44 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-agent-tool-presentation.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-agent-tool-presentation description changed (+107 −14 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-agent-tool-presentation.mode.type",
+          "category": "config",
+          "op": "changed",
+          "title": "Type of dsh-agent-tool-presentation.mode: none → string",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-agent-tool-presentation.mode.enum.native",
+          "category": "config",
+          "op": "added",
+          "title": "Setting dsh-agent-tool-presentation.mode gained value native",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-agent-tool-presentation.mode.enum.ptc",
+          "category": "config",
+          "op": "added",
+          "title": "Setting dsh-agent-tool-presentation.mode gained value ptc",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-attachment-local.maxImageBytes.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-attachment-local.maxImageBytes description changed (+72 −72 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-attachment-local.maxImageDimension.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-attachment-local.maxImageDimension description changed (+105 −103 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-client-ui-trajectory",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-client-ui-trajectory",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-client-ui-trajectory.maxResultsPerSession",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-client-ui-trajectory.maxResultsPerSession",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.gitCommand",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.gitCommand",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.gitTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.gitTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.graceMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.graceMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxBranches",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxBranches",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxCachedDiffBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxCachedDiffBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxDiffBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxDiffBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxOutputBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxOutputBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxUntrackedFiles",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxUntrackedFiles",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.readinessTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.readinessTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.worktreePrefix",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.worktreePrefix",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-cua-macos",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-cua-macos",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-cua-macos.permissionPollIntervalMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-cua-macos.permissionPollIntervalMs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.ghCommand",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.ghCommand",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.hosts",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.hosts",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.maxOutputBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.maxOutputBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.timeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.timeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-session",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-session",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-session.discoveryTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-session.discoveryTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge.activeIntervalMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge.activeIntervalMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge.fetchTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge.fetchTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge.idleIntervalMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge.idleIntervalMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge.maxBackoffMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge.maxBackoffMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.effort",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.effort",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.env",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.env",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.launchArgs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.launchArgs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.model",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.model",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.providerName",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.providerName",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.runtime",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.runtime",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-experimental-subagent-oar.timeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-subagent-oar.timeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-tool-subagent-oar",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-tool-subagent-oar",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-tool-subagent-oar.providers",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-tool-subagent-oar.providers",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-experimental-tool-subagent-oar.toolName",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-tool-subagent-oar.toolName",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-headless.approvalPolicy",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-headless.approvalPolicy",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-headless.permissionMode",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-headless.permissionMode",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.detailFetchTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.detailFetchTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.detailImageMaxBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.detailImageMaxBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.detailMaxBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.detailMaxBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.detailNpmFileSources",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.detailNpmFileSources",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.gitTransportTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.gitTransportTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.versionListLimit",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.versionListLimit",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-manager.versionLookupConcurrency",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-manager.versionLookupConcurrency",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.cacheTtlMs.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-plugin-market.cacheTtlMs description changed (+111 −47 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailCacheDir",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailCacheDir",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailCacheMaxBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailCacheMaxBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailGitTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailGitTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailGitlabHosts",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailGitlabHosts",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailImageMaxBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailImageMaxBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailMaxBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailMaxBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailNpmFileSources",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailNpmFileSources",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-plugin-market.detailRepositoryMaxBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-plugin-market.detailRepositoryMaxBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-ptc-runtime-node.executionMode.enum.vm-script",
+          "category": "config",
+          "op": "added",
+          "title": "Setting dsh-ptc-runtime-node.executionMode gained value vm-script",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-ptc-runtime-node.executionMode.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-ptc-runtime-node.executionMode description changed (+117 −106 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-ptc-runtime-node.maxMessageBytes.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-ptc-runtime-node.maxMessageBytes description changed (+86 −76 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-ptc-runtime-node.scriptPersistence",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-ptc-runtime-node.scriptPersistence",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-sandbox-policy.additionalWritableRoots",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-sandbox-policy.additionalWritableRoots",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-schedule.newSessionIntervalSeconds",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-schedule.newSessionIntervalSeconds",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-executor-ptc",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-executor-ptc",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-executor-ptc.maxParallelSubCalls",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-executor-ptc.maxParallelSubCalls",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-fs.applyPatch",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-fs.applyPatch",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-jobs.inlineOutputBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-jobs.inlineOutputBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-subagent.modelDiscovery",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-subagent.modelDiscovery",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-subagent.modelSelection",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-subagent.modelSelection",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-subagent.modelSelectionSettings",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-tool-subagent.modelSelectionSettings",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-web.searchSummaryMaxChars",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-web.searchSummaryMaxChars",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tools",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-tools",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.dsh-tools.maxParallelSubCalls",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-tools.maxParallelSubCalls",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tools.mode",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-tools.mode",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.DSH_HOME",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: DSH_HOME",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.LIVESHARE_DEBUG_READS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: LIVESHARE_DEBUG_READS",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.LIVESHARE_OWNER_CREDENTIAL_FILE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: LIVESHARE_OWNER_CREDENTIAL_FILE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.LIVESHARE_OWNER_STATE_FILE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: LIVESHARE_OWNER_STATE_FILE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.LIVESHARE_VIEWER_DEBUG",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: LIVESHARE_VIEWER_DEBUG",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "binary.engines",
+          "category": "binary",
+          "op": "added",
+          "title": "Binary engines: none → >=24.9.0",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
     },
     {
       "version": "0.2.1-rc.5",

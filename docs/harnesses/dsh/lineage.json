@@ -18,6 +18,28 @@
       ],
       "since_bounded": false
     },
+    "cli.commands.dsh headless.options.--add-dir": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.dsh headless.options.--approval-policy": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "cli.commands.dsh headless.options.--help": {
       "kind": "option",
       "ranges": [
@@ -39,6 +61,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "cli.commands.dsh headless.options.--permission-mode": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "cli.commands.dsh headless.options.--session-id": {
       "kind": "option",
@@ -216,6 +249,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.DSH_HOME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.DSH_PTC_RUNTIME_NODE": {
       "kind": "env_var",
       "ranges": [
@@ -292,6 +336,50 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.LIVESHARE_DEBUG_READS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.LIVESHARE_OWNER_CREDENTIAL_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.LIVESHARE_OWNER_STATE_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.LIVESHARE_VIEWER_DEBUG": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.MODE": {
       "kind": "env_var",
@@ -1415,6 +1503,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-client-ui-trajectory": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-client-ui-trajectory.maxResultsPerSession": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-compaction-basic": {
       "kind": "setting",
       "ranges": [
@@ -1987,6 +2097,127 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-experimental-client-ui-forge": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.gitCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.gitTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.graceMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxBranches": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxCachedDiffBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxDiffBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxOutputBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxUntrackedFiles": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.readinessTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.worktreePrefix": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-experimental-computer-use-cua-driver-mcp": {
       "kind": "setting",
       "ranges": [
@@ -2041,6 +2272,160 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-experimental-cua-macos": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-cua-macos.permissionPollIntervalMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github.ghCommand": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github.hosts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github.maxOutputBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github.timeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-session": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-session.discoveryTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge.activeIntervalMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge.fetchTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge.idleIntervalMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge.maxBackoffMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-experimental-inspector": {
       "kind": "setting",
@@ -2449,6 +2834,94 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-experimental-subagent-oar": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.effort": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.env": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.launchArgs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.model": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.providerName": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.runtime": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-subagent-oar.timeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-experimental-tool-agent-team": {
       "kind": "setting",
       "ranges": [
@@ -2459,6 +2932,39 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-experimental-tool-subagent-oar": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-tool-subagent-oar.providers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-tool-subagent-oar.toolName": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-experimental-translator": {
       "kind": "setting",
@@ -2757,6 +3263,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-headless.approvalPolicy": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-headless.json": {
       "kind": "setting",
       "ranges": [
@@ -2767,6 +3284,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-headless.permissionMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-headless.sessionId": {
       "kind": "setting",
@@ -3912,6 +4440,50 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-plugin-manager.detailFetchTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-manager.detailImageMaxBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-manager.detailMaxBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-manager.detailNpmFileSources": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-plugin-manager.fallbackRegistries": {
       "kind": "setting",
       "ranges": [
@@ -3922,6 +4494,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-plugin-manager.gitTransportTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-plugin-manager.githubConnectionTimeoutMs": {
       "kind": "setting",
@@ -4000,6 +4583,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-plugin-manager.versionListLimit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-manager.versionLookupConcurrency": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-plugin-market": {
       "kind": "setting",
       "ranges": [
@@ -4021,6 +4626,94 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-plugin-market.detailCacheDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailCacheMaxBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailGitTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailGitlabHosts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailImageMaxBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailMaxBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailNpmFileSources": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-plugin-market.detailRepositoryMaxBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-plugin-market.fetchTimeoutMs": {
       "kind": "setting",
@@ -4175,6 +4868,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-ptc-runtime-node.scriptPersistence": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-ptc-runtime-node.timeoutMs": {
       "kind": "setting",
@@ -4385,6 +5089,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-sandbox-policy.additionalWritableRoots": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-sandbox-policy.mode": {
       "kind": "setting",
       "ranges": [
@@ -4439,6 +5154,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-schedule.newSessionIntervalSeconds": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-sdk-app": {
       "kind": "setting",
@@ -6233,6 +6959,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-tool-executor-ptc": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-executor-ptc.maxParallelSubCalls": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-tool-fs": {
       "kind": "setting",
       "ranges": [
@@ -6353,6 +7101,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-tool-fs.applyPatch": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-tool-fs.edit": {
       "kind": "setting",
@@ -6485,6 +7244,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-tool-jobs.inlineOutputBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-tool-jobs.maxConsecutiveWakes": {
       "kind": "setting",
@@ -6849,13 +7619,35 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-tool-subagent.modelDiscovery": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-subagent.modelSelection": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-tool-subagent.modelSelectionSettings": {
       "kind": "setting",
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.1-rc.5",
+          "removed": "0.2.2-rc.1"
         }
       ],
       "since_bounded": false
@@ -7014,6 +7806,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-tool-web.searchSummaryMaxChars": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-tool-web.searchTimeoutMs": {
       "kind": "setting",
       "ranges": [
@@ -7085,8 +7888,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.1-rc.5",
+          "removed": "0.2.2-rc.1"
         }
       ],
       "since_bounded": false
@@ -7096,8 +7899,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.1-rc.5",
+          "removed": "0.2.2-rc.1"
         }
       ],
       "since_bounded": false
@@ -7107,8 +7910,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.1-rc.5",
+          "removed": "0.2.2-rc.1"
         }
       ],
       "since_bounded": false

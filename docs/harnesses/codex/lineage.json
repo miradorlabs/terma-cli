@@ -84,6 +84,17 @@
       ],
       "since_bounded": true
     },
+    "cli.commands.codex agents.options.--no-daemon": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "cli.commands.codex agents.options.--remote": {
       "kind": "option",
       "ranges": [
@@ -11279,6 +11290,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.features.apps_early_resource_discovery": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.features.apps_mcp_gateway": {
       "kind": "setting",
       "ranges": [
@@ -11635,6 +11657,17 @@
       "ranges": [
         {
           "since": "0.163.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.features.code_mode_host_output_truncation": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -12208,6 +12241,17 @@
       "ranges": [
         {
           "since": "0.110.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.features.gcp_setup_wizard": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -12808,6 +12852,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.features.incremental_exec_tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.features.incremental_tools": {
       "kind": "setting",
       "ranges": [
@@ -12824,6 +12879,17 @@
       "ranges": [
         {
           "since": "0.159.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.features.interrupt_on_cancel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -14315,6 +14381,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.features.suppress_model_change_announcements": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.features.system_proxy_fallback": {
       "kind": "setting",
       "ranges": [
@@ -14551,6 +14628,17 @@
       "ranges": [
         {
           "since": "0.116.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.features.tui_extensions_statusline": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -18611,6 +18699,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.model_providers.<name>.capabilities.cyber_access_programs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.model_providers.<name>.capabilities.external_web_access": {
       "kind": "setting",
       "ranges": [
@@ -18726,6 +18825,17 @@
       "ranges": [
         {
           "since": "0.156.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.model_providers.<name>.gateway_oauth.credentials_store": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -19565,6 +19675,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.otel.log_sse_deltas": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.otel.log_user_prompt": {
       "kind": "setting",
       "ranges": [
@@ -20104,6 +20225,28 @@
       ],
       "since_bounded": true
     },
+    "config.options.plugins.<name>.apps": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.plugins.<name>.apps.<name>": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.plugins.<name>.auto_provision": {
       "kind": "setting",
       "ranges": [
@@ -20479,6 +20622,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.profiles.<name>.features.apps_early_resource_discovery": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.profiles.<name>.features.apps_mcp_gateway": {
       "kind": "setting",
       "ranges": [
@@ -20703,6 +20857,17 @@
       "ranges": [
         {
           "since": "0.163.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.profiles.<name>.features.code_mode_host_output_truncation": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -21205,6 +21370,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.profiles.<name>.features.gcp_setup_wizard": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.profiles.<name>.features.general_analytics": {
       "kind": "setting",
       "ranges": [
@@ -21502,6 +21678,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.profiles.<name>.features.incremental_exec_tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.profiles.<name>.features.incremental_tools": {
       "kind": "setting",
       "ranges": [
@@ -21518,6 +21705,17 @@
       "ranges": [
         {
           "since": "0.159.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.profiles.<name>.features.interrupt_on_cancel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }
@@ -22426,6 +22624,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.profiles.<name>.features.suppress_model_change_announcements": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.profiles.<name>.features.system_proxy_fallback": {
       "kind": "setting",
       "ranges": [
@@ -22552,6 +22761,17 @@
       "ranges": [
         {
           "since": "0.116.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.profiles.<name>.features.tui_extensions_statusline": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.167.0",
           "until": null,
           "removed": null
         }

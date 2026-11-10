@@ -3,6 +3,156 @@
   "harness": "pi",
   "steps": [
     {
+      "version": "1.5.1",
+      "previous": "1.5.0",
+      "changes": [
+        {
+          "id": "caching.across_turns",
+          "category": "caching",
+          "op": "added",
+          "title": "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":false,\"stabl…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: pi/<version> (darwin; node/v24.22.1; arm64) → pi/<version> (darwin; node/v24.22.2; arm64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.pi auth.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `pi auth` changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth.options",
+          "category": "cli",
+          "op": "added",
+          "title": "cli.commands.pi auth.options added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth Options",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `pi auth Options`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth check",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `pi auth check`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth login",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `pi auth login`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth logout",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `pi auth logout`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth print-api-key",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `pi auth print-api-key`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi auth print-bearer-token",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `pi auth print-bearer-token`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+92 −76 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "cli.help.auth --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `auth --help` changed (+1386 −208 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.cacheWarming.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of cacheWarming: streaming → idle",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.ALACRITTY_WINDOW_ID",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: ALACRITTY_WINDOW_ID",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.LD_LIBRARY_PATH",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: LD_LIBRARY_PATH",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.NODE_ENV",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: NODE_ENV",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.NODE_OPTIONS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: NODE_OPTIONS",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CHORD2_LOCK",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CHORD2_LOCK",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "1.5.0",
       "previous": "1.4.0",
       "changes": []

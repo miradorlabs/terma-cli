@@ -3,21 +3,3866 @@
   "harness": "dsh",
   "from": "0.2.1-rc.5",
   "to": "0.2.2-rc.1",
-  "generated_at": "2026-11-07T05:31:09Z",
+  "generated_at": "2026-11-10T05:19:19.197557181Z",
   "source": {
     "compare": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.5...dsh-v0.2.2-rc.1"
   },
-  "changelog": null,
+  "changelog": {
+    "url": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.1",
+    "text": "[中文](#cn-v0.2.2-rc.1-5) | [English](#en-v0.2.2-rc.1-5)\r\n\r\n作为 0.2.2 系列的首个候选版本，本版本汇总了自 v0.2.1-rc.5 以来的主要用户和开发者相关变更。\r\n\r\n<h3 id=\"cn-v0.2.2-rc.1-5\">新增功能</h3>\r\n\r\n- 完善手机和平板适配，优化软键盘交互、导航与窄屏布局，保持菜单和操作入口可用。 @Stevring, @turtle2099, @LegGasai, @EricMoin, @Saafo\r\n- 支持将聊天文本作为引用插入输入框，并在发送后显示紧凑预览。 @lsdsjy, @imccyu\r\n- 支持将完整历史会话复制为 Markdown，包含可用的原始日志路径。 @tianyicui\r\n- 工作步骤收起后保留全部助手文字回复，可切换为仅最终回答。 @imccyu\r\n- 支持统一右键与键盘菜单，覆盖会话、工作区和侧边栏，并支持开发者扩展。 @std4453\r\n- 文件预览支持常驻目录树和文件定位功能。 @yudshj\r\n- 新增日语、西班牙语、法语、德语、俄语和巴西葡萄牙语文案与界面配置。 @07akioni\r\n- 插件管理页支持展示富文本详情，并改善页面布局和导航行为。 @turtle1999, @turtle2099\r\n- 插件管理支持更新第三方插件包；热更新失败时会尝试恢复旧版本。 @turtle1999, @turtle2099\r\n- 新增实验性「`subagent_oar`工具」插件，可将独立任务交给本机 Codex 或 Claude CLI。 @tianyicui\r\n- 新增实验性「个性化推荐」插件，按需在回答下方提供官方插件启用卡片或个性化页面创建卡片。 @ZiyaZhang\r\n- 新增实验性「开发者工具 - 统计」插件，按轮次和步骤查看上下文、缓存、模型与工具耗时等统计。 @mektpoy\r\n- 新增实验性「变更请求与工作树」：在独立 Git 工作树中运行会话，通过可搜索文件树和逐文件导航查看本地及 PR 差异，将选中代码和评论交给 Agent，并跟踪检查与评审状态。 @LegGasai, @tianyicui\r\n\r\n### 体验优化\r\n\r\n- 同名工作区在选择器中显示最短区分路径后缀，窄屏优先保留后缀。 @turtle2099\r\n- 会话列表支持插件图标，并改善键盘与触屏操作。 @LegGasai\r\n- 侧栏会话悬浮卡显示工作目录，便于区分未分组或同名会话。 @turtle2099\r\n- 优化侧栏空间布局，改善响应区域，平滑搜索框展开与收起。 @Yifffan\r\n- 侧栏搜索支持不区分大小写的会话 ID 子串匹配。 @turtle2099\r\n- 悬浮侧栏面板拖过屏幕边缘时有阻力，松手后弹回可见区域；窗口缩小时保持控件可达。 @yudshj\r\n- 支持中键关闭右侧栏标签，关闭后台标签不改变当前选中项，并保留不可关闭的起始页。 @Kingwl\r\n- 消息在宿主确认接收后才显示并清空草稿；发送期间输入框只读，发送失败时保留草稿、引用和附件。 @LegGasai\r\n- 图片上传方式调整为进入输入框后立即上传，发送消息时复用已上传的图片。默认单张图片上限提高到 50 MiB。 @LegGasai\r\n- 已回答的问题批次以消息气泡显示，原生与 PTC 调用的回答在过程折叠后仍可回看。 @Kaige-Gao\r\n- 运行状态位于当前工作轮次尾部、待处理插话之前，方便区分运行中和排队中的消息，并改善界面布局抖动问题。 @imccyu\r\n- 改善工作步骤展开／收起和底部输入框的布局稳定性，减少正文、滚动与输入交互时的跳动，并保持运行状态可见。 @imccyu\r\n- 输入框统计读数被截断时，可通过提示气泡查看完整数值；会话统计也显示轮次与步骤数。 @turtle2099\r\n- 点击聊天中的文件行号链接后，代码和文本预览以短暂高亮标出目标行并淡出。 @turtle2099\r\n- 支持拖动平移超出视口的图片，并通过应用内拖放或桌面原生拖放交付原始文件。 @std4453\r\n- Trajectory 结果页新增实时工具返回值的原始 JSON 查看，并与渲染结果上下展示。 @kermanx\r\n- Trajectory 支持独立折叠子调用，保留父调用和摘要；搜索或跨视图定位时可展开对应子调用。 @kermanx\r\n- 模型选择器默认勾选已配置模型，可一次添加或移除候选并保留自定义值；筛选后的全选只作用于可见候选。 @turtle2099\r\n- 对通过 pi-ai 接入且不支持在对话中追加系统消息的模型，后续系统消息会在原位置作为提醒提供，不会移到最初的提示词中。 @Tuyixiang\r\n- 支持在 DeepSeek 与 pi-ai 提供商内拖动或用方向键排序模型，保存后保留顺序及完整模型参数。 @Magolor\r\n- 自动化任务页支持确认后一次清除全部已结束任务，保留进行中的任务。 @Chinesezjc\r\n- Search 功能优先向模型提供 Search API 长摘要，默认每来源最多 800 字符；搜索卡片仍展示短摘录。 @yudshj\r\n- Auto 自动审核支持在连续工具调用之间更好地复用历史上下文缓存，减少重复处理。 @turtle2099\r\n- 后台任务完成通知直接携带小体积输出，并减少已读取结果和子代理收尾消息的重复通知。 @turtle1999\r\n- 子代理等待指引减少 sleep 和重复轮询：只有结果尚未返回时，结束当前轮次等待完成通知。 @Chinesezjc\r\n- 加快带固定目录前缀的文件查找，跳过无关目录，同时保持结果与排序规则不变。 @kermanx\r\n- Word 常规编辑在保存并核对内容与格式后即可交付，减少不必要的 ZIP、XML 与元数据检查。 @tianyicui\r\n- 远程连接默认启用 WebSocket 压缩，减少大量历史消息的传输量；可通过 `websocketCompression` 关闭。 @imccyu\r\n- Web 静态资源支持 ETag 条件请求，未变化的资源返回 304，减少重复下载。 @imccyu\r\n- 减少会话状态更新时的重复发布和目录处理开销，并降低长回复流式组装的运行时成本。 @liukx0205, @imccyu\r\n- 改善 macOS Computer Use 的系统与应用权限引导，通过独立应用申请系统权限，提供系统设置与应用拖入引导并在返回后刷新状态；支持长按、改善应用启动，应用授权可跨重启保留。 @CreatixChu, @koalazf99\r\n\r\n### 问题修复\r\n\r\n- 全局与项目 AGENTS.md 分别使用 maxBytes 预算，避免项目指令挤掉全局指令；同时包含两条链的消息总量最多为原配置的两倍。 @ZiyaZhang\r\n- 切换到较小上下文模型前先用原模型压缩历史；失败时停止切换请求并保留原请求头。 @Dudu-0223\r\n- 使用 Gemini 的 OpenAI 兼容 Chat Completions 接口时，工具调用会保留并在后续请求中带回所需的思考签名，避免因签名缺失导致请求拒绝。 @turtle2099\r\n- 系统提示词未变化时，新一轮模型请求可继续复用已有上下文前缀缓存，避免不必要的缓存失效。 @mektpoy\r\n- 通过 pi-ai 接入的模型在会话图片超过请求数量上限时，自动省略最早的图片并继续请求，避免持续失败。 @turtle2099\r\n- 缺少所需凭据时不向模型提供 Web 搜索工具；新版 Web API 的抓取工具也按凭据就绪状态提供。 @LegGasai\r\n- 修复关闭应用时 Auto 会话权限意外变成完全访问的问题，保留已保存的权限与审批策略。 @tianyicui\r\n- 修复 OpenCode 路由下自动审核在工具执行前失败的问题，审查请求携带对应会话的身份和用途。 @LegGasai\r\n- 等待后台任务输出时，用户插话可立即解除等待并返回当前输出，后台任务继续运行。 @mektpoy\r\n- 修复预设往返切换后委派工具暂时缺失的问题，并让委派工具遵循当前 Agent 的工具限制。 @Dudu-0223\r\n- 被阻塞的目标可从 Web 目标栏继续；已耗尽轮次上限时仍需先提高上限。 @turtle2099\r\n- 修复多选问题有多个推荐选项时只预选第一项的问题，现在卡片打开时预选全部推荐项；单选和已回答卡片的行为保持不变。 @yudshj\r\n- 审批提示明确说明是否向用户请求授权，避免模型误解 never 策略。 @turtle2099\r\n- 修复 macOS 持久 Bash 工具中感叹号被历史展开改写或导致命令超时的问题。 @grllll\r\n- 明确告知模型：用户跳过提问后应继续，不重复追问，也不能把跳过当作授权。 @turtle2099\r\n- 修复一个技能根目录读取失败导致其他目录中的技能也不可用的问题，保留可用技能并提示不完整的发现结果。 @Dudu-0223\r\n- Web Fetch 可读取编码声明混含 UTF-8 的可读页面。 @Dudu-0223\r\n- 修复工具调用因无歧义的可选参数而失败的问题：grep 接受空 include。 @turtle1999\r\n- 长问题和选项说明可原地展开与收起，内容区滚动时导航与提交按钮保持可见。 @yudshj\r\n- `sdk-minimal` 配置在请求模型或执行工具前保存会话恢复记录；保存失败时不会继续相关操作，提高短会话中断后的可恢复性。 @LogosVeritas\r\n- 断线或重连期间暂停聊天运行计时，连接恢复后按轮次起点恢复显示。 @turtle2099\r\n- 停止后补发的插话与新消息在轨迹中按日志顺序显示于助手输出之前，刷新和历史加载后仍保持一致。 @kermanx\r\n- 普通会话分支现在独立运行，不再被误识别为子智能体；真正子智能体仍保留创建者关系。 @Dudu-0223\r\n- 修复包含旧版子代理描述的历史会话无法打开，并导致会话搜索失败的问题。 @turtle2099\r\n- 修复加载更早的已压缩会话历史后，聊天记录停止加载和更新的问题。 @turtle2099\r\n- 本地文件工具将开头的 ~ 或 ~/ 正确展开为宿主主目录，路径中间的 ~ 保持字面含义。 @turtle2099\r\n- 聊天中的相对文件链接按点击时会话当前工作目录打开，进入 worktree 后不再误开原项目文件。 @turtle2099\r\n- Markdown 中单个 ~ 保持字面显示，只有 ~~ 才形成删除线。 @turtle2099\r\n- 本地 Markdown 图片被覆盖后，新消息和新打开的预览会显示当前文件，而不是复用旧图。 @turtle2099\r\n- 修复裸 URL 将后续中文标点及正文一并识别为链接的问题。 @turtle2099\r\n- 修复 Markdown 中 Windows 文件路径的反斜杠被转义删除，导致链接或图片打开错误位置的问题。 @turtle2099\r\n- 交付卡与收尾回复中的文件引用覆盖整轮，包括回复之后的交付与写入；present 说明等待用户回答前应先提供文件链接。 @yudshj\r\n- 修复部分结构体代码高亮导致页面长时间卡死的问题。 @yudshj\r\n- 修复输入框粘贴文件或文件夹路径时仅高亮目录前缀的问题。 @turtle2099\r\n- 切换、打开或关闭侧栏文件标签时，标签栏从原滚动位置继续，不再先跳回最左端。 @turtle2099\r\n- 侧栏原生拖动使用独立主题背景预览，避免混入后方消息内容并保留排序。 @Stevring\r\n- 深色主题设置导航的悬停背景可见，选中态保持优先。 @turtle2099\r\n- 聊天中的 Markdown 文件链接容忍无效行号，并支持行范围及行列后缀；无法定位时仍打开原文件，URL 保持为网页链接。 @kermanx\r\n- 文本和 Markdown 文件预览在刷新后保留阅读位置，文件暂时变短时也保留原位置，避免跳回第一页。 @yudshj\r\n- Trajectory 保留失败工具实际返回的文本，列表、详情和复制不再用合成错误信息替换它；原生工具和嵌套 PTC 调用使用相同规则。 @kermanx\r\n- 修复部分历史 `run_code` 记录的代码页缺少 TypeScript 或 Python 语法高亮的问题。 @kermanx\r\n- 安装自托管 Git 插件时，HTTPS 无法读取而 SSH 可用时改用 SSH。 @turtle2099\r\n- 安装含 prepare 脚本的 Git 插件时，显示脚本授权和重试选项，不再仅报告未知错误。 @turtle2099\r\n- 配置项目按自身 ESM 规则解析插件依赖子路径、包内导入和自引用。 @shigma\r\n- 修复 macOS 激活窗口时点击会话标题误触发重命名，正常双击重命名保持不变。 @turtle2099\r\n- 修复以管理员权限运行 DSH 或在 Windows Sandbox 中使用时，受限沙箱命令无法启动的问题；文件写入和删除限制保持不变。 @huoyaoyuan\r\n- Windows 已安装应用显示正确的发布者名称，卸载列表中的应用名称不再附带版本号。 @winewill\r\n- 改善 Windows 安装器进度页绘制、拖动与窗口激活表现，恢复系统最小化动画，并让标题按钮在原区域松开时触发。 @winewill\r\n- 桌面 Host 完成任务清理并确认关闭后立即退出，避免遗留事件循环句柄阻塞更新安装。 @turtle2099\r\n- macOS 桌面更新在确认前等待退出全屏，安装失败后恢复工作区；退出全屏超时则保留任务并提示重试。 @winewill\r\n- 桌面更新提示改为窗内视图，后台结果更新不再抬升原生子窗口；更新提示随应用浅色或暗色主题显示。 @winewill\r\n- 修复 macOS 桌面端会话头部菜单与按钮之间出现过大空隙的问题。 @turtle2099\r\n- 修复 macOS 原生目录选择框初次显示后灰显、目录无法点击的问题。 @EricMoin\r\n\r\n### 其他变更\r\n\r\n- 同步 Cordis Core 至 4.1.0、Loader 至 1.1.0、Include 至 1.1.0，统一配置访问、条目变更和持久化行为。 @shigma, @imccyu\r\n- Cordis Fiber 提供统一的原始配置、候选配置解析和生效配置访问，设置编辑与热更新使用一致的配置来源。 @shigma\r\n- DSH 的最低 Node.js 版本提高至 24.9；使用旧版 Node.js 的用户需先升级运行时。 @tianyicui\r\n- 升级 pi-ai 至 1.3.0，并同步模型目录、端点与推理回放规则；完整工具参数格式错误会在执行任何工具前终止该次响应。 @tianyicui\r\n- 未声明容量的自定义模型默认上下文与最大输出调整为十进制 1M/128K；较小端点应显式覆盖容量以避免延迟压缩。 @LegGasai\r\n- Agent 在提示词组装与 pre-step 前固定本步模型，重试保留同一选择；插件应通过 agent.model 选择模型，agent/request 不再允许改路由。 @kermanx\r\n- pi-ai 支持插件按会话和请求用途提供动态请求头；无效请求头在请求发出前报错。 @LegGasai\r\n- TypeScript 与 Python SDK 补齐与 Web 模式一致的文件交付、问答与回调、调度、技能和上下文能力，并支持原生命令、插件管理、计划审阅、目标续跑及操作审批；插件变更需重启 SDK 生效。 @koalazf99, @LogosVeritas\r\n- 「自动化任务」改为统一的宿主级管理，支持手动创建、直接编辑和通过预填提示在会话中创建，保留编辑草稿并支持冲突复核，可选择复用或新建会话执行任务。 @ZiyaZhang, @Magolor\r\n- 「Git 工作树」入口已合入「变更请求与工作树」，此前启用独立插件的用户需手动从 profile 的 dsh.profile.bundles 中移除 @deepseek-ai/dsh-experimental-tool-worktree。 @LegGasai\r\n- Ralph 循环与会话搜索不再显示在实验性列表。 @ZiyaZhang\r\n- 新增默认关闭的 `apply_patch` 工具，一次完成多文件新增、编辑、删除和移动，并在 Review 中查看变更。 @sjw1231, @CreatixChu\r\n- 文件修改的先读和外部修改防护默认关闭，沙箱限制和 Review 保持不变；需要原防护的 profile 可显式恢复观察策略。 @sjw1231\r\n- 工具可按步骤条件启用，模型声明、PTC 绑定与执行准入保持一致；插件需迁移 tools.resolve/executable 与提示词组装接口。 @LegGasai\r\n- Node PTC 新增 VM Script 模式，支持顶层 await、动态导入和表达式结果，可独立开启跨调用状态保留；默认仍逐次执行，脚本顶层不支持 return 或 using。 @kermanx\r\n- 原生与 PTC 工具执行拆为按 Agent 作用域选择的插件；PTC 通过配置 overlay 启用，旧 tools.mode 与 DSH_TOOLS_MODE 需迁移。 @kermanx\r\n- PTC Node 控制通道改用 birpc；自部署 bootstrap 与 SSH helper 必须同步升级，SSH 协议从 2 升为 3。 @kermanx\r\n- PTC Mode 中由调用方取消的 run_code 改为返回 ABORTED，而非 CODE_RUN_FAILED；SDK 和 Session 消费方需更新取消分类。 @kermanx\r\n- Web Fetch 不再拒绝非公网地址，可用于代理与内网，部署应自行限制网络访问。 @turtle2099\r\n- Headless 支持实验性 Auto 自动审核。 @tianyicui\r\n- 桌面启动故障可获取诊断报告，并附上有界的近期插件操作记录，便于排查问题。 @winewill\r\n- Session API 新增独立接口，可分别读取快照和持续订阅会话事件日志、运行状态以及事件投影数据。 @imccyu\r\n- 修复会话创建、恢复和销毁期间的事件发布与清理顺序；初始化事件可实时订阅，取消时等待已取得资源完成清理。 @kermanx\r\n- Session Projection 注册 API 调整为异步，需要插件启动时持有。 @kermanx, @Magolor\r\n- 整单元 JSON 与 SQLite 存储支持读取领域明确声明的兼容旧版本，并以新版本格式写入。 @Magolor\r\n- 「自定义插件市场」更名为「自定义插件索引」，发现页读取用户添加的索引文件，索引生成器排除标记为 private 的版本、标签与默认分支包。 @turtle2099, @turtle1999\r\n- 官方组合包列表改由 @deepseek-ai/dsh-official-bundles 导出；自定义集成需更新原 app-boot 的相关导入。 @turtle2099\r\n- 插件可为自己的设置页面提供导航图标，卸载后恢复默认图标。 @Magolor\r\n- 插件安装失败时显示完整诊断与 Host 日志入口，并区分安装失败和安装后启用失败。 @kermanx\r\n\r\nThis first release candidate for 0.2.2 summarizes the major user- and developer-facing changes since v0.2.1-rc.5.\r\n\r\n<h3 id=\"en-v0.2.2-rc.1-5\">New Features</h3>\r\n\r\n- Improve phone and tablet support with better on-screen keyboard interaction, navigation, and narrow layouts, keeping menus and actions accessible. by @Stevring, @turtle2099, @LegGasai, @EricMoin, @Saafo\r\n- Insert chat text as quotes in the composer and show compact previews after sending. by @lsdsjy, @imccyu\r\n- Copy the complete conversation history as Markdown, including the original log path when available. by @tianyicui\r\n- Keep all assistant text replies visible when work steps are collapsed, with an option to show only the final answer. by @imccyu\r\n- Unify mouse and keyboard context menus across Sessions, workspaces, and the sidebar, with support for developer extensions. by @std4453\r\n- Keep a directory tree in file previews and locate the current file. by @yudshj\r\n- Add Japanese, Spanish, French, German, Russian, and Brazilian Portuguese interface text and locale configuration. by @07akioni\r\n- Show rich-text plugin details in the plugin manager and improve page layout and navigation. by @turtle1999, @turtle2099\r\n- Support updating third-party plugin packages and attempt to restore the previous version if hot updates fail. by @turtle1999, @turtle2099\r\n- Add the experimental `subagent_oar` tool plugin to delegate independent tasks to local Codex or Claude CLIs. by @tianyicui\r\n- Add experimental Personalized recommendations, offering official-plugin activation or personalized-page creation cards below answers when relevant. by @ZiyaZhang\r\n- Add experimental Developer tools — Statistics for per-turn and per-step context, cache, model, and tool measurements. by @mektpoy\r\n- Add experimental Change requests and worktrees to run Sessions in separate Git worktrees, browse local and PR diffs through a searchable file tree and per-file navigation, quote selected code and comments to the Agent, and track checks and reviews. by @LegGasai, @tianyicui\r\n\r\n### Improvements\r\n\r\n- Distinguish same-named Workspaces with their shortest unique path suffix and prioritize that suffix on narrow screens. by @turtle2099\r\n- Support plugin icons in the Session list and improve keyboard and touch interaction. by @LegGasai\r\n- Show working directories on sidebar Session hover cards to distinguish ungrouped or similarly named Sessions. by @turtle2099\r\n- Improve sidebar spacing and click targets, with smoother search-field expansion and collapse. by @Yifffan\r\n- Find Sessions by case-insensitive ID substrings in sidebar search. by @turtle2099\r\n- Add resistance and spring-back when floating sidebar panels are dragged beyond screen edges, and keep their controls reachable when the window shrinks. by @yudshj\r\n- Close right-sidebar tabs with the middle mouse button without selecting background tabs, while preserving the protected start tab. by @Kingwl\r\n- Show messages and clear drafts only after the host accepts them. Keep the composer read-only while sending and preserve drafts, quotes, and attachments on failure. by @LegGasai\r\n- Upload images as soon as they enter the composer and reuse the uploaded images when sending messages. Raise the default per-image limit to 50 MiB. by @LegGasai\r\n- Show answered question batches as message bubbles so answers from native and PTC calls remain visible after work steps collapse. by @Kaige-Gao\r\n- Place running status at the active turn tail before queued steering messages, distinguishing active and pending input and reducing layout jitter. by @imccyu\r\n- Improve layout stability when expanding or collapsing work steps and interacting with the docked composer. Reduce content and scroll jumps while keeping running status visible. by @imccyu\r\n- Show full truncated composer statistics in tooltips and include turn and step counts in Session statistics. by @turtle2099\r\n- Briefly highlight and fade the target line in code and text previews after opening a file-line link from chat. by @turtle2099\r\n- Pan images that exceed the viewport and transfer original files through in-app drag-and-drop or native desktop dragging. by @std4453\r\n- Add raw JSON views of live tool results to Trajectory, displayed above rendered results. by @kermanx\r\n- Fold Trajectory subcalls independently while keeping their parent calls and summaries visible. Reveal matching subcalls through search or cross-view navigation. by @kermanx\r\n- Start the model picker with configured models selected, add or remove candidates while preserving custom values, and apply select-all only to visible candidates. by @turtle2099\r\n- For models accessed through pi-ai that cannot accept additional system messages during a conversation, keep later system messages in place as reminders rather than moving them into the initial prompt. by @Tuyixiang\r\n- Reorder models within DeepSeek and pi-ai providers by dragging or using arrow keys, preserving order and complete model parameters when saved. by @Magolor\r\n- Clear all inactive automation tasks in one confirmed action while keeping active tasks. by @Chinesezjc\r\n- Search prioritizes long Search API summaries for models, capped at 800 characters per source by default, while search cards retain short snippets. by @yudshj\r\n- Improve history-context cache reuse across consecutive tool calls in Auto review to reduce repeated processing. by @turtle2099\r\n- Background-job completion notices include small outputs and reduce duplicate notifications for already-read results and subagent closing messages. by @turtle1999\r\n- Reduce sleeping and repeated polling in subagent guidance: end the current turn when only a result remains pending and wait for its completion notification. by @Chinesezjc\r\n- Speed up file searches with literal directory prefixes by skipping unrelated directories while preserving results and ordering. by @kermanx\r\n- Deliver ordinary Word edits after saving and checking content and formatting, without unnecessary ZIP, XML, or metadata inspection. by @tianyicui\r\n- Enable WebSocket compression for remote connections by default to reduce transfers of large message histories; disable it with `websocketCompression`. by @imccyu\r\n- Web static assets support ETag revalidation, returning 304 for unchanged files to avoid repeated downloads. by @imccyu\r\n- Reduce repeated publications and catalog processing during Session state updates, and lower runtime overhead when assembling streaming replies. by @liukx0205, @imccyu\r\n- Improve system and application permission onboarding for macOS Computer Use. Request system permissions through a standalone app with system-settings and drag-in guidance, and refresh permission status on return. Support long clicks, improve application launching, and retain application permissions across restarts. by @CreatixChu, @koalazf99\r\n\r\n### Bug Fixes\r\n\r\n- Budget global and project AGENTS.md chains separately so project instructions do not evict global guidance; messages containing both chains can use up to twice maxBytes. by @ZiyaZhang\r\n- Compact history with the previous model before switching to a smaller context window; stop the switch request and preserve its previous header if compaction fails. by @Dudu-0223\r\n- Preserve the required thought signatures in Gemini tool calls over OpenAI-compatible Chat Completions and include them in subsequent requests to prevent rejection caused by missing signatures. by @turtle2099\r\n- Reuse existing context-prefix caches for new model requests when the system prompt is unchanged, avoiding unnecessary cache invalidation. by @mektpoy\r\n- Continue pi-ai conversations that exceed the request image-count limit by offloading the oldest images, preventing repeated failures. by @turtle2099\r\n- Hide Web search tools when required credentials are missing; fetch tools using the newer Web API also follow credential readiness. by @LegGasai\r\n- Preserve saved Auto permission and approval policy during application shutdown instead of unintentionally switching to Full access. by @tianyicui\r\n- Fix Auto review failures before tool execution on OpenCode routes by supplying the reviewed Session identity and request purpose. by @LegGasai\r\n- User steering now releases a background-output wait immediately and returns current output without stopping the job. by @mektpoy\r\n- Fix delegation tools being temporarily unavailable after preset round trips and apply the current Agent’s tool restrictions to delegation. by @Dudu-0223\r\n- Resume blocked goals from the Web goal bar; goals that have exhausted their round limit still require a higher limit first. by @turtle2099\r\n- Preselect every recommended option in multiple-choice questions instead of only the first, while preserving single-choice and answered-card behavior. by @yudshj\r\n- Approval messages explicitly state whether user approval is requested, avoiding ambiguity around the never policy. by @turtle2099\r\n- Prevent history expansion from rewriting exclamation marks or causing persistent Bash command timeouts on macOS. by @grllll\r\n- Tell the model to continue after a skipped question without asking it again or treating the skip as permission. by @turtle2099\r\n- Keep skills from healthy roots available when another skill root cannot be read, and report incomplete discovery. by @Dudu-0223\r\n- Allow Web Fetch to read valid UTF-8 pages whose encoding declarations contain multiple labels including UTF-8. by @Dudu-0223\r\n- Fix tool calls failing on unambiguous optional arguments by accepting an empty grep include. by @turtle1999\r\n- Expand and collapse long questions and option descriptions in place, with navigation and submission controls kept visible. by @yudshj\r\n- Save Session recovery records before model requests and tool execution in `sdk-minimal`. Stop related operations if saving fails to improve recovery after short Sessions are interrupted. by @LogosVeritas\r\n- Pause the chat running clock during disconnection or reconnection and resume elapsed-time display after reconnecting. by @turtle2099\r\n- Keep retained steering and follow-up input in log order before assistant output in Trajectory, including after refresh and history loading. by @kermanx\r\n- Run ordinary conversation forks independently instead of treating them as subagents, while preserving creator relationships for real subagents. by @Dudu-0223\r\n- Restore opening historical Sessions with older subagent descriptors and fix the resulting Session search failures. by @turtle2099\r\n- Fix chat history loading and live updates getting stuck after loading earlier compacted history. by @turtle2099\r\n- Expand leading ~ or ~/ in local file tools to the Host home directory while preserving literal tildes elsewhere in paths. by @turtle2099\r\n- Resolve relative chat file links from the Session working directory at click time so worktree Sessions do not open the original checkout. by @turtle2099\r\n- Keep single tildes literal in Markdown and require double tildes for strikethrough. by @turtle2099\r\n- Show the current local Markdown image in newly rendered messages and previews after the file is overwritten. by @turtle2099\r\n- Fix bare URLs incorrectly including following Chinese punctuation and text in links. by @turtle2099\r\n- Preserve backslash separators in Windows-path Markdown links and images so they resolve to the intended location. by @turtle2099\r\n- Include whole-turn deliveries and writes in deliverable cards and closing-reply file links, even after the reply; present guidance tells agents to link files before waiting for user input. by @yudshj\r\n- Fix prolonged page freezes caused by syntax highlighting of certain struct definitions. by @yudshj\r\n- Fix pasted file and folder paths being highlighted only through their directory prefixes in the composer. by @turtle2099\r\n- Preserve the sidebar file-tab strip's scroll position when selecting, opening, or closing tabs instead of restarting from the left edge. by @turtle2099\r\n- Use isolated, theme-backed sidebar drag previews to avoid capturing content behind rows while preserving native reordering. by @Stevring\r\n- Make settings-navigation hover visible in dark mode while retaining selected-state priority. by @turtle2099\r\n- Accept line ranges and line/column suffixes in Markdown file links, open the file when a location is invalid, and retain URLs as web links. by @kermanx\r\n- Retain reading position in text and Markdown previews across refreshes and temporary file shortening instead of jumping back to the first page. by @yudshj\r\n- Preserve the actual text returned by failed tools in Trajectory lists, details, and copied output, including native tools and nested PTC calls. by @kermanx\r\n- Restore TypeScript and Python syntax highlighting for affected historical `run_code` records. by @kermanx\r\n- Use SSH for self-hosted Git plugin installation when HTTPS is unreadable and SSH is available. by @turtle2099\r\n- Offer script approval and retry when installing Git plugins with prepare scripts instead of reporting only an unknown error. by @turtle2099\r\n- Resolve configuration-project plugins using the project’s ESM rules for dependency subpaths, package imports, and self-references. by @shigma\r\n- Prevent a window-activating click on a Session title from accidentally opening rename on macOS, while preserving normal double-click rename. by @turtle2099\r\n- Fix restricted sandbox commands failing to start when DSH runs as administrator or in Windows Sandbox, while preserving file-write and deletion restrictions. by @huoyaoyuan\r\n- Correct the Windows installed-app publisher and keep the application name separate from its version in uninstall listings. by @winewill\r\n- Improve Windows installer progress rendering, dragging, and activation, restore native minimize transitions, and trigger caption buttons on release inside the original button. by @winewill\r\n- Exit the Desktop Host immediately after acknowledging completed teardown so leftover event-loop handles do not block update installation. by @turtle2099\r\n- Leave macOS fullscreen before Desktop update confirmation so failed installs recover the workspace; preserve tasks and show retry guidance if fullscreen exit times out. by @winewill\r\n- Show desktop update prompts in-window without raising native child windows for background results, and match prompts to the app’s light or dark theme. by @winewill\r\n- Keep conversation header menus close to their trigger buttons on macOS desktop. by @turtle2099\r\n- Fix the native macOS directory picker initially appearing inactive and ignoring directory clicks. by @EricMoin\r\n\r\n### Chores\r\n\r\n- Update to Cordis Core 4.1.0, Loader 1.1.0, and Include 1.1.0, unifying configuration access, entry changes, and persistence behavior. by @shigma, @imccyu\r\n- Provide unified Cordis Fiber access to raw configuration, candidate resolution, and effective configuration, used consistently by settings and hot reload. by @shigma\r\n- Raise the minimum supported Node.js version to 24.9. Upgrade older Node.js runtimes before upgrading DSH. by @tianyicui\r\n- Upgrade pi-ai to 1.3.0 with updated model catalogs, endpoints, and reasoning replay rules; malformed completed tool arguments fail the response before any tool executes. by @tianyicui\r\n- Default undeclared custom-model capacities to decimal 1M context and 128K output; smaller endpoints should set explicit capacities to avoid delayed compaction. by @LegGasai\r\n- Capture the step model before prompt assembly and pre-step and retain it through retries; plugins should select through agent.model rather than changing routes in agent/request. by @kermanx\r\n- Allow plugins to supply dynamic pi-ai headers using Session identity and request purpose, rejecting invalid headers before dispatch. by @LegGasai\r\n- Bring the TypeScript and Python SDKs in line with Web mode for file delivery, questions and callbacks, scheduling, skills, and context. Support native commands, plugin management, plan review, goal continuation, and operation approvals; restart the SDK to apply plugin changes. by @koalazf99, @LogosVeritas\r\n- Unify scheduled-task management across the Host with manual creation, direct editing, and prefilled prompts for creation in a Session. Retain drafts, support conflict review, and run tasks in reusable or new Sessions. by @ZiyaZhang, @Magolor\r\n- The Git worktree entry is included in Change requests and worktrees. Remove @deepseek-ai/dsh-experimental-tool-worktree from dsh.profile.bundles if the standalone plugin was enabled. by @LegGasai\r\n- Ralph loop and Session search are no longer listed as experimental plugins. by @ZiyaZhang\r\n- Add `apply_patch`, disabled by default, to create, edit, delete, and move multiple files in one call, with changes available in Review. by @sjw1231, @CreatixChu\r\n- Disable read-before-write and external-change checks by default while retaining sandbox limits and Review. Profiles requiring the previous checks can explicitly restore the observation policy. by @sjw1231\r\n- Activate tools conditionally per step with consistent model declarations, PTC bindings, and execution admission. Plugins must migrate tools.resolve/executable and prompt-assembly integration. by @LegGasai\r\n- Add a VM Script mode to Node PTC with top-level await, dynamic imports, and expression results, plus optional state retention across calls. Per-call execution remains the default; top-level return and using are unsupported. by @kermanx\r\n- Split native and PTC tool execution into Agent-scoped plugins; enable PTC through configuration overlays and migrate tools.mode and DSH_TOOLS_MODE usage. by @kermanx\r\n- Move the PTC Node control channel to birpc; upgrade self-deployed bootstraps and SSH helpers together, with SSH protocol increasing from 2 to 3. by @kermanx\r\n- Report caller-cancelled run_code calls in PTC Mode as ABORTED rather than CODE_RUN_FAILED. SDK and Session consumers must update cancellation handling. by @kermanx\r\n- Allow Web Fetch to access non-public addresses for proxies and internal networks; deployments must restrict network access separately. by @turtle2099\r\n- Support experimental Auto review in Headless. by @tianyicui\r\n- Retrieve diagnostic reports for desktop startup failures, including a bounded history of recent plugin operations to help troubleshooting. by @winewill\r\n- Add independent Session APIs to read snapshots and continuously subscribe to Session event logs, execution state, and event-projection data. by @imccyu\r\n- Fix event publication and cleanup around Session creation, recovery, and disposal. Make initialization events available to live subscribers and wait for acquired resources to finish cleanup on cancellation. by @kermanx\r\n- Make Session Projection registration asynchronous, with plugins retaining a handle at startup. by @kermanx, @Magolor\r\n- Allow whole-unit JSON and SQLite storage to read explicitly declared compatible older versions and write in the current version format. by @Magolor\r\n- Rename Custom plugin markets to Custom plugin indexes. Discover reads user-added index files, and index generation excludes private versions, tags, and default-branch packages. by @turtle2099, @turtle1999\r\n- Official bundle lists are now exported by @turtle2099\r\n- Allow plugins to supply navigation icons for their settings pages, restoring the default icon when unloaded. by @Magolor\r\n- Show complete diagnostics and the Host log location for plugin failures, distinguishing installation failures from subsequent activation failures. by @kermanx\r\n\r\nFull Changelog: https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.5...dsh-v0.2.2-rc.1"
+  },
   "summary": {
-    "changes": 0,
-    "categories": {},
+    "changes": 116,
+    "categories": {
+      "binary": 1,
+      "cli": 4,
+      "config": 86,
+      "model": 22,
+      "prompt": 2,
+      "tools": 1
+    },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
-      "notable": 0
+      "informational": 83,
+      "notable": 33
     },
-    "undocumented": null
+    "undocumented": 85
   },
-  "changes": []
+  "changes": [
+    {
+      "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/cordis-plugin-timer.version",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_plugin_packages",
+        "packages",
+        "@deepseek-ai/cordis-plugin-timer",
+        "version"
+      ],
+      "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/cordis-plugin-timer.version: 1.1.7 → 1.2.0",
+      "impact": "notable",
+      "before": "1.1.7",
+      "after": "1.2.0",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/llm/plugin-package-inventory-deepseek/src/index.ts",
+            "line": 205,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/llm/plugin-package-inventory-deepseek/src/index.ts#L205"
+          },
+          {
+            "path": "packages/llm/plugin-package-inventory-deepseek/src/types.ts",
+            "line": 17,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/llm/plugin-package-inventory-deepseek/src/types.ts#L17"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/dsh-fs-observation-policy",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "params",
+        "dsh_plugin_packages",
+        "packages",
+        "@deepseek-ai/dsh-fs-observation-policy"
+      ],
+      "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-fs-observation-policy: {\"name\":\"@deepseek-ai/dsh-fs-observation-policy\",\"version… → none",
+      "impact": "notable",
+      "before": {
+        "name": "@deepseek-ai/dsh-fs-observation-policy",
+        "version": "<version>"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/llm/plugin-package-inventory-deepseek/src/index.ts",
+            "line": 205,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/llm/plugin-package-inventory-deepseek/src/index.ts#L205"
+          },
+          {
+            "path": "packages/llm/plugin-package-inventory-deepseek/src/types.ts",
+            "line": 17,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/llm/plugin-package-inventory-deepseek/src/types.ts#L17"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-executor-native",
+      "category": "model",
+      "op": "added",
+      "path": [
+        "model",
+        "params",
+        "dsh_plugin_packages",
+        "packages",
+        "@deepseek-ai/dsh-tool-executor-native"
+      ],
+      "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-executor-native: none → {\"name\":\"@deepseek-ai/dsh-tool-executor-native\",\"version\"…",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "name": "@deepseek-ai/dsh-tool-executor-native",
+        "version": "<version>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/llm/plugin-package-inventory-deepseek/src/index.ts",
+            "line": 205,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/llm/plugin-package-inventory-deepseek/src/index.ts#L205"
+          },
+          {
+            "path": "packages/llm/plugin-package-inventory-deepseek/src/types.ts",
+            "line": 17,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/llm/plugin-package-inventory-deepseek/src/types.ts#L17"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.0.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "0",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.0.time: 1793875310330 → 1794286016519",
+      "impact": "notable",
+      "before": 1793875310330,
+      "after": 1794286016519,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.1.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "1",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.1.time: 1793875310332 → 1794286016520",
+      "impact": "notable",
+      "before": 1793875310332,
+      "after": 1794286016520,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.2.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "2",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.2.time: 1793875310332 → 1794286016521",
+      "impact": "notable",
+      "before": 1793875310332,
+      "after": 1794286016521,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.3.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "3",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.3.time: 1793875310335 → 1794286016522",
+      "impact": "notable",
+      "before": 1793875310335,
+      "after": 1794286016522,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.4.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "4",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.4.time: 1793875310336 → 1794286016522",
+      "impact": "notable",
+      "before": 1793875310336,
+      "after": 1794286016522,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.5.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "5",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.5.time: 1793875310338 → 1794286016522",
+      "impact": "notable",
+      "before": 1793875310338,
+      "after": 1794286016522,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.6.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "6",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.6.time: 1793875310391 → 1794286016555",
+      "impact": "notable",
+      "before": 1793875310391,
+      "after": 1794286016555,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.7.data.message.content.0.text",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "7",
+        "data",
+        "message",
+        "content",
+        "0",
+        "text"
+      ],
+      "title": "Model parameter dsh_session_log.events.7.data.message.content.0.text: none → none",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,9 +6,9 @@\n \n Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n \n-Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n+Read an existing file before overwriting it with write and prefer edit for targeted changes.\n \n-Read a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.\n+Read a file before editing it unless you just created or edited it in this session.\n \n Use the glob tool — not shell find — to discover files by path pattern.\n \n@@ -30,4 +30,4 @@\n Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results.\n For one or two delegations, prefer plain subagent calls.\n \n-Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run.\n+Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.\n",
+      "stats": {
+        "added_chars": 440,
+        "removed_chars": 411
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/subagent/tool-subagent/src/index.ts",
+            "line": 373,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/subagent/tool-subagent/src/index.ts#L373"
+          },
+          {
+            "path": "packages/fs/tool-fs/src/write.ts",
+            "line": 68,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/fs/tool-fs/src/write.ts#L68-L69"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "model.params.dsh_session_log.events.7.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "7",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.7.time: 1793875310393 → 1794286016557",
+      "impact": "notable",
+      "before": 1793875310393,
+      "after": 1794286016557,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.8.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "8",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.8.time: 1793875310393 → 1794286016557",
+      "impact": "notable",
+      "before": 1793875310393,
+      "after": 1794286016557,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.9.data.content.0.text",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "9",
+        "data",
+        "content",
+        "0",
+        "text"
+      ],
+      "title": "Model parameter dsh_session_log.events.9.data.content.0.text: none → none",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,4 +4,4 @@\n \n Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: \"<repo>\". Some platform temporary areas may also be writable.\n \n-Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.\n+Approval prompts are enabled in this session: operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.\n",
+      "stats": {
+        "added_chars": 177,
+        "removed_chars": 153
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/interaction/user-approval/src/index.ts",
+            "line": 76,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/interaction/user-approval/src/index.ts#L76"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "model.params.dsh_session_log.events.9.data.source.sections.approval:policy.text",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "9",
+        "data",
+        "source",
+        "sections",
+        "approval:policy",
+        "text"
+      ],
+      "title": "Model parameter dsh_session_log.events.9.data.source.sections.approval:policy.text: none → none",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.\n+Approval prompts are enabled in this session: operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.\n",
+      "stats": {
+        "added_chars": 177,
+        "removed_chars": 153
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/interaction/user-approval/src/index.ts",
+            "line": 76,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/interaction/user-approval/src/index.ts#L76"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "model.params.dsh_session_log.events.9.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "9",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.9.time: 1793875310394 → 1794286016558",
+      "impact": "notable",
+      "before": 1793875310394,
+      "after": 1794286016558,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.10.data.header.tools.exit_plan_mode",
+      "category": "model",
+      "op": "removed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "10",
+        "data",
+        "header",
+        "tools",
+        "exit_plan_mode"
+      ],
+      "title": "Model parameter dsh_session_log.events.10.data.header.tools.exit_plan_mode: {\"description\":\"Use only in plan mode. Present your plan … → none",
+      "impact": "notable",
+      "before": {
+        "description": "Use only in plan mode. Present your plan for the user's review and, on approval, leave plan mode. The user may approve (carry out the plan from your next step) or keep planning — their feedback comes back in the tool result; revise and present again.",
+        "name": "exit_plan_mode",
+        "parameters": {
+          "properties": {
+            "plan": {
+              "description": "The complete plan, as markdown, starting with a # heading that names it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "plan"
+          ],
+          "type": "object"
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 187,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/session/session-log-deepseek/src/index.ts#L187"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 74,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/session/session-log-deepseek/src/types.ts#L74"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.10.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "10",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.10.time: 1793875310395 → 1794286016559",
+      "impact": "notable",
+      "before": 1793875310395,
+      "after": 1794286016559,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.11.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "11",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.11.time: 1793875310396 → 1794286016560",
+      "impact": "notable",
+      "before": 1793875310396,
+      "after": 1794286016560,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.12.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "12",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.12.time: 1793875310398 → 1794286016562",
+      "impact": "notable",
+      "before": 1793875310398,
+      "after": 1794286016562,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.events.13.time",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "events",
+        "13",
+        "time"
+      ],
+      "title": "Model parameter dsh_session_log.events.13.time: 1793875310400 → 1794286016563",
+      "impact": "notable",
+      "before": 1793875310400,
+      "after": 1794286016563,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "model.params.dsh_session_log.session.createdAt",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "dsh_session_log",
+        "session",
+        "createdAt"
+      ],
+      "title": "Model parameter dsh_session_log.session.createdAt: 1793875310326 → 1794286016514",
+      "impact": "notable",
+      "before": 1793875310326,
+      "after": 1794286016514,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-log-deepseek/src/index.ts",
+            "line": 196,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/index.ts#L196"
+          },
+          {
+            "path": "packages/session/session-log-deepseek/src/types.ts",
+            "line": 89,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-log-deepseek/src/types.ts#L89"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "prompt.context.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "0",
+        "text"
+      ],
+      "title": "Injected context changed (+177 −153 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,4 +4,4 @@\n \n Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: \"<repo>\". Some platform temporary areas may also be writable.\n \n-Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.\n+Approval prompts are enabled in this session: operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.\n",
+      "stats": {
+        "added_chars": 177,
+        "removed_chars": 153
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/interaction/user-approval/src/index.ts",
+            "line": 76,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/interaction/user-approval/src/index.ts#L76"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+440 −411 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,9 +6,9 @@\n \n Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.\n \n-Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.\n+Read an existing file before overwriting it with write and prefer edit for targeted changes.\n \n-Read a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.\n+Read a file before editing it unless you just created or edited it in this session.\n \n Use the glob tool — not shell find — to discover files by path pattern.\n \n@@ -30,4 +30,4 @@\n Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results.\n For one or two delegations, prefer plain subagent calls.\n \n-Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run.\n+Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.\n",
+      "stats": {
+        "added_chars": 440,
+        "removed_chars": 411
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/subagent/tool-subagent/src/index.ts",
+            "line": 373,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/subagent/tool-subagent/src/index.ts#L373"
+          },
+          {
+            "path": "packages/fs/tool-fs/src/write.ts",
+            "line": 68,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/fs/tool-fs/src/write.ts#L68-L69"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "tools.exit_plan_mode",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "exit_plan_mode"
+      ],
+      "title": "Tool removed: exit_plan_mode",
+      "impact": "notable",
+      "before": {
+        "description": "Use only in plan mode. Present your plan for the user's review and, on approval, leave plan mode. The user may approve (carry out the plan from your next step) or keep planning — their feedback comes back in the tool result; revise and present again.",
+        "input_schema": {
+          "properties": {
+            "plan": {
+              "description": "The complete plan, as markdown, starting with a # heading that names it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "plan"
+          ],
+          "type": "object"
+        },
+        "name": "exit_plan_mode",
+        "sha256": "b6d147ca419934b264bbd1d92d4e855eaa4a0c778408706e17afe16dca3bd620"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-plan/src/client/plan.ts",
+            "line": 35,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/client/ui-plan/src/client/plan.ts#L35"
+          },
+          {
+            "path": "packages/experimental/claude-code-mods/src/tool-names.ts",
+            "line": 20,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/experimental/claude-code-mods/src/tool-names.ts#L20"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.commands.dsh headless.options.--add-dir",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "dsh headless",
+        "options",
+        "--add-dir"
+      ],
+      "title": "New flag `dsh headless --add-dir`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "allow an additional physical absolute directory under workspace-write (repeatable)",
+        "names": [
+          "--add-dir"
+        ],
+        "value": "<path>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/browser-use-runtime/src/mcp.ts",
+            "line": 42,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/browser-use-runtime/src/mcp.ts#L42"
+          },
+          {
+            "path": "packages/experimental/browser-use-stagehand-native/src/index.ts",
+            "line": 47,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/browser-use-stagehand-native/src/index.ts#L47"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.dsh headless.options.--approval-policy",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "dsh headless",
+        "options",
+        "--approval-policy"
+      ],
+      "title": "New flag `dsh headless --approval-policy`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "choices": [
+          "ask",
+          "never"
+        ],
+        "description": "set approval behavior after selecting the permission preset",
+        "names": [
+          "--approval-policy"
+        ],
+        "value": "<policy>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/browser-use-runtime/src/mcp.ts",
+            "line": 42,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/browser-use-runtime/src/mcp.ts#L42"
+          },
+          {
+            "path": "packages/experimental/browser-use-stagehand-native/src/index.ts",
+            "line": 47,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/browser-use-stagehand-native/src/index.ts#L47"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.dsh headless.options.--permission-mode",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "dsh headless",
+        "options",
+        "--permission-mode"
+      ],
+      "title": "New flag `dsh headless --permission-mode`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "select a configured permission preset for this task, including on resume",
+        "names": [
+          "--permission-mode"
+        ],
+        "value": "<preset>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/browser-use-runtime/src/mcp.ts",
+            "line": 42,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/browser-use-runtime/src/mcp.ts#L42"
+          },
+          {
+            "path": "packages/experimental/browser-use-stagehand-native/src/index.ts",
+            "line": 47,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/browser-use-stagehand-native/src/index.ts#L47"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.headless --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "headless --help"
+      ],
+      "title": "Full help text of `headless --help` changed (+1039 −369 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,20 +3,28 @@\n Answer one task and exit; the answer goes to stdout and diagnostics to stderr.\n \n Arguments:\n-  task               the task text; multiple words are joined by spaces, and `-`\n-                     reads stdin\n+  task                        the task text; multiple words are joined by\n+                              spaces, and `-` reads stdin\n \n Options:\n-  --json             write newline-delimited run events to stdout instead of the\n-                     final message\n-  --session-id <id>  adopt the persisted Session with this id; an unknown id is\n-                     an error\n-  -h, --help         show this help\n+  --json                      write newline-delimited run events to stdout\n+                              instead of the final message\n+  --session-id <id>           adopt the persisted Session with this id; an\n+                              unknown id is an error\n+  --permission-mode <preset>  select a configured permission preset for this\n+                              task, including on resume\n+  --approval-policy <policy>  set approval behavior after selecting the\n+                              permission preset (choices: \"ask\", \"never\")\n+  --add-dir <path>            allow an additional physical absolute directory\n+                              under workspace-write (repeatable)\n+  -h, --help                  show this help\n \n Examples:\n   dsh --profile headless \"run the tests\"          answer one task and exit\n   echo \"run the tests\" | dsh --profile headless   read the task from stdin\n   dsh --profile headless --json \"run the tests\"   emit machine-readable run events\n   dsh --profile headless --session-id session-… \"continue\"   resume an existing Session\n+  dsh --profile headless --permission-mode workspace-write --add-dir /repo/.git \"commit the fix\"\n+                                                        grant shared Git metadata for this task\n \n \n",
+      "stats": {
+        "added_chars": 1039,
+        "removed_chars": 369
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/bundle/headless/src/startup.ts",
+            "line": 58,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/bundle/headless/src/startup.ts#L58-L65"
+          },
+          {
+            "path": "packages/bundle/headless/src/startup.ts",
+            "line": 72,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/bundle/headless/src/startup.ts#L72-L73"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-agent-instructions.maxBytes.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-agent-instructions.maxBytes",
+        "description"
+      ],
+      "title": "dsh-agent-instructions.maxBytes description changed (+227 −103 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-UTF-8 byte cap for one rendered baseline or dynamic batch; non-positive or non-finite disables loading.\n+UTF-8 byte cap for each instruction chain (user-global, project) within one rendered baseline or dynamic batch, so a baseline or batch holding both chains is at most twice this size; non-positive or non-finite disables loading.\n",
+      "stats": {
+        "added_chars": 227,
+        "removed_chars": 103
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-agent-loop.agents.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-agent-loop.agents",
+        "description"
+      ],
+      "title": "dsh-agent-loop.agents description changed (+123 −44 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Agents created or resumed at plugin startup.\n+Agents created or resumed at plugin startup; a resumed agent records its configured route as the Session's model selection.\n",
+      "stats": {
+        "added_chars": 123,
+        "removed_chars": 44
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-agent-tool-presentation.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-agent-tool-presentation",
+        "description"
+      ],
+      "title": "dsh-agent-tool-presentation description changed (+107 −14 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Plugin config.\n+Plugin config. @deprecated Select the native or PTC executor plugin directly instead of configuring a mode.\n",
+      "stats": {
+        "added_chars": 107,
+        "removed_chars": 14
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-agent-tool-presentation.mode.type",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-agent-tool-presentation.mode",
+        "type"
+      ],
+      "title": "Type of dsh-agent-tool-presentation.mode: none → string",
+      "impact": "notable",
+      "before": null,
+      "after": "string",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-permission-presets/src/client/PermissionSelect.tsx",
+            "line": 178,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-permission-presets/src/client/PermissionSelect.tsx#L178"
+          },
+          {
+            "path": "packages/client/ui-permission-presets/src/client/locales.ts",
+            "line": 43,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-permission-presets/src/client/locales.ts#L43"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-agent-tool-presentation.mode.enum.native",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-agent-tool-presentation.mode",
+        "enum",
+        "native"
+      ],
+      "title": "Setting dsh-agent-tool-presentation.mode gained value native",
+      "impact": "informational",
+      "before": null,
+      "after": "native",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-permission-presets/src/client/PermissionSelect.tsx",
+            "line": 178,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-permission-presets/src/client/PermissionSelect.tsx#L178"
+          },
+          {
+            "path": "packages/client/ui-permission-presets/src/client/locales.ts",
+            "line": 43,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-permission-presets/src/client/locales.ts#L43"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-agent-tool-presentation.mode.enum.ptc",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-agent-tool-presentation.mode",
+        "enum",
+        "ptc"
+      ],
+      "title": "Setting dsh-agent-tool-presentation.mode gained value ptc",
+      "impact": "informational",
+      "before": null,
+      "after": "ptc",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-permission-presets/src/client/PermissionSelect.tsx",
+            "line": 178,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-permission-presets/src/client/PermissionSelect.tsx#L178"
+          },
+          {
+            "path": "packages/client/ui-permission-presets/src/client/locales.ts",
+            "line": 43,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-permission-presets/src/client/locales.ts#L43"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-attachment-local.maxImageBytes.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-attachment-local.maxImageBytes",
+        "description"
+      ],
+      "title": "dsh-attachment-local.maxImageBytes description changed (+72 −72 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum encoded bytes accepted for one submitted image. Default: 20 MiB.\n+Maximum encoded bytes accepted for one submitted image. Default: 50 MiB.\n",
+      "stats": {
+        "added_chars": 72,
+        "removed_chars": 72
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-attachment-local.maxImageDimension.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-attachment-local.maxImageDimension",
+        "description"
+      ],
+      "title": "dsh-attachment-local.maxImageDimension description changed (+105 −103 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum intrinsic width and maximum intrinsic height accepted for one submitted image. Default: 8192px.\n+Maximum intrinsic width and maximum intrinsic height accepted for one submitted image. Default: 65,535px.\n",
+      "stats": {
+        "added_chars": 105,
+        "removed_chars": 103
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-client-ui-trajectory",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-client-ui-trajectory"
+      ],
+      "title": "New setting: dsh-client-ui-trajectory",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Count limit for each live Session's transient tool results.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-client-ui-trajectory.maxResultsPerSession",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-client-ui-trajectory.maxResultsPerSession"
+      ],
+      "title": "New setting: dsh-client-ui-trajectory.maxResultsPerSession",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum retained results per Session, including values awaiting a result event.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-trajectory/src/index.ts",
+            "line": 27,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-trajectory/src/index.ts#L27"
+          },
+          {
+            "path": "packages/client/ui-trajectory/src/index.ts",
+            "line": 34,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-trajectory/src/index.ts#L34"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Host settings of the forge panel Remote.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.gitCommand",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.gitCommand"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.gitCommand",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Git executable name or absolute path in the Session's execution world.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/worktree/src/index.ts",
+            "line": 85,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/worktree/src/index.ts#L85"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/git.ts",
+            "line": 17,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/git.ts#L17"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.gitTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.gitTimeoutMs"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.gitTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline in milliseconds for one Git command, including confinement.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 92,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L92"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/git.ts",
+            "line": 19,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/git.ts#L19"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.graceMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.graceMs"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.graceMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Termination grace period in milliseconds for each Git process.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 92,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L92"
+          },
+          {
+            "path": "packages/experimental/worktree/src/index.ts",
+            "line": 88,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/worktree/src/index.ts#L88"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.maxBranches",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.maxBranches"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.maxBranches",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Most local branches listed as worktree bases.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 98,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L98"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 43,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L43"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.maxCachedDiffBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.maxCachedDiffBytes"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.maxCachedDiffBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Most UTF-8 bytes of change request diffs kept in memory for later reads at the same head commit and base branch.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 98,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L98"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 75,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L75"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.maxDiffBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.maxDiffBytes"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.maxDiffBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest diff, or file read to show unchanged lines, in bytes.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 98,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L98"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 73,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L73"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.maxOutputBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.maxOutputBytes"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.maxOutputBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum captured bytes per Git output stream.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 42,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L42"
+          },
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 50,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L50"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.maxUntrackedFiles",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.maxUntrackedFiles"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.maxUntrackedFiles",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Most untracked files a local diff or the local changes card includes.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 98,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L98"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 74,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L74"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.readinessTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.readinessTimeoutMs"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.readinessTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline in milliseconds for one provider sign-in probe.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 92,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L92"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 70,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L70"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-client-ui-forge.worktreePrefix",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-client-ui-forge.worktreePrefix"
+      ],
+      "title": "New setting: dsh-experimental-client-ui-forge.worktreePrefix",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Prefix of the branch and checkout directory created for a Session worktree; the first eight hexadecimal digits of the Session id's UUID, a hyphen, and four random hexadecimal digits follow it.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 43,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L43"
+          },
+          {
+            "path": "packages/experimental/client-ui-forge/src/index.ts",
+            "line": 72,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/client-ui-forge/src/index.ts#L72"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-cua-macos",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-cua-macos"
+      ],
+      "title": "New setting: dsh-experimental-cua-macos",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Native preparation, operation bounds, and profile-local application grants.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-cua-macos.permissionPollIntervalMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-cua-macos.permissionPollIntervalMs"
+      ],
+      "title": "New setting: dsh-experimental-cua-macos.permissionPollIntervalMs",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Interval in milliseconds between permission and position checks while the native guide is open.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/cua-macos/src/index.ts",
+            "line": 20,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/cua-macos/src/index.ts#L20"
+          },
+          {
+            "path": "packages/experimental/cua-macos/src/index.ts",
+            "line": 24,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/cua-macos/src/index.ts#L24"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge"
+      ],
+      "title": "New setting: dsh-experimental-forge",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Poll cadence and fetch deadline for watched change requests.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-github",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-github"
+      ],
+      "title": "New setting: dsh-experimental-forge-github",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "GitHub CLI executable, served hosts, and invocation limits.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-github.ghCommand",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-github.ghCommand"
+      ],
+      "title": "New setting: dsh-experimental-forge-github.ghCommand",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "GitHub CLI executable name or absolute host path.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge-github/src/gh.ts",
+            "line": 22,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge-github/src/gh.ts#L22"
+          },
+          {
+            "path": "packages/experimental/forge-github/src/index.ts",
+            "line": 16,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge-github/src/index.ts#L16"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-github.hosts",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-github.hosts"
+      ],
+      "title": "New setting: dsh-experimental-forge-github.hosts",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Host names this provider serves; list GitHub Enterprise hosts explicitly.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge-github/src/index.ts",
+            "line": 18,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge-github/src/index.ts#L18"
+          },
+          {
+            "path": "packages/experimental/forge-github/src/index.ts",
+            "line": 27,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge-github/src/index.ts#L27"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-github.maxOutputBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-github.maxOutputBytes"
+      ],
+      "title": "New setting: dsh-experimental-forge-github.maxOutputBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum captured bytes per `gh` output stream and combined JSON bytes of one complete check read.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 42,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L42"
+          },
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 50,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L50"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-github.timeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-github.timeoutMs"
+      ],
+      "title": "New setting: dsh-experimental-forge-github.timeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline in milliseconds for one `gh` invocation.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 29,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L29"
+          },
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 37,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L37"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-session",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-session"
+      ],
+      "title": "New setting: dsh-experimental-forge-session",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deployment settings of `forgeSession`.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge-session.discoveryTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge-session.discoveryTimeoutMs"
+      ],
+      "title": "New setting: dsh-experimental-forge-session.discoveryTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline in milliseconds for one change request lookup after a push.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge-session/src/index.ts",
+            "line": 46,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge-session/src/index.ts#L46"
+          },
+          {
+            "path": "packages/experimental/forge-session/src/index.ts",
+            "line": 50,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge-session/src/index.ts#L50"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge.activeIntervalMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge.activeIntervalMs"
+      ],
+      "title": "New setting: dsh-experimental-forge.activeIntervalMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Poll interval in milliseconds while checks run or mergeability is unknown.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 83,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L83"
+          },
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 56,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L56"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge.fetchTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge.fetchTimeoutMs"
+      ],
+      "title": "New setting: dsh-experimental-forge.fetchTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline in milliseconds for one provider fetch.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 83,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L83"
+          },
+          {
+            "path": "packages/web/tool-web/src/index.ts",
+            "line": 94,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/web/tool-web/src/index.ts#L94"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge.idleIntervalMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge.idleIntervalMs"
+      ],
+      "title": "New setting: dsh-experimental-forge.idleIntervalMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Poll interval in milliseconds for a closed request or an open request whose checks have settled.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 83,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L83"
+          },
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 57,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L57"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-forge.maxBackoffMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-forge.maxBackoffMs"
+      ],
+      "title": "New setting: dsh-experimental-forge.maxBackoffMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest delay in milliseconds between polls after consecutive failures.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 83,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L83"
+          },
+          {
+            "path": "packages/experimental/forge/src/index.ts",
+            "line": 58,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/forge/src/index.ts#L58"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Native runtime selection and deployment settings for one provider instance.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.effort",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.effort"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.effort",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Native reasoning effort; unsupported choices fail during startup.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-model-selection/src/client/ModelSelect.tsx",
+            "line": 48,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-model-selection/src/client/ModelSelect.tsx#L48"
+          },
+          {
+            "path": "packages/client/ui-model-selection/src/client/ModelSelect.tsx",
+            "line": 189,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-model-selection/src/client/ModelSelect.tsx#L189"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.env",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.env"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.env",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Explicit entries applied after ambient credential scrubbing; null removes a value.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/tsdown.client.ts",
+            "line": 248,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/tsdown.client.ts#L248"
+          },
+          {
+            "path": "packages/client/ui-primitives/src/code-file-icon-artwork.ts",
+            "line": 22,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-primitives/src/code-file-icon-artwork.ts#L22"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.launchArgs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.launchArgs"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.launchArgs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Native launch arguments, including permission settings; omission uses OAR defaults.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/subagent-oar/src/index.ts",
+            "line": 37,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/subagent-oar/src/index.ts#L37"
+          },
+          {
+            "path": "packages/experimental/subagent-oar/src/index.ts",
+            "line": 48,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/subagent-oar/src/index.ts#L48"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.model",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.model"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.model",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Native model id; omission preserves the runtime's model selection.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/acp/acp/src/model-control.ts",
+            "line": 7,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/acp/acp/src/model-control.ts#L7"
+          },
+          {
+            "path": "packages/acp/acp/src/model-control.ts",
+            "line": 148,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/acp/acp/src/model-control.ts#L148"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.providerName",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.providerName"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.providerName",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Name registered on ctx.subagents (default oar).",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/llm/llm-deepseek/src/host.ts",
+            "line": 46,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/llm/llm-deepseek/src/host.ts#L46"
+          },
+          {
+            "path": "packages/client/ui-settings-subagent/src/client/SubagentModelSelectionFields.tsx",
+            "line": 25,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-subagent/src/client/SubagentModelSelectionFields.tsx#L25"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.runtime",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.runtime"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.runtime",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "OAR default-runtime id; unknown ids fail during plugin activation.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/app-boot/src/config-schema/projector.ts",
+            "line": 419,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/app-boot/src/config-schema/projector.ts#L419"
+          },
+          {
+            "path": "packages/client/shortcuts/src/client/dom.ts",
+            "line": 31,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/shortcuts/src/client/dom.ts#L31"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-experimental-subagent-oar.timeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-subagent-oar.timeoutMs"
+      ],
+      "title": "New setting: dsh-experimental-subagent-oar.timeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Optional turn deadline in milliseconds after startup; omission uses parent cancellation only.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 29,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L29"
+          },
+          {
+            "path": "packages/client/ui-settings-shell/src/client/ShellCard.tsx",
+            "line": 37,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-shell/src/client/ShellCard.tsx#L37"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-tool-subagent-oar",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-tool-subagent-oar"
+      ],
+      "title": "New setting: dsh-experimental-tool-subagent-oar",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deployment-owned runtime choices exposed by the external delegation tool.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-experimental-tool-subagent-oar.providers",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-tool-subagent-oar.providers"
+      ],
+      "title": "New setting: dsh-experimental-tool-subagent-oar.providers",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model-visible runtime aliases mapped to registered subagent provider names.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/app-boot/src/startup-diagnostics.ts",
+            "line": 88,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/app-boot/src/startup-diagnostics.ts#L88"
+          },
+          {
+            "path": "packages/client/ui-settings-models/src/client/CustomProviderCard.tsx",
+            "line": 180,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-settings-models/src/client/CustomProviderCard.tsx#L180"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-experimental-tool-subagent-oar.toolName",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-experimental-tool-subagent-oar.toolName"
+      ],
+      "title": "New setting: dsh-experimental-tool-subagent-oar.toolName",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model-facing tool name (default subagent_oar).",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-schedule/src/client/ScheduleCreateCard.tsx",
+            "line": 33,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-schedule/src/client/ScheduleCreateCard.tsx#L33"
+          },
+          {
+            "path": "packages/client/ui-trajectory/src/client/layout.ts",
+            "line": 1063,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-trajectory/src/client/layout.ts#L1063"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-headless.approvalPolicy",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-headless.approvalPolicy"
+      ],
+      "title": "New setting: dsh-headless.approvalPolicy",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Approval behavior applied after preset selection; an explicit CLI flag takes precedence. Omission keeps current policy."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/session/session-persistence-jsonl/src/format.ts",
+            "line": 107,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/session/session-persistence-jsonl/src/format.ts#L107"
+          },
+          {
+            "path": "packages/bundle/headless/src/index.ts",
+            "line": 58,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/bundle/headless/src/index.ts#L58"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-headless.permissionMode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-headless.permissionMode"
+      ],
+      "title": "New setting: dsh-headless.permissionMode",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Permission preset applied before the task; an explicit CLI flag takes precedence. Omission keeps current policy.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/subagent/subagent-claude-code/src/run.ts",
+            "line": 50,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/subagent/subagent-claude-code/src/run.ts#L50"
+          },
+          {
+            "path": "packages/bundle/headless/src/index.ts",
+            "line": 56,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/bundle/headless/src/index.ts#L56"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.detailFetchTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.detailFetchTimeoutMs"
+      ],
+      "title": "New setting: dsh-plugin-manager.detailFetchTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline of one npm file CDN request for an offered bundle's detail document.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 86,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L86"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 328,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L328"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.detailImageMaxBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.detailImageMaxBytes"
+      ],
+      "title": "New setting: dsh-plugin-manager.detailImageMaxBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest image served beside a bundle detail document, in bytes.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 84,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L84"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 327,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L327"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.detailMaxBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.detailMaxBytes"
+      ],
+      "title": "New setting: dsh-plugin-manager.detailMaxBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest bundle detail document, and largest locale file read for one, in bytes.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 82,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L82"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 326,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L326"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.detailNpmFileSources",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.detailNpmFileSources"
+      ],
+      "title": "New setting: dsh-plugin-manager.detailNpmFileSources",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "npm file CDNs that offered bundles are read from, in order; a read's `npmFileSources` moves the CDNs it names first.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 88,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L88"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 329,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L329"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.gitTransportTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.gitTransportTimeoutMs"
+      ],
+      "title": "New setting: dsh-plugin-manager.gitTransportTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum duration of each HTTP(S) and SSH access probe of a self-hosted Git repository before installation, in milliseconds.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 66,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L66"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 320,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L320"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.versionListLimit",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.versionListLimit"
+      ],
+      "title": "New setting: dsh-plugin-manager.versionListLimit",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "How many of the newest versions above the installed one a version listing reads and returns.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 78,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L78"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 324,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L324"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-manager.versionLookupConcurrency",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-manager.versionLookupConcurrency"
+      ],
+      "title": "New setting: dsh-plugin-manager.versionLookupConcurrency",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "How many single-version registry lookups a version listing runs at once.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 80,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L80"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 325,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L325"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.cacheTtlMs.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.cacheTtlMs",
+        "description"
+      ],
+      "title": "dsh-plugin-market.cacheTtlMs description changed (+111 −47 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Lifetime of a successfully read index document.\n+Lifetime of a successfully read index document, a detail read result, and a repository's default-branch commit.\n",
+      "stats": {
+        "added_chars": 111,
+        "removed_chars": 47
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailCacheDir",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailCacheDir"
+      ],
+      "title": "New setting: dsh-plugin-market.detailCacheDir",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Directory of the partial clones, relative to the profile directory; absent means `.plugin-market/repositories`.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 61,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L61"
+          },
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 120,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L120"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailCacheMaxBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailCacheMaxBytes"
+      ],
+      "title": "New setting: dsh-plugin-market.detailCacheMaxBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest total size of the partial clones; least recently used ones are deleted beyond it.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 59,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L59"
+          },
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 119,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L119"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailGitTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailGitTimeoutMs"
+      ],
+      "title": "New setting: dsh-plugin-market.detailGitTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Deadline of one Git command of the clone fallback.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 63,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L63"
+          },
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 121,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L121"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailGitlabHosts",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailGitlabHosts"
+      ],
+      "title": "New setting: dsh-plugin-market.detailGitlabHosts",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Hosts serving the GitLab repository files API.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 67,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L67"
+          },
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 123,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L123"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailImageMaxBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailImageMaxBytes"
+      ],
+      "title": "New setting: dsh-plugin-market.detailImageMaxBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest image beside a detail document in bytes.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 84,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L84"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 327,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L327"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailMaxBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailMaxBytes"
+      ],
+      "title": "New setting: dsh-plugin-market.detailMaxBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest detail document in bytes.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 82,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L82"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 326,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L326"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailNpmFileSources",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailNpmFileSources"
+      ],
+      "title": "New setting: dsh-plugin-market.detailNpmFileSources",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "npm file CDNs read in order; a read's `npmFileSources` moves the CDNs it names first.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 88,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L88"
+          },
+          {
+            "path": "packages/boot/plugin-manager/src/index.ts",
+            "line": 329,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-manager/src/index.ts#L329"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-plugin-market.detailRepositoryMaxBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-plugin-market.detailRepositoryMaxBytes"
+      ],
+      "title": "New setting: dsh-plugin-market.detailRepositoryMaxBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest amount in bytes one Git command adds to a partial clone; a repository whose fetch adds more is not read.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 57,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L57"
+          },
+          {
+            "path": "packages/boot/plugin-market/src/index.ts",
+            "line": 118,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/boot/plugin-market/src/index.ts#L118"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-ptc-runtime-node.executionMode.enum.vm-script",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-ptc-runtime-node.executionMode",
+        "enum",
+        "vm-script"
+      ],
+      "title": "Setting dsh-ptc-runtime-node.executionMode gained value vm-script",
+      "impact": "informational",
+      "before": null,
+      "after": "vm-script",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/ptc-runtime/ptc-runtime-node/src/configuration.ts",
+            "line": 11,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/ptc-runtime/ptc-runtime-node/src/configuration.ts#L11"
+          },
+          {
+            "path": "packages/ptc-runtime/ptc-runtime-node/src/config.ts",
+            "line": 11,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/ptc-runtime/ptc-runtime-node/src/config.ts#L11"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-ptc-runtime-node.executionMode.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-ptc-runtime-node.executionMode",
+        "description"
+      ],
+      "title": "dsh-ptc-runtime-node.executionMode description changed (+117 −106 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-per-call starts fresh processes; persistent-in-memory retains a REPL per owner under the same file policy.\n+per-call uses fresh async function bodies; vm-script uses VM contexts; persistent-in-memory retains a REPL per owner.\n",
+      "stats": {
+        "added_chars": 117,
+        "removed_chars": 106
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-ptc-runtime-node.maxMessageBytes.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "dsh-ptc-runtime-node.maxMessageBytes",
+        "description"
+      ],
+      "title": "dsh-ptc-runtime-node.maxMessageBytes description changed (+86 −76 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum control frame, outstanding argument and queued control-output bytes.\n+Maximum control message, outstanding binding-argument and queued control-output bytes.\n",
+      "stats": {
+        "added_chars": 86,
+        "removed_chars": 76
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-ptc-runtime-node.scriptPersistence",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-ptc-runtime-node.scriptPersistence"
+      ],
+      "title": "New setting: dsh-ptc-runtime-node.scriptPersistence",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Retain a Script process and context per stateOwner; only supported with executionMode: vm-script.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/ptc-runtime/ptc-runtime-node/src/configuration.ts",
+            "line": 11,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/ptc-runtime/ptc-runtime-node/src/configuration.ts#L11"
+          },
+          {
+            "path": "packages/ptc-runtime/ptc-runtime-node/src/config.ts",
+            "line": 13,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/ptc-runtime/ptc-runtime-node/src/config.ts#L13"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-sandbox-policy.additionalWritableRoots",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-sandbox-policy.additionalWritableRoots"
+      ],
+      "title": "New setting: dsh-sandbox-policy.additionalWritableRoots",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Extra physical absolute directories that `workspace-write` may also write under (default: none). The supervisor names them explicitly; there is no automatic repository or gitfile discovery. Entries are execution-world paths: this service validates absoluteness and detaches the list, while the enforcing host rejects missing, non-directory, or symlinked paths. They grant nothing under `read-only`.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/bundle/headless/src/startup.ts",
+            "line": 39,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/bundle/headless/src/startup.ts#L39"
+          },
+          {
+            "path": "packages/bundle/headless/src/startup.ts",
+            "line": 154,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/bundle/headless/src/startup.ts#L154"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-schedule.newSessionIntervalSeconds",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-schedule.newSessionIntervalSeconds"
+      ],
+      "title": "New setting: dsh-schedule.newSessionIntervalSeconds",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Shortest spacing, in seconds, from the occurrence of one delivery to the next delivery of one task whose target creates a Session at every delivery; omission defaults to 60. Timed and manual deliveries both wait for it.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/extensions/tool-cordis/src/api-catalog.ts",
+            "line": 2587,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/extensions/tool-cordis/src/api-catalog.ts#L2587"
+          },
+          {
+            "path": "packages/schedule/schedule/src/index.ts",
+            "line": 95,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/schedule/schedule/src/index.ts#L95"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-executor-ptc",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-executor-ptc"
+      ],
+      "title": "New setting: dsh-tool-executor-ptc",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Program execution limits.",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-executor-ptc.maxParallelSubCalls",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-executor-ptc.maxParallelSubCalls"
+      ],
+      "title": "New setting: dsh-tool-executor-ptc.maxParallelSubCalls",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum overlapping concurrency-safe program subcalls.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/tool-executor-ptc/src/config.ts",
+            "line": 7,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/core/tool-executor-ptc/src/config.ts#L7"
+          },
+          {
+            "path": "packages/core/tool-executor-ptc/src/config.ts",
+            "line": 12,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/core/tool-executor-ptc/src/config.ts#L12"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-fs.applyPatch",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-fs.applyPatch"
+      ],
+      "title": "New setting: dsh-tool-fs.applyPatch",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Register `apply_patch` and its guidance beside `edit`. Defaults to false; shipped compositions set it on their `tool-fs` rows.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/fs/tool-fs/src/index.ts",
+            "line": 37,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/fs/tool-fs/src/index.ts#L37"
+          },
+          {
+            "path": "packages/fs/tool-fs/src/index.ts",
+            "line": 53,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/fs/tool-fs/src/index.ts#L53"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-jobs.inlineOutputBytes",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-jobs.inlineOutputBytes"
+      ],
+      "title": "New setting: dsh-tool-jobs.inlineOutputBytes",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Largest complete completion notice, in UTF-8 bytes, that carries the job's output and final result inline (default 2048); a larger one, or one over the producer's `outputLimitBytes`, leaves them for `job_output`. 0 never inlines.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/jobs/tool-jobs/src/index.ts",
+            "line": 65,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/jobs/tool-jobs/src/index.ts#L65"
+          },
+          {
+            "path": "packages/jobs/tool-jobs/src/index.ts",
+            "line": 73,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/jobs/tool-jobs/src/index.ts#L73"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-subagent.modelDiscovery",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-subagent.modelDiscovery"
+      ],
+      "title": "New setting: dsh-tool-subagent.modelDiscovery",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Register the shared `list_subagent_models` tool for this scope. Enable on only one instance per scope; defaults to false and does not enable model selection. Discovery is removed when this instance unloads.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/subagent/tool-subagent/src/index.ts",
+            "line": 65,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/subagent/tool-subagent/src/index.ts#L65"
+          },
+          {
+            "path": "packages/subagent/tool-subagent/src/index.ts",
+            "line": 87,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/subagent/tool-subagent/src/index.ts#L87"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-subagent.modelSelection",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-subagent.modelSelection"
+      ],
+      "title": "New setting: dsh-tool-subagent.modelSelection",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Expose optional child `provider`, `model`, and `reasoning_effort` fields. Requires provider `agentOptions` support. Execution enforces the Session policy, or restricts explicit selection to the current parent route.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-conversation/src/client/input/hub.ts",
+            "line": 107,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-conversation/src/client/input/hub.ts#L107"
+          },
+          {
+            "path": "packages/client/ui-model-selection/src/client/service.ts",
+            "line": 81,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/ui-model-selection/src/client/service.ts#L81"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-subagent.modelSelectionSettings",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-subagent.modelSelectionSettings"
+      ],
+      "title": "Setting no longer read: dsh-tool-subagent.modelSelectionSettings",
+      "impact": "notable",
+      "before": {
+        "description": "Sample the Host `subagent-model-selection` setting for each new top-level Session and inherit that decision in its child Sessions.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/subagent/tool-subagent/src/index.ts",
+            "line": 62,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/subagent/tool-subagent/src/index.ts#L62"
+          },
+          {
+            "path": "packages/subagent/tool-subagent/src/index.ts",
+            "line": 83,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/subagent/tool-subagent/src/index.ts#L83"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tool-web.searchSummaryMaxChars",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "dsh-tool-web.searchSummaryMaxChars"
+      ],
+      "title": "New setting: dsh-tool-web.searchSummaryMaxChars",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Cap on each source summary in `web_search` output, in characters. Defaults to 800.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/web/tool-web/src/index.ts",
+            "line": 93,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/web/tool-web/src/index.ts#L93"
+          },
+          {
+            "path": "packages/web/tool-web/src/index.ts",
+            "line": 49,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/web/tool-web/src/index.ts#L49"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tools",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dsh-tools"
+      ],
+      "title": "Setting no longer read: dsh-tools",
+      "impact": "notable",
+      "before": {
+        "description": "Plugin config: how the registered tools are presented to the model.",
+        "type": "object"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.dsh-tools.maxParallelSubCalls",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dsh-tools.maxParallelSubCalls"
+      ],
+      "title": "Setting no longer read: dsh-tools.maxParallelSubCalls",
+      "impact": "notable",
+      "before": {
+        "description": "Concurrency cap for a `run_code` program's overlapping sub-calls (default 10, the loop scheduler's own default). Sub-calls follow the native scheduling contract — only calls whose tools classify concurrency-safe overlap; exclusive calls form barriers — so `1` restores strictly serial dispatch. Must be a positive integer.",
+        "type": "number"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/tools/src/index.ts",
+            "line": 694,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/core/tools/src/index.ts#L694"
+          },
+          {
+            "path": "packages/core/tools/src/index.ts",
+            "line": 813,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/core/tools/src/index.ts#L813"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.dsh-tools.mode",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "dsh-tools.mode"
+      ],
+      "title": "Setting no longer read: dsh-tools.mode",
+      "impact": "notable",
+      "before": {
+        "description": "Model presentation. `native` (default) sends every visible schema; `ptc` sends only `run_code` plus a generated SDK prompt and collapses the executor to the same surface (a model-direct call may only name `run_code`; `run_code` SDK sub-dispatches keep every visible tool). PTC mode requires a `ctx.ptcRuntime` whose `language` has a registered SDK renderer (TypeScript or Python) and fails prompt assembly when it is absent or has no renderer. Under `ptc`, native names in `toolOrder` are invalid."
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/client/ui-permission-presets/src/client/PermissionSelect.tsx",
+            "line": 178,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/client/ui-permission-presets/src/client/PermissionSelect.tsx#L178"
+          },
+          {
+            "path": "packages/client/ui-permission-presets/src/client/locales.ts",
+            "line": 43,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/packages/client/ui-permission-presets/src/client/locales.ts#L43"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.DSH_HOME",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "DSH_HOME"
+      ],
+      "title": "New environment variable: DSH_HOME",
+      "impact": "informational",
+      "before": null,
+      "after": "DSH_HOME",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/liveshare/src/host/share-host.ts",
+            "line": 588,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/liveshare/src/host/share-host.ts#L588"
+          },
+          {
+            "path": "packages/util/home-paths/src/index.ts",
+            "line": 18,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/util/home-paths/src/index.ts#L18"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LIVESHARE_DEBUG_READS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "LIVESHARE_DEBUG_READS"
+      ],
+      "title": "New environment variable: LIVESHARE_DEBUG_READS",
+      "impact": "informational",
+      "before": null,
+      "after": "LIVESHARE_DEBUG_READS",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/liveshare/src/host/viewer-dispatch.ts",
+            "line": 751,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/liveshare/src/host/viewer-dispatch.ts#L751"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LIVESHARE_OWNER_CREDENTIAL_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "LIVESHARE_OWNER_CREDENTIAL_FILE"
+      ],
+      "title": "New environment variable: LIVESHARE_OWNER_CREDENTIAL_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "LIVESHARE_OWNER_CREDENTIAL_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/liveshare/src/host/share-host.ts",
+            "line": 148,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/liveshare/src/host/share-host.ts#L148"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LIVESHARE_OWNER_STATE_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "LIVESHARE_OWNER_STATE_FILE"
+      ],
+      "title": "New environment variable: LIVESHARE_OWNER_STATE_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "LIVESHARE_OWNER_STATE_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/liveshare/src/host/share-host.ts",
+            "line": 141,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/liveshare/src/host/share-host.ts#L141"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.LIVESHARE_VIEWER_DEBUG",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "LIVESHARE_VIEWER_DEBUG"
+      ],
+      "title": "New environment variable: LIVESHARE_VIEWER_DEBUG",
+      "impact": "informational",
+      "before": null,
+      "after": "LIVESHARE_VIEWER_DEBUG",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/experimental/liveshare/src/host/share-host.ts",
+            "line": 375,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/liveshare/src/host/share-host.ts#L375"
+          },
+          {
+            "path": "packages/experimental/liveshare/src/host/source-access.ts",
+            "line": 276,
+            "url": "https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/experimental/liveshare/src/host/source-access.ts#L276"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "binary.engines",
+      "category": "binary",
+      "op": "added",
+      "path": [
+        "binary",
+        "engines"
+      ],
+      "title": "Binary engines: none → >=24.9.0",
+      "impact": "informational",
+      "before": null,
+      "after": ">=24.9.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
 }

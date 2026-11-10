@@ -18,34 +18,50 @@
     "last_change": {
       "from": "0.166.0",
       "to": "0.167.0",
-      "at": "2026-11-07T05:31:09Z",
+      "at": "2026-11-10T05:19:19.197557181Z",
       "released_at": "2026-11-06T01:46:01.347Z",
-      "changes": 0,
-      "categories": {}
+      "changes": 283,
+      "categories": {
+        "cli": 6,
+        "config": 12,
+        "filesystem": 9,
+        "prompt": 1,
+        "telemetry": 255
+      }
     }
   },
   "versions": [
     {
       "version": "0.167.0",
       "released_at": "2026-11-06T01:46:01.347Z",
-      "captured_at": "2026-11-07T05:31:09Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 0,
-      "categories": {},
+      "changes": 283,
+      "categories": {
+        "cli": 6,
+        "config": 12,
+        "filesystem": 9,
+        "prompt": 1,
+        "telemetry": 255
+      },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
-        "notable": 0
+        "informational": 281,
+        "notable": 2
       },
-      "undocumented": null,
-      "highlights": [],
-      "signing": null
+      "undocumented": 117,
+      "highlights": [
+        "Injected context changed (+47 −53 chars)",
+        "New setting: model_providers.<name>.gateway_oauth.credentials_store",
+        "Telemetry export added"
+      ],
+      "signing": "valid"
     },
     {
       "version": "0.166.0",
@@ -273,18 +289,17 @@
       ],
       "support": "unsupported",
       "previous": "0.160.0",
-      "changes": 4,
+      "changes": 3,
       "categories": {
-        "cli": 3,
-        "filesystem": 1
+        "cli": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
+        "informational": 3,
         "notable": 0
       },
-      "undocumented": 4,
+      "undocumented": 3,
       "highlights": [
         "Description of `codex cloud` changed",
         "Full help text of `cloud --help` changed (+0 −88 chars)",
@@ -745,18 +760,17 @@
       ],
       "support": "untested",
       "previous": "0.153.1",
-      "changes": 6,
+      "changes": 4,
       "categories": {
-        "caching": 4,
-        "filesystem": 2
+        "caching": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 0,
         "notable": 4
       },
-      "undocumented": 6,
+      "undocumented": 4,
       "highlights": [
         "Caching across_turns.breakpoints: none → [[],[],[]]",
         "Caching across_turns.stable_cache_key: none → true",

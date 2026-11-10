@@ -18,32 +18,50 @@
     "last_change": {
       "from": "0.2.1-rc.5",
       "to": "0.2.2-rc.1",
-      "at": "2026-11-07T05:31:09Z",
+      "at": "2026-11-10T05:19:19.197557181Z",
       "released_at": "2026-11-04T09:20:32.31Z",
-      "changes": 0,
-      "categories": {}
+      "changes": 116,
+      "categories": {
+        "binary": 1,
+        "cli": 4,
+        "config": 86,
+        "model": 22,
+        "prompt": 2,
+        "tools": 1
+      }
     }
   },
   "versions": [
     {
       "version": "0.2.2-rc.1",
       "released_at": "2026-11-04T09:20:32.31Z",
-      "captured_at": "2026-11-07T05:31:09Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.2.1-rc.5",
-      "changes": 0,
-      "categories": {},
+      "changes": 116,
+      "categories": {
+        "binary": 1,
+        "cli": 4,
+        "config": 86,
+        "model": 22,
+        "prompt": 2,
+        "tools": 1
+      },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
-        "notable": 0
+        "informational": 83,
+        "notable": 33
       },
-      "undocumented": null,
-      "highlights": [],
+      "undocumented": 85,
+      "highlights": [
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/cordis-plugin-timer.version: 1.1.7 → 1.2.0",
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-fs-observation-policy: {\"name\":\"@deepseek-ai/dsh-fs-observation-policy\",\"version… → none",
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-executor-native: none → {\"name\":\"@deepseek-ai/dsh-tool-executor-native\",\"version\"…"
+      ],
       "signing": null
     },
     {

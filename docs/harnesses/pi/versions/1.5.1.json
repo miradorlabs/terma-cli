@@ -1,0 +1,1923 @@
+{
+  "schema_version": 1,
+  "harness": "pi",
+  "version": "1.5.1",
+  "platform": "darwin/arm64",
+  "captured_at": "2026-11-10T05:19:19.197557181Z",
+  "capture": {
+    "command": [
+      "pi",
+      "-p",
+      "--model",
+      "fake/m"
+    ],
+    "partial": false,
+    "notes": [
+      "Model requests were answered by a local fixture provider, not the vendor's API; nothing was sent to a model.",
+      "The first turn ran behind a local proxy that answers every other request empty: the build used the feature flags it ships with. What live flags changed is under live."
+    ],
+    "sections": {
+      "behavior": "2026-11-10T05:19:19.197557181Z",
+      "binary": "2026-11-10T05:19:19.197557181Z",
+      "caching": "2026-11-10T05:19:19.197557181Z",
+      "cli": "2026-11-10T05:19:19.197557181Z",
+      "config": "2026-11-10T05:19:19.197557181Z",
+      "model": "2026-11-10T05:19:19.197557181Z",
+      "prompt": "2026-11-10T05:19:19.197557181Z",
+      "request": "2026-11-10T05:19:19.197557181Z",
+      "side_requests": "2026-11-10T05:19:19.197557181Z",
+      "storage": "2026-11-10T05:19:19.197557181Z",
+      "support": "2026-11-10T05:19:19.197557181Z",
+      "telemetry": "2026-11-10T05:19:19.197557181Z",
+      "tools": "2026-11-10T05:19:19.197557181Z"
+    }
+  },
+  "model": {
+    "default": "m",
+    "max_tokens": 16384,
+    "params": {}
+  },
+  "prompt": {
+    "chars": 2096,
+    "context": [],
+    "sha256": "a16f92c5ab9c7f87f8422f32cfaeef4eb7865623c5967eb49103c2530dc80493",
+    "system": [
+      {
+        "chars": 2096,
+        "sha256": "a16f92c5ab9c7f87f8422f32cfaeef4eb7865623c5967eb49103c2530dc80493",
+        "text": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nAdditional tools may be available.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for targeted changes. Batch changes to one file in a single call.\n- Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>\n\n<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: <install>/README.md\n- Additional docs: <install>/docs\n- Examples: <install>/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>\n\n<cwd>\n<repo>\n</cwd>"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+      "input_schema": {
+        "properties": {
+          "command": {
+            "description": "Shell command to execute",
+            "type": "string"
+          },
+          "timeout": {
+            "description": "Timeout in seconds (optional, no default timeout)",
+            "type": "number"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "type": "object"
+      },
+      "name": "bash",
+      "sha256": "f07c4821a300ae8f4e9aaf3f5d66d19bf004e4b69a59d87048476d8a3a4b5414"
+    },
+    {
+      "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+      "input_schema": {
+        "properties": {
+          "edits": {
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+            "items": {
+              "properties": {
+                "newText": {
+                  "description": "Replacement text for this targeted edit.",
+                  "type": "string"
+                },
+                "oldText": {
+                  "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "oldText",
+                "newText"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "path": {
+            "description": "Path to the file to edit (relative or absolute)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "edits"
+        ],
+        "type": "object"
+      },
+      "name": "edit",
+      "sha256": "17eed47bb655a2dd73b48d03b92bf8f684dbc1451b0a91f087de66a1559cde93"
+    },
+    {
+      "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+      "input_schema": {
+        "properties": {
+          "limit": {
+            "description": "Maximum number of lines to read",
+            "type": "number"
+          },
+          "offset": {
+            "description": "Line number to start reading from (1-indexed)",
+            "type": "number"
+          },
+          "path": {
+            "description": "Path to the file to read (relative or absolute)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "read",
+      "sha256": "a6b9e81c64fed54123b40c0e9144ddc879f30071e0e0dec4c347258ac35bcd33"
+    },
+    {
+      "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+      "input_schema": {
+        "properties": {
+          "content": {
+            "description": "Content to write to the file",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path to the file to write (relative or absolute)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ],
+        "type": "object"
+      },
+      "name": "write",
+      "sha256": "21065ffe7c622df6dc3433cd942fa88d16a3530a38aecca37a84bb54a440ed62"
+    }
+  ],
+  "caching": {
+    "across_turns": {
+      "breakpoints": [
+        [],
+        [],
+        []
+      ],
+      "stable_cache_key": false,
+      "stable_prefix_chars": 2395,
+      "turns": 3
+    },
+    "breakpoints": [],
+    "prompt_cache_key": false
+  },
+  "request": {
+    "betas": [],
+    "body_keys": [
+      "max_completion_tokens",
+      "messages",
+      "model",
+      "store",
+      "stream",
+      "stream_options",
+      "tools"
+    ],
+    "endpoint": "POST /v1/chat/completions",
+    "headers": {
+      "accept-language": "*",
+      "authorization": "[redacted]",
+      "sec-fetch-mode": "cors",
+      "user-agent": "pi/<version> (darwin; node/v24.22.2; arm64)",
+      "x-stainless-lang": "js",
+      "x-stainless-package-version": "7.19.0",
+      "x-stainless-runtime": "node"
+    },
+    "identifiers": [
+      "header:authorization"
+    ],
+    "stream": true,
+    "wire": "chat"
+  },
+  "side_requests": [],
+  "behavior": {
+    "retries": {
+      "statuses": {
+        "429": {
+          "attempts": 4,
+          "backoff_ms": [
+            2022,
+            4043,
+            8012
+          ],
+          "failed": 3,
+          "failed_first": 3,
+          "honors_retry_after": true,
+          "recovered": true,
+          "retry_after_seconds": 2,
+          "succeeded": true
+        },
+        "500": {
+          "attempts": 4,
+          "backoff_ms": [
+            2024,
+            4057,
+            8012
+          ],
+          "failed": 3,
+          "failed_first": 3,
+          "honors_retry_after": true,
+          "recovered": true,
+          "retry_after_seconds": 2,
+          "succeeded": true
+        }
+      }
+    },
+    "tool_output": {
+      "bytes": 450000,
+      "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+      "kept_lines": {
+        "count": 2000,
+        "first": 23001,
+        "last": 25000
+      },
+      "limit_chars": 36057,
+      "line": "TERMA-LINE-%06d",
+      "lines": 25000,
+      "truncation": "start"
+    }
+  },
+  "telemetry": {
+    "surfaces": {
+      "logs/pi.user_prompt": {
+        "keys": {
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "resource": {
+        "keys": {
+          "service.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "telemetry.sdk.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/chat {target}": {
+        "keys": {
+          "gen_ai.completion": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.request.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.finish_reasons": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.response.model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.usage.cache_creation.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.cache_read.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.reasoning.output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.total_cost": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.usage.total_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "traces/execute_tool {target}": {
+        "keys": {
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.arguments": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.result": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "cli": {
+    "commands": {
+      "pi": {
+        "description": "pi - AI coding assistant with read, bash, edit, write tools pi [options] [--] [@files...] [messages...] # Print a provider API key for an external client pi auth print-api-key --provider openai # Print an OAuth bearer token for an external client (refreshes if expired) pi auth print-bearer-token --provider openai-codex # Interactive mode pi # Interactive mode with initial prompt pi \"List all .ts files in src/\" # Include files in initial message pi @prompt.md @image.png \"What color is the sky?\" # Non-interactive mode (process and exit) pi -p \"List all .ts files in src/\" # Prompt beginning with a dash pi -p -- \"- Summarize these points\" # Multiple messages (interactive) pi \"Read package.json\" \"What dependencies do we have?\" # Continue previous session pi --continue \"What did we discuss?\" # Start a named session pi --name \"Refactor auth module\" # Use different model pi --provider openai --model gpt-4o-mini \"Help me refactor this code\" # Use model with provider prefix (no --provider needed) pi --model openai/gpt-4o \"Help me refactor this code\" # Use model with thinking level shorthand pi --model sonnet:high \"Solve this complex problem\" # Limit model cycling to specific models pi --models claude-sonnet,claude-haiku,gpt-4o # Limit to a specific provider with glob pattern pi --models \"github-copilot/*\" # Cycle models with fixed thinking levels pi --models sonnet:high,haiku:low # Start with a specific thinking level pi --thinking high \"Solve this complex problem\" # Read-only mode (no file modifications possible) pi --tools read,grep,find,ls -p \"Review the code in src/\" # Add codemode to the default tools pi --tools +codemode # Codemode with only the tools of one MCP server pi --tools read,bash,codemode,'mcp__radius__*' # Disable one tool while keeping the rest available pi --exclude-tools ask_question # Export a session file to HTML pi --export ~/.pi/agent/sessions/--path--/session.jsonl pi --export session.jsonl output.html ANTHROPIC_AUTH_TOKEN             - Anthropic bearer auth token ANTHROPIC_API_KEY                - Anthropic Claude API key ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key) ANT_LING_API_KEY                 - Ant Ling API key OPENAI_API_KEY                   - OpenAI GPT API key AZURE_OPENAI_API_KEY             - Azure OpenAI API key AZURE_OPENAI_BASE_URL            - Azure OpenAI/Cognitive Services base URL (e.g. https://{resource}.openai.azure.com) AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL) AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1) AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated) DEEPSEEK_API_KEY                 - DeepSeek API key NVIDIA_API_KEY                   - NVIDIA NIM API key GEMINI_API_KEY                   - Google Gemini API key GROQ_API_KEY                     - Groq API key CEREBRAS_API_KEY                 - Cerebras API key XAI_API_KEY                      - xAI Grok API key FIREWORKS_API_KEY                - Fireworks API key TOGETHER_API_KEY                 - Together AI API key BASETEN_API_KEY                  - Baseten API key OPENROUTER_API_KEY               - OpenRouter API key AI_GATEWAY_API_KEY               - Vercel AI Gateway API key ZAI_API_KEY                      - ZAI Coding Plan API key (Global) ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China) MISTRAL_API_KEY                  - Mistral API key MINIMAX_API_KEY                  - MiniMax API key MOONSHOT_API_KEY                 - Moonshot AI API key OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key KIMI_API_KEY                     - Kimi For Coding API key META_API_KEY                     - Meta Model API key CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway) CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both) CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway) QWEN_TOKEN_PLAN_API_KEY          - Qwen Token Plan API key (international region) QWEN_TOKEN_PLAN_CN_API_KEY       - Qwen Token Plan API key (China region) XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing) XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region) XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region) XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region) AWS_PROFILE                      - AWS profile for Amazon Bedrock AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token) AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1) PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent) PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir) PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths) PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec}) PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/) Built-in Tool Names: read       - Read file contents bash       - Execute bash commands powershell - Execute PowerShell commands on Windows edit       - Edit files with find/replace write      - Write files (creates/overwrites) grep       - Search file contents (read-only, off by default) find       - Find files by glob pattern (read-only, off by default) ls         - List directory contents (read-only, off by default)",
+        "helped": true,
+        "options": {
+          "--": {
+            "description": "End option parsing; treat remaining arguments as messages/files",
+            "names": [
+              "--"
+            ]
+          },
+          "--api-key": {
+            "description": "API key (defaults to env vars)",
+            "names": [
+              "--api-key"
+            ],
+            "value": "<key>"
+          },
+          "--append-system-prompt": {
+            "description": "Append text or file contents to the system prompt (can be used multiple times)",
+            "names": [
+              "--append-system-prompt"
+            ],
+            "value": "<text>"
+          },
+          "--approve": {
+            "description": "Trust project-local files for this run",
+            "names": [
+              "--approve",
+              "-a"
+            ]
+          },
+          "--continue": {
+            "description": "Continue the most recent session for the current directory",
+            "names": [
+              "--continue",
+              "-c"
+            ]
+          },
+          "--exclude-tools": {
+            "description": "Comma-separated denylist of tool names or patterns (*) to disable Applies to all tools, MCP tools included",
+            "names": [
+              "--exclude-tools",
+              "-xt"
+            ],
+            "value": "<tools>"
+          },
+          "--export": {
+            "description": "Export session file to HTML and exit",
+            "names": [
+              "--export"
+            ],
+            "value": "<file> [output]"
+          },
+          "--extension": {
+            "description": "Load an extension file or builtin:<name> (can be used multiple times)",
+            "names": [
+              "--extension",
+              "-e"
+            ],
+            "value": "<path>"
+          },
+          "--fork": {
+            "description": "Fork a session by file path or full/partial ID into the current directory",
+            "names": [
+              "--fork"
+            ],
+            "value": "<path|id>"
+          },
+          "--help": {
+            "description": "Show this help",
+            "names": [
+              "--help",
+              "-h"
+            ]
+          },
+          "--list-models": {
+            "description": "List available models (with optional fuzzy search)",
+            "names": [
+              "--list-models"
+            ],
+            "value": "[search]"
+          },
+          "--mode": {
+            "description": "Output mode: text (default), json, or rpc",
+            "names": [
+              "--mode"
+            ],
+            "value": "<mode>"
+          },
+          "--model": {
+            "description": "Model pattern or ID (supports \"provider/id\" and optional \":<thinking>\")",
+            "names": [
+              "--model"
+            ],
+            "value": "<pattern>"
+          },
+          "--models": {
+            "description": "Comma-separated model patterns for Ctrl+P cycling Supports globs (anthropic/*, *sonnet*) and fuzzy matching",
+            "names": [
+              "--models"
+            ],
+            "value": "<patterns>"
+          },
+          "--name": {
+            "description": "Set session display name",
+            "names": [
+              "--name",
+              "-n"
+            ],
+            "value": "<name>"
+          },
+          "--no-approve": {
+            "description": "Ignore project-local files for this run",
+            "names": [
+              "--no-approve",
+              "-na"
+            ]
+          },
+          "--no-builtin-tools": {
+            "description": "Disable built-in tools by default but keep extension/custom tools enabled",
+            "names": [
+              "--no-builtin-tools",
+              "-nbt"
+            ]
+          },
+          "--no-context-files": {
+            "description": "Disable AGENTS.md and CLAUDE.md discovery and loading",
+            "names": [
+              "--no-context-files",
+              "-nc"
+            ]
+          },
+          "--no-extensions": {
+            "description": "Disable extension discovery and built-in extensions (explicit -e paths still work)",
+            "names": [
+              "--no-extensions",
+              "-ne"
+            ]
+          },
+          "--no-mcp": {
+            "description": "Disable built-in MCP support: no servers connect and no MCP tools",
+            "names": [
+              "--no-mcp"
+            ]
+          },
+          "--no-prompt-templates": {
+            "description": "Disable prompt template discovery and loading",
+            "names": [
+              "--no-prompt-templates",
+              "-np"
+            ]
+          },
+          "--no-session": {
+            "description": "Don't save session (ephemeral)",
+            "names": [
+              "--no-session"
+            ]
+          },
+          "--no-skills": {
+            "description": "Disable skills discovery and loading",
+            "names": [
+              "--no-skills",
+              "-ns"
+            ]
+          },
+          "--no-themes": {
+            "description": "Disable theme discovery and loading",
+            "names": [
+              "--no-themes"
+            ]
+          },
+          "--no-tools": {
+            "description": "Disable all tools by default (built-in and extension)",
+            "names": [
+              "--no-tools",
+              "-nt"
+            ]
+          },
+          "--offline": {
+            "description": "Disable startup network operations (same as PI_OFFLINE=1)",
+            "names": [
+              "--offline"
+            ]
+          },
+          "--print": {
+            "description": "Non-interactive mode: process prompt and exit",
+            "names": [
+              "--print",
+              "-p"
+            ]
+          },
+          "--prompt-template": {
+            "description": "Load a prompt template file or directory (can be used multiple times)",
+            "names": [
+              "--prompt-template"
+            ],
+            "value": "<path>"
+          },
+          "--provider": {
+            "description": "Provider to search for --model (requires --model)",
+            "names": [
+              "--provider"
+            ],
+            "value": "<name>"
+          },
+          "--resume": {
+            "description": "Pick a session to resume",
+            "names": [
+              "--resume",
+              "-r"
+            ]
+          },
+          "--session": {
+            "description": "Open a session by file path or full/partial ID",
+            "names": [
+              "--session"
+            ],
+            "value": "<path|id>"
+          },
+          "--session-dir": {
+            "description": "Directory for session storage and lookup",
+            "names": [
+              "--session-dir"
+            ],
+            "value": "<dir>"
+          },
+          "--session-id": {
+            "description": "Use the current directory's existing session with the ID, creating it otherwise",
+            "names": [
+              "--session-id"
+            ],
+            "value": "<id>"
+          },
+          "--skill": {
+            "description": "Load a skill file or directory (can be used multiple times)",
+            "names": [
+              "--skill"
+            ],
+            "value": "<path>"
+          },
+          "--system-prompt": {
+            "default": "coding assistant prompt",
+            "description": "System prompt",
+            "names": [
+              "--system-prompt"
+            ],
+            "value": "<text>"
+          },
+          "--theme": {
+            "description": "Load a theme file or directory (can be used multiple times)",
+            "names": [
+              "--theme"
+            ],
+            "value": "<path>"
+          },
+          "--thinking": {
+            "description": "Set thinking level: off, minimal, low, medium, high, xhigh, max",
+            "names": [
+              "--thinking"
+            ],
+            "value": "<level>"
+          },
+          "--tools": {
+            "description": "Comma-separated allowlist of tool names or patterns (*) to enable Keeps MCP tools unless an entry starts with mcp__ Only +name/-name entries add to or remove from the defaults",
+            "names": [
+              "--tools",
+              "-t"
+            ],
+            "value": "<tools>"
+          },
+          "--tui-mode": {
+            "description": "TUI mode: fullscreen (default) or regular",
+            "names": [
+              "--tui-mode"
+            ],
+            "value": "<mode>"
+          },
+          "--use-theme": {
+            "description": "Set the initial interactive theme for this run",
+            "names": [
+              "--use-theme"
+            ],
+            "value": "<name[/name]>"
+          },
+          "--verbose": {
+            "description": "Force verbose startup (overrides quietStartup setting)",
+            "names": [
+              "--verbose"
+            ]
+          },
+          "--version": {
+            "description": "Show version number\nExtensions can register additional flags (e.g., --plan from plan-mode extension).",
+            "names": [
+              "--version",
+              "-v"
+            ]
+          }
+        }
+      },
+      "pi auth": {
+        "description": "pi auth login <provider> [--api-key] [--no-browser] pi auth logout <provider> pi auth print-api-key [--provider <provider>] [--model <model>] pi auth print-bearer-token [--provider <provider>] [--model <model>] [--min-expiry <duration>] pi auth check [--provider <provider>] [--model <model>] [--json] [--credentials] [--no-refresh] Log in to and out of model providers, print their credentials for external clients, or check that they are ready. Credentials are stored in ~/.pi/agent/auth.json.",
+        "helped": true,
+        "options": {
+          "--api-key": {
+            "description": "Save an API key instead of signing in with an account",
+            "names": [
+              "--api-key"
+            ]
+          },
+          "--credentials": {
+            "description": "Emit the credential from check, or include it in JSON output",
+            "names": [
+              "--credentials"
+            ]
+          },
+          "--json": {
+            "description": "Print the check result as JSON",
+            "names": [
+              "--json"
+            ]
+          },
+          "--min-expiry": {
+            "names": [
+              "--min-expiry"
+            ],
+            "value": "30m or 1h"
+          },
+          "--no-browser": {
+            "description": "Do not open a browser; use another sign-in method, e.g. device code",
+            "names": [
+              "--no-browser"
+            ]
+          },
+          "--no-refresh": {
+            "description": "Do not refresh expired OAuth credentials during check",
+            "names": [
+              "--no-refresh"
+            ]
+          }
+        }
+      },
+      "pi auth Options": {
+        "helped": false
+      },
+      "pi auth check": {
+        "description": "Print ready, not_ready, or invalid; exit with 0, 1, or 2",
+        "helped": false
+      },
+      "pi auth login": {
+        "description": "Sign in with an account in the browser, or save an API key, then exit",
+        "helped": false
+      },
+      "pi auth logout": {
+        "description": "Remove the stored credentials; environment variables and models.json stay",
+        "helped": false
+      },
+      "pi auth print-api-key": {
+        "description": "Print the resolved API key",
+        "helped": false
+      },
+      "pi auth print-bearer-token": {
+        "description": "Print a resolved OAuth bearer token (refreshes if expired)",
+        "helped": false
+      },
+      "pi config": {
+        "description": "pi config [-l] [--approve|--no-approve] Open the resource configuration TUI to enable or disable package resources. Without -l, starts in global settings (~/.pi/agent/settings.json). Press Tab in the TUI to switch between global and project-local modes.",
+        "helped": true,
+        "options": {
+          "--approve": {
+            "description": "Trust project-local files for this command with -l",
+            "names": [
+              "-a",
+              "--approve"
+            ]
+          },
+          "--local": {
+            "description": "Edit project overrides (.pi/settings.json)",
+            "names": [
+              "-l",
+              "--local"
+            ]
+          },
+          "--no-approve": {
+            "names": [
+              "-na",
+              "--no-approve"
+            ],
+            "value": "Ignore project-local files for this command with -l"
+          }
+        }
+      },
+      "pi install": {
+        "description": "pi install <source> [-l] [--approve|--no-approve] Install a package and add it to settings. pi install npm:@foo/bar pi install git:github.com/user/repo pi install git:git@github.com:user/repo pi install https://github.com/user/repo pi install ssh://git@github.com/user/repo pi install ./local/path",
+        "helped": true,
+        "options": {
+          "--approve": {
+            "description": "Trust project-local files for this command",
+            "names": [
+              "-a",
+              "--approve"
+            ]
+          },
+          "--local": {
+            "description": "Install project-locally (.pi/settings.json)",
+            "names": [
+              "-l",
+              "--local"
+            ]
+          },
+          "--no-approve": {
+            "names": [
+              "-na",
+              "--no-approve"
+            ],
+            "value": "Ignore project-local files for this command"
+          }
+        }
+      },
+      "pi list": {
+        "description": "pi list [--approve|--no-approve] List installed packages from user and project settings.",
+        "helped": true,
+        "options": {
+          "--approve": {
+            "description": "Trust project-local files for this command",
+            "names": [
+              "-a",
+              "--approve"
+            ]
+          },
+          "--no-approve": {
+            "description": "Ignore project-local files for this command",
+            "names": [
+              "-na",
+              "--no-approve"
+            ]
+          }
+        }
+      },
+      "pi mcp": {
+        "description": "pi mcp add <server> [options] -- <command> [args...] pi mcp add <server> [options] --url <url> pi mcp remove <server> [-l] pi mcp list [--json] pi mcp login <server> [-l] [--timeout <seconds>] pi mcp logout <server> [-l] Configure and check MCP servers and sign in to OAuth servers without starting a session. Reads ~/.pi/agent/mcp.json and, in trusted projects, .pi/mcp.json.",
+        "helped": true,
+        "options": {
+          "--bearer-token-env-var": {
+            "description": "Send \"Authorization: Bearer ${NAME}\"",
+            "names": [
+              "--bearer-token-env-var"
+            ],
+            "value": "<NAME>"
+          },
+          "--cwd": {
+            "description": "Working directory for a stdio server",
+            "names": [
+              "--cwd"
+            ],
+            "value": "<dir>"
+          },
+          "--description": {
+            "description": "What the server offers, shown in the system prompt",
+            "names": [
+              "--description"
+            ],
+            "value": "<text>"
+          },
+          "--env": {
+            "description": "Environment variable for a stdio server (repeatable)",
+            "names": [
+              "--env"
+            ],
+            "value": "<KEY=VALUE>"
+          },
+          "--exposure": {
+            "description": "codemode (default), deferred, direct, or hidden",
+            "names": [
+              "--exposure"
+            ],
+            "value": "<mode>"
+          },
+          "--header": {
+            "description": "HTTP header (repeatable)",
+            "names": [
+              "--header"
+            ],
+            "value": "<KEY=VALUE>"
+          },
+          "--json": {
+            "description": "Print the list as JSON",
+            "names": [
+              "--json"
+            ]
+          },
+          "--oauth-callback-port": {
+            "description": "Fixed OAuth callback port",
+            "names": [
+              "--oauth-callback-port"
+            ],
+            "value": "<port>"
+          },
+          "--oauth-client-id": {
+            "description": "Pre-registered OAuth client id",
+            "names": [
+              "--oauth-client-id"
+            ],
+            "value": "<id>"
+          },
+          "--oauth-client-name": {
+            "description": "Client name sent when registering with the OAuth server",
+            "names": [
+              "--oauth-client-name"
+            ],
+            "value": "<name>"
+          },
+          "--oauth-client-registration": {
+            "description": "auto (default), cimd, or dcr",
+            "names": [
+              "--oauth-client-registration"
+            ],
+            "value": "<mode>"
+          },
+          "--oauth-client-secret": {
+            "description": "OAuth client secret (may be ${NAME} or !command)",
+            "names": [
+              "--oauth-client-secret"
+            ],
+            "value": "<secret>"
+          },
+          "--timeout": {
+            "default": "300",
+            "description": "Time limit for the whole sign-in",
+            "names": [
+              "--timeout"
+            ],
+            "value": "<seconds>"
+          },
+          "--url": {
+            "description": "Streamable HTTP server URL (instead of a command)",
+            "names": [
+              "--url"
+            ],
+            "value": "<url>"
+          }
+        }
+      },
+      "pi mcp Options": {
+        "helped": false
+      },
+      "pi mcp add": {
+        "description": "Add or replace a server in mcp.json",
+        "helped": false
+      },
+      "pi mcp list": {
+        "description": "Show state, tools, and errors (exits 1 on failure)",
+        "helped": false
+      },
+      "pi mcp login": {
+        "description": "Sign in through the browser",
+        "helped": false
+      },
+      "pi mcp logout": {
+        "description": "Delete the stored OAuth credentials",
+        "helped": false
+      },
+      "pi mcp remove": {
+        "description": "Remove a server from mcp.json",
+        "helped": false
+      },
+      "pi pi": {
+        "description": "Show help for install/remove/uninstall/update/list/config/auth/mcp",
+        "helped": false
+      },
+      "pi remove": {
+        "description": "pi remove <source> [-l] [--approve|--no-approve] Remove a package and its source from settings. Alias: pi uninstall <source> [-l] pi remove npm:@foo/bar pi uninstall npm:@foo/bar",
+        "helped": true,
+        "options": {
+          "--approve": {
+            "description": "Trust project-local files for this command",
+            "names": [
+              "-a",
+              "--approve"
+            ]
+          },
+          "--local": {
+            "description": "Remove from project settings (.pi/settings.json)",
+            "names": [
+              "-l",
+              "--local"
+            ]
+          },
+          "--no-approve": {
+            "names": [
+              "-na",
+              "--no-approve"
+            ],
+            "value": "Ignore project-local files for this command"
+          }
+        }
+      },
+      "pi uninstall": {
+        "description": "pi remove <source> [-l] [--approve|--no-approve] Remove a package and its source from settings. Alias: pi uninstall <source> [-l] pi remove npm:@foo/bar pi uninstall npm:@foo/bar",
+        "helped": true,
+        "options": {
+          "--approve": {
+            "description": "Trust project-local files for this command",
+            "names": [
+              "-a",
+              "--approve"
+            ]
+          },
+          "--local": {
+            "description": "Remove from project settings (.pi/settings.json)",
+            "names": [
+              "-l",
+              "--local"
+            ]
+          },
+          "--no-approve": {
+            "names": [
+              "-na",
+              "--no-approve"
+            ],
+            "value": "Ignore project-local files for this command"
+          }
+        }
+      },
+      "pi update": {
+        "description": "pi update [source|self|pi] [--self|--extensions|--models|--all] [--extension <source>] [--approve|--no-approve] [--force] Update pi, installed packages, or model catalogs. pi update                Update pi only pi update --all          Update pi and all extensions pi update --models       Refresh model catalogs only pi update <source>       Update one package pi update pi             Update pi only (self works as alias to pi)",
+        "helped": true,
+        "options": {
+          "--all": {
+            "description": "Update pi and installed packages",
+            "names": [
+              "--all"
+            ]
+          },
+          "--approve": {
+            "description": "Trust project-local files for this command",
+            "names": [
+              "-a",
+              "--approve"
+            ]
+          },
+          "--extension": {
+            "description": "Update one package only",
+            "names": [
+              "--extension"
+            ],
+            "value": "<source>"
+          },
+          "--extensions": {
+            "description": "Update installed packages only",
+            "names": [
+              "--extensions"
+            ]
+          },
+          "--force": {
+            "description": "Reinstall pi even if the current version is latest",
+            "names": [
+              "--force"
+            ]
+          },
+          "--models": {
+            "description": "Refresh model catalogs only",
+            "names": [
+              "--models"
+            ]
+          },
+          "--no-approve": {
+            "description": "Ignore project-local files for this command",
+            "names": [
+              "-na",
+              "--no-approve"
+            ]
+          },
+          "--self": {
+            "description": "Update pi only (default when no target is given)",
+            "names": [
+              "--self"
+            ]
+          }
+        }
+      }
+    },
+    "help": {
+      "--help": "pi - AI coding assistant with read, bash, edit, write tools\n\nUsage:\n  pi [options] [--] [@files...] [messages...]\n\nCommands:\n  pi install <source> [-l]     Install extension source and add to settings\n  pi remove <source> [-l]      Remove extension source from settings\n  pi uninstall <source> [-l]   Alias for remove\n  pi update [source|self|pi]   Update pi, extensions, or model catalogs\n  pi list                      List installed extensions from settings\n  pi config [-l]               Open TUI to enable/disable package resources (Tab switches scope)\n  pi auth <command>            Log in or out, print credentials, or check provider readiness\n  pi mcp <command>             Manage MCP servers\n  pi <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp\n\nOptions:\n  --provider <name>              Provider to search for --model (requires --model)\n  --model <pattern>              Model pattern or ID (supports \"provider/id\" and optional \":<thinking>\")\n  --api-key <key>                API key (defaults to env vars)\n  --system-prompt <text>         System prompt (default: coding assistant prompt)\n  --append-system-prompt <text>  Append text or file contents to the system prompt (can be used multiple times)\n  --mode <mode>                  Output mode: text (default), json, or rpc\n  --print, -p                    Non-interactive mode: process prompt and exit\n  --continue, -c                 Continue the most recent session for the current directory\n  --resume, -r                   Pick a session to resume\n  --session <path|id>            Open a session by file path or full/partial ID\n  --session-id <id>              Use the current directory's existing session with the ID, creating it otherwise\n  --fork <path|id>               Fork a session by file path or full/partial ID into the current directory\n  --session-dir <dir>            Directory for session storage and lookup\n  --no-session                   Don't save session (ephemeral)\n  --name, -n <name>              Set session display name\n  --models <patterns>            Comma-separated model patterns for Ctrl+P cycling\n                                 Supports globs (anthropic/*, *sonnet*) and fuzzy matching\n  --no-tools, -nt                Disable all tools by default (built-in and extension)\n  --no-builtin-tools, -nbt       Disable built-in tools by default but keep extension/custom tools enabled\n  --tools, -t <tools>            Comma-separated allowlist of tool names or patterns (*) to enable\n                                 Keeps MCP tools unless an entry starts with mcp__\n                                 Only +name/-name entries add to or remove from the defaults\n  --exclude-tools, -xt <tools>   Comma-separated denylist of tool names or patterns (*) to disable\n                                 Applies to all tools, MCP tools included\n  --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max\n  --extension, -e <path>         Load an extension file or builtin:<name> (can be used multiple times)\n  --no-extensions, -ne           Disable extension discovery and built-in extensions (explicit -e paths still work)\n  --no-mcp                       Disable built-in MCP support: no servers connect and no MCP tools\n  --skill <path>                 Load a skill file or directory (can be used multiple times)\n  --no-skills, -ns               Disable skills discovery and loading\n  --prompt-template <path>       Load a prompt template file or directory (can be used multiple times)\n  --no-prompt-templates, -np     Disable prompt template discovery and loading\n  --theme <path>                 Load a theme file or directory (can be used multiple times)\n  --use-theme <name[/name]>      Set the initial interactive theme for this run\n  --no-themes                    Disable theme discovery and loading\n  --no-context-files, -nc        Disable AGENTS.md and CLAUDE.md discovery and loading\n  --export <file> [output]       Export session file to HTML and exit\n  --list-models [search]         List available models (with optional fuzzy search)\n  --verbose                      Force verbose startup (overrides quietStartup setting)\n  --tui-mode <mode>              TUI mode: fullscreen (default) or regular\n  --approve, -a                  Trust project-local files for this run\n  --no-approve, -na              Ignore project-local files for this run\n  --offline                      Disable startup network operations (same as PI_OFFLINE=1)\n  --                             End option parsing; treat remaining arguments as messages/files\n  --help, -h                     Show this help\n  --version, -v                  Show version number\n\nExtensions can register additional flags (e.g., --plan from plan-mode extension).\n\nExamples:\n  # Print a provider API key for an external client\n  pi auth print-api-key --provider openai\n\n  # Print an OAuth bearer token for an external client (refreshes if expired)\n  pi auth print-bearer-token --provider openai-codex\n\n  # Interactive mode\n  pi\n\n  # Interactive mode with initial prompt\n  pi \"List all .ts files in src/\"\n\n  # Include files in initial message\n  pi @prompt.md @image.png \"What color is the sky?\"\n\n  # Non-interactive mode (process and exit)\n  pi -p \"List all .ts files in src/\"\n\n  # Prompt beginning with a dash\n  pi -p -- \"- Summarize these points\"\n\n  # Multiple messages (interactive)\n  pi \"Read package.json\" \"What dependencies do we have?\"\n\n  # Continue previous session\n  pi --continue \"What did we discuss?\"\n\n  # Start a named session\n  pi --name \"Refactor auth module\"\n\n  # Use different model\n  pi --provider openai --model gpt-4o-mini \"Help me refactor this code\"\n\n  # Use model with provider prefix (no --provider needed)\n  pi --model openai/gpt-4o \"Help me refactor this code\"\n\n  # Use model with thinking level shorthand\n  pi --model sonnet:high \"Solve this complex problem\"\n\n  # Limit model cycling to specific models\n  pi --models claude-sonnet,claude-haiku,gpt-4o\n\n  # Limit to a specific provider with glob pattern\n  pi --models \"github-copilot/*\"\n\n  # Cycle models with fixed thinking levels\n  pi --models sonnet:high,haiku:low\n\n  # Start with a specific thinking level\n  pi --thinking high \"Solve this complex problem\"\n\n  # Read-only mode (no file modifications possible)\n  pi --tools read,grep,find,ls -p \"Review the code in src/\"\n\n  # Add codemode to the default tools\n  pi --tools +codemode\n\n  # Codemode with only the tools of one MCP server\n  pi --tools read,bash,codemode,'mcp__radius__*'\n\n  # Disable one tool while keeping the rest available\n  pi --exclude-tools ask_question\n\n  # Export a session file to HTML\n  pi --export ~/.pi/agent/sessions/--path--/session.jsonl\n  pi --export session.jsonl output.html\n\nEnvironment Variables:\n  ANTHROPIC_AUTH_TOKEN             - Anthropic bearer auth token\n  ANTHROPIC_API_KEY                - Anthropic Claude API key\n  ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key)\n  ANT_LING_API_KEY                 - Ant Ling API key\n  OPENAI_API_KEY                   - OpenAI GPT API key\n  AZURE_OPENAI_API_KEY             - Azure OpenAI API key\n  AZURE_OPENAI_BASE_URL            - Azure OpenAI/Cognitive Services base URL (e.g. https://{resource}.openai.azure.com)\n  AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL)\n  AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1)\n  AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated)\n  DEEPSEEK_API_KEY                 - DeepSeek API key\n  NVIDIA_API_KEY                   - NVIDIA NIM API key\n  GEMINI_API_KEY                   - Google Gemini API key\n  GROQ_API_KEY                     - Groq API key\n  CEREBRAS_API_KEY                 - Cerebras API key\n  XAI_API_KEY                      - xAI Grok API key\n  FIREWORKS_API_KEY                - Fireworks API key\n  TOGETHER_API_KEY                 - Together AI API key\n  BASETEN_API_KEY                  - Baseten API key\n  OPENROUTER_API_KEY               - OpenRouter API key\n  AI_GATEWAY_API_KEY               - Vercel AI Gateway API key\n  ZAI_API_KEY                      - ZAI Coding Plan API key (Global)\n  ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China)\n  MISTRAL_API_KEY                  - Mistral API key\n  MINIMAX_API_KEY                  - MiniMax API key\n  MOONSHOT_API_KEY                 - Moonshot AI API key\n  OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key\n  KIMI_API_KEY                     - Kimi For Coding API key\n  META_API_KEY                     - Meta Model API key\n  CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway)\n  CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both)\n  CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway)\n  QWEN_TOKEN_PLAN_API_KEY          - Qwen Token Plan API key (international region)\n  QWEN_TOKEN_PLAN_CN_API_KEY       - Qwen Token Plan API key (China region)\n  XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing)\n  XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region)\n  XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region)\n  XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region)\n  AWS_PROFILE                      - AWS profile for Amazon Bedrock\n  AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock\n  AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock\n  AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token)\n  AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1)\n  PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent)\n  PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir)\n  PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths)\n  PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes\n  PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec})\n  PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no\n  PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/)\n\nBuilt-in Tool Names:\n  read       - Read file contents\n  bash       - Execute bash commands\n  powershell - Execute PowerShell commands on Windows\n  edit       - Edit files with find/replace\n  write      - Write files (creates/overwrites)\n  grep       - Search file contents (read-only, off by default)\n  find       - Find files by glob pattern (read-only, off by default)\n  ls         - List directory contents (read-only, off by default)\n\n",
+      "auth --help": "Usage:\n  pi auth login <provider> [--api-key] [--no-browser]\n  pi auth logout <provider>\n  pi auth print-api-key [--provider <provider>] [--model <model>]\n  pi auth print-bearer-token [--provider <provider>] [--model <model>] [--min-expiry <duration>]\n  pi auth check [--provider <provider>] [--model <model>] [--json] [--credentials] [--no-refresh]\n\nLog in to and out of model providers, print their credentials for external clients, or check that they are ready.\nCredentials are stored in ~/.pi/agent/auth.json.\n\nCommands:\n  login <provider>        Sign in with an account in the browser, or save an API key, then exit\n  logout <provider>       Remove the stored credentials; environment variables and models.json stay\n  print-api-key           Print the resolved API key\n  print-bearer-token      Print a resolved OAuth bearer token (refreshes if expired)\n  check                   Print ready, not_ready, or invalid; exit with 0, 1, or 2\n\nOptions for print-api-key, print-bearer-token, and check (at least one is required):\n  --provider <provider>   Resolve credentials for a provider\n  --model <model>         Resolve credentials from a model\n\nOptions for login:\n  --api-key               Save an API key instead of signing in with an account\n  --no-browser            Do not open a browser; use another sign-in method, e.g. device code\n\nOther options:\n  --min-expiry <duration> Minimum remaining token lifetime for print-bearer-token, e.g. 30m or 1h\n  --json                  Print the check result as JSON\n  --credentials           Emit the credential from check, or include it in JSON output\n  --no-refresh            Do not refresh expired OAuth credentials during check\n",
+      "config --help": "Usage:\n  pi config [-l] [--approve|--no-approve]\n\nOpen the resource configuration TUI to enable or disable package resources.\nWithout -l, starts in global settings (~/.pi/agent/settings.json).\nPress Tab in the TUI to switch between global and project-local modes.\n\nOptions:\n  -l, --local       Edit project overrides (.pi/settings.json)\n  -a, --approve     Trust project-local files for this command with -l\n  -na, --no-approve Ignore project-local files for this command with -l\n\n",
+      "install --help": "Usage:\n  pi install <source> [-l] [--approve|--no-approve]\n\nInstall a package and add it to settings.\n\nOptions:\n  -l, --local       Install project-locally (.pi/settings.json)\n  -a, --approve     Trust project-local files for this command\n  -na, --no-approve Ignore project-local files for this command\n\nExamples:\n  pi install npm:@foo/bar\n  pi install git:github.com/user/repo\n  pi install git:git@github.com:user/repo\n  pi install https://github.com/user/repo\n  pi install ssh://git@github.com/user/repo\n  pi install ./local/path\n\n",
+      "list --help": "Usage:\n  pi list [--approve|--no-approve]\n\nList installed packages from user and project settings.\n\nOptions:\n  -a, --approve      Trust project-local files for this command\n  -na, --no-approve  Ignore project-local files for this command\n\n",
+      "mcp --help": "Usage:\n  pi mcp add <server> [options] -- <command> [args...]\n  pi mcp add <server> [options] --url <url>\n  pi mcp remove <server> [-l]\n  pi mcp list [--json]\n  pi mcp login <server> [-l] [--timeout <seconds>]\n  pi mcp logout <server> [-l]\n\nConfigure and check MCP servers and sign in to OAuth servers without starting a session.\nReads ~/.pi/agent/mcp.json and, in trusted projects, .pi/mcp.json.\n\nCommands:\n  add <server>            Add or replace a server in mcp.json\n  remove <server>         Remove a server from mcp.json\n  list                    Show state, tools, and errors (exits 1 on failure)\n  login <server>          Sign in through the browser\n  logout <server>         Delete the stored OAuth credentials\n\nOptions for add, remove, login, and logout:\n  -l, --local             Use .pi/mcp.json in the current project instead of the global file\n\nOptions for add:\n  --url <url>             Streamable HTTP server URL (instead of a command)\n  --env <KEY=VALUE>       Environment variable for a stdio server (repeatable)\n  --cwd <dir>             Working directory for a stdio server\n  --header <KEY=VALUE>    HTTP header (repeatable)\n  --bearer-token-env-var <NAME>\n                          Send \"Authorization: Bearer ${NAME}\"\n  --oauth-client-id <id>  Pre-registered OAuth client id\n  --oauth-client-secret <secret>\n                          OAuth client secret (may be ${NAME} or !command)\n  --oauth-callback-port <port>\n                          Fixed OAuth callback port\n  --oauth-client-name <name>\n                          Client name sent when registering with the OAuth server\n  --oauth-client-registration <mode>\n                          auto (default), cimd, or dcr\n  --exposure <mode>       codemode (default), deferred, direct, or hidden\n  --description <text>    What the server offers, shown in the system prompt\n\nOther options:\n  --json                  Print the list as JSON\n  --timeout <seconds>     Time limit for the whole sign-in (default: 300)\n",
+      "remove --help": "Usage:\n  pi remove <source> [-l] [--approve|--no-approve]\n\nRemove a package and its source from settings.\nAlias: pi uninstall <source> [-l]\n\nOptions:\n  -l, --local       Remove from project settings (.pi/settings.json)\n  -a, --approve     Trust project-local files for this command\n  -na, --no-approve Ignore project-local files for this command\n\nExamples:\n  pi remove npm:@foo/bar\n  pi uninstall npm:@foo/bar\n\n",
+      "uninstall --help": "Usage:\n  pi remove <source> [-l] [--approve|--no-approve]\n\nRemove a package and its source from settings.\nAlias: pi uninstall <source> [-l]\n\nOptions:\n  -l, --local       Remove from project settings (.pi/settings.json)\n  -a, --approve     Trust project-local files for this command\n  -na, --no-approve Ignore project-local files for this command\n\nExamples:\n  pi remove npm:@foo/bar\n  pi uninstall npm:@foo/bar\n\n",
+      "update --help": "Usage:\n  pi update [source|self|pi] [--self|--extensions|--models|--all] [--extension <source>] [--approve|--no-approve] [--force]\n\nUpdate pi, installed packages, or model catalogs.\n\nOptions:\n  --self                  Update pi only (default when no target is given)\n  --extensions            Update installed packages only\n  --models                Refresh model catalogs only\n  --all                   Update pi and installed packages\n  --extension <source>    Update one package only\n  -a, --approve           Trust project-local files for this command\n  -na, --no-approve       Ignore project-local files for this command\n  --force                 Reinstall pi even if the current version is latest\n\nShort forms:\n  pi update                Update pi only\n  pi update --all          Update pi and all extensions\n  pi update --models       Refresh model catalogs only\n  pi update <source>       Update one package\n  pi update pi             Update pi only (self works as alias to pi)\n\n"
+    }
+  },
+  "config": {
+    "env_source": "the variables its source reads",
+    "env_vars": [
+      "AI_AGENT",
+      "ALACRITTY_WINDOW_ID",
+      "ANTHROPIC_AUTH_TOKEN",
+      "ANTHROPIC_FEDERATION_RULE_ID",
+      "ANTHROPIC_IDENTITY_TOKEN_FILE",
+      "ANTHROPIC_ORGANIZATION_ID",
+      "ANTHROPIC_SERVICE_ACCOUNT_ID",
+      "ANTHROPIC_WORKSPACE_ID",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_BEARER_TOKEN_BEDROCK",
+      "AWS_BEDROCK_FORCE_CACHE",
+      "AWS_BEDROCK_FORCE_HTTP1",
+      "AWS_BEDROCK_SKIP_AUTH",
+      "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+      "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+      "AWS_DEFAULT_REGION",
+      "AWS_PROFILE",
+      "AWS_REGION",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_SESSION_TOKEN",
+      "AWS_WEB_IDENTITY_TOKEN_FILE",
+      "AZURE_OPENAI_API_VERSION",
+      "AZURE_OPENAI_BASE_URL",
+      "AZURE_OPENAI_DEPLOYMENT_NAME_MAP",
+      "AZURE_OPENAI_RESOURCE_NAME",
+      "CC",
+      "CI",
+      "COLORTERM",
+      "COLUMNS",
+      "DISPLAY",
+      "EDITOR",
+      "GCLOUD_PROJECT",
+      "GHOSTTY_RESOURCES_DIR",
+      "GITHUB_ACTIONS",
+      "GOOGLE_APPLICATION_CREDENTIALS",
+      "GOOGLE_CLOUD_API_KEY",
+      "GOOGLE_CLOUD_LOCATION",
+      "GOOGLE_CLOUD_PROJECT",
+      "HOME",
+      "HTTPS_PROXY",
+      "HTTP_PROXY",
+      "ITERM_SESSION_ID",
+      "KIMI_CODE_OAUTH_HOST",
+      "KIMI_OAUTH_HOST",
+      "KITTY_WINDOW_ID",
+      "LD_LIBRARY_PATH",
+      "LINES",
+      "LLAMA_API_KEY",
+      "LLAMA_BASE_URL",
+      "NODE_ENV",
+      "NODE_OPTIONS",
+      "ORCA_IMAGE_PROTOCOL",
+      "PI_CACHE_RETENTION",
+      "PI_CLEAR_ON_SHRINK",
+      "PI_CODEMODE_MAX_WORKERS",
+      "PI_CODING_AGENT",
+      "PI_EXPERIMENTAL",
+      "PI_HARDWARE_CURSOR",
+      "PI_HYPERLINKS",
+      "PI_IMAGE_PROTOCOL",
+      "PI_INSTALLER_API_BASE",
+      "PI_MANAGED_INSTALL_ROOT",
+      "PI_OAUTH_CALLBACK_HOST",
+      "PI_OFFLINE",
+      "PI_PACKAGE_DIR",
+      "PI_PROGRAM_STATUS",
+      "PI_RADIUS_GATEWAY",
+      "PI_SELF_UPDATE_COMMAND",
+      "PI_SHARE_VIEWER_URL",
+      "PI_SKIP_VERSION_CHECK",
+      "PI_STARTUP_BENCHMARK",
+      "PI_TELEMETRY",
+      "PI_TIMING",
+      "PI_TRUE_COLOR",
+      "PI_TUI_DEBUG",
+      "PI_TUI_DEBUG_REDRAW",
+      "PI_TUI_WIN32_TOOLCHAIN",
+      "PI_TUI_WRITE_LOG",
+      "PNPM_HOME",
+      "ProgramFiles",
+      "SHELL",
+      "SSH_CLIENT",
+      "SSH_CONNECTION",
+      "SSH_TTY",
+      "STY",
+      "SystemRoot",
+      "TERM",
+      "TERMINAL_EMULATOR",
+      "TERMUX_VERSION",
+      "TERM_PROGRAM",
+      "TERM_PROGRAM_VERSION",
+      "TMUX",
+      "USERPROFILE",
+      "VISUAL",
+      "WARP_SESSION_ID",
+      "WARP_TERMINAL_SESSION_UUID",
+      "WAYLAND_DISPLAY",
+      "WEZTERM_PANE",
+      "WSL_DISTRO_NAME",
+      "WSL_INTEROP",
+      "WT_SESSION",
+      "ZELLIJ"
+    ],
+    "options": {
+      "$schema": {
+        "description": "JSON Schema reference.",
+        "type": "string"
+      },
+      "autocompleteMaxVisible": {
+        "default": 5,
+        "description": "Maximum visible items in the autocomplete dropdown.",
+        "type": "number"
+      },
+      "branchSummary": {
+        "type": "object"
+      },
+      "branchSummary.reserveTokens": {
+        "default": 16384,
+        "description": "Tokens reserved for the prompt and LLM response.",
+        "type": "number"
+      },
+      "branchSummary.skipPrompt": {
+        "default": false,
+        "description": "When true, skips the \"Summarize branch?\" prompt and defaults to no summary.",
+        "type": "boolean"
+      },
+      "cacheWarming": {
+        "default": "idle",
+        "description": "Cache-warming profile. \"idle\" also warms between agent runs. Global only because each refresh costs money.",
+        "enum": [
+          "off",
+          "streaming",
+          "idle"
+        ],
+        "type": "string"
+      },
+      "codemode": {
+        "type": "object"
+      },
+      "codemode.inlineBudget": {
+        "default": 3000,
+        "description": "Estimated tokens available for inline codemode tool declarations.",
+        "type": "number"
+      },
+      "codemode.mode": {
+        "default": "on",
+        "description": "How codemode presents tools. \"on\" keeps direct tools declared and annotates tools callable from scripts; codemode lists only tools without direct exposure. \"only\" lists every script-callable tool in codemode and does not declare active direct tools.",
+        "enum": [
+          "on",
+          "only"
+        ],
+        "type": "string"
+      },
+      "collapseChangelog": {
+        "default": false,
+        "description": "Show the condensed changelog after update; use /changelog for the full changelog.",
+        "type": "boolean"
+      },
+      "compaction": {
+        "type": "object"
+      },
+      "compaction.enabled": {
+        "default": true,
+        "type": "boolean"
+      },
+      "compaction.keepRecentTokens": {
+        "default": 20000,
+        "type": "integer"
+      },
+      "compaction.modelOverrides": {
+        "description": "Per-model overrides keyed by exact \"provider/modelId\" strings.",
+        "type": "object"
+      },
+      "compaction.modelOverrides.<name>": {
+        "type": "object"
+      },
+      "compaction.modelOverrides.<name>.keepRecentTokens": {
+        "type": "integer"
+      },
+      "compaction.modelOverrides.<name>.reserveTokens": {
+        "type": "integer"
+      },
+      "compaction.reserveTokens": {
+        "default": 16384,
+        "type": "integer"
+      },
+      "defaultModel": {
+        "type": "string"
+      },
+      "defaultProjectTrust": {
+        "default": "ask",
+        "description": "Global setting only.",
+        "enum": [
+          "ask",
+          "always",
+          "never"
+        ],
+        "type": "string"
+      },
+      "defaultProvider": {
+        "type": "string"
+      },
+      "defaultThinkingLevel": {
+        "enum": [
+          "off",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "type": "string"
+      },
+      "defaultTools": {
+        "description": "Initial tool selection. Plain names replace the inherited selection; +name and -name entries add or remove tools.",
+        "type": "array"
+      },
+      "deviceId": {
+        "description": "Stable installation UUID, generated when authentication first needs it. Global only.",
+        "type": "string"
+      },
+      "doubleEscapeAction": {
+        "default": "tree",
+        "description": "Action for double-escape with an empty editor.",
+        "enum": [
+          "fork",
+          "tree",
+          "none"
+        ],
+        "type": "string"
+      },
+      "editorPaddingX": {
+        "default": 0,
+        "description": "Horizontal padding for the input editor.",
+        "type": "number"
+      },
+      "enableAnalytics": {
+        "default": false,
+        "description": "Opt in to analytics data sharing.",
+        "type": "boolean"
+      },
+      "enableInstallTelemetry": {
+        "default": true,
+        "description": "Send an anonymous version and update ping after changelog-detected updates.",
+        "type": "boolean"
+      },
+      "enableSkillCommands": {
+        "default": true,
+        "description": "Register skills as /skill:name commands.",
+        "type": "boolean"
+      },
+      "enabledModels": {
+        "description": "Model patterns for cycling, in the same format as the --models CLI flag.",
+        "type": "array"
+      },
+      "extensionChangelogVersions": {
+        "description": "Last seen changelog version per extension package.",
+        "type": "object"
+      },
+      "extensionChangelogVersions.<name>": {
+        "type": "string"
+      },
+      "extensions": {
+        "description": "Local extension file paths or directories.",
+        "type": "array"
+      },
+      "externalEditor": {
+        "description": "Command for Ctrl+G external editor; takes precedence over VISUAL and EDITOR.",
+        "type": "string"
+      },
+      "followUpMode": {
+        "default": "one-at-a-time",
+        "enum": [
+          "all",
+          "one-at-a-time"
+        ],
+        "type": "string"
+      },
+      "fullscreenCopyOnSelect": {
+        "default": true,
+        "description": "No effect in regular TUI mode.",
+        "type": "boolean"
+      },
+      "fullscreenExitOutput": {
+        "default": "transcript",
+        "description": "No effect in regular TUI mode.",
+        "enum": [
+          "transcript",
+          "resume-hint"
+        ],
+        "type": "string"
+      },
+      "fullscreenScrollbar": {
+        "default": "auto",
+        "description": "No effect in regular TUI mode.",
+        "enum": [
+          "auto",
+          "always",
+          "hidden"
+        ],
+        "type": "string"
+      },
+      "fullscreenWheelScrollLines": {
+        "default": "auto",
+        "description": "Lines scrolled per wheel event in fullscreen mode; numeric values are clamped from 1 to 100.",
+        "enum": [
+          "auto"
+        ],
+        "type": "number|string"
+      },
+      "hideThinkingBlock": {
+        "default": false,
+        "type": "boolean"
+      },
+      "httpIdleTimeoutMs": {
+        "description": "HTTP header or body idle timeout in milliseconds; 0 or \"disabled\" disables it.",
+        "enum": [
+          "disabled"
+        ],
+        "type": "number|string"
+      },
+      "httpProxy": {
+        "description": "Proxy URL applied as HTTP_PROXY and HTTPS_PROXY for Pi-managed HTTP clients.",
+        "type": "string"
+      },
+      "images": {
+        "type": "object"
+      },
+      "images.autoResize": {
+        "default": true,
+        "description": "Resize images to 2000x2000 maximum for better model compatibility.",
+        "type": "boolean"
+      },
+      "images.blockImages": {
+        "default": false,
+        "description": "When true, prevents all images from being sent to LLM providers.",
+        "type": "boolean"
+      },
+      "lastChangelogVersion": {
+        "type": "string"
+      },
+      "markdown": {
+        "type": "object"
+      },
+      "markdown.codeBlockIndent": {
+        "default": "  ",
+        "type": "string"
+      },
+      "markdown.mermaid": {
+        "default": "streaming",
+        "enum": [
+          "off",
+          "final",
+          "streaming"
+        ],
+        "type": "string"
+      },
+      "modelThinkingLevels": {
+        "description": "Per-model default thinking level overrides keyed by \"provider/modelId\".",
+        "type": "object"
+      },
+      "modelThinkingLevels.<name>": {
+        "enum": [
+          "off",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "type": "string"
+      },
+      "npmCommand": {
+        "description": "Command used for npm package lookup and installation, in argv form such as [\"mise\", \"exec\", \"node@20\", \"--\", \"npm\"].",
+        "type": "array"
+      },
+      "outputPad": {
+        "default": 1,
+        "description": "Horizontal padding for transcript content.",
+        "enum": [
+          0,
+          1
+        ],
+        "type": "number"
+      },
+      "packages": {
+        "description": "npm or git package sources, as strings or objects with resource filtering.",
+        "type": "array"
+      },
+      "packages[].autoload": {
+        "description": "When false, start empty and only apply explicit resource patterns.",
+        "type": "boolean"
+      },
+      "packages[].extensions": {
+        "type": "array"
+      },
+      "packages[].prompts": {
+        "type": "array"
+      },
+      "packages[].skills": {
+        "type": "array"
+      },
+      "packages[].source": {
+        "type": "string"
+      },
+      "packages[].themes": {
+        "type": "array"
+      },
+      "prompts": {
+        "description": "Local prompt template file paths or directories.",
+        "type": "array"
+      },
+      "queueMode": {
+        "deprecated": true,
+        "description": "Legacy setting migrated to steeringMode.",
+        "enum": [
+          "all",
+          "one-at-a-time"
+        ],
+        "type": "string"
+      },
+      "quietStartup": {
+        "default": false,
+        "description": "When true, hide all startup output. When \"header\", keep only the startup header.",
+        "enum": [
+          "header"
+        ],
+        "type": "boolean|string"
+      },
+      "retry": {
+        "type": "object"
+      },
+      "retry.baseDelayMs": {
+        "default": 2000,
+        "description": "Exponential backoff base delay in milliseconds: 2s, 4s, 8s.",
+        "type": "number"
+      },
+      "retry.enabled": {
+        "default": true,
+        "type": "boolean"
+      },
+      "retry.maxAgentDelayMs": {
+        "default": 60000,
+        "type": "number"
+      },
+      "retry.maxDelayMs": {
+        "deprecated": true,
+        "description": "Legacy retry delay setting. Use provider.maxRetryDelayMs instead.",
+        "type": "number"
+      },
+      "retry.maxRetries": {
+        "default": 3,
+        "type": "number"
+      },
+      "retry.provider": {
+        "type": "object"
+      },
+      "retry.provider.maxRetries": {
+        "description": "SDK or provider retry attempts.",
+        "type": "number"
+      },
+      "retry.provider.maxRetryDelayMs": {
+        "default": 60000,
+        "description": "Maximum server-requested delay before failing.",
+        "type": "number"
+      },
+      "retry.provider.timeoutMs": {
+        "description": "SDK or provider request timeout in milliseconds.",
+        "type": "number"
+      },
+      "selfUpdateCommand": {
+        "description": "Command `pi update` runs to update Pi itself, in argv form such as [\"mise\", \"use\", \"-g\", \"npm:{packageName}@{version}\"]. Placeholders: {packageName}, {version}, {installSpec}. PI_SELF_UPDATE_COMMAND takes precedence. Global setting only.",
+        "type": "array"
+      },
+      "sessionDir": {
+        "description": "Custom session storage directory, in the same format as the --session-dir CLI flag.",
+        "type": "string"
+      },
+      "sessionShareDestination": {
+        "default": "auto",
+        "description": "Destination used by /share. \"auto\" uses Radius when authenticated and otherwise creates a GitHub gist.",
+        "enum": [
+          "auto",
+          "gist",
+          "radius"
+        ],
+        "type": "string"
+      },
+      "shellCommandPrefix": {
+        "description": "Prefix prepended to every bash command, for example to enable shell aliases.",
+        "type": "string"
+      },
+      "shellPath": {
+        "description": "Custom shell path, for example for Cygwin on Windows, with support for leading ~ expansion.",
+        "type": "string"
+      },
+      "showCacheMissNotices": {
+        "default": false,
+        "description": "Show cache cost and provider recovery notices.",
+        "type": "boolean"
+      },
+      "showHardwareCursor": {
+        "description": "Show the terminal cursor while still positioning it for IME.",
+        "type": "boolean"
+      },
+      "skills": {
+        "deprecated": true,
+        "description": "Local skill file paths or directories.",
+        "type": "array|object"
+      },
+      "skills.customDirectories": {
+        "type": "array"
+      },
+      "skills.enableSkillCommands": {
+        "type": "boolean"
+      },
+      "steeringMode": {
+        "default": "one-at-a-time",
+        "enum": [
+          "all",
+          "one-at-a-time"
+        ],
+        "type": "string"
+      },
+      "terminal": {
+        "type": "object"
+      },
+      "terminal.clearOnShrink": {
+        "default": false,
+        "description": "Clear empty rows when content shrinks.",
+        "type": "boolean"
+      },
+      "terminal.hyperlinks": {
+        "enum": [
+          "auto"
+        ],
+        "type": "boolean|string"
+      },
+      "terminal.imageWidthCells": {
+        "default": 60,
+        "description": "Preferred inline image width in terminal cells.",
+        "type": "number"
+      },
+      "terminal.images": {
+        "enum": [
+          "kitty",
+          "iterm2",
+          "auto",
+          false
+        ],
+        "type": "boolean|string"
+      },
+      "terminal.showImages": {
+        "default": true,
+        "description": "Show images when the terminal supports them.",
+        "type": "boolean"
+      },
+      "terminal.showTerminalProgress": {
+        "default": false,
+        "description": "Show OSC 9;4 terminal progress indicators.",
+        "type": "boolean"
+      },
+      "terminal.trueColor": {
+        "enum": [
+          "auto"
+        ],
+        "type": "boolean|string"
+      },
+      "theme": {
+        "type": "string"
+      },
+      "themes": {
+        "description": "Local theme file paths or directories.",
+        "type": "array"
+      },
+      "thinkingBudgets": {
+        "description": "Custom token budgets for thinking levels.",
+        "type": "object"
+      },
+      "thinkingBudgets.high": {
+        "type": "number"
+      },
+      "thinkingBudgets.low": {
+        "type": "number"
+      },
+      "thinkingBudgets.medium": {
+        "type": "number"
+      },
+      "thinkingBudgets.minimal": {
+        "type": "number"
+      },
+      "trackingId": {
+        "description": "Analytics tracking identifier, generated when analytics is enabled.",
+        "type": "string"
+      },
+      "transport": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "sse",
+          "websocket",
+          "websocket-cached"
+        ],
+        "type": "string"
+      },
+      "treeFilterMode": {
+        "default": "default",
+        "description": "Default filter when opening /tree.",
+        "enum": [
+          "default",
+          "no-tools",
+          "user-only",
+          "labeled-only",
+          "all"
+        ],
+        "type": "string"
+      },
+      "tuiMode": {
+        "default": "fullscreen",
+        "enum": [
+          "regular",
+          "fullscreen"
+        ],
+        "type": "string"
+      },
+      "warnings": {
+        "type": "object"
+      },
+      "warnings.anthropicExtraUsage": {
+        "default": true,
+        "type": "boolean"
+      },
+      "websocketConnectTimeoutMs": {
+        "description": "WebSocket connect or open handshake timeout in milliseconds; 0 or \"disabled\" disables it.",
+        "enum": [
+          "disabled"
+        ],
+        "type": "number|string"
+      },
+      "websockets": {
+        "deprecated": true,
+        "description": "Legacy setting migrated to transport.",
+        "type": "boolean"
+      }
+    },
+    "source": "packages/coding-agent/schemas/settings.schema.json at v1.5.1"
+  },
+  "storage": {
+    "agent": {
+      "files": 2,
+      "format": "json",
+      "path": "<home>/.pi/agent/auth.json",
+      "paths": [
+        "<home>/.pi/agent/auth.json",
+        "<home>/.pi/agent/models-store.json"
+      ]
+    },
+    "transcript": {
+      "files": 1,
+      "format": "jsonl",
+      "path": "<home>/.pi/agent/sessions/-<project>--/<time>_<uuid>.jsonl",
+      "record_types": {
+        "message": [
+          "id",
+          "message",
+          "message.api",
+          "message.content",
+          "message.content[].text",
+          "message.content[].type",
+          "message.durationMs",
+          "message.model",
+          "message.provider",
+          "message.rawStopReason",
+          "message.responseId",
+          "message.role",
+          "message.sections",
+          "message.sections.cwd",
+          "message.sections.docs",
+          "message.sections.preamble",
+          "message.sections.rules",
+          "message.sections.tools",
+          "message.stopReason",
+          "message.thinkingLevel",
+          "message.timestamp",
+          "message.toolsAdded",
+          "message.toolsAdded[].constrainedSampling",
+          "message.toolsAdded[].description",
+          "message.toolsAdded[].name",
+          "message.toolsAdded[].parameters",
+          "message.usage",
+          "message.usage.cacheRead",
+          "message.usage.cacheWrite",
+          "message.usage.cost",
+          "message.usage.input",
+          "message.usage.output",
+          "message.usage.reasoning",
+          "message.usage.totalTokens",
+          "parentId",
+          "timestamp",
+          "type"
+        ],
+        "model_change": [
+          "id",
+          "modelId",
+          "parentId",
+          "provider",
+          "timestamp",
+          "type"
+        ],
+        "session": [
+          "cwd",
+          "id",
+          "timestamp",
+          "type",
+          "version"
+        ],
+        "thinking_level_change": [
+          "id",
+          "parentId",
+          "thinkingLevel",
+          "timestamp",
+          "type"
+        ]
+      }
+    }
+  },
+  "binary": {
+    "engines": ">=22.19.0",
+    "form": "package",
+    "heuristic": [
+      "env_vars"
+    ],
+    "runtime": "node",
+    "sdk": {
+      "@anthropic-ai/sdk": "0.129.0",
+      "@google/genai": "2.21.0",
+      "openai": "7.19.0"
+    },
+    "size_bytes": 115241410
+  },
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.content_allowed",
+        "label": "Prompts and tool content delivered when allowed",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.content_withheld",
+        "label": "Prompts and tool content withheld when the project says so",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.equivalent",
+        "label": "The same telemetry through the relay as exported directly",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.only_opted_in",
+        "label": "Nothing leaves for sessions no repository opted in to",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      },
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  },
+  "live": {
+    "differs": false,
+    "model": "m",
+    "prompt": {
+      "chars": 2096,
+      "context": [],
+      "sha256": "a16f92c5ab9c7f87f8422f32cfaeef4eb7865623c5967eb49103c2530dc80493",
+      "system": [
+        {
+          "chars": 2096,
+          "sha256": "a16f92c5ab9c7f87f8422f32cfaeef4eb7865623c5967eb49103c2530dc80493",
+          "text": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nAdditional tools may be available.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for targeted changes. Batch changes to one file in a single call.\n- Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>\n\n<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: <install>/README.md\n- Additional docs: <install>/docs\n- Examples: <install>/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>\n\n<cwd>\n<repo>\n</cwd>"
+        }
+      ]
+    },
+    "tools": [
+      "bash",
+      "edit",
+      "read",
+      "write"
+    ]
+  }
+}

@@ -11,13 +11,48 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/pingdotgg/t3code/releases",
-    "latest": "0.0.45",
-    "support": "supported",
-    "versions_tracked": 1,
+    "latest": "0.1.8",
+    "support": "unsupported",
+    "versions_tracked": 2,
     "first_tracked": "2026-10-02",
-    "last_change": null
+    "last_change": {
+      "from": "0.0.45",
+      "to": "0.1.8",
+      "at": "2026-11-10T05:19:19.197557181Z",
+      "released_at": "2026-11-09T22:48:39.205Z",
+      "changes": 2,
+      "categories": {
+        "support": 2
+      }
+    }
   },
   "versions": [
+    {
+      "version": "0.1.8",
+      "released_at": "2026-11-09T22:48:39.205Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "unsupported",
+      "previous": "0.0.45",
+      "changes": 2,
+      "categories": {
+        "support": 2
+      },
+      "impact": {
+        "breaking": 2,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [
+        "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64",
+        "Terma support: supported → unsupported"
+      ],
+      "signing": null
+    },
     {
       "version": "0.0.45",
       "released_at": "2026-10-02T18:17:11.449Z",

@@ -3,22 +3,2072 @@
   "harness": "claude",
   "from": "2.1.318",
   "to": "2.1.319",
-  "generated_at": "2026-11-09T19:16:44.022458436Z",
+  "generated_at": "2026-11-10T05:19:19.197557181Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
     "text": "- Changed auto mode with telemetry or feature flags off, including behind LLM gateways: calls the server can't check are asked about or denied, with no fallback to the built-in classifier; set `CLAUDE_CODE_AUTO_MODE_SERVER=0` to keep using it (Bedrock, Vertex and Foundry are unchanged)\n- Changed auto mode behind an LLM gateway: `CLAUDE_CODE_AUTO_MODE_SERVER=1` turns on the server-side check even with `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` set; if managed settings set the latter, they must set the `1` too\n- Added support for MCP tasks in the terminal: when an MCP server runs a tool call as a task, Claude Code moves it to the background right away and tells Claude the result when it finishes\n- Added the `CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND` environment variable to make Claude Code wait for an MCP task inside its tool call instead of moving it to the background right away\n- Added `permissions.denyInsteadOfPrompting` setting: a tool call that would wait on a permission prompt is denied and the turn continues, in terminal sessions, subagents and teammates\n- Added `/claude-api latency-optimize` to find where your Claude API code makes people wait and try faster settings against your eval\n- Added the `CLAUDE_CODE_DISABLE_FEATURE_FLAGS` environment variable, which stops feature-flag fetching without turning off telemetry; every flag then uses its built-in default\n- Added spend for today, this week and this month to `/usage` for developers behind a Claude apps gateway who have no spend limit, when the gateway runs this version or later\n- Added `admin.pooled_conflict_rule` and `admin.pooled_priority_order` to the Claude apps gateway, to set which pooled group budget pays first for a developer in several groups\n- Added an optional `login_notice` setting to the Claude apps gateway that shows an operator-defined message on the gateway's browser verification page and on Claude Code's sign-in screen\n- Added `CLAUDE_GATEWAY_LOG_FORMAT=json` to the Claude apps gateway: operational log lines become JSON with `severity`, `time` and `message`, for log collectors that read the level from a field\n- Added a Claude apps gateway boot warning for a case where another policy's `availableModels` also allows a custom model id that one policy lists by name\n- Added start-up warnings to the Claude apps gateway for policies with no `desktopHome` that rely on `coworkTabEnabled: false` or `chatSessionRetentionDays`, ahead of Claude Desktop's November 10 change\n- Added a warning when your claude.ai login ends and Claude Code continues on the sign-in from `ant auth login`, which bills usage to your Claude Console organization\n- Added a line at startup naming the Claude Console organization that is billed in a case where Claude Code uses the sign-in from `ant auth login`\n- Added an \"Earlier in this session\" row to `/tasks` that lists finished subagents, so you can reopen one and message it even after it leaves the list or you restart\n- Added a note to `/loop` confirmations in cloud sessions that a timer stops with its container, with an offer of a loop that survives\n- Fixed MCP servers on the older handshake failing to connect, or returning empty results, because Claude Code declared an extension that it only uses with newer servers\n- Fixed a long-running MCP tool call on a claude.ai connector sometimes never reporting its result after `--resume`\n- Fixed a session's diff failing to load on claude.ai and the mobile apps when the folder Claude Code runs in has a file or folder named `HEAD`\n- Fixed `/diff` showing \"Diff unavailable\" when a git repository has a file or folder named `HEAD` at its top level\n- Fixed the `/diff` pane opening blank in sessions where 64 or more turns edited files\n- Fixed slash commands typed after a leading space, tab or newline being sent to Claude as plain text instead of running\n- Fixed a request that kept failing with a 401 refreshing your login on every retry and causing 401s in your other sessions\n- Fixed `/context` sending its full visual grid to Claude on every later turn; Claude now reads only the table\n- Fixed `claude -p` exiting 0 in auto mode when its actions were refused because no safety check was available: text and JSON output now exit 1\n- Fixed a case where Claude Code listed every project file at start on Linux for projects on a network file system (NFS, SMB, Lustre and similar)\n- Fixed a case where auto mode was wrongly refused when a client sent a model change and a request for auto mode back to back\n- Fixed `/status` showing \"Auto mode server: Enabled\" when the server-side review isn't reaching the session, for example behind an LLM gateway that drops it\n- Fixed Claude-drafted feedback, surveys and `/feedback` continuing to appear after the server refused feedback for your organization\n- Fixed Claude drafting feedback on third-party gateways, where it can't be sent\n- Fixed auto mode refusing actions without saying why when permission rules or `autoMode` settings are very large: it now explains and, unless `autoMode` deny rules are set, asks you in the terminal\n- Fixed a case where Bash deny and ask rules missed commands written with quoted words\n- Fixed subagent hand-back reports showing an internal marker and provenance note when expanded outside verbose mode\n- Fixed `claude -p --resume` with a prompt losing a deferred tool call when its MCP server is missing: the run now exits 1, keeps the call and refuses later input\n- Fixed a case where text was dropped from informational messages sent to SDK clients\n- Fixed a case where Agent SDK hosts got a generic exit-code error instead of a failed run's own error message when the disk was full\n- Fixed `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` re-running a turn that was interrupted in plan mode when the session resumes in another permission mode\n- Fixed edits to a settings file being ignored when made within a few seconds of Claude Code writing that file\n- Fixed a config file left at the legacy name hiding your setup with no warning: Claude Code now says on stderr when a home holds two config files, and which is in use\n- Fixed `~/.claude.json`, settings and edited files ending up empty or cut off when the disk fills during a save in a read-only folder or to a bind-mounted file (one session saving at a time)\n- Fixed Write ending the turn as a refusal when it couldn't read the file to overwrite\n- Fixed background Bash commands that finish almost instantly losing their output while being reported as completed\n- Fixed the Bash tool's diff of changed files missing a file that the command wrote just before it ended\n- Fixed a mistyped model name, such as `opus-5-5`, telling you to update Claude Code instead of suggesting the model you meant\n- Fixed a case where `NotebookEdit` changed the wrong cell when the notebook changed while a permission prompt was open\n- Fixed a ~0.5s hang after pressing Enter on the `/login` success screen: the dialog now dismisses immediately and the post-login refresh runs in the background\n- Fixed Ctrl+G not opening the external editor while typing an \"Other\" answer to a question in screen reader mode\n- Fixed Monitor's WebSocket watch failing with \"could not resolve\" behind a proxy when `CLAUDE_CODE_PROXY_RESOLVES_HOSTS` is set and the machine has no DNS of its own\n- Fixed `claude plugin eval` warnings suggesting `max: 0` for a tool that must not be called, which could never pass\n- Fixed background plugin auto-update not installing a dependency added by the updated plugin version\n- Fixed Cmd+click not opening links in Ghostty over tmux in sessions opened from the agents view\n- Fixed a mod's hot reload in `.claude/skills` missing a file that was deleted just after it appeared, and missing its return\n- Fixed `/rewind` failing with \"No files were restored\" when restoring code to a checkpoint from before `/branch`\n- Fixed the `/claude-api` skill saying Console web settings don't apply to Managed Agents sessions, and tightened its credential and permission examples\n- Fixed needless permission prompts for read-only commands wrapped in a plain `timeout DURATION`, such as `timeout 30 rg foo`\n- Fixed WebFetch describing claude.ai shared-chat links as empty pages; it now says shared chats can't be read and to paste the conversation instead\n- Fixed Artifact database calls being re-sent to artifacts without a database; errors now say whether republishing helps\n- Fixed a case where artifact database reads that save to a folder (`out_dir`) were refused\n- Fixed detailed beta tracing not presenting `CLAUDE_CODE_CLIENT_CERT` to collectors that require a client certificate\n- Fixed the OpenTelemetry `claude_code.session.count` metric counting Agent SDK `prewarm()` processes that were never claimed; a pre-started process now counts once, when it is claimed\n- Fixed `/clear` killing running commands of background agents, teammates and workflows that keep running, and foreground subagents of background agents and teammates\n- Fixed a terminal whose Claude apps gateway sign-in had expired sending telemetry and managed-settings requests that the gateway refused and logged as `invalid_token`\n- Fixed the agents view appearing to send a reply to a background session waiting on a permission prompt; the reply now stays in the box with a hint to open the session and answer\n- Fixed agent view removing a draft saved by another agent view in the same directory when exiting\n- Fixed a case where agent view came back with another agent view's input text after restarting itself for an update\n- Fixed the agents view preview cutting off long commands, results and status lines without an ellipsis, and dropping `**`, backticks and tags from commands waiting for approval\n- Fixed Claude in Chrome reporting the extension as not connected when the connection dropped mid-action; Claude now checks the page before repeating an action that may have run\n- Fixed Remote Control sessions still showing \"Limit reached\" on other devices after a usage limit was lifted outside the session\n- Fixed the file card sometimes missing in the Claude iOS app when Claude sent a single file\n- Fixed self-hosted runner sessions failing with no explanation when the server keeps refusing to renew model access: the runner now retries sooner and posts a warning in the session\n- Fixed `/permissions` in cloud sessions replying only that it isn't available; it now says where the session's rules live and how to change them\n- Fixed cloud sessions losing session-scoped deny and ask permission rules, such as those a PermissionRequest hook adds, when the session moves to a new worker\n- Fixed mod hot-reloading turning off for the session when you typed three messages instead of answering its question in a cloud session\n- Fixed background tasks that keep running after `/clear` disappearing from the task list in Claude Code on the web until another task started or ended\n- Fixed hidden commands appearing in the slash command menu of cloud sessions on mobile and web\n- Fixed a case where `/rewind` could restore or delete a file through a directory symlink\n- Fixed a case where a `sed` command could skip the permission check in accept-edits and auto mode\n- Fixed a case where `CLAUDE_CODE_AUTO_MODE_SERVER=1` in managed settings was ignored behind an LLM gateway when the gateway's URL is set only there and server-managed settings can't be fetched\n- Fixed a Bash permission bypass where a crafted environment prefix could hide part of a command from permission checks\n- Fixed a case where deny and ask rules, hook matchers and `disallowedTools` entries written with a claude.ai connector's terminal name (`mcp__claude_ai_Slack`) were ignored in Claude Desktop (takes effect once Claude Desktop includes this version)\n- Fixed a sandbox escape when creating a worktree\n- Fixed self-hosted runners: `--trust-workspace false` now also stops hooks in the repository's settings files and skills from running\n- Fixed a case where idle background sessions started through a shell-exported LLM gateway left the gateway after an update\n- Fixed help links in `/status` and the auto mode billing notice opening only part of the address when they wrap\n- Fixed a case where certificate errors behind a TLS-inspecting proxy persisted when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` was set. With it set, Claude Code now makes a TLS handshake with the configured API host after a certificate failure, through your http:// proxy if one is set; it sends no API request\n- Fixed `claude remote-control` exiting silently with status 0 when a first-run question gets no answer (scripts, services, batch jobs, Ctrl+C); it now says why and exits 1\n- Fixed `claude remote-control` ignoring a piped `y` that has no newline after it at the first-run question; it now counts as a yes\n- Fixed `/rename` reporting plain success when the new name could not be saved to the session transcript; it now warns that the new name may not last\n- Fixed `${CLAUDE_PLUGIN_ROOT}` not being substituted in a plugin-provided `subagentStatusLine` command, which can now reference the plugin's own scripts\n- Fixed `claude plugin update` and `/plugin` \"Update now\" not installing dependencies added by the new plugin version\n- Fixed subagents being told after compaction to expect a completion notice for background agents they neither started nor took over\n- Fixed a case where a background agent's later report was lost silently: the notification now says it was refused and how to ask for it\n- Improved config saves on Windows: Claude Code waits longer for a file another program has open, so a kill during a save is less likely to leave `~/.claude.json` empty\n- Improved Claude in Chrome after a brief disconnect: it waits up to 6 seconds for the session's own browser to return before picking another\n- Improved Claude in Chrome: `javascript_tool` results of up to 60,000 characters now stay in the conversation instead of being saved to a file\n- Improved `claude purge` and the clean-up of old sessions to retry a folder that could not be fully deleted, and to report it as an error if it remains\n- Improved the refusal for a path outside the working directories on macOS and Windows: when only its letter case differs from a path inside them, the message names that spelling\n- Improved the contrast of faint gray secondary text, such as hints, details in `/stats`, `/model` and `/sandbox`, and rejected-action messages\n- Improved the artifact database error when an update targets a document that does not exist, and when the service pauses repeated refused writes\n- Improved the Claude apps gateway's warnings about a failed upstream call: each now names the upstream, not only its provider\n- Improved the Claude apps gateway's spend limit error: it reads \"spend limit reached · resets Dec 1\", then `admin.blocked_message` if one is set\n- Improved the `/model` picker: older models are now grouped under a \"More models\" row instead of being listed after the current ones\n- Improved `/context` at the terminal so the table Claude reads stays short: each list keeps its 10 largest rows, and MCP tools that load on demand share one row per server until they're called\n- Improved `/usage` in cloud sessions: it now links to Settings → Usage on claude.ai in a case where plan limits can't be shown\n- [VSCode] Improved the confirmation for removing a plugin marketplace: it now checks which of its plugins are installed at that moment\n- Changed MCP tasks to work in the terminal without feature-flag fetching (Bedrock, Vertex, Foundry, LLM gateways, `DISABLE_TELEMETRY`); set `CLAUDE_CODE_DISABLE_MCP_TASKS=1` to turn them off\n- Changed auto mode so that a project's settings files or a plugin can no longer switch its server-side check back on once you have switched it off outside the project\n- Changed Monitor's WebSocket watch to follow a rule on every Bash command: a deny refuses it, and under an ask rule an allow on Monitor, bypass mode or auto mode no longer skips the prompt\n- Changed `CLAUDE_CODE_PROXY_RESOLVES_HOSTS` so that settings files can no longer set it where the host manages the network; set it in the process environment\n- Changed a session's exact Bash or PowerShell ask rule to be refused, not asked about, when a broader deny rule covers the command\n- Changed the Bash tool to ask for permission before running `which` with flags outside a lookup/display set\n- Changed `--add-dir` directories to register plugin marketplaces only once that directory's own trust dialog has been accepted\n- Changed nested skill loading: with the Bash sandbox on, skills in `.claude/skills` folders below the starting folder load only if you start Claude Code there or `/cd` there\n- Changed self-paced `/loop` to end when a turn finishes without rescheduling, instead of scheduling a fallback wakeup; set `CLAUDE_CODE_LOOP_KEEPALIVE=1` to keep the old behavior\n- Changed PostToolUse hooks to run, with up to 10 seconds to finish, on tool calls that finish after a new message interrupts the turn\n- Changed what Claude is told after safeguards stop a subagent: retry with a narrower prompt or tell you, instead of doing the work itself\n- Changed cloud sessions to drop session-scoped allow rules at a move to a new worker when their deny and ask rules can't all be kept, so you may be asked again\n- Changed the automatic certificate repair behind a TLS-inspecting proxy: it no longer runs when `ALL_PROXY` is the only proxy variable set. Set `HTTPS_PROXY` to the proxy's http:// URL instead\n- Changed artifact database saves of rows others may have written: each file gets a hidden marker file, and existing files without one, earlier versions' exports among them, are left alone and reported\n- Updated `/claude-api managed-agents-onboard` templates to match the Claude Console: removed Performance tuner, renamed two, and turned off web search and fetch in five whose prompts don't use them\n- Removed `shortcuts_list` and `shortcuts_execute`, which listed and started shortcuts saved in the extension, from Claude Code's built-in Claude in Chrome tools\n- Gateway: Added startup warnings for upstreams that mix AWS GovCloud with other upstreams, and for base URL variables in the gateway's environment\n- Gateway: Added a start-up log warning when managed settings name an Amazon Bedrock guardrail in a header, which the gateway doesn't forward, and no `bedrock` upstream sets a `guardrail`\n- Gateway: Fixed Claude Desktop offering a web search tool that always failed when every upstream is Amazon Bedrock\n- Self-hosted runner: Fixed a runner started with `--use-anthropic-git-proxy` or `--configure-git` registering before a failed startup check made it exit; it now exits first\n- Self-hosted runner: Changed `CLAUDE_RUNNER_CHECKOUT_PATH` so that each repository in a session gets its own folder: a folder name already taken in the session gets `-2`, `-3`, … at the end\n- Self-hosted runner: Removed the end-of-session upload of a session's debug log; a failed session's log stays on the runner host unless `--remove-session-state` is set\n- [VSCode] Fixed prompts over 50,000 characters being cut off silently: the prompt now stays in the chat box with a notice, and a paste over the limit is refused with a notice\n- [VSCode] Fixed a click on the survey or \"Report a problem\" buttons sending the unfinished prompt\n- [VSCode] Fixed cloud sessions opened from the extension's Web tab bringing back turns that `/clear`, or Retry or Edit of a typed prompt, had removed\n- [VSCode] Fixed a deleted session's file coming back when that session was renamed in the extension\n- [VSCode] Fixed Claude carrying out an unapproved plan after a window reload: a step interrupted in plan mode now stops with a notice when the session comes back in another permission mode\n- [VSCode] Improved the \"not signed in\" message behind a Claude apps gateway: it now looks like an error and has a Sign in link\n- [VSCode] Changed links in Claude's replies that point at Claude sign-in, connector or API addresses to show as text with the address, instead of opening in the browser\n- [VSCode] Fixed a possible chat panel freeze when a dropped item's path contains a very long run of \"/\" characters\n- [VSCode] Fixed the `claude-vscode.toggleDictation` command starting dictation in every open Claude view at once; it now acts only in the view you are using, and a second press stops it\n- [VSCode] Fixed the chat panel slowing down while a reply with many unclosed `$$` math fences, each shorter than the last, streams in\n- [VSCode] Improved the chat panel's diagnostics tool for large workspaces: it leaves out files with no problems, returns compact JSON, and accepts an optional minimum severity\n- [Cloud sessions] Fixed scheduled tasks silently dropping a connector named memory: runs now keep it, mounted under that name plus a short suffix\n- [Cloud sessions] Fixed Send now on a waiting message in cloud sessions ending running background agents; they now keep running\n- [Cloud sessions] Improved the stalled-setup warning on self-hosted environments: its link now prefers your organization's default or an environment with a live runner, and names it\n- [Code Review] Changed unlinking a GitHub organization to also turn off its All repositories setting in Code Review; it stays off after you relink until you turn it back on\n- [Claude Tag] Fixed Claude Tag setup blocking launch when the channel list couldn't fully load; admins can now launch without picking a channel\n- [Claude Tag] Added a Claude Tag row to the Models admin page for Enterprise orgs with Claude Tag connected, linking to where its model defaults are managed\n- [Claude Tag] Fixed saving auto mode allow rules in Claude Tag admin settings overwriting another admin's changes; the save is now refused with a message"
   },
   "summary": {
-    "changes": 0,
-    "categories": {},
+    "changes": 96,
+    "categories": {
+      "binary": 1,
+      "config": 19,
+      "network": 58,
+      "telemetry": 18
+    },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
-      "notable": 0
+      "informational": 37,
+      "notable": 59
     },
-    "undocumented": 0
+    "undocumented": 33
   },
-  "changes": []
+  "changes": [
+    {
+      "id": "telemetry.export",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "export"
+      ],
+      "title": "Telemetry export added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "interval_batches": {
+          "logs": 2,
+          "metrics": 1
+        },
+        "interval_ms": {
+          "logs": 5000,
+          "metrics": 60000
+        },
+        "protocol": "http/protobuf"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "s",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "USD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "tokens",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.interaction.root",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.interaction",
+        "root"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.interaction.root added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.parent",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "parent"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.llm_request.parent added",
+      "impact": "informational",
+      "before": null,
+      "after": "traces/claude_code.interaction",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.disableWindowsBashCommandSplit",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "disableWindowsBashCommandSplit"
+      ],
+      "title": "New setting: disableWindowsBashCommandSplit",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Windows only. Set to true to keep every Bash command in a single argument to bash, so that endpoint security tools that match text in process command lines see it whole. Otherwise Claude Code may split a long command over several arguments. With true, a command of about 7,000 characters or more, or fewer if it is full of quotes, may reach bash cut short, and then usually fails with a syntax error. Only honored from managed settings; ignored in user, project, local and --settings sources.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sshHostCommands.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sshHostCommands",
+        "description"
+      ],
+      "title": "sshHostCommands description changed (+561 −318 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,7 +1,11 @@\n-SSH connections in Claude Desktop on macOS and Linux whose host comes from a command.\n+SSH connections in Claude Desktop whose host comes from a command.\n A list of entries, each with `id`, `name` and `command`, and optionally `sshIdentityFile` and `startDirectory`.\n-When you ask Desktop to create or replace an entry's host, it runs `command` on this computer: a program name or absolute path, followed by plain arguments.\n-There is no shell, so quotes, pipes, variables and a leading `~` do not work.\n+Desktop runs `command` on this computer when you create the connection or another host for it, not each time you connect.\n+`command` is a program name or absolute path (single-quote a path with spaces), then plain arguments.\n+Nothing else can be quoted.\n+For pipes, variables or a leading `~`, use a script.\n+On Windows, the program must be a full path from a drive letter, such as `C:/tools/acme.exe`, ending in `.exe`, `.cmd` or `.bat`.\n+Quoted paths and Windows need Claude Desktop v4.16336.0 or later.\n The command must print only the host on standard output: `host` or `user@host` on one line, or a JSON object with `sshHost` and, optionally, `sshPort` and `startDirectory`.\n Desktop reads this key only from user settings and from this computer's managed settings.\n Claude Code itself does not use it.\n",
+      "stats": {
+        "added_chars": 561,
+        "removed_chars": 318
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_COWORK_PLUGIN_SKILL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_COWORK_PLUGIN_SKILL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_COWORK_PLUGIN_SKILL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_COWORK_PLUGIN_SKILL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CRYPTIC_HORIZON",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CRYPTIC_HORIZON"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CRYPTIC_HORIZON",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CRYPTIC_HORIZON",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DESKTOP_WORKFLOW_LIMIT_WAIT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DESKTOP_WORKFLOW_LIMIT_WAIT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DESKTOP_WORKFLOW_LIMIT_WAIT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DESKTOP_WORKFLOW_LIMIT_WAIT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_FEATURE_FLAGS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_NATIVE_APP_BUNDLE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_NATIVE_APP_BUNDLE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_NATIVE_APP_BUNDLE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_NATIVE_APP_BUNDLE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_NORMALIZE_PREFIX_CACHE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_NORMALIZE_PREFIX_CACHE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_NORMALIZE_PREFIX_CACHE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_NORMALIZE_PREFIX_CACHE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_NORMALIZE_PREFIX_CACHE_VERIFY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_NORMALIZE_PREFIX_CACHE_VERIFY"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_NORMALIZE_PREFIX_CACHE_VERIFY",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_NORMALIZE_PREFIX_CACHE_VERIFY",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_THREAD_CPU_ONE_IN",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_THREAD_CPU_ONE_IN"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_THREAD_CPU_ONE_IN",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_THREAD_CPU_ONE_IN",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TRANSCRIPT_TAIL_LOAD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TRANSCRIPT_TAIL_LOAD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TRANSCRIPT_TAIL_LOAD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TRANSCRIPT_TAIL_LOAD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_GATEWAY_LOG_FORMAT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_GATEWAY_LOG_FORMAT"
+      ],
+      "title": "New environment variable: CLAUDE_GATEWAY_LOG_FORMAT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_GATEWAY_LOG_FORMAT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.CLAUDE_RUNNER_DISABLE_RENEWAL_WARNING",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_RUNNER_DISABLE_RENEWAL_WARNING"
+      ],
+      "title": "New environment variable: CLAUDE_RUNNER_DISABLE_RENEWAL_WARNING",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_RUNNER_DISABLE_RENEWAL_WARNING",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.TZ",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TZ"
+      ],
+      "title": "New environment variable: TZ",
+      "impact": "informational",
+      "before": null,
+      "after": "TZ",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_MCP_SKIP_UNCHANGED_RELIST",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_after_normalize.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_api_after_normalize",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_api_after_normalize telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_before_normalize.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_api_before_normalize",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_api_before_normalize telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_cache_breakpoints.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_api_cache_breakpoints",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_api_cache_breakpoints telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_query.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_api_query",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_api_query telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_api_success.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_api_success",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_api_success telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_artifact_toolset.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_artifact_toolset",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_artifact_toolset telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_attachment_compute_duration.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_attachment_compute_duration",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_attachment_compute_duration telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_attachments.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_attachments",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_attachments telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_auto_compact_window_in_force.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_auto_compact_window_in_force",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_auto_compact_window_in_force telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_cache_eviction_hint.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_cache_eviction_hint",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_cache_eviction_hint telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_claudeai_mcp_eligibility.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_claudeai_mcp_eligibility",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_claudeai_mcp_eligibility telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_claudemd__initial_load.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_claudemd__initial_load",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_claudemd__initial_load telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_cli_flags.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_cli_flags",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_cli_flags telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_config_cache_stats.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_config_cache_stats",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_config_cache_stats telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_announcement.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_context_announcement",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_context_announcement telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_rendering_recorded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_context_rendering_recorded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_context_rendering_recorded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_context_size.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_context_size",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_context_size telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_deferred_tools_pool_change.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_deferred_tools_pool_change",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_deferred_tools_pool_change telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_dir_search.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_dir_search",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_dir_search telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_ok.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_feature_ok",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_feature_ok telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_feature_sad.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_feature_sad",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_feature_sad telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_fork_subagent_enabled.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_fork_subagent_enabled",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_fork_subagent_enabled telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_mcp_first_turn_join.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_headless_mcp_first_turn_join",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_headless_mcp_first_turn_join telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_mcp_prewait.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_headless_mcp_prewait",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_headless_mcp_prewait telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_plugin_install.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_headless_plugin_install",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_headless_plugin_install telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_init.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_init",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_init telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_input_prompt.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_input_prompt",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_input_prompt telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_managed_config_ready.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_managed_config_ready",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_managed_config_ready telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_managed_settings_os_read.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_managed_settings_os_read",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_managed_settings_os_read telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_mcp_registry_fetch.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_mcp_registry_fetch",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_mcp_registry_fetch telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_memdir_loaded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_memdir_loaded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_memdir_loaded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_org_config_gate_shadow.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_org_config_gate_shadow",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_org_config_gate_shadow telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_enabled_for_session.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_plugin_enabled_for_session",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_plugin_enabled_for_session telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_name_collision.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_plugin_name_collision",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_plugin_name_collision telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_plugin_skills_dir_loaded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_plugin_skills_dir_loaded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_plugin_skills_dir_loaded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_prompt_suggestion_init.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_prompt_suggestion_init",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_prompt_suggestion_init telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_reminder_fold_recorded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_reminder_fold_recorded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_reminder_fold_recorded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_repl_hook_finished.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_repl_hook_finished",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_repl_hook_finished telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_reset_pro_to_opus_default.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_reset_pro_to_opus_default",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_reset_pro_to_opus_default telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_retention_sweep",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_retention_sweep"
+      ],
+      "title": "Vendor telemetry event no longer sent: tengu_retention_sweep",
+      "impact": "notable",
+      "before": {
+        "count": 1,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_run_hook.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_run_hook",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_run_hook telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_memory_summary.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_sdk_memory_summary",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_sdk_memory_summary telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_result.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_sdk_result",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_sdk_result telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_ttft.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_sdk_ttft",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_sdk_ttft telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shell_allow_rules_at_init.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_shell_allow_rules_at_init",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_shell_allow_rules_at_init telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shell_set_cwd.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_shell_set_cwd",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_shell_set_cwd telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_shutdown_pending_state.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_shutdown_pending_state",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_shutdown_pending_state telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_skill_loaded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_skill_loaded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_skill_loaded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_started.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_started",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_started telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sysprompt_block.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_sysprompt_block",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_sysprompt_block telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_timer.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_timer",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_timer telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_tool_schema_sizes.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_tool_schema_sizes",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_tool_schema_sizes telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_tool_search_mode_decision.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_tool_search_mode_decision",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_tool_search_mode_decision telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_end.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_turn_end",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_turn_end telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_turn_first_text.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_turn_first_text",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_turn_first_text telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_uds_startup_bind.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_uds_startup_bind",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_uds_startup_bind telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_shape_recorded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_wire_shape_recorded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_wire_shape_recorded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_wire_tool_input_echo_recorded.fields.rh",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_wire_tool_input_echo_recorded",
+        "fields",
+        "rh"
+      ],
+      "title": "tengu_wire_tool_input_echo_recorded telemetry event field rh added",
+      "impact": "notable",
+      "before": null,
+      "after": "rh",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "binary.signing.certificate",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "signing",
+        "certificate"
+      ],
+      "title": "Signed with a different certificate",
+      "impact": "notable",
+      "before": {
+        "not_after": "2029-07-10T10:27:32Z",
+        "not_before": "2024-07-09T10:27:33Z",
+        "serial": "14B042FE697BE6AF8BA82BC2568182D6",
+        "sha256": "190c15919bf88ffceea272fdb6583aaf591190b82f30c15c9b761b1610015e37",
+        "subject": "Developer ID Application: Anthropic PBC (Q6L2SF6YDW)"
+      },
+      "after": {
+        "not_after": "2031-05-30T16:28:47Z",
+        "not_before": "2026-05-29T16:28:48Z",
+        "serial": "7B694F16633EA0D7A33F25AE7BE0C8DB",
+        "sha256": "80871fc96487042b473ff3e7340af22d12ab6507cb9690f24d1203a3646f968e",
+        "subject": "Developer ID Application: Anthropic PBC (Q6L2SF6YDW)"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
 }

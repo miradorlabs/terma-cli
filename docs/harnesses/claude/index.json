@@ -7,89 +7,29 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.322",
+    "latest": "9.9.9",
     "support": "untested",
-    "versions_tracked": 103,
+    "versions_tracked": 105,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.321",
-      "to": "2.1.322",
-      "at": "2026-11-10T02:25:33.04205458Z",
-      "released_at": "2026-11-10T01:58:41.811Z",
-      "changes": 2,
-      "categories": {
-        "behavior": 1,
-        "config": 1
-      }
+      "from": "9.9.8",
+      "to": "9.9.9",
+      "at": "2026-11-10T05:19:19.197557181Z",
+      "released_at": null,
+      "changes": 0,
+      "categories": {}
     }
   },
   "versions": [
     {
-      "version": "2.1.322",
-      "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-10T02:25:33.04205458Z",
+      "version": "9.9.9",
+      "released_at": null,
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
       "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
+        "darwin/arm64"
       ],
       "support": "untested",
-      "previous": "2.1.321",
-      "changes": 2,
-      "categories": {
-        "behavior": 1,
-        "config": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 1
-      },
-      "undocumented": null,
-      "highlights": [
-        "Behaviour: subagents system 2 text changed",
-        "fastMode description changed (+132 −72 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "version": "2.1.321",
-      "released_at": "2026-11-09T19:02:47.641Z",
-      "captured_at": "2026-11-09T19:16:44.022458436Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.319",
-      "changes": 44,
-      "categories": {
-        "telemetry": 44
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 20,
-        "informational": 18,
-        "notable": 6
-      },
-      "undocumented": null,
-      "highlights": [
-        "Telemetry surface no longer sent: logs/api_request",
-        "Telemetry surface no longer sent: logs/assistant_response",
-        "Telemetry surface no longer sent: logs/hook_execution_complete"
-      ],
-      "signing": "valid"
-    },
-    {
-      "version": "2.1.319",
-      "released_at": "2026-11-06T00:58:56.366Z",
-      "captured_at": "2026-11-07T05:31:09Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "supported",
-      "previous": "2.1.318",
+      "previous": "9.9.8",
       "changes": 0,
       "categories": {},
       "impact": {
@@ -98,9 +38,125 @@
         "informational": 0,
         "notable": 0
       },
-      "undocumented": 0,
+      "undocumented": null,
       "highlights": [],
       "signing": null
+    },
+    {
+      "version": "9.9.8",
+      "released_at": null,
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.322",
+      "changes": 7,
+      "categories": {
+        "network": 7
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 7
+      },
+      "undocumented": null,
+      "highlights": [
+        "Network request no longer made: POST api.anthropic.com/api/eval/sdk-zAZezfDKGoZuXXKe",
+        "Network request no longer made: POST api.anthropic.com/api/event_logging/v2/batch",
+        "Network request no longer made: GET api.anthropic.com/mcp-registry/v0/servers"
+      ],
+      "signing": null
+    },
+    {
+      "version": "2.1.322",
+      "released_at": "2026-11-10T01:58:41.811Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.321",
+      "changes": 1,
+      "categories": {
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "fastMode description changed (+132 −72 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.321",
+      "released_at": "2026-11-09T19:02:47.641Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.319",
+      "changes": 26,
+      "categories": {
+        "behavior": 1,
+        "cli": 2,
+        "config": 13,
+        "filesystem": 6,
+        "prompt": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 18,
+        "notable": 8
+      },
+      "undocumented": 22,
+      "highlights": [
+        "Injected context changed (+1013 −924 chars)",
+        "Interactive session's injected context changed (+1013 −924 chars)",
+        "Interactive system prompt changed (+459 −418 chars)"
+      ],
+      "signing": "valid"
+    },
+    {
+      "version": "2.1.319",
+      "released_at": "2026-11-06T00:58:56.366Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.318",
+      "changes": 96,
+      "categories": {
+        "binary": 1,
+        "config": 19,
+        "network": 58,
+        "telemetry": 18
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 37,
+        "notable": 59
+      },
+      "undocumented": 33,
+      "highlights": [
+        "tengu_api_after_normalize telemetry event field rh added",
+        "tengu_api_before_normalize telemetry event field rh added",
+        "tengu_api_cache_breakpoints telemetry event field rh added"
+      ],
+      "signing": "valid"
     },
     {
       "version": "2.1.318",

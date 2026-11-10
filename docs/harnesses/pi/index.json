@@ -11,20 +11,55 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/earendil-works/pi/releases",
-    "latest": "1.5.0",
+    "latest": "1.5.1",
     "support": "supported",
-    "versions_tracked": 4,
+    "versions_tracked": 5,
     "first_tracked": "2026-10-12",
     "last_change": {
-      "from": "1.4.0",
-      "to": "1.5.0",
-      "at": "2026-11-05T11:12:22.390019Z",
-      "released_at": "2026-11-02T11:05:09.564Z",
-      "changes": 0,
-      "categories": {}
+      "from": "1.5.0",
+      "to": "1.5.1",
+      "at": "2026-11-10T05:19:19.197557181Z",
+      "released_at": "2026-11-09T23:45:13.428Z",
+      "changes": 18,
+      "categories": {
+        "caching": 1,
+        "cli": 10,
+        "config": 6,
+        "request": 1
+      }
     }
   },
   "versions": [
+    {
+      "version": "1.5.1",
+      "released_at": "2026-11-09T23:45:13.428Z",
+      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.5.0",
+      "changes": 18,
+      "categories": {
+        "caching": 1,
+        "cli": 10,
+        "config": 6,
+        "request": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 2
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":false,\"stabl…",
+        "Default of cacheWarming: streaming → idle",
+        "Header user-agent: pi/<version> (darwin; node/v24.22.1; arm64) → pi/<version> (darwin; node/v24.22.2; arm64)"
+      ],
+      "signing": null
+    },
     {
       "version": "1.5.0",
       "released_at": "2026-11-02T11:05:09.564Z",

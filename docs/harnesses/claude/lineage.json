@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.322",
-    "builds": 103
+    "newest": "9.9.9",
+    "builds": 105
   },
   "items": {
     "cli.commands.claude agents": {
@@ -5561,7 +5561,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -5891,7 +5891,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -5913,7 +5913,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -6111,7 +6111,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -6562,7 +6562,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -7057,7 +7057,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -7332,7 +7332,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -9396,7 +9396,7 @@
         {
           "since": "2.1.315",
           "until": "2.1.318",
-          "removed": "2.1.321"
+          "removed": "2.1.319"
         }
       ],
       "since_bounded": true
@@ -9548,7 +9548,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -9603,7 +9603,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -9614,7 +9614,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -11945,7 +11945,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -12396,7 +12396,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -12605,7 +12605,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -13353,7 +13353,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -13716,7 +13716,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -17632,7 +17632,7 @@
       "kind": "env_var",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -20811,7 +20811,7 @@
       "kind": "setting",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }
@@ -23462,7 +23462,7 @@
       "kind": "setting",
       "ranges": [
         {
-          "since": "2.1.321",
+          "since": "2.1.319",
           "until": null,
           "removed": null
         }

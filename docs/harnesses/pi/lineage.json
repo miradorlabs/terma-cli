@@ -3,8 +3,8 @@
   "harness": "pi",
   "window": {
     "oldest": "1.2.0",
-    "newest": "1.5.0",
-    "builds": 4
+    "newest": "1.5.1",
+    "builds": 5
   },
   "items": {
     "cli.commands.pi auth": {
@@ -17,6 +17,138 @@
         }
       ],
       "since_bounded": false
+    },
+    "cli.commands.pi auth Options": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth check": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth login": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth logout": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth print-api-key": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth print-bearer-token": {
+      "kind": "subcommand",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth.options.--api-key": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth.options.--credentials": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth.options.--json": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth.options.--min-expiry": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth.options.--no-browser": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "cli.commands.pi auth.options.--no-refresh": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "cli.commands.pi config": {
       "kind": "subcommand",
@@ -1041,6 +1173,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.ALACRITTY_WINDOW_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.ANTHROPIC_AUTH_TOKEN": {
       "kind": "env_var",
       "ranges": [
@@ -1310,8 +1453,8 @@
       "ranges": [
         {
           "since": "1.5.0",
-          "until": null,
-          "removed": null
+          "until": "1.5.0",
+          "removed": "1.5.1"
         }
       ],
       "since_bounded": false
@@ -1525,6 +1668,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.LD_LIBRARY_PATH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.LINES": {
       "kind": "env_var",
       "ranges": [
@@ -1557,6 +1711,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.NODE_ENV": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.NODE_OPTIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.5.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.ORCA_IMAGE_PROTOCOL": {
       "kind": "env_var",

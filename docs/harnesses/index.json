@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T05:18:32.935805758Z",
+  "generated_at": "2026-11-10T05:19:19.197557181Z",
   "harnesses": [
     {
       "id": "claude",
@@ -9,20 +9,17 @@
       "homepage": "https://claude.com/claude-code",
       "source": null,
       "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-      "latest": "2.1.322",
+      "latest": "9.9.9",
       "support": "untested",
-      "versions_tracked": 103,
+      "versions_tracked": 105,
       "first_tracked": "2026-07-09",
       "last_change": {
-        "from": "2.1.321",
-        "to": "2.1.322",
-        "at": "2026-11-10T02:25:33.04205458Z",
-        "released_at": "2026-11-10T01:58:41.811Z",
-        "changes": 2,
-        "categories": {
-          "behavior": 1,
-          "config": 1
-        }
+        "from": "9.9.8",
+        "to": "9.9.9",
+        "at": "2026-11-10T05:19:19.197557181Z",
+        "released_at": null,
+        "changes": 0,
+        "categories": {}
       }
     },
     {
@@ -55,10 +52,16 @@
       "last_change": {
         "from": "0.166.0",
         "to": "0.167.0",
-        "at": "2026-11-07T05:31:09Z",
+        "at": "2026-11-10T05:19:19.197557181Z",
         "released_at": "2026-11-06T01:46:01.347Z",
-        "changes": 0,
-        "categories": {}
+        "changes": 283,
+        "categories": {
+          "cli": 6,
+          "config": 12,
+          "filesystem": 9,
+          "prompt": 1,
+          "telemetry": 255
+        }
       }
     },
     {
@@ -102,7 +105,7 @@
       "last_change": {
         "from": "1.0.107",
         "to": "1.0.108",
-        "at": "2026-11-09T17:38:10.676342852Z",
+        "at": "2026-11-10T05:19:19.197557181Z",
         "released_at": "2026-11-09T16:20:23.734Z",
         "changes": 13,
         "categories": {
@@ -132,10 +135,17 @@
       "last_change": {
         "from": "0.2.1-rc.5",
         "to": "0.2.2-rc.1",
-        "at": "2026-11-07T05:31:09Z",
+        "at": "2026-11-10T05:19:19.197557181Z",
         "released_at": "2026-11-04T09:20:32.31Z",
-        "changes": 0,
-        "categories": {}
+        "changes": 116,
+        "categories": {
+          "binary": 1,
+          "cli": 4,
+          "config": 86,
+          "model": 22,
+          "prompt": 2,
+          "tools": 1
+        }
       }
     },
     {
@@ -156,10 +166,12 @@
       "last_change": {
         "from": "0.66.0",
         "to": "0.67.0",
-        "at": "2026-11-05T11:56:08.292632Z",
+        "at": "2026-11-10T05:19:19.197557181Z",
         "released_at": "2026-11-04T20:32:45.08Z",
-        "changes": 0,
-        "categories": {}
+        "changes": 32,
+        "categories": {
+          "telemetry": 32
+        }
       }
     },
     {
@@ -214,7 +226,7 @@
       "last_change": {
         "from": "1.19.4",
         "to": "1.19.5",
-        "at": "2026-11-05T11:12:22.390019Z",
+        "at": "2026-11-10T05:19:19.197557181Z",
         "released_at": "2026-10-28T06:17:11.1Z",
         "changes": 0,
         "categories": {}
@@ -231,17 +243,22 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/earendil-works/pi/releases",
-      "latest": "1.5.0",
+      "latest": "1.5.1",
       "support": "supported",
-      "versions_tracked": 4,
+      "versions_tracked": 5,
       "first_tracked": "2026-10-12",
       "last_change": {
-        "from": "1.4.0",
-        "to": "1.5.0",
-        "at": "2026-11-05T11:12:22.390019Z",
-        "released_at": "2026-11-02T11:05:09.564Z",
-        "changes": 0,
-        "categories": {}
+        "from": "1.5.0",
+        "to": "1.5.1",
+        "at": "2026-11-10T05:19:19.197557181Z",
+        "released_at": "2026-11-09T23:45:13.428Z",
+        "changes": 18,
+        "categories": {
+          "caching": 1,
+          "cli": 10,
+          "config": 6,
+          "request": 1
+        }
       }
     },
     {
@@ -255,11 +272,20 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/pingdotgg/t3code/releases",
-      "latest": "0.0.45",
-      "support": "supported",
-      "versions_tracked": 1,
+      "latest": "0.1.8",
+      "support": "unsupported",
+      "versions_tracked": 2,
       "first_tracked": "2026-10-02",
-      "last_change": null
+      "last_change": {
+        "from": "0.0.45",
+        "to": "0.1.8",
+        "at": "2026-11-10T05:19:19.197557181Z",
+        "released_at": "2026-11-09T22:48:39.205Z",
+        "changes": 2,
+        "categories": {
+          "support": 2
+        }
+      }
     }
   ]
 }

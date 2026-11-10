@@ -1,5 +1,28 @@
 {
   "schema_version": 1,
   "harness": "t3",
-  "steps": []
+  "steps": [
+    {
+      "version": "0.1.8",
+      "previous": "0.0.45",
+      "changes": [
+        {
+          "id": "support.capabilities.relay.telemetry@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64",
+          "impact": "breaking",
+          "documented": true
+        },
+        {
+          "id": "support.status",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma support: supported → unsupported",
+          "impact": "breaking",
+          "documented": false
+        }
+      ]
+    }
+  ]
 }

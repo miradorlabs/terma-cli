@@ -3,7 +3,7 @@
   "harness": "gemini",
   "version": "0.67.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-05T11:56:08.292632Z",
+  "captured_at": "2026-11-10T05:19:19.197557181Z",
   "capture": {
     "command": [
       "gemini",
@@ -16,19 +16,20 @@
       "The first turn ran behind a local proxy that answers every other request empty: the build used the feature flags it ships with. What live flags changed is under live."
     ],
     "sections": {
+      "behavior": "2026-11-10T05:19:19.197557181Z",
       "binary": "2026-11-05T11:12:22.390019Z",
-      "caching": "2026-11-05T11:12:22.390019Z",
+      "caching": "2026-11-10T05:19:19.197557181Z",
       "cli": "2026-11-05T11:12:22.390019Z",
       "config": "2026-11-05T11:12:22.390019Z",
-      "hooks": "2026-11-05T11:12:22.390019Z",
+      "hooks": "2026-11-10T05:19:19.197557181Z",
       "model": "2026-11-05T11:12:22.390019Z",
-      "network": "2026-11-05T11:12:22.390019Z",
+      "network": "2026-11-10T05:19:19.197557181Z",
       "prompt": "2026-11-05T11:12:22.390019Z",
-      "request": "2026-11-05T11:12:22.390019Z",
+      "request": "2026-11-10T05:19:19.197557181Z",
       "side_requests": "2026-11-05T11:12:22.390019Z",
-      "storage": "2026-11-05T11:12:22.390019Z",
+      "storage": "2026-11-10T05:19:19.197557181Z",
       "support": "2026-11-05T06:31:08.621178Z",
-      "telemetry": "2026-11-05T11:56:08.292632Z",
+      "telemetry": "2026-11-10T05:19:19.197557181Z",
       "tools": "2026-11-05T11:12:22.390019Z"
     }
   },
@@ -295,6 +296,16 @@
     }
   ],
   "caching": {
+    "across_turns": {
+      "breakpoints": [
+        [],
+        [],
+        []
+      ],
+      "stable_cache_key": false,
+      "stable_prefix_chars": 717,
+      "turns": 3
+    },
     "breakpoints": [],
     "prompt_cache_key": false
   },
@@ -312,7 +323,7 @@
       "sec-fetch-mode": "cors",
       "user-agent": "GeminiCLI-tui/<version>/gemini-3.1-pro-preview (darwin; arm64; terminal)",
       "x-gemini-api-privileged-user-id": "<uuid>",
-      "x-goog-api-client": "google-genai-sdk/1.30.0 gl-node/v24.22.1",
+      "x-goog-api-client": "google-genai-sdk/1.30.0 gl-node/v24.22.2",
       "x-goog-api-key": "[redacted]"
     },
     "identifiers": [
@@ -337,7 +348,70 @@
       "when": "before the first model request"
     }
   ],
+  "behavior": {
+    "retries": {
+      "statuses": {
+        "429": {
+          "attempts": 5,
+          "backoff_ms": [
+            5916,
+            12737,
+            16631,
+            49
+          ],
+          "failed": 3,
+          "failed_first": 3,
+          "honors_retry_after": true,
+          "recovered": true,
+          "retry_after_seconds": 2,
+          "succeeded": true
+        },
+        "500": {
+          "attempts": 5,
+          "backoff_ms": [
+            5715,
+            12107,
+            16916,
+            29
+          ],
+          "failed": 3,
+          "failed_first": 3,
+          "honors_retry_after": true,
+          "recovered": true,
+          "retry_after_seconds": 2,
+          "succeeded": true
+        }
+      }
+    },
+    "tool_output": {
+      "bytes": 450000,
+      "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
+      "kept_lines": {
+        "count": 2218,
+        "first": 1,
+        "last": 25000
+      },
+      "limit_chars": 42579,
+      "line": "TERMA-LINE-%06d",
+      "lines": 25000,
+      "marker": "l_command\",\"response\":{\"output\":\"Output too large. Showing first 8,000 and last 32,000 ch",
+      "truncation": "middle"
+    }
+  },
   "telemetry": {
+    "export": {
+      "interval_batches": {
+        "logs": 2,
+        "metrics": 6,
+        "traces": 1
+      },
+      "interval_ms": {
+        "logs": 5000,
+        "metrics": 10000,
+        "traces": 5000
+      },
+      "protocol": "http/json"
+    },
     "surfaces": {
       "logs/gemini_cli.api_request": {
         "keys": {
@@ -1499,7 +1573,10 @@
               "number"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.api.request.latency": {
         "keys": {
@@ -1533,7 +1610,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.file.operation.count": {
         "keys": {
@@ -1637,7 +1717,10 @@
               "bool"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.hook_call.latency": {
         "keys": {
@@ -1683,7 +1766,10 @@
               "bool"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.lines.changed": {
         "keys": {
@@ -1793,7 +1879,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.session.count": {
         "keys": {
@@ -1815,7 +1904,10 @@
               "text"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.startup.duration": {
         "keys": {
@@ -1885,7 +1977,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.token.usage": {
         "keys": {
@@ -1925,7 +2020,10 @@
               "text"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.tool.call.count": {
         "keys": {
@@ -2063,7 +2161,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "s"
       },
       "metrics/gen_ai.client.token.usage": {
         "keys": {
@@ -2121,7 +2222,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "token"
       },
       "resource": {
         "keys": {
@@ -2285,7 +2389,8 @@
               "number"
             ]
           }
-        }
+        },
+        "root": true
       },
       "traces/schedule_tool_calls": {
         "keys": {
@@ -2389,67 +2494,8 @@
   },
   "hooks": {
     "events": {
-      "AfterAgent": {
-        "count": 1,
-        "cwd": "<repo>",
-        "env": [
-          "CLAUDE_PROJECT_DIR",
-          "GEMINI_CLI_NO_RELAUNCH",
-          "GEMINI_CWD",
-          "GEMINI_PLANS_DIR",
-          "GEMINI_PROJECT_DIR",
-          "GEMINI_SESSION_ID"
-        ],
-        "env_paths": {
-          "CLAUDE_PROJECT_DIR": "<repo>",
-          "GEMINI_CWD": "<repo>",
-          "GEMINI_PLANS_DIR": "<home>/.gemini<tmp><uuid>/plans",
-          "GEMINI_PROJECT_DIR": "<repo>"
-        },
-        "env_values": {
-          "CLAUDE_PROJECT_DIR": "<repo>",
-          "GEMINI_CLI_NO_RELAUNCH": "true",
-          "GEMINI_CWD": "<repo>",
-          "GEMINI_PLANS_DIR": "<home>/.gemini<tmp><uuid>/plans",
-          "GEMINI_PROJECT_DIR": "<repo>",
-          "GEMINI_SESSION_ID": "<uuid>"
-        },
-        "example": {
-          "cwd": "<repo>",
-          "hook_event_name": "AfterAgent",
-          "prompt": "<prompt>",
-          "prompt_response": "TERMA_TELEMETRY_REPLY",
-          "session_id": "<uuid>",
-          "stop_hook_active": false,
-          "timestamp": "<timestamp>",
-          "transcript_path": "<home>/.gemini<tmp>"
-        },
-        "fired": true,
-        "keys": [
-          "cwd",
-          "hook_event_name",
-          "prompt",
-          "prompt_response",
-          "session_id",
-          "stop_hook_active",
-          "timestamp",
-          "transcript_path"
-        ],
-        "kinds": {
-          "cwd": "text",
-          "hook_event_name": "text",
-          "prompt": "text",
-          "prompt_response": "text",
-          "session_id": "text",
-          "stop_hook_active": "bool",
-          "timestamp": "text",
-          "transcript_path": "text"
-        },
-        "matcher": false,
-        "stdin": "json"
-      },
       "AfterModel": {
-        "count": 2,
+        "count": 1,
         "cwd": "<repo>",
         "env": [
           "CLAUDE_PROJECT_DIR",
@@ -2607,7 +2653,7 @@
           },
           "tool_name": "run_shell_command",
           "tool_response": {
-            "llmContent": "<untrusted_context>\nOutput: hooks-ok\nProcess Group PGID: 2363\n</untrusted_context>",
+            "llmContent": "<untrusted_context>\nOutput: hooks-ok\nProcess Group PGID: 14895\n</untrusted_context>",
             "returnDisplay": "hooks-ok"
           },
           "transcript_path": "<home>/.gemini<tmp>"
@@ -2774,7 +2820,7 @@
           "timestamp": "text",
           "transcript_path": "text"
         },
-        "matcher": false,
+        "matcher": true,
         "stdin": "json"
       },
       "BeforeTool": {
@@ -2838,7 +2884,7 @@
         "stdin": "json"
       },
       "BeforeToolSelection": {
-        "count": 2,
+        "count": 1,
         "cwd": "<repo>",
         "env": [
           "CLAUDE_PROJECT_DIR",
@@ -2972,59 +3018,6 @@
         "matcher": true,
         "stdin": "json"
       },
-      "SessionEnd": {
-        "count": 1,
-        "cwd": "<repo>",
-        "env": [
-          "CLAUDE_PROJECT_DIR",
-          "GEMINI_CLI_NO_RELAUNCH",
-          "GEMINI_CWD",
-          "GEMINI_PLANS_DIR",
-          "GEMINI_PROJECT_DIR",
-          "GEMINI_SESSION_ID"
-        ],
-        "env_paths": {
-          "CLAUDE_PROJECT_DIR": "<repo>",
-          "GEMINI_CWD": "<repo>",
-          "GEMINI_PLANS_DIR": "<home>/.gemini<tmp><uuid>/plans",
-          "GEMINI_PROJECT_DIR": "<repo>"
-        },
-        "env_values": {
-          "CLAUDE_PROJECT_DIR": "<repo>",
-          "GEMINI_CLI_NO_RELAUNCH": "true",
-          "GEMINI_CWD": "<repo>",
-          "GEMINI_PLANS_DIR": "<home>/.gemini<tmp><uuid>/plans",
-          "GEMINI_PROJECT_DIR": "<repo>",
-          "GEMINI_SESSION_ID": "<uuid>"
-        },
-        "example": {
-          "cwd": "<repo>",
-          "hook_event_name": "SessionEnd",
-          "reason": "exit",
-          "session_id": "<uuid>",
-          "timestamp": "<timestamp>",
-          "transcript_path": "<home>/.gemini<tmp>"
-        },
-        "fired": true,
-        "keys": [
-          "cwd",
-          "hook_event_name",
-          "reason",
-          "session_id",
-          "timestamp",
-          "transcript_path"
-        ],
-        "kinds": {
-          "cwd": "text",
-          "hook_event_name": "text",
-          "reason": "text",
-          "session_id": "text",
-          "timestamp": "text",
-          "transcript_path": "text"
-        },
-        "matcher": true,
-        "stdin": "json"
-      },
       "SessionStart": {
         "count": 1,
         "cwd": "<repo>",
@@ -3081,7 +3074,9 @@
     },
     "method": 2,
     "not_fired": {
-      "Notification": "fires for an interactive session's tool permission prompts; the probe's run is -p --yolo"
+      "AfterAgent": "none of the probe's runs fired it",
+      "Notification": "fires for an interactive session's tool permission prompts; the probe's run is -p --yolo",
+      "SessionEnd": "none of the probe's runs fired it"
     },
     "source": "binary",
     "supported": [
@@ -7690,7 +7685,77 @@
     "telemetry": {
       "POST play.googleapis.com/log": {
         "events": {
+          "api_request": {
+            "count": 2,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
+          "api_response": {
+            "count": 2,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
+          "hook_call": {
+            "count": 2,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
+          "model_routing": {
+            "count": 1,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
+          "new_prompt": {
+            "count": 1,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
           "ripgrep_fallback": {
+            "count": 1,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
+          "start_session": {
+            "count": 1,
+            "fields": [
+              "application",
+              "client_install_id",
+              "console_type",
+              "event_metadata",
+              "event_name"
+            ]
+          },
+          "startup_stats": {
             "count": 1,
             "fields": [
               "application",
@@ -7732,7 +7797,7 @@
     "transcript": {
       "files": 1,
       "format": "jsonl",
-      "path": "<home>/.gemini<tmp><time>eb97cfd.jsonl",
+      "path": "<home>/.gemini<tmp><time>-<id>.jsonl",
       "record_types": {
         "(untyped)": [
           "$set",

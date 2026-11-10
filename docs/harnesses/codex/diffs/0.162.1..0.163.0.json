@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.162.1",
   "to": "0.163.0",
-  "generated_at": "2026-11-07T05:31:09Z",
+  "generated_at": "2026-11-10T05:19:19.197557181Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.162.1...rust-v0.163.0"
   },
@@ -180,7 +180,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/model-provider/src/models_endpoint.rs",
+            "line": 323,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/model-provider/src/models_endpoint.rs#L323"
+          },
+          {
+            "path": "codex-rs/model-provider/src/models_endpoint.rs",
+            "line": 349,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/model-provider/src/models_endpoint.rs#L349"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -315,7 +329,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 693,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L693"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -450,7 +473,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1070,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1070"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1094,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1094"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -543,7 +580,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 371,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L371"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -648,7 +694,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1206,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1206"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1215,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1215"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -795,7 +855,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/tool_result.rs",
+            "line": 57,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/tool_result.rs#L57"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -876,7 +945,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 387,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L387"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -963,7 +1041,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1181,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1181"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1187,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1187"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1026,7 +1118,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/model-provider/src/models_endpoint.rs",
+            "line": 323,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/model-provider/src/models_endpoint.rs#L323"
+          },
+          {
+            "path": "codex-rs/model-provider/src/models_endpoint.rs",
+            "line": 349,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/model-provider/src/models_endpoint.rs#L349"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1089,7 +1195,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 16,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L16"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 781,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L781"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1176,7 +1296,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/auth_storage.rs",
+            "line": 123,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/auth_storage.rs#L123"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1263,7 +1392,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/auth_storage.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/auth_storage.rs#L122"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -1302,7 +1440,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cloud-config/src/metrics.rs",
+            "line": 5,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/cloud-config/src/metrics.rs#L5"
+          },
+          {
+            "path": "codex-rs/cloud-config/src/metrics.rs",
+            "line": 51,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/cloud-config/src/metrics.rs#L51"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1353,7 +1505,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/handlers.rs",
+            "line": 359,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/handlers.rs#L359"
+          },
+          {
+            "path": "codex-rs/otel/src/metrics/config.rs",
+            "line": 19,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/config.rs#L19"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1380,7 +1546,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/lib.rs",
+            "line": 145,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/state/src/lib.rs#L145"
+          },
+          {
+            "path": "codex-rs/rollout/src/metadata.rs",
+            "line": 388,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/rollout/src/metadata.rs#L388"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1407,7 +1587,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/lib.rs",
+            "line": 147,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/state/src/lib.rs#L147"
+          },
+          {
+            "path": "codex-rs/rollout/src/metadata.rs",
+            "line": 208,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/rollout/src/metadata.rs#L208"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1470,7 +1664,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/config/metrics.rs",
+            "line": 15,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/config/metrics.rs#L15"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1551,7 +1754,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 63,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L63"
+          },
+          {
+            "path": "codex-rs/core/src/hook_runtime.rs",
+            "line": 935,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/hook_runtime.rs#L935"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1632,7 +1849,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 64,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L64"
+          },
+          {
+            "path": "codex-rs/core/src/hook_runtime.rs",
+            "line": 940,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/hook_runtime.rs#L940"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1659,7 +1890,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/catalog_telemetry.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-mcp/src/connection_manager/catalog_telemetry.rs#L8"
+          },
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/catalog_telemetry.rs",
+            "line": 7,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-mcp/src/connection_manager/catalog_telemetry.rs#L7"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1686,7 +1931,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 12,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L12"
+          },
+          {
+            "path": "codex-rs/otel/src/metrics/process.rs",
+            "line": 22,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/process.rs#L22"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1713,7 +1972,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/rollout/src/compression.rs",
+            "line": 1148,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/rollout/src/compression.rs#L1148"
+          },
+          {
+            "path": "codex-rs/rollout/src/compression.rs",
+            "line": 1216,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/rollout/src/compression.rs#L1216"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -1770,7 +2043,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/rollout/src/compression/read_metrics.rs",
+            "line": 117,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/rollout/src/compression/read_metrics.rs#L117"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -1827,7 +2109,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/rollout/src/compression/read_metrics.rs",
+            "line": 119,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/rollout/src/compression/read_metrics.rs#L119"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2064,7 +2355,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 241,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/shell_snapshot.rs#L241"
+          },
+          {
+            "path": "codex-rs/exec-server/src/telemetry.rs",
+            "line": 217,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/telemetry.rs#L217"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -2133,7 +2438,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/runtimes/unified_exec/snapshot_metrics.rs",
+            "line": 68,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tools/runtimes/unified_exec/snapshot_metrics.rs#L68"
+          },
+          {
+            "path": "codex-rs/exec-server/src/telemetry.rs",
+            "line": 238,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/telemetry.rs#L238"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -2196,7 +2515,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 221,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/shell_snapshot.rs#L221"
+          },
+          {
+            "path": "codex-rs/exec-server/src/telemetry.rs",
+            "line": 216,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/telemetry.rs#L216"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2265,7 +2598,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/runtimes/unified_exec/snapshot_metrics.rs",
+            "line": 69,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tools/runtimes/unified_exec/snapshot_metrics.rs#L69"
+          },
+          {
+            "path": "codex-rs/exec-server/src/telemetry.rs",
+            "line": 239,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/telemetry.rs#L239"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2316,7 +2663,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 50,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L50"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 351,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L351"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2367,7 +2728,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 52,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L52"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 354,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L354"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2418,7 +2793,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 51,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L51"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 352,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L352"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2469,7 +2858,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 54,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L54"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 364,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L364"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2520,7 +2923,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 55,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L55"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 369,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L369"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2571,7 +2988,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 53,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L53"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 359,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L359"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2622,7 +3053,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/lib.rs",
+            "line": 151,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/state/src/lib.rs#L151"
+          },
+          {
+            "path": "codex-rs/state/src/telemetry.rs",
+            "line": 94,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/state/src/telemetry.rs#L94"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2673,7 +3118,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/state/src/lib.rs",
+            "line": 153,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/state/src/lib.rs#L153"
+          },
+          {
+            "path": "codex-rs/state/src/telemetry.rs",
+            "line": 95,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/state/src/telemetry.rs#L95"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2736,7 +3195,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1070,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1070"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1094,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1094"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2799,7 +3272,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 18,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L18"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1064,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1064"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2862,7 +3349,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 66,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L66"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 367,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L367"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2919,7 +3420,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 76,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L76"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/render_observability.rs",
+            "line": 97,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/render_observability.rs#L97"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -2976,7 +3491,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 73,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L73"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/render_observability.rs",
+            "line": 82,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/render_observability.rs#L82"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3033,7 +3562,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 74,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L74"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/render_observability.rs",
+            "line": 87,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/render_observability.rs#L87"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3090,7 +3633,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 77,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L77"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/render_observability.rs",
+            "line": 92,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/render_observability.rs#L92"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -3153,7 +3710,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 72,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L72"
+          },
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1385,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1385"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3180,7 +3751,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/thread-store/src/local/thread_history_materialization.rs",
+            "line": 19,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/thread-store/src/local/thread_history_materialization.rs#L19"
+          },
+          {
+            "path": "codex-rs/thread-store/src/local/thread_history_materialization.rs",
+            "line": 358,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/thread-store/src/local/thread_history_materialization.rs#L358"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3261,7 +3846,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 3,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L3"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1317,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1317"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3342,7 +3941,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 4,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L4"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1318,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L1318"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3399,7 +4012,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 5,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L5"
+          },
+          {
+            "path": "codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs",
+            "line": 551,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs#L551"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3527,7 +4154,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 35,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L35"
+          },
+          {
+            "path": "codex-rs/core/src/tasks/mod.rs",
+            "line": 412,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/mod.rs#L412"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3602,7 +4243,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 39,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L39"
+          },
+          {
+            "path": "codex-rs/core/src/tasks/mod.rs",
+            "line": 145,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/mod.rs#L145"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -3665,7 +4320,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 38,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L38"
+          },
+          {
+            "path": "codex-rs/core/src/tasks/mod.rs",
+            "line": 131,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/mod.rs#L131"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -3728,7 +4397,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L41"
+          },
+          {
+            "path": "codex-rs/core/src/state/turn_token_usage.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/state/turn_token_usage.rs#L41"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -3785,7 +4468,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 40,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L40"
+          },
+          {
+            "path": "codex-rs/core/src/tasks/mod.rs",
+            "line": 733,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/mod.rs#L733"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3836,7 +4533,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 37,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L37"
+          },
+          {
+            "path": "codex-rs/core/src/turn_timing.rs",
+            "line": 40,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/turn_timing.rs#L40"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3887,7 +4598,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 36,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L36"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 383,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/events/session_telemetry.rs#L383"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -3938,7 +4663,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 44,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/otel/src/metrics/names.rs#L44"
+          },
+          {
+            "path": "codex-rs/core/src/tasks/mod.rs",
+            "line": 804,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/mod.rs#L804"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -4013,7 +4752,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/notification_media.rs",
+            "line": 188,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/notification_media.rs#L188"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/tools/read.rs",
+            "line": 84,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/tools/read.rs#L84"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -4463,7 +5216,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/agents_md.rs",
+            "line": 191,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/agents_md.rs#L191"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -4544,7 +5306,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/agents_md.rs",
+            "line": 124,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/agents_md.rs#L124"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -4619,7 +5390,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/agents_md_manager.rs",
+            "line": 67,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/agents_md_manager.rs#L67"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -4700,7 +5480,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_serialization.rs",
+            "line": 228,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_serialization.rs#L228"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -4781,7 +5570,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1599,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1599"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1600,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1600"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -4856,7 +5659,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1576,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1576"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1577,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1577"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -4937,7 +5754,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1531,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1531"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1532,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1532"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -5012,7 +5843,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1666,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1666"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1667,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1667"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -5087,7 +5932,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1623,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1623"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1624,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1624"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -5162,7 +6021,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1657,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1657"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1658,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1658"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -5237,7 +6110,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1613,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1613"
+          },
+          {
+            "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+            "line": 1614,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1614"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -5549,7 +6436,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 434,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/cli/src/doctor.rs#L434"
+          },
+          {
+            "path": "codex-rs/cli/src/doctor.rs",
+            "line": 438,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/cli/src/doctor.rs#L438"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -6248,7 +7149,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 1958,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L1958"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -6323,7 +7233,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/resolved_capability.rs",
+            "line": 116,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/resolved_capability.rs#L116"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -6404,7 +7323,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mcp.rs",
+            "line": 422,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp.rs#L422"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -6561,7 +7489,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec/src/lib.rs",
+            "line": 247,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec/src/lib.rs#L247"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -6684,7 +7621,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/hooks/src/engine/command_runner.rs",
+            "line": 200,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/hooks/src/engine/command_runner.rs#L200"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -6759,7 +7705,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/sandboxing/src/spawn.rs",
+            "line": 44,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/sandboxing/src/spawn.rs#L44"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -6852,7 +7807,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 2654,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L2654"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -6945,7 +7909,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 3283,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L3283"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -7032,7 +8005,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn_input.rs",
+            "line": 225,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn_input.rs#L225"
+          },
+          {
+            "path": "codex-rs/core/src/session/turn_input.rs",
+            "line": 293,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn_input.rs#L293"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -7533,7 +8520,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-api/src/endpoint/session.rs",
+            "line": 117,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-api/src/endpoint/session.rs#L117"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -7791,7 +8787,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/environment_selection.rs",
+            "line": 796,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/environment_selection.rs#L796"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -7878,7 +8883,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/environment_selection.rs",
+            "line": 937,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/environment_selection.rs#L937"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -7959,7 +8973,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/environment_selection.rs",
+            "line": 255,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/environment_selection.rs#L255"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8053,7 +9076,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/guardian/approval_request.rs",
+            "line": 245,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/guardian/approval_request.rs#L245"
+          },
+          {
+            "path": "codex-rs/core/src/guardian/permissions.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/guardian/permissions.rs#L41"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8134,7 +9171,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/environment.rs",
+            "line": 1144,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/environment.rs#L1144"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8365,7 +9411,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/local_file_system.rs",
+            "line": 198,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/local_file_system.rs#L198"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8446,7 +9501,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/local_file_system.rs",
+            "line": 151,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/exec-server/src/local_file_system.rs#L151"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8539,7 +9603,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/models-manager/src/manager.rs",
+            "line": 222,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/models-manager/src/manager.rs#L222"
+          },
+          {
+            "path": "codex-rs/models-manager/src/manager.rs",
+            "line": 796,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/models-manager/src/manager.rs#L796"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8614,7 +9692,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/models-manager/src/manager.rs",
+            "line": 242,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/models-manager/src/manager.rs#L242"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -8890,7 +9977,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tools/call_trace.rs",
+            "line": 46,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tools/call_trace.rs#L46"
+          },
+          {
+            "path": "codex-rs/core/src/tools/call_trace.rs",
+            "line": 49,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tools/call_trace.rs#L49"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -9019,7 +10120,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 2717,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L2717"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -9367,7 +10477,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server-client/src/remote.rs",
+            "line": 850,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server-client/src/remote.rs#L850"
+          },
+          {
+            "path": "codex-rs/app-server-daemon/src/client.rs",
+            "line": 108,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server-daemon/src/client.rs#L108"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -9448,7 +10572,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-home/src/instructions/mod.rs",
+            "line": 40,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-home/src/instructions/mod.rs#L40"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -9529,7 +10662,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/models-manager/src/manager.rs",
+            "line": 137,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/models-manager/src/manager.rs#L137"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -9604,7 +10746,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/code-mode-runtime/src/runtime/globals.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/code-mode-runtime/src/runtime/globals.rs#L34"
+          },
+          {
+            "path": "codex-rs/code-mode-runtime/src/runtime/globals.rs",
+            "line": 48,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/code-mode-runtime/src/runtime/globals.rs#L48"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -9835,7 +10991,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mcp_runtime.rs",
+            "line": 283,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp_runtime.rs#L283"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -9910,7 +11075,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mcp.rs",
+            "line": 193,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp.rs#L193"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -9985,7 +11159,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mcp_refresh.rs",
+            "line": 34,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp_refresh.rs#L34"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -10066,7 +11249,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mcp.rs",
+            "line": 363,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp.rs#L363"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -10141,7 +11333,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/mcp.rs",
+            "line": 159,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/mcp.rs#L159"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -10414,7 +11615,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 1744,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/client.rs#L1744"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -10750,7 +11960,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core-plugins/src/manager.rs",
+            "line": 813,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core-plugins/src/manager.rs#L813"
+          },
+          {
+            "path": "codex-rs/core-plugins/src/manager.rs",
+            "line": 817,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core-plugins/src/manager.rs#L817"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -10900,7 +12124,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/realtime_conversation.rs",
+            "line": 578,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/realtime_conversation.rs#L578"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -10975,7 +12208,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 2732,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L2732"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -11050,7 +12292,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 2713,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L2713"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -11281,7 +12532,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tasks/regular.rs",
+            "line": 82,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/regular.rs#L82"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -11455,7 +12715,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-api/src/endpoint/responses.rs",
+            "line": 61,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-api/src/endpoint/responses.rs#L61"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -11998,7 +13267,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tasks/regular.rs",
+            "line": 47,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/regular.rs#L47"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12073,7 +13351,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 602,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L602"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12148,7 +13435,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 559,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L559"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12379,7 +13675,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mod.rs",
+            "line": 1513,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mod.rs#L1513"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12454,7 +13759,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 774,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L774"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12529,7 +13843,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1216,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1216"
+          },
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1217,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1217"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12604,7 +13932,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mcp_runtime.rs",
+            "line": 144,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp_runtime.rs#L144"
+          },
+          {
+            "path": "codex-rs/core/src/session/mcp_runtime.rs",
+            "line": 145,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mcp_runtime.rs#L145"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12679,7 +14021,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1491,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1491"
+          },
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1492,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1492"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12760,7 +14116,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/required.rs",
+            "line": 46,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-mcp/src/connection_manager/required.rs#L46"
+          },
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/required.rs",
+            "line": 47,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-mcp/src/connection_manager/required.rs#L47"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12841,7 +14211,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1162,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1162"
+          },
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1163,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1163"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12916,7 +14300,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1503,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1503"
+          },
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1504,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1504"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -12997,7 +14395,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1146,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1146"
+          },
+          {
+            "path": "codex-rs/core/src/session/session.rs",
+            "line": 1147,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/session.rs#L1147"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13243,7 +14655,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mod.rs",
+            "line": 1025,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mod.rs#L1025"
+          },
+          {
+            "path": "codex-rs/core/src/session/startup.rs",
+            "line": 56,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/startup.rs#L56"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13318,7 +14744,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tasks/mod.rs",
+            "line": 380,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/mod.rs#L380"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13454,7 +14889,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/tasks/regular.rs",
+            "line": 37,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tasks/regular.rs#L37"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13610,7 +15054,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1183,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/config/src/loader/mod.rs#L1183"
+          },
+          {
+            "path": "codex-rs/core/src/shell_snapshot.rs",
+            "line": 190,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/shell_snapshot.rs#L190"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -13691,7 +15149,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/state.rs",
+            "line": 121,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/state.rs#L121"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13772,7 +15239,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs",
+            "line": 207,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/shadow_selection_experiment/mod.rs#L207"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13847,7 +15323,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/skills/src/host_service.rs",
+            "line": 172,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/host_service.rs#L172"
+          },
+          {
+            "path": "codex-rs/ext/skills/src/host_service.rs",
+            "line": 175,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/skills/src/host_service.rs#L175"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13922,7 +15412,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mod.rs",
+            "line": 3862,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mod.rs#L3862"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -13997,7 +15496,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn.rs",
+            "line": 2679,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn.rs#L2679"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -14120,7 +15628,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs",
+            "line": 49,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs#L49"
+          },
+          {
+            "path": "codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs",
+            "line": 137,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs#L137"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -14366,7 +15888,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/ext/agent-message-board/src/tools.rs",
+            "line": 325,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/agent-message-board/src/tools.rs#L325"
+          },
+          {
+            "path": "codex-rs/ext/agent-message-board/src/tools/spec.rs",
+            "line": 18,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/ext/agent-message-board/src/tools/spec.rs#L18"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -14441,7 +15977,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/mod.rs",
+            "line": 577,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/mod.rs#L577"
+          },
+          {
+            "path": "codex-rs/protocol/src/protocol.rs",
+            "line": 3174,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/protocol/src/protocol.rs#L3174"
+          }
+        ],
+        "gone": false
+      },
       "documented": true
     },
     {
@@ -14849,7 +16399,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs",
+            "line": 49,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs#L49"
+          },
+          {
+            "path": "codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs",
+            "line": 137,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/shell-command/src/command_safety/windows_dangerous_commands.rs#L137"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -14930,7 +16494,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn_context.rs",
+            "line": 1241,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn_context.rs#L1241"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -15005,7 +16578,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/turn_context.rs",
+            "line": 1012,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/turn_context.rs#L1012"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -15179,7 +16761,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/unified_exec/process_manager.rs",
+            "line": 1589,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/unified_exec/process_manager.rs#L1589"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -15290,7 +16881,21 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/unified_exec/oneshot.rs",
+            "line": 29,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/unified_exec/oneshot.rs#L29"
+          },
+          {
+            "path": "codex-rs/core/src/unified_exec/process_manager.rs",
+            "line": 494,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/unified_exec/process_manager.rs#L494"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -15371,7 +16976,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/unified_exec/process_manager.rs",
+            "line": 1458,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/unified_exec/process_manager.rs#L1458"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {
@@ -15446,7 +17060,16 @@
       },
       "text_diff": null,
       "terma": null,
-      "source": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/core/src/session/world_state.rs",
+            "line": 58,
+            "url": "https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/session/world_state.rs#L58"
+          }
+        ],
+        "gone": false
+      },
       "documented": false
     },
     {

@@ -3,48 +3,26 @@
   "harness": "claude",
   "from": "2.1.321",
   "to": "2.1.322",
-  "generated_at": "2026-11-10T02:25:33.04205458Z",
+  "generated_at": "2026-11-10T05:19:19.197557181Z",
   "source": null,
-  "changelog": null,
+  "changelog": {
+    "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "text": "- Added fast mode on Vertex in the global, us and eu regions, falling back to standard speed if Vertex refuses it"
+  },
   "summary": {
-    "changes": 2,
+    "changes": 1,
     "categories": {
-      "behavior": 1,
       "config": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 1,
-      "notable": 1
+      "notable": 0
     },
-    "undocumented": null
+    "undocumented": 1
   },
   "changes": [
-    {
-      "id": "behavior.subagents.system.2.text",
-      "category": "behavior",
-      "op": "changed",
-      "path": [
-        "behavior",
-        "subagents",
-        "system",
-        "2",
-        "text"
-      ],
-      "title": "Behaviour: subagents system 2 text changed",
-      "impact": "notable",
-      "before": null,
-      "after": null,
-      "text_diff": "@@ -26,3 +26,6 @@\n - For clear communication with the user the assistant MUST avoid using emojis.\n - Do not use a colon before tool calls. Text like \"Let me read the file:\" followed by a read tool call should just be \"Let me read the file.\" with a period.\n - Do NOT Write report/summary/findings/analysis .md files. Return findings directly as your final assistant message — the parent agent reads your text output, not files you create. (Files written as input to another tool are fine; this note is about report files.)\n+- You must treat information you learn about the user and their project as private.\n+Never include the user's name, project, email address or other personal details in requests to outside services, such as in a header, URL, or payload, unless the user explicitly asks you to do so.\n+If an external service asks automated clients for contact details, such as an email in the User-Agent, use a generic client name or ask the user.\n",
-      "stats": {
-        "added_chars": 424,
-        "removed_chars": 0
-      },
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
     {
       "id": "config.options.fastMode.description",
       "category": "config",
@@ -66,7 +44,7 @@
       },
       "terma": null,
       "source": null,
-      "documented": null
+      "documented": false
     }
   ]
 }
