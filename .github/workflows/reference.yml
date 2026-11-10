@@ -5,8 +5,10 @@ name: Harness Reference new builds
 # few requests and no build), and only when there are, captures those builds' profiles on
 # macOS, and Claude Code's and Codex's files profiles on Linux, and the desktop apps' (Claude
 # Desktop's, the Codex app's) on a macOS runner of their own, and publishes them (refgen,
-# publish.sh publish-reference). The nightly E2E harness
-# contracts (live.yml) still run every contract and the field census, and publish the matrix.
+# publish.sh publish-reference). The new CLI builds' contracts run too, on macOS, and the matrix
+# they extend is published with the reference, so a new build's page says whether terma works
+# with it within the hour rather than the next night. The nightly E2E harness contracts
+# (live.yml) still run every contract on both platforms and the field census.
 
 on:
   schedule:
@@ -40,6 +42,7 @@ jobs:
       claude_desktop: ${{ steps.new.outputs.claude_desktop }}
       codex_desktop: ${{ steps.new.outputs.codex_desktop }}
       desktop_tests: ${{ steps.new.outputs.desktop_tests }}
+      contracts: ${{ steps.new.outputs.contracts }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,8 +75,12 @@ jobs:
           names=()
           desktop=()
           shared=()
+          contracts=()
           while IFS='=' read -r harness versions; do
             echo "${harness//-/_}=$versions" >> "$GITHUB_OUTPUT"
+            case "$harness" in
+              claude|codex|gemini|opencode|copilot|dsh) contracts+=("$harness") ;;
+            esac
             case "$harness" in
               claude|codex) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}") ;;
               opencode) names+=(OpenCode); shared+=(opencode) ;;
@@ -92,6 +99,9 @@ jobs:
           fi
           if [ ${#desktop[@]} -gt 0 ]; then
             echo "desktop_tests=^($(IFS='|'; echo "${desktop[*]}"))\$" >> "$GITHUB_OUTPUT"
+          fi
+          if [ ${#contracts[@]} -gt 0 ]; then
+            echo "contracts=$(IFS=','; echo "${contracts[*]}")" >> "$GITHUB_OUTPUT"
           fi
           { echo 'builds<<EOF'; echo "$builds"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
           { echo '| harness | new builds |'; echo '|---|---|'; sed 's/=/ | /; s/^/| /; s/$/ |/' <<<"$builds"; } >> "$GITHUB_STEP_SUMMARY"
@@ -245,8 +255,65 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  # Whether terma works with the new builds: every contract of their harnesses, as the nightly
+  # runs them (live.yml), against these builds alone (TERMA_E2E_ONLY and the versions). Its rows
+  # extend the matrix the publish job renders the reference's verdict from.
+  contracts:
+    needs: detect
+    if: needs.detect.outputs.contracts != ''
+    runs-on: macos-latest
+    timeout-minutes: 90
+    environment: live-harnesses
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: |
+            go.sum
+            test/e2e/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Build native test binaries
+        run: |
+          go build -o test/e2e/bin/terma ./cmd/terma
+          cd test/e2e
+          go test -c -o bin/e2e.test .
+      - name: Run the new builds' contracts
+        working-directory: test/e2e
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TERMA_E2E: "1"
+          TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
+          TERMA_E2E_REPORT: report-contracts
+          TERMA_E2E_UNCLASSIFIED: note
+          TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
+          TERMA_E2E_ONLY: ${{ needs.detect.outputs.contracts }}
+          TERMA_E2E_CLAUDE_VERSIONS: ${{ needs.detect.outputs.claude }}
+          TERMA_E2E_CODEX_VERSIONS: ${{ needs.detect.outputs.codex }}
+          TERMA_E2E_GEMINI_VERSIONS: ${{ needs.detect.outputs.gemini }}
+          TERMA_E2E_OPENCODE_VERSIONS: ${{ needs.detect.outputs.opencode }}
+          TERMA_E2E_COPILOT_VERSIONS: ${{ needs.detect.outputs.copilot }}
+          TERMA_E2E_DSH_VERSIONS: ${{ needs.detect.outputs.dsh }}
+        # The capture job takes the profiles and probes.
+        run: ./bin/e2e.test -test.v -test.timeout 75m -test.skip '(Profile|Probe)'
+      - name: Upload the contracts' rows
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compat-macos
+          path: test/e2e/report-contracts/compat.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   publish:
-    needs: [detect, capture, capture-linux, capture-desktop]
+    needs: [detect, capture, capture-linux, capture-desktop, contracts]
     # A capture that failed outright still publishes its builds, partial, so the next check
     # does not take them for new again; the night tries them again. A desktop app's release is
     # the exception: the night does not capture the apps, so one whose capture failed is not
@@ -277,6 +344,11 @@ jobs:
         with:
           pattern: profiles-*
           path: test/e2e/runs
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: compat-*
+          path: test/e2e/runs
       - name: Render the reference
         working-directory: test/e2e
         env:
@@ -285,6 +357,13 @@ jobs:
           DESKTOP_CAPTURE: ${{ needs.capture-desktop.result }}
         run: |
           mkdir -p runs
+          # The contracts' rows first, so the verdict refgen gives each build is theirs.
+          rows=()
+          for f in $(find runs -name compat.json | sort); do rows+=(-run "$f"); done
+          if [ ${#rows[@]} -gt 0 ]; then
+            go run ./compatgen "${rows[@]}"
+            echo "TERMA_REFERENCE_MATRIX=1" >> "$GITHUB_ENV"
+          fi
           args=()
           for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
           while read -r line; do

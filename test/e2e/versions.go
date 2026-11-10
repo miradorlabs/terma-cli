@@ -33,7 +33,8 @@ import (
 //
 // TERMA_E2E_CLAUDE_VERSIONS / TERMA_E2E_CODEX_VERSIONS (and each harness's own):
 // "installed", "lastN", "checked", or a comma list of versions; default
-// "installed,last3". "checked" is the newest build the history at TERMA_E2E_CHECKED
+// "installed,last3". TERMA_E2E_ONLY limits a run to the harnesses it names
+// (skipUnlessSelected). "checked" is the newest build the history at TERMA_E2E_CHECKED
 // has a result of on this platform and every release since, as the nightly runs them
 // (sinceChecked); it applies to harnesses that ship releases, not prereleases alone.
 // Downloads are cached under test/e2e/versions/ (ignored by git).
@@ -74,8 +75,26 @@ func CodexBinaries(t *testing.T) []Binary {
 	return resolve(t, "codex", os.Getenv("TERMA_E2E_CODEX_VERSIONS"), codexVersionList, ensureCodex)
 }
 
+// skipUnlessSelected skips a scenario of harness when TERMA_E2E_ONLY, a comma list of
+// harness ids, does not name it: the frequent check runs the contracts of the harnesses with
+// a new build alone (reference.yml). Unset, every harness's scenarios run.
+func skipUnlessSelected(t *testing.T, harness string) {
+	t.Helper()
+	only := os.Getenv("TERMA_E2E_ONLY")
+	if only == "" {
+		return
+	}
+	for h := range strings.SplitSeq(only, ",") {
+		if strings.TrimSpace(h) == harness {
+			return
+		}
+	}
+	t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, only)
+}
+
 func resolve(t *testing.T, harness, spec string, list func() ([]string, error), ensure func(string) (string, error)) []Binary {
 	t.Helper()
+	skipUnlessSelected(t, harness)
 	if spec == "" {
 		spec = "installed,last3"
 	}

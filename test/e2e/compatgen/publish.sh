@@ -7,7 +7,10 @@
 #   publish  commits the night's matrix, catalog and reference to compat-matrix and pushes it
 #   publish-reference
 #            commits the reference alone (the frequent check's new builds, reference.yml),
-#            leaving the night's matrix and catalog as they are
+#            leaving the night's matrix and catalog as they are; with TERMA_REFERENCE_MATRIX
+#            set, also the matrix the check's contract run extended (the history, compat.json
+#            and COMPATIBILITY.md), so a new build's page and the matrix give it one verdict.
+#            The catalog stays the night's: only the night's census rewrites it.
 #
 # What they write is generated, and git-ignored on every other branch.
 set -euo pipefail
@@ -65,6 +68,13 @@ publish-reference)
 	tmp=$(mktemp -d)
 	trap 'rm -rf "$tmp"' EXIT
 	cp -R docs/harnesses "$tmp/"
+	matrix=(docs/COMPATIBILITY.md docs/compat/history.json docs/compat/compat.json)
+	if [ -n "${TERMA_REFERENCE_MATRIX:-}" ]; then
+		for f in "${matrix[@]}"; do
+			mkdir -p "$tmp/matrix/$(dirname "$f")"
+			cp "$f" "$tmp/matrix/$f"
+		done
+	fi
 	# What restore put back must not meet the checkout either.
 	rm -rf docs/COMPATIBILITY.md docs/FIELDS.md docs/compat docs/harnesses
 	git config user.name "terma-compat"
@@ -79,6 +89,13 @@ publish-reference)
 	rm -rf docs/harnesses
 	cp -R "$tmp/harnesses" docs/harnesses
 	git add -A -f docs/harnesses
+	if [ -d "$tmp/matrix" ]; then
+		for f in "${matrix[@]}"; do
+			mkdir -p "$(dirname "$f")"
+			cp "$tmp/matrix/$f" "$f"
+			git add -f "$f"
+		done
+	fi
 	if git diff --cached --quiet; then exit 0; fi
 	git commit -q -m "reference: ${TERMA_REFERENCE_BUILDS:-new builds}, $(date -u +%FT%RZ)"
 	git push -q origin "$branch"

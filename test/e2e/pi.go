@@ -23,6 +23,7 @@ func forEachPi(t *testing.T, run func(t *testing.T, b Binary)) {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
+	skipUnlessSelected(t, "pi")
 	path, err := exec_LookPath("pi")
 	if err != nil {
 		Record(t.Name(), "not run", "pi is not installed")

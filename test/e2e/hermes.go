@@ -29,6 +29,7 @@ func forEachHermes(t *testing.T, run func(t *testing.T, b Binary)) {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
+	skipUnlessSelected(t, "hermes")
 	path, err := exec_LookPath("hermes")
 	if err != nil {
 		Record(t.Name(), "not run", "hermes is not installed")

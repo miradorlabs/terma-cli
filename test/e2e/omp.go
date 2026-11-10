@@ -22,6 +22,7 @@ func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
+	skipUnlessSelected(t, "omp")
 	path, err := exec_LookPath("omp")
 	if err != nil {
 		Record(t.Name(), "not run", "omp is not installed")

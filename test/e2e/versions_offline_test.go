@@ -134,3 +134,27 @@ func countOf(vs []string, v string) int {
 	}
 	return n
 }
+
+// TERMA_E2E_ONLY runs the harnesses it names and skips the rest; unset, it skips none.
+func TestSkipUnlessSelected(t *testing.T) {
+	for _, tc := range []struct {
+		only, harness string
+		skipped       bool
+	}{
+		{"", "gemini", false},
+		{"claude,codex", "codex", false},
+		{"claude, codex", "codex", false},
+		{"claude,codex", "gemini", true},
+		{"claude", "claude-desktop", true},
+	} {
+		t.Setenv("TERMA_E2E_ONLY", tc.only)
+		skipped := false
+		t.Run(tc.harness, func(t *testing.T) {
+			defer func() { skipped = t.Skipped() }()
+			skipUnlessSelected(t, tc.harness)
+		})
+		if skipped != tc.skipped {
+			t.Errorf("TERMA_E2E_ONLY=%q, %s: skipped %v, want %v", tc.only, tc.harness, skipped, tc.skipped)
+		}
+	}
+}

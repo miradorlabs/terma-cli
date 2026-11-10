@@ -278,8 +278,10 @@ type ClaudeDesktopPin struct {
 	SDKWrapperVersion string `json:"sdkWrapperVersion"`
 }
 
-// claudePinJSON is the pin as the app's bundle declares it: JSON in a JavaScript string.
-var claudePinJSON = regexp.MustCompile(`JSON\.parse\('(\{"version":"[^"']+","manifest":\{[^']*?"baseUrl":"[^"']*claude-code-releases"[^']*?\})'\)`)
+// claudePinJSON is the pin as the app's bundle declares it: JSON in a JavaScript string, its
+// base URL Claude Code's releases or (from 4.23118.1) a release candidate's under them,
+// `claude-code-releases/rc/<commit>`; never the SSH helper's pin beside it.
+var claudePinJSON = regexp.MustCompile(`JSON\.parse\('(\{"version":"[^"']+","manifest":\{[^']*?"baseUrl":"[^"']*claude-code-releases(?:/[^"']*)?"[^']*?\})'\)`)
 
 // claudeDesktopPinOf reads the pin from app's app.asar.
 func claudeDesktopPinOf(app DesktopApp) (ClaudeDesktopPin, error) {

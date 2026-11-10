@@ -35,6 +35,7 @@ func forEachT3(t *testing.T, run func(t *testing.T, b Binary)) {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
+	skipUnlessSelected(t, "t3")
 	path, err := exec_LookPath("t3")
 	if err != nil {
 		Record(t.Name(), "not run", "t3 is not installed")
