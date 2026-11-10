@@ -15,9 +15,11 @@ var claudeHooks = []struct {
 }{
 	{"SessionStart", "", "session-start"},
 	{"SessionEnd", "", "session-end"},
-	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
-	// subagent's model is named.
-	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
+	// Synchronous, so a commit in the same Bash call finds the files the call writes before it.
+	{"PreToolUse", "Bash", "pre-tool-use"},
+	// Edits and Bash writes build the manifest; the Agent tool's response (Task in older builds) is
+	// the only place a subagent's model is named.
+	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task", "post-tool-use"},
 	{"Stop", "", "stop"},
 	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
