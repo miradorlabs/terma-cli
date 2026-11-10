@@ -308,6 +308,8 @@ events:
       - ref: terma.credits.present
       - ref: terma.credits.unlimited
       - ref: terma.credits.balance
+      - ref: terma.serving.backend
+        note: Codex only, from the session's model provider.
 
   - name: terma.session.account
     stability: development
@@ -624,6 +626,7 @@ events:
           conditionally_required: When the agent recorded the count.
       - ref: terma.response.service_tier
       - ref: terma.response.inference_geo
+      - ref: terma.serving.backend
 
   - name: terma.relay.heartbeat
     stability: development
