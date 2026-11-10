@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "9.9.9",
-    "builds": 105
+    "newest": "2.1.322",
+    "builds": 103
   },
   "items": {
     "cli.commands.claude agents": {
