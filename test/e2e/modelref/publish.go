@@ -1,0 +1,438 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
+)
+
+// Publishing: the run's snapshots merged into the published tree at out (docs/models), each
+// model's timeline grown by what changed since the run before, its notes made again, and the
+// index and feed written.
+
+// maxRecent is how many events recent.json keeps.
+const maxRecent = 200
+
+// probeParallel is how many models are probed at once.
+const probeParallel = 4
+
+// validID is what a model id must be to name a folder: a letter or digit, then letters, digits
+// and . _ -, never "..".
+var validID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// published is what the tree at out held before the run.
+type published struct {
+	snaps     map[string]*Snapshot
+	timelines map[string]*Timeline
+	recent    []RecentEvent
+	vendors   map[string]bool // vendors with a model published
+}
+
+func readPublished(out string) (*published, error) {
+	p := &published{snaps: map[string]*Snapshot{}, timelines: map[string]*Timeline{}, vendors: map[string]bool{}}
+	var idx Index
+	if err := readOptional(filepath.Join(out, "index.json"), &idx); err != nil {
+		return nil, err
+	}
+	for _, e := range idx.Models {
+		if !validID.MatchString(e.ID) {
+			continue
+		}
+		var s Snapshot
+		if err := readOptional(filepath.Join(out, e.ID, "snapshot.json"), &s); err != nil {
+			return nil, err
+		}
+		if s.ID == "" {
+			continue
+		}
+		normalizeFacts(s.Facts)
+		for _, vals := range s.Provenance {
+			normalizeFacts(vals)
+		}
+		p.snaps[s.ID] = &s
+		p.vendors[s.Vendor] = true
+		var t Timeline
+		if err := readOptional(filepath.Join(out, e.ID, "timeline.json"), &t); err != nil {
+			return nil, err
+		}
+		p.timelines[s.ID] = &t
+	}
+	var r Recent
+	if err := readOptional(filepath.Join(out, "recent.json"), &r); err != nil {
+		return nil, err
+	}
+	p.recent = r.Events
+	return p, nil
+}
+
+// normalizeFacts gives facts read back from JSON the types a run makes: counts int64, lists of
+// words []string, maps of ids map[string]string.
+func normalizeFacts(f map[string]any) {
+	for k, v := range f {
+		switch x := v.(type) {
+		case float64:
+			f[k] = int64(x)
+		case []any:
+			ss := make([]string, 0, len(x))
+			for _, e := range x {
+				ss = append(ss, fmt.Sprint(e))
+			}
+			f[k] = ss
+		case map[string]any:
+			m := map[string]string{}
+			for a, b := range x {
+				m[a] = fmt.Sprint(b)
+			}
+			f[k] = m
+		}
+	}
+}
+
+// result is a run's published state, for announcements.
+type result struct {
+	snaps    map[string]*Snapshot
+	notes    map[string]*Notes
+	new      []string // models first listed this run
+	vendored map[string]bool
+}
+
+func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, changelogs map[string][]ChangelogEntry,
+	probe func(*Snapshot) *Probes) (*result, error) {
+	ids := followed(r, prev.snaps)
+	vendorOf := map[string]string{}
+	for _, o := range r.obs {
+		if o.listed {
+			vendorOf[o.id] = o.vendor
+		}
+	}
+	for id, s := range prev.snaps {
+		if _, ok := vendorOf[id]; !ok {
+			vendorOf[id] = s.Vendor
+		}
+	}
+	snaps := map[string]*Snapshot{}
+	for id, listed := range ids {
+		if !validID.MatchString(id) {
+			continue
+		}
+		s := assemble(id, vendorOf[id], r, prev.snaps[id], listed)
+		s.Harnesses = usesFor(uses, s)
+		snaps[id] = s
+	}
+	// Probes, where a key is configured and the run asks for them (probe says which), a few
+	// models at a time: each model's cases run one after another.
+	if probe != nil {
+		var todo []*Snapshot
+		for _, id := range sortedIDs(snaps) {
+			s := snaps[id]
+			if st, _ := s.Facts[factStatus].(string); s.Listed && st != "retired" {
+				todo = append(todo, s)
+			}
+		}
+		probed := make([]*Probes, len(todo))
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, probeParallel)
+		for i, s := range todo {
+			wg.Go(func() {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				probed[i] = probe(s)
+			})
+		}
+		wg.Wait()
+		for i, s := range todo {
+			p := probed[i]
+			if p == nil {
+				continue
+			}
+			if s.API == nil {
+				s.API = &API{}
+			}
+			// Probes that saw what the ones before saw keep their time: a run that only confirms
+			// them changes no file.
+			p.At = r.now
+			if old := s.API.Probes; old != nil {
+				if p.Tokens == nil {
+					// The corpus not counted this time (a refusal of the counting endpoint) is not
+					// counted as something else.
+					p.Tokens = old.Tokens
+				}
+				if reflectEqual(probeView(old), probeView(p)) {
+					p.At = old.At
+				}
+			}
+			s.API.Probes = p
+		}
+	}
+	tokenizerLike(snaps)
+	pred, succ := lineage(snaps)
+	names := harnessNames(uses)
+	res := &result{snaps: snaps, notes: map[string]*Notes{}, vendored: prev.vendors}
+	recent := prev.recent
+	var entries []Entry
+	for _, id := range sortedIDs(snaps) {
+		s := snaps[id]
+		tl := prev.timelines[id]
+		if tl == nil {
+			tl = &Timeline{SchemaVersion: schemaVersion, ID: id, Steps: []Step{}}
+		}
+		var step *Step
+		if old := prev.snaps[id]; old == nil {
+			step = &Step{At: r.now, Event: "listed", Changes: []refdiff.Change{}}
+			res.new = append(res.new, id)
+		} else if changes := compare(view(old), view(s), names); len(changes) > 0 {
+			ev := "changed"
+			if old.Listed && !s.Listed {
+				ev = "unlisted"
+			} else if !old.Listed && s.Listed {
+				ev = "listed"
+			}
+			step = &Step{At: r.now, Event: ev, Changes: changes}
+		}
+		if step != nil {
+			tl.Steps = append([]Step{*step}, tl.Steps...)
+			recent = append([]RecentEvent{{At: r.now, Model: id, Vendor: s.Vendor, Name: s.Name, Event: step.Event,
+				Changes: len(step.Changes), Highlights: highlights(step.Changes, 3)}}, recent...)
+		}
+		n := notes(s, snaps[pred[id]], changelogs[s.Vendor], names)
+		res.notes[id] = n
+		dir := filepath.Join(out, id)
+		for name, v := range map[string]any{"snapshot.json": s, "timeline.json": tl, "notes.json": n} {
+			if err := writeJSON(filepath.Join(dir, name), v); err != nil {
+				return nil, err
+			}
+		}
+		entries = append(entries, entry(s, tl, pred[id], succ[id]))
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		ri, rj := deref(entries[i].ReleasedAt), deref(entries[j].ReleasedAt)
+		if ri != rj {
+			return ri > rj
+		}
+		return entries[i].ID < entries[j].ID
+	})
+	var vs []VendorInfo
+	for _, v := range vendors {
+		n := 0
+		for _, e := range entries {
+			if e.Vendor == v.id {
+				n++
+			}
+		}
+		vs = append(vs, VendorInfo{ID: v.id, Name: v.name, Docs: v.docsURL, Changelog: v.changelogURL, Models: n})
+	}
+	if len(recent) > maxRecent {
+		recent = recent[:maxRecent]
+	}
+	// As of the newest change: a run that changed nothing writes the same bytes.
+	asOf := time.Time{}
+	if len(recent) > 0 {
+		asOf = recent[0].At
+	}
+	if err := writeJSON(filepath.Join(out, "index.json"), Index{SchemaVersion: schemaVersion, GeneratedAt: asOf, Vendors: vs, Models: entries}); err != nil {
+		return nil, err
+	}
+	if err := writeJSON(filepath.Join(out, "recent.json"), Recent{SchemaVersion: schemaVersion, GeneratedAt: asOf, Events: recent}); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// notes are a model's release notes: what its vendor says is new, its changelog's entries that
+// name it, and what differs from the model before it.
+func notes(s, before *Snapshot, log []ChangelogEntry, names map[string]string) *Notes {
+	n := &Notes{SchemaVersion: schemaVersion, ID: s.ID, Changelog: mentions(log, s.ID, s.Name),
+		Changes: []refdiff.Change{}, Highlights: []string{}}
+	if p, ok := s.Docs["whats_new"]; ok {
+		n.WhatsNew = &p
+	}
+	n.VendorHighlights = vendorHighlights(n.WhatsNew, launch(n.Changelog), 5)
+	if before == nil {
+		return n
+	}
+	n.Predecessor = &before.ID
+	for _, c := range compare(noteView(before), noteView(s), names) {
+		// A fact one of the two has no source for is unknown there, not new or gone; and a
+		// refusal's wording differing between two models is no news of either.
+		if c.Category == "facts" && len(c.Path) == 2 && c.Op != "changed" {
+			continue
+		}
+		if c.Title = noteTitle(c, before); c.Title != "" {
+			n.Changes = append(n.Changes, c)
+		}
+	}
+	n.Highlights = highlights(n.Changes, 5)
+	if pct, ok := tokenRatio(before, s); ok && (pct >= 1 || pct <= -1) {
+		more := "more"
+		if pct < 0 {
+			more, pct = "fewer", -pct
+		}
+		n.Highlights = append([]string{fmt.Sprintf("Counts %.0f%% %s tokens than %s for the same text", pct, more, before.Name)}, n.Highlights...)
+	}
+	return n
+}
+
+// launch are the entries of a model's changelog mentions under the oldest date: the ones that
+// announced it.
+func launch(entries []ChangelogEntry) []ChangelogEntry {
+	oldest := ""
+	for _, e := range entries {
+		if oldest == "" || e.Date < oldest {
+			oldest = e.Date
+		}
+	}
+	var out []ChangelogEntry
+	for _, e := range entries {
+		if e.Date == oldest {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// noteTitle says a difference from the model before as news of this one.
+func noteTitle(c refdiff.Change, before *Snapshot) string {
+	p := c.Path
+	if c.Category == "api" && len(p) == 5 && p[2] == "params" && p[4] == "accepted" {
+		if c.After == true {
+			return "Accepts " + p[3] + " (" + before.Name + " rejects it)"
+		}
+		return "Rejects " + p[3] + " (" + before.Name + " accepts it)"
+	}
+	if c.Category == "api" && len(p) >= 4 && p[2] == "params" {
+		return ""
+	}
+	return title(c, nil)
+}
+
+// highlights are the n changes most worth a headline: the ones that break a caller first, then
+// facts, then the API, then the rest; text changes of pages last.
+func highlights(changes []refdiff.Change, n int) []string {
+	rank := func(c refdiff.Change) int {
+		r := map[string]int{"breaking": 0, "notable": 10, "informational": 20}[c.Impact]
+		r += map[string]int{"listed": 0, "facts": 1, "api": 2, "harnesses": 3, "docs": 4}[c.Category]
+		return r
+	}
+	sorted := slices.Clone(changes)
+	sort.SliceStable(sorted, func(i, j int) bool { return rank(sorted[i]) < rank(sorted[j]) })
+	out := []string{}
+	for _, c := range sorted {
+		if len(out) == n {
+			break
+		}
+		if c.Title != "" && !slices.Contains(out, c.Title) {
+			out = append(out, c.Title)
+		}
+	}
+	return out
+}
+
+func entry(s *Snapshot, tl *Timeline, pred, succ string) Entry {
+	e := Entry{ID: s.ID, Vendor: s.Vendor, Name: s.Name, Family: s.Family, FirstSeen: s.FirstSeen, Harnesses: []string{},
+		Probed: s.API != nil && s.API.Probes != nil}
+	if v, ok := s.Facts[factStatus].(string); ok {
+		e.Status = &v
+	}
+	if !s.Listed {
+		v := "unlisted"
+		e.Status = &v
+	}
+	if v, ok := s.Facts[factReleasedAt].(string); ok {
+		e.ReleasedAt = &v
+	}
+	if v, ok := s.Facts[factContextWindow].(int64); ok {
+		e.ContextWindow = &v
+	}
+	if v, ok := s.Facts[factMaxOutput].(int64); ok {
+		e.MaxOutput = &v
+	}
+	if v, ok := s.Facts[factKnowledgeCutoff].(string); ok {
+		e.KnowledgeCutoff = &v
+	}
+	if v, ok := s.Facts[factReasoning].(bool); ok {
+		e.Reasoning = &v
+	}
+	if pred != "" {
+		e.Predecessor = &pred
+	}
+	if succ != "" {
+		e.Successor = &succ
+	}
+	for _, u := range s.Harnesses {
+		if u.Current && !slices.Contains(e.Harnesses, u.Harness) {
+			e.Harnesses = append(e.Harnesses, u.Harness)
+		}
+	}
+	for _, st := range tl.Steps {
+		if st.Event != "listed" || len(st.Changes) > 0 {
+			e.LastChange = &LastChange{At: st.At, Changes: len(st.Changes)}
+			break
+		}
+	}
+	return e
+}
+
+func harnessNames(uses map[string][]HarnessUse) map[string]string {
+	names := map[string]string{}
+	for _, list := range uses {
+		for _, u := range list {
+			names[u.Harness] = u.Name
+		}
+	}
+	return names
+}
+
+func sortedIDs(m map[string]*Snapshot) []string {
+	ids := make([]string, 0, len(m))
+	for id := range m {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// writeJSON writes v, indented, with a trailing newline, creating its folder; HTML is not
+// escaped, so the published text reads as the vendor wrote it.
+func writeJSON(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+func readOptional(path string, v any) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, v); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	return nil
+}
