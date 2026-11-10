@@ -33,7 +33,11 @@ const (
 	sourceMuseUsage = "muse_usage"
 
 	museQuotaEvery = 5 * time.Minute
-	museViewPage   = 200
+	// museReadEvery spaces a session's reads: each starts a `muse serve` for a moment
+	// (~0.2 s, ~125 MB), and what a turn's end skips the next read takes up from its cursor.
+	// The session's end always reads.
+	museReadEvery = 2 * time.Minute
+	museViewPage  = 200
 	// museTurnWait is how long the reader waits for the turn that ended to reach the view:
 	// Muse records it after the Stop hook returns.
 	museTurnWait = 10 * time.Second
@@ -53,9 +57,15 @@ type viewCursor struct {
 	Started map[string]time.Time `json:"started,omitempty"`
 }
 
-// readLater starts the detached reader for the root session, under the developer's consent.
-func readLater(env hookrun.Env, root, cwd, turn string) {
+// readLater starts the detached reader for the root session, under the developer's consent:
+// at a turn's end only once museReadEvery has passed since the session's last read, at its
+// end always. Each read rewrites the session's cursor, so its time is the last read's.
+func readLater(env hookrun.Env, root, cwd, turn string, final bool) {
 	if env.Detach == nil || !consented(env.Consent()) {
+		return
+	}
+	cursor := filepath.Join(env.StateDir, museFeedDir, hookrun.EvidenceID(root)+".json")
+	if info, err := os.Stat(cursor); !final && err == nil && env.Time().Sub(info.ModTime()) < museReadEvery {
 		return
 	}
 	env.Detach(museFeedEvent, root, cwd, turn)

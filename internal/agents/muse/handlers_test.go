@@ -3,6 +3,7 @@ package muse
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -253,12 +254,16 @@ func TestMuseContentConsent(t *testing.T) {
 	}
 }
 
-// A turn's end starts the detached reader for its session and turn, the session's end one
-// more; a subagent's stop starts none, and without consent no reader runs.
+// A turn's end starts the detached reader for its session and turn, but not again within
+// museReadEvery; the session's end always does. A subagent's stop starts none, and without
+// consent no reader runs.
 func TestMuseStopStartsTheReader(t *testing.T) {
 	t.Setenv(museRootEnv, "")
 	f := newMuseFixture(t)
 	f.run(stop, "Stop", map[string]any{"last_assistant_message": "done"})
+	// The read it started rewrote the session's cursor.
+	hookruntest.WriteFile(t, filepath.Join(f.state, museFeedDir), hookrun.EvidenceID(museSession)+".json", "{}")
+	f.run(stop, "Stop", map[string]any{"last_assistant_message": "done again"})
 	f.run(sessionEnd, "SessionEnd", map[string]any{"reason": "exit"})
 	t.Setenv(museRootEnv, museSession)
 	f.run(stop, "Stop", map[string]any{"session_id": museChild})
@@ -270,8 +275,24 @@ func TestMuseStopStartsTheReader(t *testing.T) {
 	if strings.Join(got, "|") != want {
 		t.Fatalf("detached = %q, want %q", got, want)
 	}
+
+	// Once museReadEvery has passed, a turn's end reads again.
 	t.Setenv(museRootEnv, "")
+	marker := filepath.Join(f.state, museFeedDir, hookrun.EvidenceID(museSession)+".json")
+	past := time.Now().Add(-museReadEvery - time.Second)
+	if err := os.Chtimes(marker, past, past); err != nil {
+		t.Fatal(err)
+	}
+	f.detached = nil
+	f.run(stop, "Stop", nil)
+	if len(f.detached) != 1 {
+		t.Fatalf("after %v, detached = %v", museReadEvery, f.detached)
+	}
+
 	f.agent, f.detached = nil, nil
+	if err := os.Chtimes(marker, past, past); err != nil {
+		t.Fatal(err)
+	}
 	f.run(stop, "Stop", nil)
 	if len(f.detached) != 0 {
 		t.Fatalf("a reader ran without consent: %v", f.detached)

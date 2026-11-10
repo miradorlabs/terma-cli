@@ -359,7 +359,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	}
 	spoolMessage(env, r, in, semconv.TermaAssistantMessageEvent, "Stop", in.LastAssistantMessage, "reply")
 	if thread == "" {
-		readLater(env, root, in.Cwd, in.TurnID)
+		readLater(env, root, in.Cwd, in.TurnID, false)
 	}
 	return nil
 }
@@ -375,6 +375,6 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.EndSession(r, root, museTool)
-	readLater(env, root, in.Cwd, "")
+	readLater(env, root, in.Cwd, "", true)
 	return nil
 }
