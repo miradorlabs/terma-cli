@@ -21871,7 +21871,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-10T03:30:00.612331367Z",
+    "fetched_at": "2026-11-10T03:42:38.545255875Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -22571,7 +22571,7 @@
       },
       "extraKnownMarketplaces": {
         "default": "unset",
-        "description": "Register additional plugin marketplaces by name, so that people who open the repository, or everyone your managed settings reach, get the marketplace without adding it themselves. Claude Code registers each marketplace it doesn't already know. Whether a plugin that `enabledPlugins` names from it installs depends on the plugin's source and which file enables it; that entry has the rules.",
+        "description": "Register additional plugin marketplaces by name, so that people who open the repository, or everyone your managed settings reach, get the marketplace without adding it themselves. Claude Code registers each marketplace it doesn't already know. Whether a plugin that `enabledPlugins` names from it installs depends on the plugin's source and which file enables it; Enabled in project settings but not installed has the rules.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Claude Code honors entries in a repository's `.claude/settings.json` or `.claude/settings.local.json` only after you accept the workspace trust dialog for that folder; in a folder you haven't trusted, including a `-p` run there, it ignores them without a message.",
