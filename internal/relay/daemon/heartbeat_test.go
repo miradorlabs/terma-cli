@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -85,7 +87,7 @@ func TestARunSendsItsExitHeartbeat(t *testing.T) {
 	c := runConfig(stateDir, time.Millisecond, nil)
 	c.Launch, c.Version = LaunchHook, "1.2.0"
 	c.Engine.HeartbeatEvery = time.Hour
-	c.Engine.HeartbeatSend = func(_ context.Context, b *logspb.LogsData) error {
+	c.Engine.HeartbeatSend = func(_ context.Context, b *logspb.LogsData, _ relay.HeartbeatTarget) error {
 		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
 		if err == nil {
 			unlock()
@@ -145,7 +147,7 @@ func TestARelayWhoseSetupWentSendsNoExitHeartbeat(t *testing.T) {
 	var beats atomic.Int32
 	c := runConfig(stateDir, 0, nil)
 	c.Engine.HeartbeatEvery = time.Hour
-	c.Engine.HeartbeatSend = func(context.Context, *logspb.LogsData) error { beats.Add(1); return nil }
+	c.Engine.HeartbeatSend = func(context.Context, *logspb.LogsData, relay.HeartbeatTarget) error { beats.Add(1); return nil }
 	r := startRun(t, c)
 	r.await(t, "the relay")
 	if err := os.Remove(token); err != nil {
@@ -178,6 +180,59 @@ func TestLastBeatDue(t *testing.T) {
 	} {
 		if got := tc.res.LastBeatDue(); got != tc.want {
 			t.Errorf("%+v.LastBeatDue() = %v, want %v", tc.res, got, tc.want)
+		}
+	}
+}
+
+// A beat for a target names its team and endpoint, and Beat tells the network's or the
+// platform's failure (a refused key too) from a beat the relay would send elsewhere, could not
+// send, or sent, or failed, without holding it to the target (a relay from before targets).
+func TestBeatForATarget(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	for _, tc := range []struct {
+		status      int
+		body        string
+		notAccepted bool
+		keyRefused  bool
+		elsewhere   bool
+		untargeted  bool
+	}{
+		{status: 200, body: `{"team":"p1"}`},
+		{status: 200, body: `{}`, untargeted: true},
+		{status: 502, body: `{"error":"the ingest answered HTTP 401"}`, untargeted: true},
+		{status: 502, body: `{"team":"p1","error":"otlp ingest returned 401: bad key","code":"undelivered","key_refused":true}`, notAccepted: true, keyRefused: true},
+		{status: 502, body: `{"team":"p1","error":"otlp ingest returned 503: busy","code":"undelivered"}`, notAccepted: true},
+		{status: 502, body: `{"team":"p1","error":"the relay sends this team's records to another ingest: https://a, not https://b","code":"elsewhere"}`, elsewhere: true},
+		{status: 502, body: `{"team":"p1","error":"the keychain is locked","code":"unsent"}`},
+		{status: 401, body: "unauthorized\n"},
+	} {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(ln.Addr().String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		var query string
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			query = r.URL.RawQuery
+			w.WriteHeader(tc.status)
+			fmt.Fprint(w, tc.body)
+		})}
+		go func() { _ = srv.Serve(ln) }()
+		err = Beat(t.Context(), stateDir, semconv.TermaRelayHeartbeatReasonDoctor, relay.HeartbeatTarget{Team: "p1", Endpoint: "https://b"}, 0)
+		_ = srv.Close()
+		if want := "endpoint=https%3A%2F%2Fb&reason=doctor&team=p1"; query != want {
+			t.Errorf("%d: asked %q, want %q", tc.status, query, want)
+		}
+		undelivered, isUndelivered := errors.AsType[*UndeliveredError](err)
+		switch {
+		case tc.status == 200 && !tc.untargeted && err != nil,
+			errors.Is(err, ErrUntargeted) != tc.untargeted,
+			isUndelivered != tc.notAccepted,
+			isUndelivered && undelivered.KeyRefused() != tc.keyRefused,
+			errors.Is(err, relay.ErrElsewhere) != tc.elsewhere:
+			t.Errorf("%d %s: Beat = %v", tc.status, tc.body, err)
 		}
 	}
 }

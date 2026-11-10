@@ -38,8 +38,12 @@ type Env struct {
 type Probes struct {
 	Spool func() SpoolState
 	// Deliver flushes every project's queued events, retry windows ignored.
-	Deliver  func(ctx context.Context) (Delivery, error)
-	Endpoint func(projectID string) string
+	Deliver func(ctx context.Context) (Delivery, error)
+	// Heartbeat asks the running relay to send a heartbeat now, with projectID's key alone,
+	// to endpoint alone: nil once the backend accepts it, ErrNoHeartbeat (wrapped, saying why)
+	// when none could be sent there, and any other error when the backend refused it.
+	Heartbeat func(ctx context.Context, projectID, endpoint string) error
+	Endpoint  func(projectID string) string
 	// Relay is the local relay as the machine finds it.
 	Relay func() Relay
 	// Credential is the signed-in developer, or the team server key a profile set up with
@@ -368,11 +372,37 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if len(others) > 0 {
 		return Check{Status: Warn, Detail: detail, Fix: othersFix}
 	}
-	if res.Sent == 0 {
+	if res.Sent > 0 {
+		return Check{Status: Pass, Detail: detail}
+	}
+	// An empty queue proves nothing, so a heartbeat through the relay stands in for an event:
+	// with this team's key, to the host this team's events go to.
+	if p.Heartbeat == nil || projectID == "" {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail}
 	}
-	return Check{Status: Pass, Detail: detail}
+	endpoint := p.Endpoint(projectID)
+	// What the flush left undelivered goes with the beat's outcome, which leads only with
+	// "nothing queued" when that is so.
+	withUndelivered := func(beat string) string {
+		if len(undelivered) == 0 {
+			beat = "nothing queued; " + beat
+		}
+		return strings.Join(append([]string{beat}, undelivered...), "; ")
+	}
+	switch err := p.Heartbeat(ctx, projectID, endpoint); {
+	case err == nil:
+		return Check{Status: Pass, Detail: withUndelivered("a test heartbeat with team " + projectID + "'s key was accepted by " + endpoint)}
+	case errors.Is(err, ErrNoHeartbeat):
+		return Check{Status: Skip, Inconclusive: true, Detail: detail + "; " + err.Error()}
+	default:
+		var refused interface{ KeyRefused() bool }
+		f := Failure{ProjectID: projectID, Endpoint: endpoint, KeyRefused: errors.As(err, &refused) && refused.KeyRefused()}
+		return Check{Status: Fail, Detail: withUndelivered("a test heartbeat was not accepted: " + err.Error()), Fix: failureFix(f)}
+	}
 }
+
+// ErrNoHeartbeat is a Heartbeat probe's error when no heartbeat could be sent at all.
+var ErrNoHeartbeat = errors.New("no test heartbeat could be sent")
 
 // describeFailure names the host, which a developer with projects in two environments cannot guess.
 func describeFailure(f Failure) string {

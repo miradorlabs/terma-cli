@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +18,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -67,7 +74,7 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	}
 	send := func() {
 		t.Helper()
-		if err := testApp.relayHeartbeatSend(context.Background(), beat()); err != nil {
+		if err := testApp.relayHeartbeatSend(context.Background(), beat(), relay.HeartbeatTarget{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -106,6 +113,87 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 		"ter_srv_team=user-a", "ter_srv_team2="}
 	if strings.Join(sent, " ") != strings.Join(want, " ") {
 		t.Fatalf("beats sent %q, want %q", sent, want)
+	}
+}
+
+// A beat with a target goes with the target team's key alone, and only to the target's
+// endpoint: one the relay would send elsewhere, or for a team with no key here, is not sent;
+// a redirect is not followed; and a key the ingest refuses says so.
+func TestATargetedHeartbeatGoesOnlyWhereAsked(t *testing.T) {
+	var sent []string // the key of each beat the ingest received
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		sent = append(sent, key+r.URL.Path)
+		switch key {
+		case "ter_srv_revoked":
+			http.Error(w, "unknown key", http.StatusUnauthorized)
+		case "ter_srv_moved":
+			http.Redirect(w, r, "/elsewhere", http.StatusFound)
+		}
+	}))
+	defer srv.Close()
+	authSandbox(t, &fakeAuth{srv: srv})
+	hosts := keystore.Hosts{OTLP: srv.URL, API: srv.URL}
+	for team, key := range map[string]string{"team": "ter_srv_team", "other": "ter_srv_other", "revoked": "ter_srv_revoked", "moved": "ter_srv_moved"} {
+		if err := keystore.Set(testApp.dir, team, key, hosts); err != nil {
+			t.Fatal(err)
+		}
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "other", Revision: 1, FetchedAt: time.Now()})
+	send := func(team, endpoint string) error {
+		return testApp.relayHeartbeatSend(t.Context(), &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}},
+			relay.HeartbeatTarget{Team: team, Endpoint: endpoint})
+	}
+	if err := send("team", srv.URL); err != nil {
+		t.Fatalf("beat for the team at its endpoint: %v", err)
+	}
+	for _, endpoint := range []string{"https://otlp.elsewhere.example", ""} {
+		if err := send("team", endpoint); !errors.Is(err, relay.ErrElsewhere) {
+			t.Fatalf("beat for endpoint %q: %v", endpoint, err)
+		}
+	}
+	if err := send("unkeyed", srv.URL); !errors.Is(err, relay.ErrNoKey) {
+		t.Fatalf("beat for a team with no key: %v", err)
+	}
+	// An ingest that redirects is not followed: the key stays put, and nothing is proven.
+	if _, tried := errors.AsType[*relay.DeliveryError](send("moved", srv.URL)); !tried {
+		t.Fatal("a redirected beat did not fail as a delivery")
+	}
+	err := send("revoked", srv.URL)
+	ingest, ok := errors.AsType[*delivery.IngestError](err)
+	if _, tried := errors.AsType[*relay.DeliveryError](err); !tried || !ok || !ingest.KeyRefused() || err.Error() != "otlp ingest returned 401" {
+		t.Fatalf("beat with a revoked key: %v", err)
+	}
+	if want := []string{"ter_srv_team/v1/logs", "ter_srv_moved/v1/logs", "ter_srv_revoked/v1/logs"}; !slices.Equal(sent, want) {
+		t.Fatalf("beats sent with %q, want %q", sent, want)
+	}
+}
+
+// Doctor fails its check only on the platform's refusal; whatever kept the beat from being
+// tried where doctor asked leaves it unproven.
+func TestDoctorHeartbeatFailsOnlyOnTheRefusal(t *testing.T) {
+	t.Parallel()
+	refused := &daemon.UndeliveredError{Detail: "otlp ingest returned 401", Refused: true}
+	if err := doctorHeartbeat(nil); err != nil {
+		t.Fatalf("accepted beat = %v", err)
+	}
+	if err := doctorHeartbeat(refused); err != refused {
+		t.Fatalf("refused beat = %v", err)
+	}
+	for _, err := range []error{relay.ErrNoKey, fmt.Errorf("%w: https://a, not https://b", relay.ErrElsewhere),
+		fmt.Errorf("%w on 127.0.0.1:1", daemon.ErrNoAnswer), daemon.ErrUntargeted, errors.New("the relay answered 401")} {
+		if got := doctorHeartbeat(err); !errors.Is(got, doctor.ErrNoHeartbeat) || !errors.Is(got, err) {
+			t.Errorf("doctorHeartbeat(%v) = %v, want it unproven", err, got)
+		}
+	}
+}
+
+// With no relay running, doctor's probe sends nothing and leaves the check unproven.
+func TestDoctorHeartbeatNeedsARunningRelay(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	probes := testApp.doctorProbes(&config.Config{})
+	if err := probes.Heartbeat(t.Context(), "team", "https://otlp.example"); !errors.Is(err, doctor.ErrNoHeartbeat) {
+		t.Fatalf("heartbeat without a relay = %v", err)
 	}
 }
 

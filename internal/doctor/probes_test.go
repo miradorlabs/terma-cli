@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -376,6 +377,69 @@ func TestTheBackendCheckPassesOnAnAcceptedFlush(t *testing.T) {
 		t.Fatalf("empty queue = %+v", c)
 	}
 }
+
+// With nothing queued, a heartbeat the backend accepts with this team's key at this team's
+// ingest is the proof instead; one that could not be sent there leaves the check
+// inconclusive, and one the backend refused fails it, with a refused key's own fix.
+func TestTheBackendCheckSendsAHeartbeatWhenNothingIsQueued(t *testing.T) {
+	t.Parallel()
+	keys := Keys(func(string, string) string { return "ter_srv_…" })
+	for _, tc := range []struct {
+		name         string
+		team         string
+		sent         int
+		held         bool
+		beat         error
+		status       Status
+		inconclusive bool
+		beats        int
+		detail, fix  string
+	}{
+		{name: "accepted", team: "p1", beat: nil, status: Pass, beats: 1,
+			detail: "team p1's key was accepted by https://otlp.example"},
+		{name: "not sent", team: "p1", beat: fmt.Errorf("%w: the relay is not running", ErrNoHeartbeat), status: Skip, inconclusive: true, beats: 1,
+			detail: "the relay is not running"},
+		{name: "refused", team: "p1", beat: errors.New("the relay could not reach your organization: otlp ingest returned 503"), status: Fail, beats: 1,
+			detail: "503", fix: "check the network and https://otlp.example"},
+		{name: "key refused", team: "p1", beat: keyRefused{}, status: Fail, beats: 1,
+			detail: "401", fix: "the key this machine holds for team p1 was refused"},
+		{name: "no team", team: "", status: Skip, inconclusive: true, detail: "nothing queued"},
+		{name: "flushed events", team: "p1", sent: 2, status: Pass, detail: "flushed"},
+		{name: "refused, with events held", team: "p1", held: true, beat: errors.New("otlp ingest returned 503"), status: Fail, beats: 1,
+			detail: "a test heartbeat was not accepted: otlp ingest returned 503; holding 2 for a team key"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			beats := 0
+			p := Probes{Keys: keys, Endpoint: func(string) string { return "https://otlp.example" },
+				Deliver: func(context.Context) (Delivery, error) {
+					d := Delivery{Sent: tc.sent, Delivered: fmt.Sprintf("%d events", tc.sent)}
+					if tc.held {
+						d.Undelivered = []string{"holding 2 for a team key (run `terma setup`)"}
+					}
+					return d, nil
+				},
+				Heartbeat: func(_ context.Context, projectID, endpoint string) error {
+					if projectID != tc.team || endpoint != "https://otlp.example" {
+						t.Errorf("heartbeat for %q at %q, want %q at this team's endpoint", projectID, endpoint, tc.team)
+					}
+					beats++
+					return tc.beat
+				}}
+			c := BackendCheck(t.Context(), p, tc.team)
+			if c.Status != tc.status || c.Inconclusive != tc.inconclusive || beats != tc.beats ||
+				!strings.Contains(c.Detail, tc.detail) || !strings.HasPrefix(c.Fix, tc.fix) {
+				t.Fatalf("check = %+v after %d beats", c, beats)
+			}
+		})
+	}
+}
+
+type keyRefused struct{}
+
+func (keyRefused) Error() string {
+	return "the relay could not reach your organization: otlp ingest returned 401"
+}
+func (keyRefused) KeyRefused() bool { return true }
 
 // Doctor admits a repository only under the policy hooks apply: a list not validated for a
 // team admits nothing, and a validated empty list says who can change that.

@@ -15,10 +15,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
@@ -57,6 +59,13 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			}
 			return d, nil
 		},
+		Heartbeat: func(ctx context.Context, projectID, endpoint string) error {
+			if !daemon.Running(claim.Dir(app.stateDir)) {
+				return fmt.Errorf("%w: the relay is not running", doctor.ErrNoHeartbeat)
+			}
+			return doctorHeartbeat(daemon.Beat(ctx, app.stateDir, semconv.TermaRelayHeartbeatReasonDoctor,
+				relay.HeartbeatTarget{Team: projectID, Endpoint: endpoint}, 0))
+		},
 		Relay:    app.relayFacts,
 		Endpoint: func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
 		Credential: func() (doctor.Credential, error) {
@@ -75,6 +84,15 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 		},
 		Keys: app.storedKeys,
 	}
+}
+
+// doctorHeartbeat is doctor's reading of a beat's outcome: only the platform's refusal fails
+// its check; a beat that could not be sent where doctor asked proves nothing either way.
+func doctorHeartbeat(err error) error {
+	if _, undelivered := errors.AsType[*daemon.UndeliveredError](err); err == nil || undelivered {
+		return err
+	}
+	return fmt.Errorf("%w: %w", doctor.ErrNoHeartbeat, err)
 }
 
 // serverKeyCredential is what a profile set up with a server key signs in with: its team's
