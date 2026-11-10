@@ -633,6 +633,7 @@ events:
       - ref: gen_ai.usage.input_tokens
       - ref: gen_ai.usage.output_tokens
       - ref: gen_ai.usage.cache_read.input_tokens
+      - ref: gen_ai.usage.cache_write.input_tokens
       - ref: gen_ai.usage.reasoning.output_tokens
       - ref: terma.operation.status
         note: The agent's word for how the call ended.

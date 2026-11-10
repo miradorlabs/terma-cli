@@ -81,8 +81,13 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 	return planHooks(dir, command, install)
 }
 
+// ContentConsented is delivery asking again, as each prompt and reply leaves, whether the
+// developer chose Muse; the team's policy decides the rest.
+func (Agent) ContentConsented(c hookrun.Consent) bool { return consented(c) }
+
 var (
-	_ agents.Covered       = Agent{}
-	_ agents.PayloadReader = Agent{}
-	_ agents.UserHooks     = Agent{}
+	_ agents.ContentConsent = Agent{}
+	_ agents.Covered        = Agent{}
+	_ agents.PayloadReader  = Agent{}
+	_ agents.UserHooks      = Agent{}
 )

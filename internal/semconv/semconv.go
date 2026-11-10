@@ -37,6 +37,8 @@ const (
 	GenAIToolTypeKey = "gen_ai.tool.type"
 	// GenAIUsageCacheReadInputTokensKey is gen_ai.usage.cache_read.input_tokens: The number of input tokens served from a provider-managed cache.
 	GenAIUsageCacheReadInputTokensKey = "gen_ai.usage.cache_read.input_tokens"
+	// GenAIUsageCacheWriteInputTokensKey is gen_ai.usage.cache_write.input_tokens: The number of input tokens written to a provider-managed cache.
+	GenAIUsageCacheWriteInputTokensKey = "gen_ai.usage.cache_write.input_tokens"
 	// GenAIUsageInputTokensKey is gen_ai.usage.input_tokens: The number of tokens used in the GenAI input (prompt).
 	GenAIUsageInputTokensKey = "gen_ai.usage.input_tokens"
 	// GenAIUsageOutputTokensKey is gen_ai.usage.output_tokens: The number of tokens used in the GenAI response (completion).

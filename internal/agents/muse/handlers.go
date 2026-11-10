@@ -58,6 +58,8 @@ type museHookInput struct {
 		InputTokens     *int64 `json:"input_tokens"`
 		OutputTokens    *int64 `json:"output_tokens"`
 		CachedTokens    *int64 `json:"cached_tokens"`
+		CacheReadTokens *int64 `json:"cache_read_tokens"`
+		CacheWrite      *int64 `json:"cache_write_tokens"`
 		ReasoningTokens *int64 `json:"reasoning_tokens"`
 	} `json:"usage"`
 	// Stop.
@@ -297,9 +299,15 @@ func postLLMCall(ctx context.Context, env hookrun.Env) error {
 		a[semconv.TermaStepIndexKey] = *in.Step
 	}
 	if u := in.Usage; u != nil {
+		// cached_tokens is Muse's combined count; a build that splits reads from writes says so.
+		cacheRead := u.CachedTokens
+		if u.CacheReadTokens != nil {
+			cacheRead = u.CacheReadTokens
+		}
 		for k, v := range map[string]*int64{
 			semconv.GenAIUsageInputTokensKey: u.InputTokens, semconv.GenAIUsageOutputTokensKey: u.OutputTokens,
-			semconv.GenAIUsageCacheReadInputTokensKey: u.CachedTokens, semconv.GenAIUsageReasoningOutputTokensKey: u.ReasoningTokens,
+			semconv.GenAIUsageCacheReadInputTokensKey: cacheRead, semconv.GenAIUsageCacheWriteInputTokensKey: u.CacheWrite,
+			semconv.GenAIUsageReasoningOutputTokensKey: u.ReasoningTokens,
 		} {
 			if v != nil && *v >= 0 {
 				a[k] = *v

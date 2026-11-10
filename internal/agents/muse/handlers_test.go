@@ -81,7 +81,7 @@ func TestMuseTurnIsSpooled(t *testing.T) {
 		"tool_input": map[string]any{"path": filepath.Join(f.root, "hello.txt"), "content": "hello\n"}, "tool_response": map[string]any{"ok": true}})
 	f.run(postToolUse, "PostToolUseFailure", map[string]any{"tool_name": "shell", "tool_use_id": "call_2", "tool_input": map[string]any{"command": "false"}})
 	f.run(postLLMCall, "PostLLMCall", map[string]any{"provider": "meta", "request_id": "req_1", "response_id": "resp_1", "finish_reason": "stop",
-		"status": "ok", "step": 2, "messages": []any{"never read"}, "usage": map[string]any{"input_tokens": 1200, "output_tokens": 80, "cached_tokens": 900, "reasoning_tokens": 30}})
+		"status": "ok", "step": 2, "messages": []any{"never read"}, "usage": map[string]any{"input_tokens": 1200, "output_tokens": 80, "cached_tokens": 950, "cache_read_tokens": 900, "cache_write_tokens": 50, "reasoning_tokens": 30}})
 	t.Setenv(museRootEnv, museSession)
 	f.run(subagentStart, "SubagentStart", map[string]any{"session_id": museChild, "subagent_id": "skill-reminder", "child_session_id": museChild})
 	f.run(postLLMCall, "PostLLMCall", map[string]any{"session_id": museChild, "request_id": "req_2", "usage": map[string]any{"input_tokens": 50, "output_tokens": 5}})
@@ -122,8 +122,9 @@ func TestMuseTurnIsSpooled(t *testing.T) {
 	for k, want := range map[string]any{
 		semconv.TermaModelCallIDKey: "req_1", semconv.GenAIResponseIDKey: "resp_1", semconv.GenAIRequestModelKey: "muse-spark-1",
 		semconv.GenAIUsageInputTokensKey: float64(1200), semconv.GenAIUsageOutputTokensKey: float64(80),
-		semconv.GenAIUsageCacheReadInputTokensKey: float64(900), semconv.GenAIUsageReasoningOutputTokensKey: float64(30),
-		semconv.TermaStepIndexKey: float64(2), semconv.TermaTurnIDKey: museTurn,
+		semconv.GenAIUsageCacheReadInputTokensKey: float64(900), semconv.GenAIUsageCacheWriteInputTokensKey: float64(50),
+		semconv.GenAIUsageReasoningOutputTokensKey: float64(30),
+		semconv.TermaStepIndexKey:                  float64(2), semconv.TermaTurnIDKey: museTurn,
 	} {
 		if model[0].Attrs[k] != want {
 			t.Errorf("model call %s = %v, want %v", k, model[0].Attrs[k], want)
@@ -229,5 +230,22 @@ func TestMuseHooksMergeIntoSettings(t *testing.T) {
 	}
 	if stop := hooks["Stop"]; len(stop) != 1 || stop[0].Hooks[0].Async || stop[0].Hooks[0].Timeout != 10 {
 		t.Errorf("Stop = %+v", stop)
+	}
+}
+
+// Delivery asks the agent again before a prompt or reply leaves: Muse consents for a
+// developer who chose it, or under global mode, and for no one else.
+func TestMuseContentConsent(t *testing.T) {
+	for _, tc := range []struct {
+		c    hookrun.Consent
+		want bool
+	}{
+		{hookrun.Consent{Agents: []string{name}}, true},
+		{hookrun.Consent{Global: true}, true},
+		{hookrun.Consent{Agents: []string{"claude"}}, false},
+	} {
+		if got := (Agent{}).ContentConsented(tc.c); got != tc.want {
+			t.Errorf("ContentConsented(%+v) = %v", tc.c, got)
+		}
 	}
 }
