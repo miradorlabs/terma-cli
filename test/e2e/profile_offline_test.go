@@ -130,6 +130,42 @@ func TestWriteProfilesOffline(t *testing.T) {
 	}
 }
 
+// A profile a test records without running a harness's build (a unit test's, of a made-up
+// version) is the test's to read, and never reaches profiles.json: the nightly once published a
+// Claude Code 9.9.8 and 9.9.9 so.
+func TestUnitTestProfilesAreNotWrittenOffline(t *testing.T) {
+	dir := t.TempDir()
+	profilesMu.Lock()
+	saved := profiles
+	profiles = map[profileID]*Profile{}
+	profilesMu.Unlock()
+	t.Cleanup(func() { profilesMu.Lock(); profiles = saved; profilesMu.Unlock() })
+
+	made := Binary{Harness: "claude", Version: "9.9.9"}
+	profileOf(t, made).Command = []string{"-p"}
+	if got := profileOf(t, made).Command; len(got) != 1 {
+		t.Fatalf("the test could not read its profile back: %v", got)
+	}
+	t.Run("scenario", func(t *testing.T) {
+		scenarioOf(t, "codex")
+		profileOf(t, Binary{Harness: "codex", Version: "0.170.0"})
+	})
+	if err := WriteProfiles(dir); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "profiles.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []Profile
+	if err := json.Unmarshal(data, &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Harness != "codex" {
+		t.Errorf("profiles.json = %+v, want the scenario's codex profile alone", rows)
+	}
+}
+
 // A build's npm package folder, found through its node_modules/.bin link, is its <install>; an
 // executable outside node_modules has none.
 func TestNpmPackageRootOffline(t *testing.T) {
