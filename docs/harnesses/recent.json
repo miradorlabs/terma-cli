@@ -1,7 +1,37 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T01:57:40.613527381Z",
+  "generated_at": "2026-11-10T02:25:33.04205458Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.322",
+      "released_at": "2026-11-10T01:58:41.811Z",
+      "captured_at": "2026-11-10T02:25:33.04205458Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "2.1.321",
+      "changes": 2,
+      "categories": {
+        "behavior": 1,
+        "config": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 1
+      },
+      "undocumented": null,
+      "highlights": [
+        "Behaviour: subagents system 2 text changed",
+        "fastMode description changed (+132 −72 chars)"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6206,43 +6236,6 @@
         "Setting no longer read: features.voice_transcription",
         "New setting: model_providers.<name>.auth",
         "`codex --remote`: description changed (+58 −76 chars)"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.117.0",
-      "released_at": "2026-03-26T22:28:43.427Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.116.0",
-      "changes": 95,
-      "categories": {
-        "binary": 1,
-        "caching": 1,
-        "cli": 24,
-        "config": 14,
-        "filesystem": 33,
-        "hooks": 7,
-        "prompt": 1,
-        "tools": 14
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 73,
-        "notable": 22
-      },
-      "undocumented": 50,
-      "highlights": [
-        "System prompt changed (+1106 −0 chars)",
-        "close_agent tool description changed (+216 −172 chars)",
-        "close_agent tool parameter id removed"
       ],
       "signing": "revoked"
     }

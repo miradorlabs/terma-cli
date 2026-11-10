@@ -3,6 +3,28 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.322",
+      "previous": "2.1.321",
+      "changes": [
+        {
+          "id": "behavior.subagents.system.2.text",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: subagents system 2 text changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.fastMode.description",
+          "category": "config",
+          "op": "changed",
+          "title": "fastMode description changed (+132 −72 chars)",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.321",
       "previous": "2.1.319",
       "changes": [
