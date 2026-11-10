@@ -224,10 +224,11 @@ func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request)
 	delete(a.delegated, body.Code)
 	a.mu.Unlock()
 	sum := sha256.Sum256([]byte(body.CodeVerifier))
-	// Every failed redemption is the same 403, as the platform answers it.
+	// Every failed redemption is the auth gateway's one 401, whatever the account service
+	// refused it for.
 	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 ||
 		base64.RawURLEncoding.EncodeToString(sum[:]) != grant.challenge {
-		writeAuthError(w, http.StatusForbidden, "PERMISSION_DENIED", "invalid or expired authorization code")
+		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid or expired credentials")
 		return true
 	}
 	w.Header().Set("Cache-Control", "no-store")

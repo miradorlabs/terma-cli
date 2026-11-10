@@ -161,6 +161,11 @@ func LoginWithGrant(ctx context.Context, exchanger TokenExchanger, opts GrantOpt
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		// The auth host refuses a code with the 401 a dead sign-in gets; this is no sign-out,
+		// so the cause is what the host said.
+		if errors.Is(err, ErrNotLoggedIn) {
+			err = errors.New(strings.TrimPrefix(err.Error(), ErrNotLoggedIn.Error()+": "))
+		}
 		return nil, &GrantError{Code: GrantRejected, Message: "Terma did not accept the code from Terma Desktop",
 			Err: redacted(err, *reply.Code, pkce.Verifier)}
 	}

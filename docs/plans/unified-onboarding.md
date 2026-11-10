@@ -316,5 +316,6 @@ council invariant:
 - **The fake follows the auth gateway spec** (mirador-platform `gateways/auth/spec/openapi.yaml`, branch
   `dawson/delegated-cli-grant`): errors in the `{"error":{"code","message"}}` envelope (`error.reason` only on a
   delegate refusal for a session that cannot delegate, `NOT_DELEGABLE`, which the CLI never sees: it never calls
-  delegate), 403 `PERMISSION_DENIED` for any failed redemption, 400 for a challenge that is not 43 characters, and
+  delegate), 401 `UNAUTHENTICATED` "invalid or expired credentials" for any failed redemption (the account service's
+  `PERMISSION_DENIED`, as the gateway maps it), 400 for a challenge that is not 43 characters, and
   `organization {id, name, type}` and `user {id, email}` in the token and delegate answers.

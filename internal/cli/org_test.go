@@ -161,7 +161,8 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 }
 
 // serveToken redeems a delegated code, once, as /v1/auth/cli/token does: only with
-// redirect_port 0, and only for a code it delegated.
+// redirect_port 0, and only for a code it delegated. Every refusal is the auth gateway's
+// one 401 UNAUTHENTICATED, in its envelope.
 func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		GrantType    string `json:"grant_type"`
@@ -173,7 +174,7 @@ func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	if body.GrantType != "authorization_code" {
 		// Refreshes are refused, as every token here is for good or dead.
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid token"}`)
+		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
 		return
 	}
 	f.mu.Lock()
@@ -182,8 +183,8 @@ func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	f.verifiers = append(f.verifiers, body.CodeVerifier)
 	f.mu.Unlock()
 	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 || body.CodeVerifier == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `{"code":"INVALID_ARGUMENT","message":"invalid grant"}`)
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
 		return
 	}
 	n := f.exchanges.Add(1)

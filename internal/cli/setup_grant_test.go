@@ -315,6 +315,10 @@ func TestDesktopGrantFailures(t *testing.T) {
 			if !strings.Contains(stderr, tc.want) || strings.Contains(stdout+stderr, "spent") {
 				t.Fatalf("stderr names the code and nothing quotes what was sent:\n%s\n%s", stdout, stderr)
 			}
+			// The auth host refuses a code with a 401; that is no sign-out, so nothing says one.
+			if strings.Contains(stderr, "not logged in") {
+				t.Fatalf("a refused code reads as a sign-out:\n%s", stderr)
+			}
 			if pinned := desktopLines(t)["no code to give: stdin closes, and the CLI exits 1 with grant_no_code"]; tc.want == auth.GrantNoCode &&
 				!strings.HasSuffix(stdout, "\n"+pinned+"\n") {
 				t.Fatalf("stdout = %q, want it to end with the desktop's pinned line %q", stdout, pinned)
