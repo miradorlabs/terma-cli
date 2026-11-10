@@ -1,0 +1,155 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+)
+
+// A fake Messages API: it refuses temperature (with a request id in its message), is always
+// overloaded for top_k, answers anything else, streams, and counts tokens a word each.
+func fakeAnthropic(t *testing.T) *client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		data, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(data, &body)
+		if r.Header.Get("x-api-key") != "k" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/count_tokens"):
+			msgs := body["messages"].([]any)
+			text := msgs[0].(map[string]any)["content"].(string)
+			_ = json.NewEncoder(w).Encode(map[string]any{"input_tokens": len(strings.Fields(text))})
+		case body["temperature"] != nil:
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"temperature is not supported for this model (request req_011abcDEF)."}}`))
+		case body["top_k"] != nil:
+			w.WriteHeader(529)
+		case body["stream"] == true:
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("event: message_start\ndata: {}\n\nevent: content_block_delta\ndata: {}\n\nevent: content_block_delta\ndata: {}\n\nevent: message_stop\ndata: {}\n\n"))
+		default:
+			w.Header().Set("Anthropic-Ratelimit-Requests-Limit", "50")
+			w.Header().Set("Request-Id", "req_1")
+			w.Header().Set("Cf-Ray", "x")
+			_ = json.NewEncoder(w).Encode(map[string]any{"model": body["model"], "stop_reason": "max_tokens",
+				"usage": map[string]any{"input_tokens": 9, "output_tokens": 16, "cache_creation": map[string]any{"ephemeral_5m_input_tokens": 0}}})
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient()
+	c.wait = time.Millisecond
+	c.tries = 2
+	c.rewrite = func(u string) string { return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+	return c
+}
+
+func TestAnthropicProbe(t *testing.T) {
+	c := fakeAnthropic(t)
+	m := &Snapshot{ID: "claude-fable-5-2", Facts: map[string]any{factMaxOutput: int64(128_000)}}
+	p := anthropicProbe(context.Background(), c, "k", m)
+	if r := p.Params["baseline"]; !r.Accepted || r.Status != 200 {
+		t.Errorf("baseline = %+v", r)
+	}
+	r := p.Params["sampling.temperature"]
+	if r.Accepted || r.Status != 400 || r.Error != "temperature is not supported for this model (request <id>)." {
+		t.Errorf("temperature = %+v", r)
+	}
+	// Never answered meaningfully: left out, not a refusal.
+	if _, ok := p.Params["sampling.top_k"]; ok {
+		t.Errorf("an overloaded case was recorded: %+v", p.Params["sampling.top_k"])
+	}
+	if !slices.ContainsFunc(p.Errors, func(e string) bool { return strings.HasPrefix(e, "sampling.top_k") }) {
+		t.Errorf("errors = %v", p.Errors)
+	}
+	if _, ok := p.Params["max_tokens.over_stated_limit"]; !ok {
+		t.Error("the output limit was not probed")
+	}
+	s := p.Response
+	if s == nil || s.Model != "claude-fable-5-2" || s.StopReason != "max_tokens" {
+		t.Fatalf("response = %+v", s)
+	}
+	if !slices.Equal(s.UsageKeys, []string{"cache_creation.ephemeral_5m_input_tokens", "input_tokens", "output_tokens"}) {
+		t.Errorf("usage keys = %v", s.UsageKeys)
+	}
+	if !slices.Equal(s.Headers, []string{"anthropic-ratelimit-requests-limit", "request-id"}) {
+		t.Errorf("headers = %v", s.Headers)
+	}
+	if !slices.Equal(s.StreamEvents, []string{"message_start", "content_block_delta", "message_stop"}) {
+		t.Errorf("stream events = %v", s.StreamEvents)
+	}
+	if len(p.Tokens) != len(corpus) || p.Tokens["prose"] == 0 {
+		t.Errorf("tokens = %v", p.Tokens)
+	}
+}
+
+func TestTokenizerLike(t *testing.T) {
+	same := map[string]int{}
+	for i, c := range corpus {
+		same[c.name] = i + 10
+	}
+	other := map[string]int{}
+	for i, c := range corpus {
+		other[c.name] = i + 11
+	}
+	probed := func(id string, tokens map[string]int) *Snapshot {
+		return &Snapshot{ID: id, Vendor: "anthropic", API: &API{Probes: &Probes{Tokens: tokens}}}
+	}
+	snaps := map[string]*Snapshot{"a": probed("a", same), "b": probed("b", same), "c": probed("c", other), "d": {ID: "d", Vendor: "anthropic"}}
+	tokenizerLike(snaps)
+	if got := snaps["a"].API.Probes.TokenizerLike; !slices.Equal(got, []string{"b"}) {
+		t.Errorf("a like %v", got)
+	}
+	if got := snaps["c"].API.Probes.TokenizerLike; len(got) != 0 {
+		t.Errorf("c like %v", got)
+	}
+}
+
+func TestMerge(t *testing.T) {
+	base := map[string]any{"model": "m", "input": "x", "cfg": map[string]any{"a": 1, "b": 2}}
+	got := merge(base, map[string]any{"input": del, "cfg": map[string]any{"b": 3}})
+	if _, ok := got["input"]; ok || got["cfg"].(map[string]any)["a"] != 1 || got["cfg"].(map[string]any)["b"] != 3 {
+		t.Errorf("merge = %v", got)
+	}
+	if base["cfg"].(map[string]any)["b"] != 2 {
+		t.Error("merge changed the plain request")
+	}
+}
+
+// A case the API did not answer on a later run keeps its answer from before: no timeline step.
+func TestUnansweredProbeKeepsItsResult(t *testing.T) {
+	dir := t.TempDir()
+	obs := docsObs("claude-fable-5-2", fable52)
+	first := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200},
+		"sampling.top_k": {Status: 400, Error: "top_k: Extra inputs are not permitted"}}}
+	later := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}},
+		Errors: []string{"sampling.top_k: Service Unavailable"}}
+	for i, p := range []*Probes{first, later} {
+		prev, err := readPublished(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := testNow.Add(time.Duration(i) * time.Hour)
+		if _, err := publish(dir, testRun(now, obs), prev, nil, nil, func(*Snapshot) *Probes { c := *p; return &c }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tl := readTimeline(t, dir, "claude-fable-5-2")
+	if len(tl.Steps) != 1 {
+		t.Errorf("steps = %+v", tl.Steps)
+	}
+	var s Snapshot
+	_ = readOptional(dir+"/claude-fable-5-2/snapshot.json", &s)
+	if r := s.API.Probes.Params["sampling.top_k"]; r.Status != 400 || !s.API.Probes.At.Equal(testNow) {
+		t.Errorf("top_k = %+v, at %v", r, s.API.Probes.At)
+	}
+}

@@ -46,7 +46,11 @@ func probeView(p *Probes) map[string]any {
 		pv["tokens"] = p.Tokens
 	}
 	if p.Response != nil {
-		pv["response"] = p.Response
+		// Why one short answer stopped is the run's (a model that thought more ran out of
+		// tokens): the response's shape is what is compared.
+		r := *p.Response
+		r.StopReason = ""
+		pv["response"] = r
 	}
 	return pv
 }
@@ -216,7 +220,7 @@ func title(c refdiff.Change, names map[string]string) string {
 			return harness + " uses it as " + role
 		case c.Op == "removed":
 			return harness + " no longer tracked using it as " + role
-		case c.After == false || (len(p) == 3 && c.After == false):
+		case c.After == false:
 			return harness + " stopped using it as " + role
 		default:
 			return harness + " uses it as " + role + " again"

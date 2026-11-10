@@ -99,10 +99,47 @@ func TestPublishTwoNights(t *testing.T) {
 	write(between, "docs/compat/history.json", "not to be published\n")
 	run(between, "bash", script, "publish-reference")
 
+	// The Model Reference publishes its own tree, twice: the second run starts from the first's,
+	// with the Harness Reference beside it to read, and changes nothing else.
+	for i, content := range []string{"models 1\n", "models 2\n"} {
+		models := filepath.Join(tmp, "models"+string(rune('1'+i)))
+		run(tmp, "git", "clone", "-q", "-b", "main", origin, models)
+		run(models, "bash", script, "restore-models")
+		if b, err := os.ReadFile(filepath.Join(models, "docs/harnesses/claude/versions/1.0.1.json")); err != nil || string(b) != "between\n" {
+			t.Fatalf("restore-models did not put back the Harness Reference: %q (%v)", b, err)
+		}
+		if i == 1 {
+			if b, err := os.ReadFile(filepath.Join(models, "docs/models/index.json")); err != nil || string(b) != "models 1\n" {
+				t.Fatalf("restore-models put back %q (%v)", b, err)
+			}
+		}
+		write(models, "docs/models/index.json", content)
+		write(models, "docs/harnesses/index.json", "not to be published\n")
+		if s := run(models, "git", "status", "--porcelain"); s != "" {
+			t.Fatalf("the Model Reference is not ignored on main:\n%s", s)
+		}
+		run(models, "bash", script, "publish-models")
+	}
+	// A run that changed nothing commits nothing.
+	same := filepath.Join(tmp, "models-same")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, same)
+	run(same, "bash", script, "restore-models")
+	run(same, "bash", script, "publish-models")
+	// And the Harness Reference's next publish leaves the Model Reference where it is.
+	after := filepath.Join(tmp, "after")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, after)
+	run(after, "bash", script, "restore")
+	write(after, "docs/harnesses/claude/versions/1.0.1.json", "between\n")
+	write(after, "docs/harnesses/claude/versions/1.0.2.json", "after\n")
+	run(after, "bash", script, "publish-reference")
+
 	check := filepath.Join(tmp, "check")
 	run(tmp, "git", "clone", "-q", "-b", "compat-matrix", origin, check)
-	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "3" {
-		t.Errorf("compat-matrix has %s commits, want one a night and the check's", n)
+	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "6" {
+		t.Errorf("compat-matrix has %s commits, want one a night, the checks' and two of the Model Reference's", n)
+	}
+	if b, err := os.ReadFile(filepath.Join(check, "docs/models/index.json")); err != nil || string(b) != "models 2\n" {
+		t.Errorf("compat-matrix has the Model Reference as %q (%v)", b, err)
 	}
 	if b, err := os.ReadFile(filepath.Join(check, "docs/harnesses/claude/versions/1.0.1.json")); err != nil || string(b) != "between\n" {
 		t.Errorf("the check's reference was not published: %q (%v)", b, err)

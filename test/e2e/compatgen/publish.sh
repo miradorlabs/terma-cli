@@ -8,6 +8,11 @@
 #   publish-reference
 #            commits the reference alone (the frequent check's new builds, reference.yml),
 #            leaving the night's matrix and catalog as they are
+#   restore-models
+#            puts back the Model Reference (docs/models) as last published, and the Harness
+#            Reference it reads
+#   publish-models
+#            commits the Model Reference alone (models.yml), leaving the rest as it is
 #
 # What they write is generated, and git-ignored on every other branch.
 set -euo pipefail
@@ -83,8 +88,41 @@ publish-reference)
 	git commit -q -m "reference: ${TERMA_REFERENCE_BUILDS:-new builds}, $(date -u +%FT%RZ)"
 	git push -q origin "$branch"
 	;;
+restore-models)
+	# The Model Reference merges into what it last published, and reads the Harness Reference
+	# for the harnesses that use each model.
+	git fetch -q origin "$branch" 2>/dev/null || exit 0
+	rm -rf docs/models docs/harnesses
+	for d in docs/models docs/harnesses; do
+		if git cat-file -e "origin/$branch:$d" 2>/dev/null; then
+			git archive "origin/$branch" "$d" | tar -x
+		fi
+	done
+	;;
+publish-models)
+	[ -d docs/models ] || exit 0
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' EXIT
+	cp -R docs/models "$tmp/"
+	rm -rf docs/models docs/harnesses
+	git config user.name "terma-compat"
+	git config user.email "terma-compat@users.noreply.github.com"
+	if git rev-parse -q --verify "origin/$branch" >/dev/null; then
+		git checkout -q -B "$branch" "origin/$branch"
+	else
+		git checkout -q --orphan "$branch"
+		git rm -rq --cached . && git clean -fdxq
+	fi
+	mkdir -p docs
+	rm -rf docs/models
+	cp -R "$tmp/models" docs/models
+	git add -A -f docs/models
+	if git diff --cached --quiet; then exit 0; fi
+	git commit -q -m "models: ${TERMA_MODELS_SUMMARY:-changes}, $(date -u +%FT%RZ)"
+	git push -q origin "$branch"
+	;;
 *)
-	echo "usage: $0 restore|publish|publish-reference" >&2
+	echo "usage: $0 restore|publish|publish-reference|restore-models|publish-models" >&2
 	exit 2
 	;;
 esac

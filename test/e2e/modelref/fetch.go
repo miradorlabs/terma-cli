@@ -31,6 +31,8 @@ type client struct {
 	// 429, a 5xx) is made in all.
 	tries int
 	wait  time.Duration
+	// rewrite, in tests, sends a request for one URL to another (a local server's).
+	rewrite func(url string) string
 }
 
 func newClient() *client {
@@ -67,6 +69,9 @@ type apiResponse struct {
 // post sends body as JSON and returns the API's answer, whatever its status. It is tried again
 // only where the request never reached an answer the API meant (a 429, a 5xx, the network).
 func (c *client) post(ctx context.Context, url string, headers map[string]string, body any) (*apiResponse, error) {
+	if c.rewrite != nil {
+		url = c.rewrite(url)
+	}
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -113,6 +118,9 @@ func (c *client) post(ctx context.Context, url string, headers map[string]string
 }
 
 func (c *client) do(ctx context.Context, method, url string, headers map[string]string, body []byte) ([]byte, http.Header, error) {
+	if c.rewrite != nil {
+		url = c.rewrite(url)
+	}
 	var lastErr error
 	var lastStatus int
 	var lastHeader http.Header

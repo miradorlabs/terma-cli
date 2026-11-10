@@ -1,0 +1,93 @@
+> ## AI Agent Context
+> Get the complete documentation index at: https://aistudio.google.com/llms.txt
+> Use this file to discover all available pages.
+> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt
+
+# What's new in Gemini 4 Argon
+
+Gemini 4 Argon (`gemini-4-argon`) is our latest, most capable model. It can reason longer on hard problems for better results on complex coding, agentic, math, and science tasks. Gemini 4 Argon is available through the Gemini API and in Google AI Studio.
+
+Gemini 4 Argon supports a unified 1M-token context window, long decode up to 1M tokens, and tunable thinking levels (`low`, `medium`, `high`).
+
+{% card-grid %}
+  {% card description="Build apps from scratch with Gemini 4 Argon and AI Studio." href="https://aistudio.google.com/apps?model=gemini-4-argon" icon="experiment" title="Try it in AI Studio" /%}
+
+  {% card description="Play and remix apps, built with Gemini 4 Argon." href="https://aistudio.google.com/learn/gemini-4-argon-showcase" icon="smart_toy" title="App Gallery" /%}
+
+  {% card description="Get started with Gemini 4 Argon with starter prompts." href="https://aistudio.google.com/learn/gemini-4-argon" icon="rocket_launch" title="Get started" /%}
+
+{% /card-grid %}
+
+This guide explains what's new in Gemini 4 Argon, API changes, code examples, and migration guidance.
+
+## New model  {% id="new-model" %}
+
+| Model | Model ID | Default thinking level | Pricing | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| Gemini 4 Argon | `gemini-4-argon` | `medium` | Available through Nov 30, 2026 at an introductory price of $2/1M input tokens and $10/1M output tokens ($4/1M input and $20/1M output thereafter). See [pricing](/docs/pricing) for more details. | Our most capable model, built to solve the hardest problems with depth and precision across real-world software engineering and knowledge work tasks. |
+
+For complete details, see the [Gemini 4 Argon model page](/docs/models/gemini-4-argon). For introductory pricing details, see the [pricing section](/docs/whats-new-gemini-4-argon#pricing) later on this page or the [pricing page](/docs/pricing#gemini-4-argon).
+
+## Quickstart  {% id="quickstart" %}
+
+Use the following example to send a request to `gemini-4-argon` with the recommended default `thinking_level` (`medium`) and a 64K output token limit:
+
+{% tabs %}
+  {% tab label="Python" %}
+  ```python
+  from google import genai
+  
+  client = genai.Client()
+  
+  interaction = client.interactions.create(
+      model="gemini-4-argon",
+      input="Write a three.js script that renders a realistic 3D black hole with gravitational lensing."
+  )
+  
+  print(interaction.output_text)
+  ```
+
+  {% /tab %}
+
+  {% tab label="JavaScript" %}
+  ```javascript
+  import { GoogleGenAI } from "@google/genai";
+  
+  const client = new GoogleGenAI({});
+  
+  const interaction = await client.interactions.create({
+    model: "gemini-4-argon",
+    input: "Write a three.js script that renders a realistic 3D black hole with gravitational lensing.",
+  });
+  
+  console.log(interaction.output_text);
+  ```
+
+  {% /tab %}
+
+  {% tab label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/interactions" \
+    -H "x-goog-api-key: $GEMINI_API_KEY" \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d '{
+      "model": "gemini-4-argon",
+      "input": "Write a three.js script that renders a realistic 3D black hole with gravitational lensing."
+    }'
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## What's new in Gemini 4 Argon  {% id="whats-new-gemini-4-argon" %}
+
+* **Unified 1M input-output token limit:** Input, thinking, and output share one window of 1,048,576 tokens.
+* **Long decode:** A single response can now go past 64K tokens, up to 1M tokens minus your input. See [Long decode](/docs/long-decode).
+* **Agentic video understanding:** [Agentic video understanding](/docs/video-understanding#agentic-video-understanding) is now generally available.
+* **Supported in Managed Agents:** The [Antigravity agent](/docs/antigravity-agent) in Gemini Managed Agents now supports Gemini 4 Argon.
+
+For more details, see the [Gemini 4 Argon model page](/docs/models/gemini-4-argon). For pricing details, see the [pricing page](/docs/pricing#gemini-4-argon).
+
+## Larger output and long decode  {% id="long-decode" %}

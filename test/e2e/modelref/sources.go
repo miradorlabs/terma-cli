@@ -122,7 +122,9 @@ func setFact(facts map[string]any, key string, v any) {
 	case nil:
 		return
 	case string:
-		if strings.TrimSpace(x) == "" {
+		// A dash in a vendor's table cell is its "none stated".
+		switch strings.TrimSpace(x) {
+		case "", "—", "–", "-", "N/A", "n/a":
 			return
 		}
 	case []string:

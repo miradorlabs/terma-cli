@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"strings"
-	"time"
 )
 
 // The two public catalogs: models.dev (an open, community-kept catalog) and OpenRouter (a
@@ -196,5 +195,3 @@ var catalogs = []struct {
 func pageRead(title, url, text string) Page {
 	return Page{Title: title, URL: url, Text: strings.TrimSpace(text) + "\n"}
 }
-
-var _ = time.Now
