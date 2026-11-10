@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/live"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -54,6 +55,9 @@ type Deps struct {
 	Flush   func()
 	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
 	AwaitPush func(path string)
+	// Notifier is how a hook tells the developer about a live finding, while the profile
+	// has desktop notifications on.
+	Notifier live.Notifier
 }
 
 // Profile is what a hook reads of the developer's setup.
@@ -62,6 +66,8 @@ type Profile struct {
 	Agents []string
 	// Policy is the collection policy, NoPolicy until one is validated.
 	Policy config.Policy
+	// Notifications is whether the developer has desktop notifications on.
+	Notifications bool
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -84,7 +90,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
 			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team}
 		if !r.HooksOff {
-			env.Spool = d.Spool()
+			env.Spool, env.Notifier = d.Spool(), d.notifier(p)
 		}
 		return render(ctx, env)
 	}
@@ -150,6 +156,14 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	if flush && env.Spool != nil && !flushed {
 		d.Flush()
 	}
+}
+
+// notifier is the profile's: none while desktop notifications are off.
+func (d Deps) notifier(p Profile) live.Notifier {
+	if !p.Notifications {
+		return nil
+	}
+	return d.Notifier
 }
 
 // boundedBuffer keeps the first max bytes, so an oversized payload cannot inflate it.

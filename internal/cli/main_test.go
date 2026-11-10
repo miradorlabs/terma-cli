@@ -21,6 +21,8 @@ import (
 var testApp = func() *App {
 	app := New(builtin.Agents, "dev")
 	app.binDirs = func() []string { return nil }
+	// No test pops a real desktop notification.
+	app.notifier = nil
 	return app
 }()
 
