@@ -74,10 +74,18 @@
             $failure = "HTTP $code"
             break
           }
+          # A connection that drops mid-body is a failed attempt like any other: the next
+          # one starts the file again. $null: PowerShell 7 would print the VoidTaskResult.
           $file = [IO.File]::Create($outFile)
-          # $null: PowerShell 7 would print the task's VoidTaskResult.
-          try { $null = $resp.Content.CopyToAsync($file).GetAwaiter().GetResult() } finally { $file.Dispose(); $resp.Dispose() }
-          return
+          try {
+            $null = $resp.Content.CopyToAsync($file).GetAwaiter().GetResult()
+          } catch {
+            $failure = $_.Exception.Message
+          } finally {
+            $file.Dispose(); $resp.Dispose()
+          }
+          if ($null -eq $failure) { return }
+          break
         }
         if ($null -eq $failure) { $failure = 'too many redirects' }
         if ($attempt -ge 3) { Fail "download failed: $url ($failure)" }
