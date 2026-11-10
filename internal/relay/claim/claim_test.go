@@ -133,11 +133,9 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 	now := time.Now()
 	var wg sync.WaitGroup
 	for i := range 16 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{1000 + i}}, now)
-		}()
+		})
 	}
 	wg.Wait()
 	c, ok := Read(dir, "s", now)
@@ -448,5 +446,52 @@ func TestClaimFollowsTheBranch(t *testing.T) {
 		if at, covered := got.At(0, time.Time{}); !ok || !covered || at.Branch != next.Branch || at.Remote != next.Remote || at.Worktree != next.Worktree {
 			t.Fatalf("read %+v, at %+v", got, at)
 		}
+	}
+}
+
+// Only a hook that reads the session's credential names it (WriteCredential), "" included, and
+// a fresh claim naming another is rewritten at once; every other claim keeps the session's, a
+// refresh and a move to another project alike, and cannot name one of its own.
+func TestClaimKeepsTheCredentialItsHooksRead(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	t0 := time.Now()
+	c := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api", PIDs: []int{10}, Credential: "api_key"}
+	credential := func(at time.Time) string {
+		t.Helper()
+		got, ok := Read(dir, "s", at)
+		if !ok {
+			t.Fatal("no claim")
+		}
+		if latest, _ := got.At(10, time.Time{}); latest.Credential != got.Credential {
+			t.Fatalf("the latest placement names %q, the claim %q", latest.Credential, got.Credential)
+		}
+		return got.Credential
+	}
+	if !Write(dir, "s", c, t0) || credential(t0) != "" {
+		t.Fatalf("a claim that read no credential named one: %q", credential(t0))
+	}
+	if !WriteCredential(dir, "s", c, t0.Add(time.Second)) || credential(t0) != "api_key" {
+		t.Fatalf("a fresh claim was not rewritten for its credential: %q", credential(t0))
+	}
+	if WriteCredential(dir, "s", c, t0.Add(2*time.Second)) {
+		t.Fatal("the same credential within Refresh rewrote the claim")
+	}
+	other := c
+	other.Credential = ""
+	at := time.Now().Add(2 * Refresh) // freshness is the file mtime, which the writes set to now
+	if !Write(dir, "s", other, at) || credential(at) != "api_key" {
+		t.Fatalf("a refresh dropped the session's credential: %q", credential(at))
+	}
+	other.ProjectID, other.Root, other.Cwd = "p2", "/src/web", "/src/web"
+	if !Write(dir, "s", other, at.Add(time.Second)) || credential(at) != "api_key" {
+		t.Fatalf("the session's next placement dropped its credential: %q", credential(at))
+	}
+	if !WriteCredential(dir, "s", other, at.Add(2*time.Second)) || credential(at) != "" {
+		t.Fatalf("a hook that could not tell kept an earlier credential: %q", credential(at))
+	}
+	got, _ := Read(dir, "s", at)
+	if first, _ := got.At(10, t0.Add(time.Minute)); first.ProjectID != "p1" || first.Credential != "api_key" {
+		t.Fatalf("the first placement's credential: %+v", first)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/session"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
@@ -77,6 +78,21 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		return live && prev.ProjectID != ""
 	}
 	return true
+}
+
+// ClaimCredential claims sessionID for r's project as every spooling hook does, naming the
+// credential its agent's hook read: a terma.account.credential value, "" when it cannot tell,
+// which the relay stamps on the session's records. Other hooks' claims keep it.
+func (e Env) ClaimCredential(r *Repo, sessionID, tool, credential string) {
+	if r == nil || r.ProjectID == "" || !session.ValidID(sessionID) {
+		return
+	}
+	c := r.claim(tool)
+	c.Cwd, c.PIDs, c.Credential = e.workingDir(), claimPIDs(), credential
+	claim.WriteCredential(e.StateDir, sessionID, c, e.Time())
+	if e.OnClaim != nil {
+		e.OnClaim(r.Root)
+	}
 }
 
 // workingDir is the directory the hook ran in, symlink-resolved as Repo.workTree is: where

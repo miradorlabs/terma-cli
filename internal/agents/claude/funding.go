@@ -18,11 +18,13 @@ const (
 	sourceClaudeTranscript  = "claude_transcript"
 )
 
-// claudeFunding is the stored login as a hook sees it: the evidence to spool, and whether
-// that login is the session's credential (oauthEffective).
+// claudeFunding is the stored login as a hook sees it: the evidence to spool, whether that
+// login is the session's credential (oauthEffective), and the other credential the hook
+// proves where it is not (proven).
 type claudeFunding struct {
 	hookrun.FundingEvidence
 	oauthEffective bool
+	proven         string
 }
 
 // readFunding reads the stored login's metadata and visible credential hints: the hook's view,
@@ -67,7 +69,8 @@ func readFunding(repoRoot string) claudeFunding {
 			}
 		}
 	}
-	f := claudeFunding{FundingEvidence: e, oauthEffective: oauthAccountIsEffective(repoRoot, configPath)}
+	f := claudeFunding{FundingEvidence: e}
+	f.proven, f.oauthEffective = effectiveCredential(repoRoot, configPath)
 	// The cached login's email is withheld wherever the session may use another credential: it would
 	// name a person who did not run the session (a CI machine's baked-in ~/.claude.json).
 	if !f.oauthEffective {
@@ -76,14 +79,27 @@ func readFunding(repoRoot string) claudeFunding {
 	return f
 }
 
-// oauthAccountIsEffective reports whether the cached OAuth login is the session's credential: no
-// env key or token, no cloud provider, no visible OAuth token, and apiKeyHelper positively not
-// configured. Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so its absence tells nothing.
-func oauthAccountIsEffective(repoRoot, configPath string) bool {
+// credential is terma.account.credential for the session: account where the stored login is its
+// credential and names an account, the credential the hook proves otherwise, "" when it cannot tell.
+func (f claudeFunding) credential() string {
+	if _, ok := f.accountID(); ok {
+		return semconv.TermaAccountCredentialAccount
+	}
+	return f.proven
+}
+
+// effectiveCredential is the session's credential as far as a hook can prove it, in Claude Code's
+// order: a cloud provider, then an env key or token or a configured apiKeyHelper (proven). Else oauth
+// reports whether the cached OAuth login is the credential: no visible OAuth token, and apiKeyHelper
+// positively not configured. Claude Code strips CLAUDE_CODE_OAUTH_TOKEN from hooks, so its absence
+// tells nothing.
+func effectiveCredential(repoRoot, configPath string) (proven string, oauth bool) {
 	// isOn's truthiness, so a "yes"-enabled cloud route withholds the cached OAuth account too.
-	if os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != "" || os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" ||
-		isOn(os.Getenv("CLAUDE_CODE_USE_BEDROCK")) || isOn(os.Getenv("CLAUDE_CODE_USE_VERTEX")) || isOn(os.Getenv("CLAUDE_CODE_USE_FOUNDRY")) {
-		return false
+	if isOn(os.Getenv("CLAUDE_CODE_USE_BEDROCK")) || isOn(os.Getenv("CLAUDE_CODE_USE_VERTEX")) || isOn(os.Getenv("CLAUDE_CODE_USE_FOUNDRY")) {
+		return semconv.TermaAccountCredentialCloud, false
+	}
+	if os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != "" {
+		return semconv.TermaAccountCredentialApiKey, false
 	}
 	// Presence in files, not effective settings: --settings and MDM overrides are not observable.
 	// Never execute or export the command.
@@ -91,17 +107,22 @@ func oauthAccountIsEffective(repoRoot, configPath string) bool {
 	if repoRoot != "" {
 		paths = append(paths, filepath.Join(repoRoot, ".claude", "settings.json"), filepath.Join(repoRoot, ".claude", "settings.local.json"))
 	}
+	known := true
 	for _, path := range paths {
 		settings, status := hookrun.ReadEvidenceJSON(path)
 		if status != "present" && status != "missing" {
-			return false
+			known = false
+			continue
 		}
 		if raw, ok := settings["apiKeyHelper"]; ok {
 			var command string
-			if json.Unmarshal(raw, &command) != nil || strings.TrimSpace(command) != "" {
-				return false
+			if json.Unmarshal(raw, &command) != nil {
+				known = false
+			} else if strings.TrimSpace(command) != "" {
+				return semconv.TermaAccountCredentialApiKey, false
 			}
 		}
 	}
-	return true
+	// A visible OAuth token may be another account's.
+	return "", known && os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") == ""
 }

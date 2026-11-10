@@ -47,6 +47,8 @@ const (
 	SessionIDKey = "session.id"
 	// TermaAccountBillingTypeKey is terma.account.billing_type: The provider's word for how the account is billed.
 	TermaAccountBillingTypeKey = "terma.account.billing_type"
+	// TermaAccountCredentialKey is terma.account.credential: The kind of credential the session's agent runs on, as its hooks read it.
+	TermaAccountCredentialKey = "terma.account.credential"
 	// TermaAccountExtraUsageEnabledKey is terma.account.extra_usage.enabled: Whether the account may spend past its plan.
 	TermaAccountExtraUsageEnabledKey = "terma.account.extra_usage.enabled"
 	// TermaAccountIDKey is terma.account.id: The provider's id for the account the session ran under.
@@ -369,6 +371,12 @@ const (
 const (
 	// ErrorTypeOther is error.type _OTHER: A fallback error value to be used when the instrumentation doesn't define a custom value.
 	ErrorTypeOther = "_OTHER"
+	// TermaAccountCredentialApiKey is terma.account.credential api_key: An API key or bearer token, from the agent's environment or a helper command its settings name.
+	TermaAccountCredentialApiKey = "api_key"
+	// TermaAccountCredentialCloud is terma.account.credential cloud: A cloud provider's, such as Amazon Bedrock, Google Cloud or Microsoft Foundry.
+	TermaAccountCredentialCloud = "cloud"
+	// TermaAccountCredentialAccount is terma.account.credential account: The provider's account login the agent stores, which terma.session.account names.
+	TermaAccountCredentialAccount = "account"
 	// TermaCaptureGapInvalidCheckpoint is terma.capture.gap invalid_checkpoint: The ordering checkpoint was unreadable, so a new stream began.
 	TermaCaptureGapInvalidCheckpoint = "invalid_checkpoint"
 	// TermaCaptureSurfaceDesktop is terma.capture.surface desktop: Records only terma reports for the agent, sent from every surface.

@@ -96,6 +96,63 @@ func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 	}
 }
 
+// The credential a session runs on reads as Claude Code picks one: a cloud provider over a key or
+// token, either over the stored login, which counts only where nothing may stand in for it.
+// Where the hook cannot tell, it names none.
+func TestClaudeCredentialKinds(t *testing.T) {
+	const helper = `{"apiKeyHelper":"/usr/local/bin/get-key"}`
+	for _, c := range []struct {
+		name  string
+		env   map[string]string
+		login bool
+		// user is the developer's settings.json, local the repository's settings.local.json.
+		user, local string
+		// unreadable makes the repository's settings.json a directory.
+		unreadable bool
+		want       string
+	}{
+		{name: "stored login", login: true, want: semconv.TermaAccountCredentialAccount},
+		{name: "no stored login", want: ""},
+		{name: "visible OAuth token", login: true, env: map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "t"}, want: ""},
+		{name: "API key", login: true, env: map[string]string{"ANTHROPIC_API_KEY": "k"}, want: semconv.TermaAccountCredentialApiKey},
+		{name: "auth token", env: map[string]string{"ANTHROPIC_AUTH_TOKEN": "t"}, want: semconv.TermaAccountCredentialApiKey},
+		{name: "user apiKeyHelper", login: true, user: helper, want: semconv.TermaAccountCredentialApiKey},
+		{name: "repository apiKeyHelper over an OAuth token", login: true, local: helper,
+			env: map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "t"}, want: semconv.TermaAccountCredentialApiKey},
+		{name: "blank apiKeyHelper", login: true, user: `{"apiKeyHelper":" "}`, want: semconv.TermaAccountCredentialAccount},
+		{name: "malformed apiKeyHelper", login: true, user: `{"apiKeyHelper":["get-key"]}`, want: ""},
+		{name: "unreadable settings", login: true, unreadable: true, want: ""},
+		{name: "unreadable settings beside a helper", login: true, unreadable: true, local: helper, want: semconv.TermaAccountCredentialApiKey},
+		{name: "Bedrock", login: true, env: map[string]string{"CLAUDE_CODE_USE_BEDROCK": "1"}, want: semconv.TermaAccountCredentialCloud},
+		{name: "Vertex over a key", env: map[string]string{"CLAUDE_CODE_USE_VERTEX": "true", "ANTHROPIC_API_KEY": "k"}, want: semconv.TermaAccountCredentialCloud},
+		{name: "Foundry over a helper", user: helper, env: map[string]string{"CLAUDE_CODE_USE_FOUNDRY": "yes"}, want: semconv.TermaAccountCredentialCloud},
+		{name: "cloud switched off", login: true, env: map[string]string{"CLAUDE_CODE_USE_BEDROCK": "0"}, want: semconv.TermaAccountCredentialAccount},
+	} {
+		dir, repo := t.TempDir(), t.TempDir()
+		t.Setenv("CLAUDE_CONFIG_DIR", dir)
+		for _, k := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"} {
+			t.Setenv(k, c.env[k])
+		}
+		if c.login {
+			writeEvidenceFile(t, filepath.Join(dir, ".claude.json"), `{"oauthAccount":{"accountUuid":"account-a"}}`)
+		}
+		if c.user != "" {
+			writeEvidenceFile(t, filepath.Join(dir, "settings.json"), c.user)
+		}
+		if c.local != "" {
+			writeEvidenceFile(t, filepath.Join(repo, ".claude", "settings.local.json"), c.local)
+		}
+		if c.unreadable {
+			if err := os.MkdirAll(filepath.Join(repo, ".claude", "settings.json"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := readFunding(repo).credential(); got != c.want {
+			t.Errorf("%s: credential %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestClaudeFundingMissingMalformedAndSpecialFiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
