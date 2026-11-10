@@ -106,6 +106,9 @@ type Probes struct {
 	// At is when the probes first saw what they show: a run that sees the same keeps it.
 	At       time.Time `json:"at"`
 	Endpoint string    `json:"endpoint"`
+	// Unavailable says why the plain request was refused, where it was (a model the reference's
+	// key may not use): no case was sent then.
+	Unavailable string `json:"unavailable,omitempty"`
 	// Params is each probe case's outcome, by its name.
 	Params map[string]ProbeResult `json:"params"`
 	// Tokens is the token count of each text of the corpus (probecorpus.go), by its name.

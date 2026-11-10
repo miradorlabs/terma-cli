@@ -42,6 +42,9 @@ func view(s *Snapshot) map[string]any {
 
 func probeView(p *Probes) map[string]any {
 	pv := map[string]any{"params": p.Params, "endpoint": p.Endpoint}
+	if p.Unavailable != "" {
+		pv["unavailable"] = p.Unavailable
+	}
 	if p.Tokens != nil {
 		pv["tokens"] = p.Tokens
 	}

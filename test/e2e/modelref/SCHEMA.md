@@ -78,7 +78,7 @@ or `YYYY-MM` where the source names no day. `first_seen` is when the reference f
 (the next lower version, the same vendor's), `successor` the one after. `harnesses` are the Harness
 Reference's ids of the harnesses whose newest captured build uses the model in some role.
 `last_change` is the newest timeline step with changes, null for none. `probed` says the reference
-has probed its API.
+has probed its API (a model its key may not use is not probed).
 
 ## <model>/snapshot.json
 
@@ -153,7 +153,9 @@ what the API did with each:
 }
 ```
 
-`at` is when the probes first saw what they show: a run that sees the same keeps it. `params` are
+`at` is when the probes first saw what they show: a run that sees the same keeps it. Where the API refused
+the plain request (a model the reference's key may not use, Mythos models), `unavailable` says
+why (`"404 model: claude-mythos-5-2"`) and no case was sent: `params` is empty. `params` are
 the cases by name (`modelref/probe_vendors.go`: sampling, stop sequences, thinking and effort,
 forced tool use, prefill, structured output, the output limit plus one, service tiers), each
 `accepted` or not with the API's status and its error message (request ids taken out). A case the

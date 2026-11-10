@@ -348,7 +348,7 @@ func highlights(changes []refdiff.Change, n int) []string {
 
 func entry(s *Snapshot, tl *Timeline, pred, succ string) Entry {
 	e := Entry{ID: s.ID, Vendor: s.Vendor, Name: s.Name, Family: s.Family, FirstSeen: s.FirstSeen, Harnesses: []string{},
-		Probed: s.API != nil && s.API.Probes != nil}
+		Probed: s.API != nil && s.API.Probes != nil && s.API.Probes.Unavailable == ""}
 	if v, ok := s.Facts[factStatus].(string); ok {
 		e.Status = &v
 	}

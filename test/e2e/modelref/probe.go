@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net/http"
 	"regexp"
@@ -70,6 +71,13 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 		r := ProbeResult{Accepted: resp.Status/100 == 2, Status: resp.Status}
 		if !r.Accepted {
 			r.Error = apiError(resp.Body)
+		}
+		if pc.name == "baseline" && !r.Accepted {
+			// The plain request refused (a model the key may not use, one taken down): no case
+			// would say anything of the model's API.
+			p.Unavailable = fmt.Sprintf("%d %s", r.Status, r.Error)
+			p.Params = map[string]ProbeResult{}
+			return p
 		}
 		p.Params[pc.name] = r
 		if pc.name == "baseline" && r.Accepted && t.shape != nil {

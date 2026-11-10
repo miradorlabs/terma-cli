@@ -153,3 +153,20 @@ func TestUnansweredProbeKeepsItsResult(t *testing.T) {
 		t.Errorf("top_k = %+v, at %v", r, s.API.Probes.At)
 	}
 }
+
+// A model the key may not use refuses the plain request: nothing else is sent, and the probes say
+// why, rather than every case looking refused by the model.
+func TestProbeUnavailableModel(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"not_found_error","message":"model: claude-mythos-5-2"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient()
+	calls := 0
+	c.rewrite = func(u string) string { calls++; return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+	p := anthropicProbe(context.Background(), c, "k", &Snapshot{ID: "claude-mythos-5-2", Facts: map[string]any{}})
+	if p.Unavailable != "404 model: claude-mythos-5-2" || len(p.Params) != 0 || p.Tokens != nil || calls != 1 {
+		t.Errorf("probes = %+v after %d requests", p, calls)
+	}
+}
