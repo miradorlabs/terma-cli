@@ -59,7 +59,8 @@ func announcements(res *result, site, since string) []Announcement {
 	for _, id := range res.new {
 		s := res.snaps[id]
 		released, _ := s.Facts[factReleasedAt].(string)
-		recentRelease := since != "" && released != "" && released >= since
+		// A release date known to the month is compared to the month.
+		recentRelease := since != "" && released != "" && released >= since[:min(len(since), len(released))]
 		if !s.Listed || (!res.vendored[s.Vendor] && !recentRelease) {
 			continue
 		}

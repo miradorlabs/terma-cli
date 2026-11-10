@@ -51,8 +51,8 @@ func init() {
 // "" where s is no date.
 func isoDate(s string) string {
 	s = strings.TrimSpace(s)
-	if m := reISODate.FindString(s); m != "" {
-		return m
+	if m := reISODate.FindStringSubmatch(s); m != nil {
+		return m[1]
 	}
 	if m := reMonthDayYear.FindStringSubmatch(s); m != nil {
 		if mo, ok := months[strings.ToLower(strings.TrimSuffix(m[1], "."))]; ok {
@@ -71,7 +71,8 @@ func isoDate(s string) string {
 }
 
 var (
-	reISODate      = regexp.MustCompile(`\b\d{4}-\d{2}(?:-\d{2})?\b`)
+	// A day may run into a time (2026-11-09T18:30:00Z): T is no word boundary.
+	reISODate      = regexp.MustCompile(`\b(\d{4}-\d{2}(?:-\d{2})?)(?:T|\b)`)
 	reMonthDayYear = regexp.MustCompile(`\b([A-Za-z]{3,9}\.?)\s+(\d{1,2}),?\s+(\d{4})\b`)
 	reMonthYear    = regexp.MustCompile(`\b([A-Za-z]{3,9}\.?)\s+(\d{4})\b`)
 )

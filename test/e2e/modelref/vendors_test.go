@@ -250,7 +250,7 @@ func TestParsers(t *testing.T) {
 		}
 	}
 	for in, want := range map[string]string{"November 9, 2026": "2026-11-09", "Nov 5, 2026": "2026-11-05", "Jun 2026": "2026-06",
-		"Apr 30, 2026 knowledge cutoff": "2026-04-30", "2026-06": "2026-06", "Not sooner than November 9, 2027": "2027-11-09", "N/A": ""} {
+		"Apr 30, 2026 knowledge cutoff": "2026-04-30", "2026-06": "2026-06", "2026-11-09T18:30:00Z": "2026-11-09", "Not sooner than November 9, 2027": "2027-11-09", "N/A": ""} {
 		if got := isoDate(in); got != want {
 			t.Errorf("isoDate(%q) = %q, want %q", in, got, want)
 		}
