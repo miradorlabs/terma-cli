@@ -11,25 +11,53 @@
       "language": "rust"
     },
     "changelog": "https://github.com/openai/codex/releases",
-    "latest": "0.167.0",
-    "support": "supported",
-    "versions_tracked": 101,
+    "latest": "0.167.1",
+    "support": "untested",
+    "versions_tracked": 102,
     "first_tracked": "2026-01-25",
     "last_change": {
-      "from": "0.166.0",
-      "to": "0.167.0",
-      "at": "2026-11-10T05:27:59.913036763Z",
-      "released_at": "2026-11-06T01:46:01.347Z",
-      "changes": 28,
+      "from": "0.167.0",
+      "to": "0.167.1",
+      "at": "2026-11-10T21:46:13.106302964Z",
+      "released_at": "2026-11-10T21:39:51.99Z",
+      "changes": 466,
       "categories": {
-        "cli": 6,
-        "config": 12,
-        "filesystem": 9,
-        "prompt": 1
+        "config": 1,
+        "filesystem": 1,
+        "telemetry": 464
       }
     }
   },
   "versions": [
+    {
+      "version": "0.167.1",
+      "released_at": "2026-11-10T21:39:51.99Z",
+      "captured_at": "2026-11-10T21:46:13.106302964Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.167.0",
+      "changes": 466,
+      "categories": {
+        "config": 1,
+        "filesystem": 1,
+        "telemetry": 464
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 38,
+        "informational": 259,
+        "notable": 169
+      },
+      "undocumented": 466,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "0.167.0",
       "released_at": "2026-11-06T01:46:01.347Z",

@@ -1,7 +1,38 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T21:30:49.077773519Z",
+  "generated_at": "2026-11-10T21:46:13.106302964Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.167.1",
+      "released_at": "2026-11-10T21:39:51.99Z",
+      "captured_at": "2026-11-10T21:46:13.106302964Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.167.0",
+      "changes": 466,
+      "categories": {
+        "config": 1,
+        "filesystem": 1,
+        "telemetry": 464
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 38,
+        "informational": 259,
+        "notable": 169
+      },
+      "undocumented": 466,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "gemini",
       "name": "Gemini CLI",
@@ -6222,42 +6253,6 @@
         "System prompt changed (+376 −387 chars)",
         "Behaviour: sandbox removed",
         "New setting: auto_review.policy"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.123.0",
-      "released_at": "2026-04-23T01:27:03.972Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.122.0",
-      "changes": 44,
-      "categories": {
-        "behavior": 4,
-        "cli": 18,
-        "config": 7,
-        "filesystem": 11,
-        "model": 1,
-        "prompt": 1,
-        "tools": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 34,
-        "notable": 10
-      },
-      "undocumented": 25,
-      "highlights": [
-        "Default model: gpt-5.3-codex → gpt-5.4",
-        "System prompt changed (+6570 −4207 chars)",
-        "spawn_agent tool description changed (+1159 −1537 chars)"
       ],
       "signing": "revoked"
     }
