@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T05:19:19.197557181Z",
+  "generated_at": "2026-11-10T05:27:59.913036763Z",
   "harnesses": [
     {
       "id": "claude",
@@ -52,15 +52,14 @@
       "last_change": {
         "from": "0.166.0",
         "to": "0.167.0",
-        "at": "2026-11-10T05:19:19.197557181Z",
+        "at": "2026-11-10T05:27:59.913036763Z",
         "released_at": "2026-11-06T01:46:01.347Z",
-        "changes": 283,
+        "changes": 28,
         "categories": {
           "cli": 6,
           "config": 12,
           "filesystem": 9,
-          "prompt": 1,
-          "telemetry": 255
+          "prompt": 1
         }
       }
     },
@@ -166,12 +165,10 @@
       "last_change": {
         "from": "0.66.0",
         "to": "0.67.0",
-        "at": "2026-11-10T05:19:19.197557181Z",
+        "at": "2026-11-10T05:27:59.913036763Z",
         "released_at": "2026-11-04T20:32:45.08Z",
-        "changes": 32,
-        "categories": {
-          "telemetry": 32
-        }
+        "changes": 0,
+        "categories": {}
       }
     },
     {

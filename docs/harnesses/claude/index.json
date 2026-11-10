@@ -72,7 +72,7 @@
     {
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -98,7 +98,7 @@
     {
       "version": "2.1.321",
       "released_at": "2026-11-09T19:02:47.641Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -130,27 +130,26 @@
     {
       "version": "2.1.319",
       "released_at": "2026-11-06T00:58:56.366Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.318",
-      "changes": 96,
+      "changes": 78,
       "categories": {
         "binary": 1,
         "config": 19,
-        "network": 58,
-        "telemetry": 18
+        "network": 58
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 37,
+        "informational": 19,
         "notable": 59
       },
-      "undocumented": 33,
+      "undocumented": 17,
       "highlights": [
         "tengu_api_after_normalize telemetry event field rh added",
         "tengu_api_before_normalize telemetry event field rh added",

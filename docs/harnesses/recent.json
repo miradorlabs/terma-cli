@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T05:19:19.197557181Z",
+  "generated_at": "2026-11-10T05:27:59.913036763Z",
   "versions": [
     {
       "harness": "claude",
       "name": "Claude Code",
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -95,7 +95,7 @@
       "name": "Claude Code",
       "version": "2.1.321",
       "released_at": "2026-11-09T19:02:47.641Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -261,32 +261,31 @@
       "name": "Codex CLI",
       "version": "0.167.0",
       "released_at": "2026-11-06T01:46:01.347Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 283,
+      "changes": 28,
       "categories": {
         "cli": 6,
         "config": 12,
         "filesystem": 9,
-        "prompt": 1,
-        "telemetry": 255
+        "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 281,
+        "informational": 26,
         "notable": 2
       },
-      "undocumented": 117,
+      "undocumented": 18,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "Telemetry export added"
+        "Description of `codex agents` changed"
       ],
       "signing": "valid"
     },
@@ -295,27 +294,26 @@
       "name": "Claude Code",
       "version": "2.1.319",
       "released_at": "2026-11-06T00:58:56.366Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.318",
-      "changes": 96,
+      "changes": 78,
       "categories": {
         "binary": 1,
         "config": 19,
-        "network": 58,
-        "telemetry": 18
+        "network": 58
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 37,
+        "informational": 19,
         "notable": 59
       },
-      "undocumented": 33,
+      "undocumented": 17,
       "highlights": [
         "tengu_api_after_normalize telemetry event field rh added",
         "tengu_api_before_normalize telemetry event field rh added",
@@ -328,28 +326,22 @@
       "name": "Gemini CLI",
       "version": "0.67.0",
       "released_at": "2026-11-04T20:32:45.08Z",
-      "captured_at": "2026-11-10T05:19:19.197557181Z",
+      "captured_at": "2026-11-10T05:27:59.913036763Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.66.0",
-      "changes": 32,
-      "categories": {
-        "telemetry": 32
-      },
+      "changes": 0,
+      "categories": {},
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 32,
+        "informational": 0,
         "notable": 0
       },
-      "undocumented": 30,
-      "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
-        "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added"
-      ],
+      "undocumented": 0,
+      "highlights": [],
       "signing": null
     },
     {

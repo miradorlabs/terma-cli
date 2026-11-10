@@ -3,7 +3,7 @@
   "harness": "claude",
   "version": "2.1.322",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-10T05:19:19.197557181Z",
+  "captured_at": "2026-11-10T05:27:59.913036763Z",
   "capture": {
     "command": [
       "claude",
@@ -34,7 +34,7 @@
       "side_requests": "2026-11-10T02:25:33.04205458Z",
       "storage": "2026-11-10T02:25:33.04205458Z",
       "support": "2026-11-10T05:19:19.197557181Z",
-      "telemetry": "2026-11-10T05:19:19.197557181Z",
+      "telemetry": "2026-11-10T05:27:59.913036763Z",
       "tools": "2026-11-10T02:25:33.04205458Z"
     }
   },
@@ -887,17 +887,6 @@
     }
   },
   "telemetry": {
-    "export": {
-      "interval_batches": {
-        "logs": 2,
-        "metrics": 1
-      },
-      "interval_ms": {
-        "logs": 5000,
-        "metrics": 60000
-      },
-      "protocol": "http/protobuf"
-    },
     "surfaces": {
       "logs/api_request": {
         "keys": {
@@ -2257,11 +2246,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum",
-        "unit": "s"
+        }
       },
       "metrics/claude_code.code_edit_tool.decision": {
         "keys": {
@@ -2371,11 +2356,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum",
-        "unit": "USD"
+        }
       },
       "metrics/claude_code.lines_of_code.count": {
         "keys": {
@@ -2461,10 +2442,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/claude_code.token.usage": {
         "keys": {
@@ -2522,11 +2500,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum",
-        "unit": "tokens"
+        }
       },
       "resource": {
         "keys": {
@@ -2654,8 +2628,7 @@
               "number"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/claude_code.llm_request": {
         "keys": {
@@ -2827,8 +2800,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/claude_code.interaction"
+        }
       },
       "traces/claude_code.llm_request/events/gen_ai.request.attempt": {
         "keys": {
@@ -24233,7 +24205,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-10T05:19:19.197557181Z",
+    "fetched_at": "2026-11-10T05:27:59.913036763Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",

@@ -3,7 +3,7 @@
   "harness": "codex",
   "version": "0.167.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-10T05:19:19.197557181Z",
+  "captured_at": "2026-11-10T05:27:59.913036763Z",
   "capture": {
     "command": [
       "codex",
@@ -49,7 +49,7 @@
       "side_requests": "2026-11-10T05:19:19.197557181Z",
       "storage": "2026-11-10T05:19:19.197557181Z",
       "support": "2026-11-07T05:31:09Z",
-      "telemetry": "2026-11-10T05:19:19.197557181Z",
+      "telemetry": "2026-11-10T05:27:59.913036763Z",
       "tools": "2026-11-10T05:19:19.197557181Z"
     }
   },
@@ -618,19 +618,6 @@
     }
   },
   "telemetry": {
-    "export": {
-      "interval_batches": {
-        "logs": 1,
-        "metrics": 1,
-        "traces": 1
-      },
-      "interval_ms": {
-        "logs": 1000,
-        "metrics": 60000,
-        "traces": 10000
-      },
-      "protocol": "http/protobuf"
-    },
     "surfaces": {
       "logs/codex.api_request": {
         "keys": {
@@ -1458,10 +1445,7 @@
               "bool"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.api_request.duration_ms": {
         "keys": {
@@ -1507,10 +1491,7 @@
               "bool"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.auth_storage.duration": {
         "keys": {
@@ -1580,10 +1561,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.auth_storage.operation": {
         "keys": {
@@ -1653,10 +1631,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.cloud_config_bundle.load": {
         "keys": {
@@ -1678,10 +1653,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.conversation.turn.count": {
         "keys": {
@@ -1715,10 +1687,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.db.backfill": {
         "keys": {
@@ -1728,10 +1697,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.db.backfill.duration_ms": {
         "keys": {
@@ -1741,10 +1707,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.feature.state": {
         "keys": {
@@ -1790,10 +1753,7 @@
               "bool"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.guardian.turn.blocking_ms": {
         "keys": {
@@ -1833,10 +1793,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.hooks.run": {
         "keys": {
@@ -1900,10 +1857,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.hooks.run.duration_ms": {
         "keys": {
@@ -1967,10 +1921,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.mcp.binding_catalog.raw_definition_json_bytes": {
         "keys": {
@@ -1980,9 +1931,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.process.start": {
         "keys": {
@@ -1992,10 +1941,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.rollout_compression.materialize": {
         "keys": {
@@ -2005,10 +1951,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.rollout_compression.read": {
         "keys": {
@@ -2048,10 +1991,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.rollout_compression.read.io_duration_ms": {
         "keys": {
@@ -2091,10 +2031,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.sandbox_integrity.check": {
         "keys": {
@@ -2236,10 +2173,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.shell_snapshot.command": {
         "keys": {
@@ -2337,10 +2271,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.shell_snapshot.wait_ms": {
         "keys": {
@@ -2438,9 +2369,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.skills.shadow_selection": {
         "keys": {
@@ -2474,10 +2403,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.skills.shadow_selection.catalog_entries": {
         "keys": {
@@ -2511,9 +2437,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.skills.shadow_selection.duration_ms": {
         "keys": {
@@ -2547,10 +2471,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.skills.shadow_selection.query_terms": {
         "keys": {
@@ -2584,9 +2505,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.skills.shadow_selection.reduction_bps": {
         "keys": {
@@ -2620,9 +2539,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.skills.shadow_selection.selected_entries": {
         "keys": {
@@ -2656,9 +2573,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.sqlite.init.count": {
         "keys": {
@@ -2692,10 +2607,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.sqlite.init.duration_ms": {
         "keys": {
@@ -2729,10 +2641,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.sse_event": {
         "keys": {
@@ -2778,10 +2687,7 @@
               "bool"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.sse_event.duration_ms": {
         "keys": {
@@ -2827,10 +2733,7 @@
               "bool"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.startup.phase.duration_ms": {
         "keys": {
@@ -2876,10 +2779,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.thread.skills.description_truncated_chars": {
         "keys": {
@@ -2919,9 +2819,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.thread.skills.enabled_total": {
         "keys": {
@@ -2961,9 +2859,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.thread.skills.kept_total": {
         "keys": {
@@ -3003,9 +2899,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.thread.skills.truncated": {
         "keys": {
@@ -3045,9 +2939,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.thread.started": {
         "keys": {
@@ -3093,10 +2985,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.thread_history.sqlite_projection": {
         "keys": {
@@ -3106,10 +2995,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.tool.call": {
         "keys": {
@@ -3341,9 +3227,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.turn.e2e_duration_ms": {
         "keys": {
@@ -3377,10 +3261,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.turn.memory": {
         "keys": {
@@ -3438,10 +3319,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.turn.network_proxy": {
         "keys": {
@@ -3487,10 +3365,7 @@
               "bool"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/codex.turn.token_usage": {
         "keys": {
@@ -3536,9 +3411,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.turn.tool.call": {
         "keys": {
@@ -3578,9 +3451,7 @@
               "bool"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram"
+        }
       },
       "metrics/codex.turn.ttfm.duration_ms": {
         "keys": {
@@ -3614,10 +3485,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.turn.ttft.duration_ms": {
         "keys": {
@@ -3651,10 +3519,7 @@
               "text"
             ]
           }
-        },
-        "temporality": "delta",
-        "type": "histogram",
-        "unit": "ms"
+        }
       },
       "metrics/codex.turn.unified_exec.running_processes": {
         "keys": {
@@ -3688,10 +3553,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "resource": {
         "keys": {
@@ -3807,8 +3669,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/add_core_tool_sources"
+        }
       },
       "traces/add_core_tool_sources": {
         "keys": {
@@ -3866,8 +3727,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_tool_router"
+        }
       },
       "traces/add_core_utility_tools": {
         "keys": {
@@ -3925,8 +3785,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/add_core_tool_sources"
+        }
       },
       "traces/add_mcp_resource_tools": {
         "keys": {
@@ -3984,8 +3843,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/add_core_tool_sources"
+        }
       },
       "traces/add_shell_tools": {
         "keys": {
@@ -4043,8 +3901,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/add_core_tool_sources"
+        }
       },
       "traces/agents_md.discover": {
         "keys": {
@@ -4102,8 +3959,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/agents_md.load"
+        }
       },
       "traces/agents_md.load": {
         "keys": {
@@ -4167,8 +4023,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/agents_md.refresh"
+        }
       },
       "traces/agents_md.refresh": {
         "keys": {
@@ -4226,11 +4081,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/session_init",
-          "traces/step_context.capture"
-        ]
+        }
       },
       "traces/app_server.serialized_request_queue": {
         "keys": {
@@ -4294,11 +4145,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/thread/unsubscribe",
-          "traces/turn/start"
-        ]
+        }
       },
       "traces/app_server.thread_start.attach_listener": {
         "keys": {
@@ -4362,8 +4209,7 @@
               "bool"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/app_server.thread_start.config_snapshot": {
         "keys": {
@@ -4421,8 +4267,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/app_server.thread_start.create_thread": {
         "keys": {
@@ -4486,8 +4331,7 @@
               "number"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/app_server.thread_start.notify_started": {
         "keys": {
@@ -4545,8 +4389,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/app_server.thread_start.resolve_status": {
         "keys": {
@@ -4604,8 +4447,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/app_server.thread_start.send_response": {
         "keys": {
@@ -4663,8 +4505,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/app_server.thread_start.upsert_thread": {
         "keys": {
@@ -4722,8 +4563,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/append_dynamic_tool_runtimes": {
         "keys": {
@@ -4787,8 +4627,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_tool_router"
+        }
       },
       "traces/append_items": {
         "keys": {
@@ -4852,11 +4691,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/append_items",
-          "traces/persist_rollout_items"
-        ]
+        }
       },
       "traces/append_mcp_tools": {
         "keys": {
@@ -4914,8 +4749,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_tool_router"
+        }
       },
       "traces/auth": {
         "keys": {
@@ -4973,15 +4807,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/codex.turn_input",
-          "traces/model_client.stream_responses_api",
-          "traces/session_init",
-          "traces/session_init.thread_persistence",
-          "traces/world_state.build"
-        ],
-        "root": true
+        }
       },
       "traces/build_extension_turn_input_items": {
         "keys": {
@@ -5045,8 +4871,7 @@
               "number"
             ]
           }
-        },
-        "parent": "traces/build_skills_and_plugins"
+        }
       },
       "traces/build_model_visible_specs": {
         "keys": {
@@ -5104,8 +4929,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/finalize_tool_router"
+        }
       },
       "traces/build_prompt": {
         "keys": {
@@ -5163,8 +4987,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_sampling_request"
+        }
       },
       "traces/build_skill_outcome": {
         "keys": {
@@ -5222,8 +5045,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/skills_for_config"
+        }
       },
       "traces/build_skills_and_plugins": {
         "keys": {
@@ -5281,8 +5103,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/build_tool_call": {
         "keys": {
@@ -5340,8 +5161,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/handle_output_item_done"
+        }
       },
       "traces/build_tool_router": {
         "keys": {
@@ -5399,8 +5219,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/built_tools"
+        }
       },
       "traces/built_tools": {
         "keys": {
@@ -5476,8 +5295,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/step_context.capture"
+        }
       },
       "traces/built_tools.load_discoverable_tools": {
         "keys": {
@@ -5535,8 +5353,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/built_tools"
+        }
       },
       "traces/capability_roots.resolve": {
         "keys": {
@@ -5594,8 +5411,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/step_context.capture"
+        }
       },
       "traces/capability_roots.snapshot_for_step": {
         "keys": {
@@ -5659,8 +5475,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/step_context.capture"
+        }
       },
       "traces/capture_binding_with_metadata": {
         "keys": {
@@ -5718,8 +5533,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/mcp.runtime.resolve_for_step"
+        }
       },
       "traces/codex.exec": {
         "keys": {
@@ -5784,8 +5598,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/codex.hooks.command": {
         "keys": {
@@ -5891,13 +5704,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/run_pending_session_start_hooks",
-          "traces/run_session_end_hooks",
-          "traces/run_turn_stop_hooks"
-        ],
-        "root": true
+        }
       },
       "traces/codex.process.spawn": {
         "keys": {
@@ -6031,8 +5838,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/try_run_sampling_request"
+        }
       },
       "traces/codex.tool_blocking": {
         "keys": {
@@ -6178,8 +5984,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/op.dispatch.turn_input"
+        }
       },
       "traces/collect_explicit_skill_mentions": {
         "keys": {
@@ -6249,8 +6054,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_extension_turn_input_items"
+        }
       },
       "traces/consume_startup_prewarm_for_regular_turn": {
         "keys": {
@@ -6308,8 +6112,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/regular_task.prepare_run_turn"
+        }
       },
       "traces/dispatch_tool_call_with_state": {
         "keys": {
@@ -6655,11 +6458,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/codex.turn_input",
-          "traces/regular_task.prepare_run_turn"
-        ]
+        }
       },
       "traces/endpoint_session.stream_encoded_json_with": {
         "keys": {
@@ -6729,8 +6528,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/responses.stream_request"
+        }
       },
       "traces/endpoint_session.stream_encoded_json_with/events/event otel/src/events/session_telemetry.rs": {
         "keys": {
@@ -6954,8 +6752,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/environments.snapshot": {
         "keys": {
@@ -7025,14 +6822,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/codex.turn_input",
-          "traces/mcp.runtime.refresh_if_dirty",
-          "traces/run_session_end_hooks",
-          "traces/session_init",
-          "traces/step_context.capture"
-        ]
+        }
       },
       "traces/environments.wait_until_ready": {
         "keys": {
@@ -7096,8 +6886,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/environments.snapshot"
+        }
       },
       "traces/exec_command": {
         "keys": {
@@ -7350,8 +7139,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/environments.resolve"
+        }
       },
       "traces/extension_tool_executors": {
         "keys": {
@@ -7409,8 +7197,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_tool_router"
+        }
       },
       "traces/finalize_tool_router": {
         "keys": {
@@ -7468,8 +7255,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_tool_router"
+        }
       },
       "traces/flush_assistant_text_segments_all": {
         "keys": {
@@ -7527,8 +7313,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/try_run_sampling_request"
+        }
       },
       "traces/flush_assistant_text_segments_for_item": {
         "keys": {
@@ -7586,8 +7371,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/try_run_sampling_request"
+        }
       },
       "traces/fs.get_metadata": {
         "keys": {
@@ -7651,15 +7435,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/agents_md.discover",
-          "traces/app_server.thread_start.attach_listener",
-          "traces/build_skill_outcome",
-          "traces/load_with_cli_overrides",
-          "traces/skills_for_config",
-          "traces/turn_diff_display_roots"
-        ]
+        }
       },
       "traces/fs.read_file": {
         "keys": {
@@ -7723,13 +7499,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/build_skill_outcome",
-          "traces/load_with_cli_overrides",
-          "traces/turn/start"
-        ],
-        "root": true
+        }
       },
       "traces/get_default_model": {
         "keys": {
@@ -7805,8 +7575,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread_spawn"
+        }
       },
       "traces/get_model_info": {
         "keys": {
@@ -7870,19 +7639,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/app_server.thread_start.attach_listener",
-          "traces/app_server.thread_start.config_snapshot",
-          "traces/codex.turn_input",
-          "traces/session_init",
-          "traces/thread_spawn",
-          "traces/track_turn_resolved_config_analytics",
-          "traces/try_run_sampling_request",
-          "traces/turn/start",
-          "traces/turn_context.build"
-        ],
-        "root": true
+        }
       },
       "traces/guardian_scoring_observation": {
         "keys": {
@@ -8022,8 +7779,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/handle_responses"
+        }
       },
       "traces/handle_output_item_done/events/codex.tool_call_received": {
         "keys": {
@@ -8217,8 +7973,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/receiving_stream"
+        }
       },
       "traces/handle_tool_call": {
         "keys": {
@@ -8392,8 +8147,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_tool_router"
+        }
       },
       "traces/initialize": {
         "keys": {
@@ -8499,8 +8253,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/instructions.load": {
         "keys": {
@@ -8564,8 +8317,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/agents_md.refresh"
+        }
       },
       "traces/list_models": {
         "keys": {
@@ -8629,12 +8381,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/get_default_model",
-          "traces/thread_spawn"
-        ],
-        "root": true
+        }
       },
       "traces/load": {
         "keys": {
@@ -8692,8 +8439,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread_spawn"
+        }
       },
       "traces/load_skill_prompts": {
         "keys": {
@@ -8757,8 +8503,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_skills_and_plugins"
+        }
       },
       "traces/load_with_cli_overrides": {
         "keys": {
@@ -8816,12 +8561,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/codex.exec",
-          "traces/thread/start",
-          "traces/turn/start"
-        ]
+        }
       },
       "traces/mcp.runtime.refresh": {
         "keys": {
@@ -8879,8 +8619,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init.mcp_manager_init"
+        }
       },
       "traces/mcp.runtime.refresh_if_dirty": {
         "keys": {
@@ -8938,11 +8677,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/mcp.runtime.resolve_for_step",
-          "traces/run_turn"
-        ]
+        }
       },
       "traces/mcp.runtime.refresh_wait": {
         "keys": {
@@ -9000,11 +8735,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/mcp.runtime.refresh_if_dirty",
-          "traces/op.dispatch.shutdown"
-        ]
+        }
       },
       "traces/mcp.runtime.resolve_for_step": {
         "keys": {
@@ -9068,8 +8799,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/step_context.capture"
+        }
       },
       "traces/mcp.runtime_config.project_for_step": {
         "keys": {
@@ -9127,8 +8857,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init.auth_mcp"
+        }
       },
       "traces/merge_connector_selection": {
         "keys": {
@@ -9192,8 +8921,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/merge_into_namespaces": {
         "keys": {
@@ -9257,8 +8985,7 @@
               "number"
             ]
           }
-        },
-        "parent": "traces/build_model_visible_specs"
+        }
       },
       "traces/model_client.stream_responses_api": {
         "keys": {
@@ -9352,8 +9079,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/stream_request"
+        }
       },
       "traces/op.dispatch.shutdown": {
         "keys": {
@@ -9423,8 +9149,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_loop"
+        }
       },
       "traces/op.dispatch.turn_input": {
         "keys": {
@@ -9494,8 +9219,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/turn/start"
+        }
       },
       "traces/persist_rollout_items": {
         "keys": {
@@ -9559,21 +9283,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/handle_output_item_done",
-          "traces/record_context_updates_and_set_reference_context_item",
-          "traces/record_conversation_items",
-          "traces/regular_task.prepare_run_turn",
-          "traces/run_hooks_and_record_inputs",
-          "traces/run_pending_session_start_hooks",
-          "traces/run_session_end_hooks",
-          "traces/run_turn_stop_hooks",
-          "traces/send_raw_response_items",
-          "traces/session_init",
-          "traces/session_task.turn",
-          "traces/try_run_sampling_request"
-        ]
+        }
       },
       "traces/plugins_for_config": {
         "keys": {
@@ -9637,18 +9347,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/app_server.thread_start.attach_listener",
-          "traces/codex.turn_input",
-          "traces/mcp.runtime_config.project_for_step",
-          "traces/prepare_tool_recommendations",
-          "traces/record_context_updates_and_set_reference_context_item",
-          "traces/run_turn",
-          "traces/session_init",
-          "traces/session_init.plugin_skill_warmup",
-          "traces/turn_context.build"
-        ]
+        }
       },
       "traces/prepare_tool_recommendations": {
         "keys": {
@@ -9706,8 +9405,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/step_context.capture"
+        }
       },
       "traces/realtime_conversation.running_state": {
         "keys": {
@@ -9765,19 +9463,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/handle_output_item_done",
-          "traces/regular_task.prepare_run_turn",
-          "traces/run_hooks_and_record_inputs",
-          "traces/run_pending_session_start_hooks",
-          "traces/run_session_end_hooks",
-          "traces/run_turn_stop_hooks",
-          "traces/send_raw_response_items",
-          "traces/session_task.turn",
-          "traces/try_run_sampling_request",
-          "traces/turn_context.build"
-        ]
+        }
       },
       "traces/receiving": {
         "keys": {
@@ -9835,8 +9521,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/handle_responses"
+        }
       },
       "traces/receiving_stream": {
         "keys": {
@@ -9894,8 +9579,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/try_run_sampling_request"
+        }
       },
       "traces/record_context_updates_and_set_reference_context_item": {
         "keys": {
@@ -9953,8 +9637,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/record_conversation_items": {
         "keys": {
@@ -10018,11 +9701,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/handle_output_item_done",
-          "traces/record_context_updates_and_set_reference_context_item"
-        ]
+        }
       },
       "traces/regular_task.prepare_run_turn": {
         "keys": {
@@ -10080,8 +9759,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_task.run"
+        }
       },
       "traces/render_available_skills": {
         "keys": {
@@ -10145,11 +9823,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/record_context_updates_and_set_reference_context_item",
-          "traces/world_state.build"
-        ]
+        }
       },
       "traces/responses.stream_request": {
         "keys": {
@@ -10225,8 +9899,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/model_client.stream_responses_api"
+        }
       },
       "traces/run_hooks_and_record_inputs": {
         "keys": {
@@ -10284,11 +9957,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/run_turn",
-          "traces/session_task.turn"
-        ]
+        }
       },
       "traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs": {
         "keys": {
@@ -10458,8 +10127,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/run_pending_session_start_hooks": {
         "keys": {
@@ -10517,8 +10185,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/run_pre_sampling_compact": {
         "keys": {
@@ -10576,8 +10243,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/run_sampling_request": {
         "keys": {
@@ -10653,8 +10319,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/run_session_end_hooks": {
         "keys": {
@@ -10712,8 +10377,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/op.dispatch.shutdown"
+        }
       },
       "traces/run_turn": {
         "keys": {
@@ -10783,8 +10447,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_task.run"
+        }
       },
       "traces/run_turn.collect_post_sampling_state": {
         "keys": {
@@ -10842,8 +10505,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/run_turn.prepare_sampling_request_input": {
         "keys": {
@@ -10901,8 +10563,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/run_turn_stop_hooks": {
         "keys": {
@@ -10960,8 +10621,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/send_raw_response_items": {
         "keys": {
@@ -11025,11 +10685,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/record_conversation_items",
-          "traces/run_hooks_and_record_inputs"
-        ]
+        }
       },
       "traces/session.flush_rollout": {
         "keys": {
@@ -11087,12 +10743,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/run_session_end_hooks",
-          "traces/session_task.turn"
-        ],
-        "root": true
+        }
       },
       "traces/session_init": {
         "keys": {
@@ -11150,8 +10801,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread_spawn"
+        }
       },
       "traces/session_init.auth_mcp": {
         "keys": {
@@ -11209,8 +10859,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init.mcp_manager_init": {
         "keys": {
@@ -11268,8 +10917,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init.plugin_skill_warmup": {
         "keys": {
@@ -11327,8 +10975,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init.required_mcp_wait": {
         "keys": {
@@ -11392,8 +11039,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init.state_db": {
         "keys": {
@@ -11457,8 +11103,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init.thread_name_lookup": {
         "keys": {
@@ -11516,8 +11161,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init.thread_persistence": {
         "keys": {
@@ -11581,8 +11225,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_init"
+        }
       },
       "traces/session_init/events/event otel/src/events/session_telemetry.rs": {
         "keys": {
@@ -11794,8 +11437,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/session_task.run": {
         "keys": {
@@ -11853,8 +11495,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/session_task.turn"
+        }
       },
       "traces/session_task.turn": {
         "keys": {
@@ -11973,8 +11614,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/codex.turn_input"
+        }
       },
       "traces/session_task.turn/events/codex.turn_profile": {
         "keys": {
@@ -12096,11 +11736,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/run_turn",
-          "traces/session_init"
-        ]
+        }
       },
       "traces/shell_snapshot": {
         "keys": {
@@ -12164,8 +11800,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/environments.resolve"
+        }
       },
       "traces/skills.executor.refresh_executor_catalog": {
         "keys": {
@@ -12229,8 +11864,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/step_context.capture"
+        }
       },
       "traces/skills.shadow_selection.rank": {
         "keys": {
@@ -12294,8 +11928,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/build_extension_turn_input_items"
+        }
       },
       "traces/skills_for_config": {
         "keys": {
@@ -12353,11 +11986,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/session_init.plugin_skill_warmup",
-          "traces/turn_context.build"
-        ]
+        }
       },
       "traces/step_context.capture": {
         "keys": {
@@ -12415,8 +12044,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/stream_request": {
         "keys": {
@@ -12474,8 +12102,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/try_run_sampling_request"
+        }
       },
       "traces/thread/items/list": {
         "keys": {
@@ -12581,8 +12208,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/thread/start": {
         "keys": {
@@ -12688,8 +12314,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/thread/start/events/event otel/src/events/session_telemetry.rs": {
         "keys": {
@@ -12901,8 +12526,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/thread_spawn": {
         "keys": {
@@ -12960,8 +12584,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/thread/start"
+        }
       },
       "traces/tool_dispatch.parallel_lock": {
         "keys": {
@@ -13083,8 +12706,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/try_run_sampling_request": {
         "keys": {
@@ -13154,8 +12776,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_sampling_request"
+        }
       },
       "traces/try_run_sampling_request/events/event otel/src/events/session_telemetry.rs": {
         "keys": {
@@ -13361,8 +12982,7 @@
               "text"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/turn_context.build": {
         "keys": {
@@ -13426,11 +13046,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/codex.turn_input",
-          "traces/run_session_end_hooks"
-        ]
+        }
       },
       "traces/turn_context.make": {
         "keys": {
@@ -13488,8 +13104,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/turn_context.build"
+        }
       },
       "traces/turn_diff_display_roots": {
         "keys": {
@@ -13547,8 +13162,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/run_turn"
+        }
       },
       "traces/unified_exec.collect_output": {
         "keys": {
@@ -13846,11 +13460,7 @@
               "text"
             ]
           }
-        },
-        "parents": [
-          "traces/record_context_updates_and_set_reference_context_item",
-          "traces/run_turn"
-        ]
+        }
       }
     }
   },
