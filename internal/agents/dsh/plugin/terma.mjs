@@ -16,13 +16,14 @@
 // attribution. dsh computes no cost; the platform prices the tokens.
 //
 // It sets no environment: dsh passes its own to every tool, and a tool must never inherit
-// terma's endpoint or token. Dependency-free: only Node's fetch, node:crypto and
-// node:child_process.
+// terma's endpoint or token. Dependency-free: only node:crypto, node:child_process and
+// node:http.
 
 const CONFIG = null /* terma:config */
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
+import { Agent, request } from "node:http"
 
 export const name = "terma"
 
@@ -72,17 +73,27 @@ let spans = []
 let logs = []
 let timer
 
-async function post(path, body) {
-  try {
-    await fetch(CONFIG.endpoint.replace(/\/+$/, "") + path, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...CONFIG.headers },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10000),
-    })
-  } catch {
-    // A telemetry failure must never surface in the agent.
-  }
+// relayAgent keeps the connection to the relay alive between exports, closing it once idle
+// well before the relay would.
+const relayAgent = new Agent({ keepAlive: true, timeout: 5000 })
+
+// post sends straight to the local relay with node:http through relayAgent rather than
+// fetch, whose route is whatever dispatcher the host installed: no HTTP proxy policy of
+// the host's, or NODE_USE_ENV_PROXY, applies to it.
+function post(path, body) {
+  const data = JSON.stringify(body)
+  return new Promise((resolve) => {
+    try {
+      const headers = { "content-type": "application/json", "content-length": String(Buffer.byteLength(data)), ...CONFIG.headers }
+      const req = request(CONFIG.endpoint.replace(/\/+$/, "") + path, { method: "POST", headers, agent: relayAgent, timeout: 10000 }, (res) => res.resume())
+      req.on("timeout", () => req.destroy())
+      req.on("error", resolve) // A telemetry failure must never surface in the agent.
+      req.on("close", resolve)
+      req.end(data)
+    } catch {
+      resolve()
+    }
+  })
 }
 
 async function flush() {

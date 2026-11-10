@@ -66,3 +66,16 @@ func Write(path string, cfg Config) (string, error) {
 	}
 	return path, config.WriteFileAtomic(path, []byte(text), 0o600)
 }
+
+// Refresh rewrites the extension at path, keeping its configuration, in this build's
+// template; a missing or inert one is left alone.
+func Refresh(path string) (bool, error) {
+	return relayexport.Refresh(path, "const CONFIG: TermaConfig | null = ", " /* terma:config */", func(raw string) (string, bool) {
+		var cfg Config
+		if json.Unmarshal([]byte(raw), &cfg) != nil || cfg.Endpoint == "" {
+			return "", false
+		}
+		text, err := Render(cfg)
+		return text, err == nil
+	})
+}
