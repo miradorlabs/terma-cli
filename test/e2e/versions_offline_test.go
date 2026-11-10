@@ -84,6 +84,25 @@ func TestCheckedBuildsAreThisPlatforms(t *testing.T) {
 	}
 }
 
+// Each OpenCode major is checked from its own last checked build: the newest checked
+// OpenCode 2 build is no baseline for OpenCode 1's releases.
+func TestCheckedBuildsAreTheMajors(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	if err := os.WriteFile(path, []byte(`[
+		{"harness": "opencode", "version": "1.19.0", "platform": "darwin/arm64", "capability": "relay.telemetry", "result": "pass"},
+		{"harness": "opencode", "version": "2.0.29", "platform": "darwin/arm64", "capability": "relay.telemetry", "result": "pass"}
+	]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TERMA_E2E_CHECKED", path)
+	if got, _ := checkedBuildsOn("darwin/arm64", "opencode", []string{"1.18.35", "1.19.0", "1.19.1", "1.19.2"}); !slices.Equal(got, []string{"1.19.0", "1.19.1", "1.19.2"}) {
+		t.Errorf("OpenCode 1: %v, want from 1.19.0", got)
+	}
+	if got, _ := checkedBuildsOn("darwin/arm64", "opencode", []string{"2.0.28", "2.0.29", "2.0.30"}); !slices.Equal(got, []string{"2.0.29", "2.0.30"}) {
+		t.Errorf("OpenCode 2: %v, want from 2.0.29", got)
+	}
+}
+
 // resolve with "checked": the builds it picks, each once beside the installed one, and the
 // last three, with a note saying why, where the history says nothing.
 func TestResolveChecked(t *testing.T) {
