@@ -206,15 +206,18 @@
     $userPath = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $next = "``terma setup``"
+    # terma by its path, for when PATH will not find it: quoted as PowerShell reads it, an
+    # apostrophe in a folder name doubled.
+    $quotedExe = $exe.Replace("'", "''")
     $onPath = $true
     if ((Test-OnPath $userPath $dest) -or (Test-OnPath $machinePath $dest)) {
       Say "$dest is already on PATH in new terminals."
     } elseif ($dest.Contains(';')) {
       Say "Note: $dest cannot go on PATH, which would split it at the ';'."
-      $onPath, $next = $false, "``& '$exe' setup``"
+      $onPath, $next = $false, "``& '$quotedExe' setup``"
     } elseif (Test-Path Env:TERMA_NO_MODIFY_PATH) {
       Say "Note: $dest is not on your PATH. Add it to your user PATH to run terma by name."
-      $onPath, $next = $false, "``& '$exe' setup``"
+      $onPath, $next = $false, "``& '$quotedExe' setup``"
     } else {
       $kind = [Microsoft.Win32.RegistryValueKind]::ExpandString
       if ($userPath) { $kind = $envKey.GetValueKind('Path') }

@@ -177,10 +177,15 @@ try {
   if ($res.Out -notmatch [regex]::Escape("$default is already on PATH in new terminals.")) { Fail "a reinstall said: $($res.Out)" }
 
   Write-Host '== opted out, and a folder PATH cannot hold, leave the user PATH alone'
-  $bin4 = Join-Path $work 'bin4'
+  # An apostrophe in the folder, as in C:\Users\O'Brien: the command printed to run terma by
+  # its path must still be one PowerShell reads.
+  $bin4 = Join-Path $work "o'brien"
   $res = Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = $bin4; TERMA_NO_MODIFY_PATH = '1' }
   Assert-Installed $bin4 $res
-  if ($res.Out -notmatch 'is not on your PATH' -or $res.Out -notmatch [regex]::Escape("Next: run ``& '$bin4\terma.exe' setup``.")) { Fail "opted out, but said: $($res.Out)" }
+  $quoted = (Join-Path $bin4 'terma.exe').Replace("'", "''")
+  if ($res.Out -notmatch 'is not on your PATH' -or $res.Out -notmatch [regex]::Escape("Next: run ``& '$quoted' setup``.")) { Fail "opted out, but said: $($res.Out)" }
+  $ran = Invoke-Expression "& '$quoted' version"
+  if ($ran -ne $want) { Fail "the printed command, run, said $ran; want $want" }
   $semi = Join-Path $work 'a;b'
   $res = Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = $semi }
   Assert-Installed $semi $res
