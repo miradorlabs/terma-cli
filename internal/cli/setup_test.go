@@ -325,7 +325,7 @@ func TestSetupLeavesAnUnconfiguredAgentsConfigAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if data, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json")); !strings.Contains(string(data), token) {
+	if data := claudeExport(t); !strings.Contains(data, token) {
 		t.Fatalf("Claude Code is not on the relay:\n%s", data)
 	}
 	if data, _ := os.ReadFile(codexConfig); string(data) != mine {
@@ -358,7 +358,6 @@ func TestSetupReleasesTheRelayFromADeselectedAgent(t *testing.T) {
 	if err := os.WriteFile(geminiSettings, []byte(geminiMine), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	claudeSettings := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json")
 	read := func(path string) string {
 		t.Helper()
 		data, _ := os.ReadFile(path)
@@ -372,8 +371,8 @@ func TestSetupReleasesTheRelayFromADeselectedAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(read(codexConfig), token) || !strings.Contains(read(claudeSettings), token) {
-		t.Fatalf("setup did not point both agents at the relay:\ncodex:\n%s\nclaude:\n%s", read(codexConfig), read(claudeSettings))
+	if !strings.Contains(read(codexConfig), token) || !strings.Contains(claudeExport(t), token) {
+		t.Fatalf("setup did not point both agents at the relay:\ncodex:\n%s\nclaude:\n%s", read(codexConfig), claudeExport(t))
 	}
 
 	out, err := runTerma(t, "setup", "--harness", "claude", "--verbose")
@@ -386,15 +385,15 @@ func TestSetupReleasesTheRelayFromADeselectedAgent(t *testing.T) {
 	if !strings.Contains(out, "Codex") || !strings.Contains(out, "no longer sends to the local relay") {
 		t.Errorf("setup did not say Codex stopped sending:\n%s", out)
 	}
-	if !strings.Contains(read(claudeSettings), token) {
-		t.Fatalf("Claude Code, still chosen, left the relay:\n%s", read(claudeSettings))
+	if !strings.Contains(claudeExport(t), token) {
+		t.Fatalf("Claude Code, still chosen, left the relay:\n%s", claudeExport(t))
 	}
 
 	// And the other way round: dropping Claude Code takes its env block off the relay.
 	if out, err := runTerma(t, "setup", "--harness", "codex"); err != nil {
 		t.Fatalf("setup without Claude Code: %v\n%s", err, out)
 	}
-	if got := read(claudeSettings); strings.Contains(got, token) {
+	if got := claudeExport(t); strings.Contains(got, token) {
 		t.Fatalf("Claude Code still sends to the relay:\n%s", got)
 	}
 	if !strings.Contains(read(codexConfig), token) {

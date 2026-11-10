@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -53,6 +54,11 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 			if _, ok := paths[e.Name()]; !ok {
 				t.Fatalf("this test knows no configuration file for %s", e.Name())
 			}
+			// Claude Code's settings name a headers helper, which holds the token instead.
+			credential := map[string]string{}
+			if runtime.GOOS != "windows" {
+				credential["claude"] = "terma/helpers/claude-relay"
+			}
 			for name, path := range paths {
 				if name == e.Name() {
 					continue
@@ -85,7 +91,18 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 				if name != e.Name() && string(body) != "other agent's configuration" {
 					t.Errorf("overwrote %s's configuration", name)
 				}
-				if name == e.Name() && !strings.Contains(string(body), "private-relay-token") {
+				if name != e.Name() {
+					continue
+				}
+				if at, ok := credential[name]; ok {
+					if strings.Contains(string(body), "private-relay-token") {
+						t.Errorf("%s holds the local credential its headers helper should", path)
+					}
+					if body, err = os.ReadFile(filepath.Join(home, at)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if !strings.Contains(string(body), "private-relay-token") {
 					t.Error("the selected exporter lacks its local credential")
 				}
 			}

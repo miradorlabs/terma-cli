@@ -46,9 +46,8 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	if err != nil || len(token) < 32 {
 		t.Fatalf("token = %q, %v", token, err)
 	}
-	claude, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
 	codex, _ := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
-	for name, data := range map[string][]byte{"claude": claude, "codex": codex} {
+	for name, data := range map[string][]byte{"claude": []byte(claudeExport(t)), "codex": codex} {
 		if !strings.Contains(string(data), "http://"+addr) || !strings.Contains(string(data), token) {
 			t.Errorf("%s does not export to the relay with its token:\n%s", name, data)
 		}
@@ -66,7 +65,7 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	for _, h := range []string{"claude", "codex"} {
 		disconnect(t, h)
 	}
-	claude, _ = os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
+	claude, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
 	if strings.Contains(string(claude), addr) {
 		t.Fatalf("disconnect left Claude on the relay:\n%s", claude)
 	}
