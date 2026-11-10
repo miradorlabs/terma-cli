@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -530,9 +531,17 @@ func (s *Store) Park(name string, lines []byte) error {
 	return f.Close()
 }
 
+// maxUnpark bounds what one Unpark reads, so a hook's memory never follows what was parked.
+// Hooks outside the sandbox unpark as they run, so a few records wait at a time.
+const maxUnpark = 4 << 20
+
+// errUnparkable is a parked file no Unpark takes: past maxUnpark, or not a regular file.
+var errUnparkable = errors.New("parked file past the unpark bound, or not a regular file")
+
 // Unpark passes what Park kept under name to deliver, and removes the files it passed once
 // deliver has taken them. It changes nothing unless it holds the store: a hook that cannot
-// leaves the parked lines to the next.
+// leaves the parked lines to the next. It reads at most maxUnpark: files past it wait for the
+// next Unpark, and a file past it on its own, or not a regular file, is removed unread.
 func (s *Store) Unpark(name string, deliver func(lines []byte) error) error {
 	if len(s.parked(name)) == 0 {
 		return nil // nothing parked: the common case takes no lock
@@ -543,17 +552,22 @@ func (s *Store) Unpark(name string, deliver func(lines []byte) error) error {
 		return nil
 	}
 	var lines []byte
-	var read []string
+	var read, dropped []string
 	for _, path := range s.parked(name) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue // another hook took it first
+		data, err := readParked(path)
+		switch {
+		case errors.Is(err, errUnparkable):
+			dropped = append(dropped, path)
+		case err != nil:
+			// another hook took it first
+		case len(lines)+len(data) < maxUnpark:
+			if len(data) > 0 && data[len(data)-1] != '\n' {
+				data = append(data, '\n')
+			}
+			lines, read = append(lines, data...), append(read, path)
 		}
-		if len(data) > 0 && data[len(data)-1] != '\n' {
-			data = append(data, '\n')
-		}
-		lines, read = append(lines, data...), append(read, path)
 	}
+	removeAll(dropped)
 	if len(read) == 0 {
 		return nil
 	}
@@ -562,6 +576,27 @@ func (s *Store) Unpark(name string, deliver func(lines []byte) error) error {
 	}
 	removeAll(read)
 	return nil
+}
+
+// readParked reads a parked file, or returns errUnparkable.
+func readParked(path string) ([]byte, error) {
+	st, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !st.Mode().IsRegular() || st.Size() >= maxUnpark {
+		return nil, errUnparkable
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, maxUnpark))
+	if err == nil && len(data) >= maxUnpark {
+		return nil, errUnparkable
+	}
+	return data, err
 }
 
 // parked is the files Park wrote under name.
