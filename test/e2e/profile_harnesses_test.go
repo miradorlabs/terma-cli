@@ -198,3 +198,20 @@ func placeUnresolved(t *testing.T, b Binary, sb *Sandbox) {
 // copilotModel is the model a Copilot profile names: BYOK needs one, and a model Copilot's
 // catalog knows gets the agent configuration (prompt, tools, limits) it has for it.
 const copilotModel = "claude-sonnet-4.5"
+
+// TestMuseProfile: `muse exec` with a synthetic key, its Meta provider at the Responses fixture
+// (--base-url), and the model named (--model), so no catalog is needed.
+func TestMuseProfile(t *testing.T) {
+	forEachMuse(t, func(t *testing.T, b Binary) {
+		var calls atomic.Int32
+		var url string
+		harnessProfile(t, b, museProvider(&calls, nil), func(sb *Sandbox, u string) []string {
+			url = u
+			sb.UseMuse()
+			return nil
+		}, func(*Sandbox) []string {
+			return museArgs(url, profilePrompt, false)
+		}, []string{"--help"}, []string{"exec", "--help"})
+		requireCalls(t, b, &calls)
+	})
+}
