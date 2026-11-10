@@ -182,7 +182,7 @@ try {
   $bin4 = Join-Path $work "o'brien"
   $res = Install 'pwsh' @{ TERMA_RELEASE_BASE = $base; TERMA_INSTALL_DIR = $bin4; TERMA_NO_MODIFY_PATH = '1' }
   Assert-Installed $bin4 $res
-  $quoted = (Join-Path $bin4 'terma.exe').Replace("'", "''")
+  $quoted = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent((Join-Path $bin4 'terma.exe'))
   if ($res.Out -notmatch 'is not on your PATH' -or $res.Out -notmatch [regex]::Escape("Next: run ``& '$quoted' setup``.")) { Fail "opted out, but said: $($res.Out)" }
   $ran = Invoke-Expression "& '$quoted' version"
   if ($ran -ne $want) { Fail "the printed command, run, said $ran; want $want" }

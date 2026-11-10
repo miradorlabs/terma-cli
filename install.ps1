@@ -206,9 +206,10 @@
     $userPath = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $next = "``terma setup``"
-    # terma by its path, for when PATH will not find it: quoted as PowerShell reads it, an
-    # apostrophe in a folder name doubled.
-    $quotedExe = $exe.Replace("'", "''")
+    # terma by its path, for when PATH will not find it, quoted by PowerShell's own escaper:
+    # it doubles an apostrophe in a folder name, the curly ones too, which also end a
+    # single-quoted string.
+    $quotedExe = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($exe)
     $onPath = $true
     if ((Test-OnPath $userPath $dest) -or (Test-OnPath $machinePath $dest)) {
       Say "$dest is already on PATH in new terminals."
