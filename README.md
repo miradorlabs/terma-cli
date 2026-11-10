@@ -5,6 +5,10 @@
   </picture>
 </p>
 
+<p align="center">
+  <a href="https://shadybin.dev/registry/github.com/miradorlabs/terma-cli/"><img src="https://img.shields.io/endpoint?url=https://shadybin.dev/registry/github.com/miradorlabs/terma-cli/badge.json" alt="shadybin: the latest release, rebuilt from source and reviewed"></a>
+</p>
+
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop) and **GitHub Copilot** (CLI and VS Code).
