@@ -23068,6 +23068,10 @@
         "description": "Set to `1` to disable fast mode",
         "read": true
       },
+      "CLAUDE_CODE_DISABLE_FEATURE_FLAGS": {
+        "description": "Set to `1` to turn off feature-flag fetching. Requires Claude Code v2.1.319 or later. With this variable set, Remote Control and the other features that need feature-flag fetching are unavailable. Telemetry event logging stays on unless `DISABLE_TELEMETRY` is also set. The older name, `DISABLE_GROWTHBOOK`, still works, and it is the only one that v2.1.124 through v2.1.318 read",
+        "read": true
+      },
       "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": {
         "description": "Set to `1` to disable the \"How is Claude doing?\" session quality surveys. Surveys are also disabled when `DISABLE_TELEMETRY`, `DO_NOT_TRACK`, or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is set, unless `CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL` opts back in. To set a sample rate instead of disabling outright, use the `feedbackSurveyRate` setting. See Session quality surveys",
         "read": true
@@ -23881,7 +23885,7 @@
         "read": true
       },
       "DISABLE_GROWTHBOOK": {
-        "description": "Set to `1` or `true` to disable feature-flag fetching and use code defaults for every flag. This makes Remote Control and the other features that need feature-flag fetching unavailable. Setting it to `0` or `false` leaves fetching on. Telemetry event logging stays on unless `DISABLE_TELEMETRY` is also set",
+        "description": "Set to `1` to turn off feature-flag fetching. Requires Claude Code v2.1.124 or later. Superseded by `CLAUDE_CODE_DISABLE_FEATURE_FLAGS`, which requires v2.1.319 or later: use that name unless a machine on v2.1.318 or earlier reads the configuration. This name still works",
         "read": true
       },
       "DISABLE_INSTALLATION_CHECKS": {
@@ -24205,7 +24209,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-10T17:17:30.953104486Z",
+    "fetched_at": "2026-11-10T21:30:49.077773519Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24988,7 +24992,7 @@
       },
       "forceLoginMethod": {
         "default": "unset, so people pick a login method",
-        "description": "Restrict which kind of account people can log in with. Set `\"claudeai\"` to allow only claude.ai accounts, `\"console\"` to allow only Claude Console accounts, or `\"gateway\"` to send people to a cloud gateway instead of a first-party login. Administrators set it in managed settings and pair it with `forceLoginOrgUUID` to keep developers' claude.ai logins inside one organization.",
+        "description": "Restrict which kind of account people can log in with: `\"claudeai\"` for claude.ai sign-in or `\"console\"` for Claude Console sign-in. Set `\"gateway\"` to send people to a cloud gateway instead of a first-party login. Administrators set it in managed settings and pair it with `forceLoginOrgUUID` to keep developers' claude.ai logins inside one organization.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Claude Code honors `\"gateway\"` from the same sources as `forceLoginGatewayUrl` and treats it as unset everywhere else.",
@@ -25891,7 +25895,7 @@
         "description": "Skip the confirmation dialog Claude Code shows before a session enters `bypassPermissions` mode, whether from `--dangerously-skip-permissions` or from `defaultMode: \"bypassPermissions\"`. Claude Code writes `true` here in your user settings when you accept that dialog once.",
         "read": true,
         "scope": "User, local, or managed",
-        "scope_note": "An untrusted repository can't skip the dialog for you.",
+        "scope_note": "Background sessions count only user and managed settings. An untrusted repository can't skip the dialog for you.",
         "topic": "Permission settings",
         "type": "Boolean"
       },
@@ -25983,11 +25987,11 @@
       },
       "strictPluginOnlyCustomization": {
         "default": "unset, so nothing is locked",
-        "description": "Block skills, agents, hooks, and MCP servers from user and project sources, so they can come only from plugins or managed settings. Combine it with `strictKnownMarketplaces` to control the full customization supply chain: the marketplace allowlist controls which plugins users can install.",
+        "description": "Block skills, agents, hooks, and MCP servers from user and project sources. Combine it with `strictKnownMarketplaces` to choose which marketplaces users can install plugins from. Add `disableSideloadFlags` to reject the CLI flags that sideload plugins, agents, and MCP servers for a single run.",
         "read": true,
         "scope": "Managed",
         "topic": "Plugins and skills",
-        "type": "`true` to lock all four kinds of customization, or an array naming the kinds to lock, from `\"skills\"`, `\"agents\"`, `\"hooks\"`, and `\"mcp\"`"
+        "type": "`true` to lock all of them, or an array naming the ones to lock, from `\"skills\"`, `\"agents\"`, `\"hooks\"`, and `\"mcp\"`"
       },
       "strictPluginOnlyCustomization.agents": {
         "default": "not locked",
@@ -26568,7 +26572,6 @@
       "CLAUDE_CODE_DISABLE_CLAUDE_CODE_SKILL",
       "CLAUDE_CODE_DISABLE_EMPTY_CLASSIC_DISPATCH_SKIP",
       "CLAUDE_CODE_DISABLE_EXPLORE_INHERIT_CAP",
-      "CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
       "CLAUDE_CODE_DISABLE_HELD_MESSAGE_RECOGNITION",
       "CLAUDE_CODE_DISABLE_HOME_SETTINGS_SEED",
       "CLAUDE_CODE_DISABLE_HOOK_FORWARDING",

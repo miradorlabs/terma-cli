@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T17:17:30.953104486Z",
+  "generated_at": "2026-11-10T21:30:49.077773519Z",
   "versions": [
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.68.0",
+      "released_at": "2026-11-10T21:22:49.277Z",
+      "captured_at": "2026-11-10T21:30:49.077773519Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.67.0",
+      "changes": 76,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "network": 7,
+        "prompt": 1,
+        "request": 1,
+        "telemetry": 63
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 19,
+        "informational": 34,
+        "notable": 23
+      },
+      "undocumented": 73,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/gemini_cli.api_request",
+        "Telemetry surface no longer sent: logs/gemini_cli.api_response",
+        "Telemetry surface no longer sent: logs/gemini_cli.config"
+      ],
+      "signing": null
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -6224,39 +6258,6 @@
         "Default model: gpt-5.3-codex → gpt-5.4",
         "System prompt changed (+6570 −4207 chars)",
         "spawn_agent tool description changed (+1159 −1537 chars)"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.122.0",
-      "released_at": "2026-04-20T18:39:33.583Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.121.0",
-      "changes": 68,
-      "categories": {
-        "cli": 25,
-        "config": 20,
-        "filesystem": 22,
-        "hooks": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 62,
-        "notable": 6
-      },
-      "undocumented": 43,
-      "highlights": [
-        "New hook event: PermissionRequest",
-        "Default of `codex app --download-url`: https://persistent.oaistatic.com/codex-app-prod/Codex.dmg → none",
-        "Command removed: `codex marketplace`"
       ],
       "signing": "revoked"
     }

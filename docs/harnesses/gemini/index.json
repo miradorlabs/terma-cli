@@ -11,20 +11,59 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/google-gemini/gemini-cli/releases",
-    "latest": "0.67.0",
-    "support": "supported",
-    "versions_tracked": 7,
+    "latest": "0.68.0",
+    "support": "untested",
+    "versions_tracked": 8,
     "first_tracked": "2026-09-24",
     "last_change": {
-      "from": "0.66.0",
-      "to": "0.67.0",
-      "at": "2026-11-10T05:27:59.913036763Z",
-      "released_at": "2026-11-04T20:32:45.08Z",
-      "changes": 0,
-      "categories": {}
+      "from": "0.67.0",
+      "to": "0.68.0",
+      "at": "2026-11-10T21:30:49.077773519Z",
+      "released_at": "2026-11-10T21:22:49.277Z",
+      "changes": 76,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "network": 7,
+        "prompt": 1,
+        "request": 1,
+        "telemetry": 63
+      }
     }
   },
   "versions": [
+    {
+      "version": "0.68.0",
+      "released_at": "2026-11-10T21:22:49.277Z",
+      "captured_at": "2026-11-10T21:30:49.077773519Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "0.67.0",
+      "changes": 76,
+      "categories": {
+        "config": 3,
+        "hooks": 1,
+        "network": 7,
+        "prompt": 1,
+        "request": 1,
+        "telemetry": 63
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 19,
+        "informational": 34,
+        "notable": 23
+      },
+      "undocumented": 73,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/gemini_cli.api_request",
+        "Telemetry surface no longer sent: logs/gemini_cli.api_response",
+        "Telemetry surface no longer sent: logs/gemini_cli.config"
+      ],
+      "signing": null
+    },
     {
       "version": "0.67.0",
       "released_at": "2026-11-04T20:32:45.08Z",
