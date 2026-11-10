@@ -67,8 +67,7 @@ func (sb *Sandbox) StartAccount() *Account {
 			}
 		}
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid token"}`)
+			writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid token")
 			return
 		}
 		switch r.URL.Path {
@@ -78,7 +77,7 @@ func (sb *Sandbox) StartAccount() *Account {
 		case "/v1/whoami":
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": accountOrg, "auth_type": "cli_token", "user_id": accountUser, "email": "live@terma.test"})
 		case "/v1/organizations":
-			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin"}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin", "type": accountOrganization["type"]}}})
 		case "/v1/projects":
 			_ = json.NewEncoder(w).Encode(map[string]any{"projects": []map[string]any{
 				{"id": sb.ProjectID, "name": "Live", "organization_id": accountOrg},
@@ -160,7 +159,9 @@ func (sb *Sandbox) SignIn(profile string) {
 }
 
 // The auth gateway's answers, as mirador-platform's gateways/auth/spec/openapi.yaml has
-// them: the organization and user a sign-in is for, and an error.
+// them: the organization (with its type) and user a sign-in is for, and an error, whose
+// optional error.reason no answer here needs (only a delegate refusal for a session that
+// cannot delegate carries one, NOT_DELEGABLE, and this account's desktop always can).
 var (
 	accountOrganization = map[string]string{"id": accountOrg, "name": "Live", "type": "personal"}
 	accountUserInfo     = map[string]string{"id": accountUser, "email": "live@terma.test"}

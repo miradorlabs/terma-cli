@@ -303,6 +303,24 @@ func TestMatchOrganization(t *testing.T) {
 	}
 }
 
+// /v1/organizations' type tells the person's own workspace from a team, whatever the
+// names: the picker says "personal" beside it, and a team's role beside a team.
+func TestOrganizationTypeNamesThePersonalWorkspace(t *testing.T) {
+	var list listOrganizationsResponse
+	body := `{"organizations":[{"id":"t","name":"Personal","role":"admin","type":"team"},` +
+		`{"id":"p","name":"Personal","role":"admin","type":"personal"},{"id":"o","name":"Old","role":"member"}]}`
+	if err := json.Unmarshal([]byte(body), &list); err != nil {
+		t.Fatal(err)
+	}
+	var notes []string
+	for _, o := range list.Organizations {
+		notes = append(notes, o.note())
+	}
+	if got := strings.Join(notes, ","); got != "admin,personal,member" {
+		t.Fatalf("notes = %s, want admin,personal,member", got)
+	}
+}
+
 // signInHere runs the sign-in `terma setup` starts with, under a deadline that cuts a
 // browser handoff short; it returns what it printed.
 func signInHere(t *testing.T, opts signInOptions, wait time.Duration) (*signInResult, string, error) {

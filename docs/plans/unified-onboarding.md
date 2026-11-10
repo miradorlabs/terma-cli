@@ -163,7 +163,8 @@ two sign-ins apart.
 
 Unchanged. The platform's changes force nothing here: `/cli/auth` keeps its click and its organization picker for
 any organization; a PERSONAL organization shows in the picker and in `/v1/organizations` like any other (the new
-`type` field is additive and the CLI's JSON decoding ignores it); a PERSONAL organization has one team, so
+`type` field is additive; the picker reads it to say "personal" beside that one, since a name never classifies an
+organization); a PERSONAL organization has one team, so
 `soleOrPick` takes it. A session from `/cli/auth` cannot delegate, and the CLI never delegates.
 
 ### 6. Windows install (decided: a PowerShell script first, winget after)
@@ -312,3 +313,8 @@ council invariant:
   desktop does, runs `terma doctor`, and checks a second run reuses the sign-in. It runs in CI's e2e job. The leg against
   dev, with a desktop session minted through the desktop approval, is a follow-up once platform tasks 11 to 16 are on
   dev and the suite has a way to mint that session.
+- **The fake follows the auth gateway spec** (mirador-platform `gateways/auth/spec/openapi.yaml`, branch
+  `dawson/delegated-cli-grant`): errors in the `{"error":{"code","message"}}` envelope (`error.reason` only on a
+  delegate refusal for a session that cannot delegate, `NOT_DELEGABLE`, which the CLI never sees: it never calls
+  delegate), 403 `PERMISSION_DENIED` for any failed redemption, 400 for a challenge that is not 43 characters, and
+  `organization {id, name, type}` and `user {id, email}` in the token and delegate answers.
