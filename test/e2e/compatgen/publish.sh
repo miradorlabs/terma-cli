@@ -18,6 +18,21 @@ set -euo pipefail
 
 branch=compat-matrix
 
+# branch_exists says the branch is on origin: false (status 1) where origin answers that it is
+# not; any other failure to ask (the network, credentials) stops the script.
+branch_exists() {
+	local status=0
+	git ls-remote --exit-code --heads origin "$branch" >/dev/null || status=$?
+	case $status in
+	0) return 0 ;;
+	2) return 1 ;;
+	*)
+		echo "cannot read origin's $branch (git ls-remote exited $status)" >&2
+		exit 1
+		;;
+	esac
+}
+
 case "${1:-}" in
 restore)
 	git fetch -q origin "$branch" 2>/dev/null || exit 0
@@ -90,7 +105,10 @@ publish-reference)
 restore-models)
 	# The Model Reference merges into what it last published: that alone, from the branch's
 	# newest commit (it reads the Harness Reference from where it is published).
-	git fetch -q --depth=1 origin "$branch" 2>/dev/null || exit 0
+	# A branch not there yet is a first run; a branch that could not be read fails the run,
+	# which would otherwise start from nothing and publish every model as new.
+	branch_exists || exit 0
+	git fetch -q --depth=1 origin "$branch"
 	rm -rf docs/models
 	if git cat-file -e "origin/$branch:docs/models" 2>/dev/null; then
 		git archive "origin/$branch" docs/models | tar -x
@@ -107,7 +125,8 @@ publish-models)
 	# The branch as it is now (another job may have published since the restore), its newest
 	# commit, with only docs/models in the working tree: the rest of the branch is committed
 	# as it stands, never checked out.
-	if git fetch -q --depth=1 origin "$branch" 2>/dev/null && git rev-parse -q --verify "origin/$branch" >/dev/null; then
+	if branch_exists; then
+		git fetch -q --depth=1 origin "$branch"
 		git sparse-checkout set --no-cone /docs/models/
 		git checkout -q -B "$branch" "origin/$branch"
 	else

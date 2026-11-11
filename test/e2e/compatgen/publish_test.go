@@ -142,6 +142,17 @@ func TestPublishTwoNights(t *testing.T) {
 	write(after, "docs/harnesses/claude/versions/1.0.2.json", "after\n")
 	run(after, "bash", script, "publish-reference")
 
+	// An origin that cannot be read fails the restore: starting from nothing would publish every
+	// model as new.
+	lost := filepath.Join(tmp, "lost")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, lost)
+	run(lost, "git", "remote", "set-url", "origin", filepath.Join(tmp, "gone.git"))
+	cmd := exec.Command("bash", script, "restore-models")
+	cmd.Dir = lost
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "cannot read origin's compat-matrix") {
+		t.Errorf("restore-models went on without its origin (%v):\n%s", err, out)
+	}
+
 	check := filepath.Join(tmp, "check")
 	run(tmp, "git", "clone", "-q", "-b", "compat-matrix", origin, check)
 	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "7" {
