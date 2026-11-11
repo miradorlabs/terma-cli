@@ -16,10 +16,11 @@ import (
 )
 
 type recordingExchanger struct {
-	code     string
-	verifier string
-	port     int
-	err      error
+	code      string
+	verifier  string
+	port      int
+	delegated bool
+	err       error
 }
 
 func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier string, port int) (*Credential, error) {
@@ -28,6 +29,12 @@ func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier stri
 		return nil, r.err
 	}
 	return &Credential{AccessToken: "mir_cli_test", ExpiresAt: time.Now().Add(time.Hour)}, nil
+}
+
+// ExchangeDelegatedCode records a delegated exchange as port 0, the port it sends.
+func (r *recordingExchanger) ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*Credential, error) {
+	r.delegated = true
+	return r.ExchangeCode(ctx, code, verifier, 0)
 }
 
 // browser drives the login flow the way the approval page has so far: a GET with the code

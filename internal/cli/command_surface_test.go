@@ -162,6 +162,20 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	}
 }
 
+// --desktop-grant is Terma Desktop's, never a person's: setup takes it, and its help does
+// not show it.
+func TestDesktopGrantIsAHiddenSetupFlag(t *testing.T) {
+	setup := commandNamed(testApp.NewRootCommand(), "setup")
+	flag := setup.Flags().Lookup("desktop-grant")
+	if flag == nil || !flag.Hidden {
+		t.Fatalf("setup's --desktop-grant = %+v, want a hidden flag", flag)
+	}
+	help, _, err := termaRun{}.exec(t, "setup", "--help")
+	if err != nil || strings.Contains(help, "desktop-grant") {
+		t.Fatalf("`terma setup --help` shows --desktop-grant (%v):\n%s", err, help)
+	}
+}
+
 // hiddenCommandSources implement a hidden command whose own help names it. Every other
 // shipped line a person reads names only a primary command.
 var hiddenCommandSources = []string{

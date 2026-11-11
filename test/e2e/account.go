@@ -1,6 +1,9 @@
 package e2e
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,7 +29,21 @@ type Account struct {
 	withholdContent atomic.Bool
 	mu              sync.Mutex
 	keys            map[string]string // project → minted key
+	// desktopRefresh is Terma Desktop's refresh token, which /v1/auth/cli/delegate rotates;
+	// delegated are its unredeemed codes, each bound to the CLI's challenge, and delegations
+	// counts its calls.
+	desktopRefresh string
+	delegated      map[string]delegatedCode
+	delegations    atomic.Int32
+	// revokes counts the sessions signed out at /v1/auth/cli/revoke.
+	revokes atomic.Int32
+	// refuseDelegation, when set, is the error.reason delegate refuses the desktop's
+	// session with: NOT_DELEGABLE or ORG_NOT_ACCESSIBLE.
+	refuseDelegation string
 }
+
+// delegatedCode is a code the delegate endpoint made for a CLI's challenge and label.
+type delegatedCode struct{ challenge, label string }
 
 // accountOrg is the organization the fake account signs the developer in to, and
 // accountUser the developer it signs in.
@@ -40,18 +57,30 @@ func (sb *Sandbox) StartAccount() *Account {
 	if sb.account != nil {
 		return sb.account
 	}
-	a := &Account{token: "ter_cli_" + accountOrg, keys: map[string]string{}}
+	a := &Account{token: "ter_cli_" + accountOrg, keys: map[string]string{}, desktopRefresh: "ter_clr_desktop_0", delegated: map[string]delegatedCode{}}
 	a.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The two sign-in endpoints take no bearer: the body is the credential.
+		switch r.URL.Path {
+		case "/v1/auth/cli/delegate":
+			a.serveDelegate(w, r)
+			return
+		case "/v1/auth/cli/token":
+			if a.serveDelegatedExchange(w, r) {
+				return
+			}
+		}
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid token"}`)
+			writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "", "invalid token")
 			return
 		}
 		switch r.URL.Path {
+		case "/v1/auth/cli/revoke":
+			a.revokes.Add(1)
+			w.WriteHeader(http.StatusNoContent)
 		case "/v1/whoami":
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": accountOrg, "auth_type": "cli_token", "user_id": accountUser, "email": "live@terma.test"})
 		case "/v1/organizations":
-			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin"}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin", "type": accountOrganization["type"]}}})
 		case "/v1/projects":
 			_ = json.NewEncoder(w).Encode(map[string]any{"projects": []map[string]any{
 				{"id": sb.ProjectID, "name": "Live", "organization_id": accountOrg},
@@ -130,6 +159,126 @@ func (sb *Sandbox) SignIn(profile string) {
 	p["auth_url"], p["api_url"], p["app_url"] = a.srv.URL, a.srv.URL, a.srv.URL
 	data, _ = json.Marshal(file)
 	sb.writeAbs(path, string(data))
+}
+
+// The auth gateway's answers, as mirador-platform's gateways/auth/spec/openapi.yaml has
+// them: the organization (with its type, personal or shared) and user a sign-in is for,
+// and an error, {"error":{"code","reason","message"}}, its reason only where the spec
+// gives one.
+var (
+	accountOrganization = map[string]string{"id": accountOrg, "name": "Live", "type": "personal"}
+	accountUserInfo     = map[string]string{"id": accountUser, "email": "live@terma.test"}
+)
+
+func writeAuthError(w http.ResponseWriter, status int, code, reason, message string) {
+	body := map[string]string{"code": code, "message": message}
+	if reason != "" {
+		body["reason"] = reason
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": body})
+}
+
+// RefuseDelegation makes delegate refuse the desktop's session with reason (403
+// PERMISSION_DENIED), "" to delegate again.
+func (a *Account) RefuseDelegation(reason string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.refuseDelegation = reason
+}
+
+// serveDelegate is the platform's POST /v1/auth/cli/delegate, as Terma Desktop calls it:
+// its refresh token rotates and a 60-second single-use code is bound to the CLI's challenge.
+// A challenge that is not 43 characters is 400, a refresh token that is not the desktop's
+// live one 401, and a session that may not delegate 403 with its reason.
+func (a *Account) serveDelegate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		RefreshToken  string `json:"refresh_token"`
+		CodeChallenge string `json:"code_challenge"`
+		Label         string `json:"label"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if len(body.CodeChallenge) != 43 {
+		writeAuthError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "", "code_challenge must be 43 characters")
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if body.RefreshToken != a.desktopRefresh {
+		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "", "invalid or expired refresh token")
+		return
+	}
+	if a.refuseDelegation != "" {
+		writeAuthError(w, http.StatusForbidden, "PERMISSION_DENIED", a.refuseDelegation, "this session cannot delegate")
+		return
+	}
+	n := a.delegations.Add(1)
+	a.desktopRefresh = fmt.Sprintf("ter_clr_desktop_%d", n)
+	code := fmt.Sprintf("ter_cod_delegated_%d", n)
+	a.delegated[code] = delegatedCode{challenge: body.CodeChallenge, label: body.Label}
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": fmt.Sprintf("ter_cli_desktop_%d", n), "refresh_token": a.desktopRefresh,
+		"token_type": "Bearer", "expires_in": 3600, "session_id": "desktop", "organization": accountOrganization, "user": accountUserInfo,
+		"code": code, "code_expires_in": 60})
+}
+
+// serveDelegatedExchange is POST /v1/auth/cli/token for a delegated code: redeemed once,
+// with redirect_port 0 and the verifier of the challenge it was made for. It answers only
+// a code's exchange: for a refresh it answers nothing and returns false, so a refresh is
+// refused as before.
+func (a *Account) serveDelegatedExchange(w http.ResponseWriter, r *http.Request) bool {
+	var body struct {
+		GrantType    string `json:"grant_type"`
+		Code         string `json:"code"`
+		CodeVerifier string `json:"code_verifier"`
+		RedirectPort *int   `json:"redirect_port"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if body.GrantType != "authorization_code" {
+		return false
+	}
+	a.mu.Lock()
+	grant, ok := a.delegated[body.Code]
+	delete(a.delegated, body.Code)
+	a.mu.Unlock()
+	sum := sha256.Sum256([]byte(body.CodeVerifier))
+	// Every failed redemption is the auth gateway's one 401, whatever the account service
+	// refused it for.
+	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 ||
+		base64.RawURLEncoding.EncodeToString(sum[:]) != grant.challenge {
+		writeAuthError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "", "invalid or expired credentials")
+		return true
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": a.token, "refresh_token": "ter_clr_live", "token_type": "Bearer",
+		"expires_in": 3600, "session_id": "delegated", "organization": accountOrganization, "user": accountUserInfo})
+	return true
+}
+
+// Delegate is what Terma Desktop does with the CLI's challenge: it trades its own refresh
+// token for a rotated pair and a code, and returns the code.
+func (a *Account) Delegate(challenge, label string) (string, error) {
+	a.mu.Lock()
+	refresh := a.desktopRefresh
+	a.mu.Unlock()
+	req, _ := json.Marshal(map[string]string{"refresh_token": refresh, "code_challenge": challenge, "label": label})
+	resp, err := http.Post(a.srv.URL+"/v1/auth/cli/delegate", "application/json", bytes.NewReader(req))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Code  string `json:"code"`
+		Error struct {
+			Code   string `json:"code"`
+			Reason string `json:"reason"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || resp.StatusCode != http.StatusOK || out.Code == "" {
+		return "", fmt.Errorf("delegate: HTTP %d %s %s, %v", resp.StatusCode, out.Error.Code, out.Error.Reason, err)
+	}
+	return out.Code, nil
 }
 
 // KeyFor is the key the account minted for a project, "" if none.

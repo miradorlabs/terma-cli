@@ -11,8 +11,8 @@
 # and of the shell that ran it when that is another (zsh's .zshrc; bash's .bashrc and
 # its login file; or a fish conf.d file), then prints the `source` command that puts
 # it on PATH in this terminal. Nothing else is written; nothing downloaded is
-# executed before it has been verified. Windows users: download
-# terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
+# executed before it has been verified. Windows: install.ps1 does the same
+# (https://terma.ai/install.ps1).
 #
 #   TERMA_VERSION         install this release instead of the latest (v1.2.3 or 1.2.3)
 #   TERMA_INSTALL_DIR     put the binary here instead of ~/.local/bin

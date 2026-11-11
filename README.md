@@ -25,6 +25,21 @@ curl -fsSL https://terma.ai/install.sh | bash
 terma setup
 ```
 
+**Installer script** (Windows). Installs to `%LOCALAPPDATA%\Programs\terma`, without
+administrator rights, verifies `checksums.txt`, and adds that folder to your user PATH (never
+the machine's), so new terminals find `terma`, and so does the PowerShell you run it in. It
+runs in Windows PowerShell 5.1 and PowerShell 7, and takes the same `TERMA_INSTALL_DIR`,
+`TERMA_VERSION` and `TERMA_NO_MODIFY_PATH` as the script above. In PowerShell:
+
+```powershell
+irm https://terma.ai/install.ps1 | iex
+terma setup
+```
+
+From Command Prompt, `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://terma.ai/install.ps1 | iex"`
+installs the same way; open a new terminal before `terma setup`, since the PATH of the one you
+ran it from does not change.
+
 **Homebrew** (macOS and Linux). terma keeps it up to date through the Homebrew that owns it
 (see [Updates](#updates)); `terma update` runs `brew upgrade terma` there at once.
 
