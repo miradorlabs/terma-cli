@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -75,7 +78,7 @@ func TestAnthropicProbe(t *testing.T) {
 		t.Error("the output limit was not probed")
 	}
 	s := p.Response
-	if s == nil || s.Model != "claude-fable-5-2" || s.StopReason != "max_tokens" {
+	if s == nil || s.Model != "claude-fable-5-2" {
 		t.Fatalf("response = %+v", s)
 	}
 	if !slices.Equal(s.UsageKeys, []string{"cache_creation.ephemeral_5m_input_tokens", "input_tokens", "output_tokens"}) {
@@ -125,32 +128,64 @@ func TestMerge(t *testing.T) {
 	}
 }
 
-// A case the API did not answer on a later run keeps its answer from before: no timeline step.
-func TestUnansweredProbeKeepsItsResult(t *testing.T) {
+// A re-probe the API partly did not answer (overloaded: the plain request, its stream, a case)
+// observes nothing new: the snapshot keeps every byte, and the timeline gets no step.
+func TestUnansweredProbesChangeNoByte(t *testing.T) {
+	overloaded := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		data, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(data, &body)
+		_, extra := body["top_k"]
+		plain := len(body) == 3 // model, max_tokens, messages
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/count_tokens"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"input_tokens": 7})
+		case overloaded && (extra || body["stream"] == true && len(body) == 4):
+			w.WriteHeader(529)
+		case extra:
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"top_k: Extra inputs are not permitted"}}`))
+		case body["stream"] == true:
+			_, _ = w.Write([]byte("event: message_start\ndata: {}\n\nevent: message_stop\ndata: {}\n\n"))
+		case overloaded && plain:
+			w.WriteHeader(529)
+		default:
+			_ = json.NewEncoder(w).Encode(map[string]any{"model": body["model"], "stop_reason": "end_turn",
+				"usage": map[string]any{"input_tokens": 9, "output_tokens": 2}})
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient()
+	c.wait, c.tries = time.Millisecond, 1
+	c.rewrite = func(u string) string { return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+	probe := func(s *Snapshot) *Probes { return anthropicProbe(context.Background(), c, "k", s) }
 	dir := t.TempDir()
-	obs := docsObs("claude-fable-5-2", fable52)
-	first := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200},
-		"sampling.top_k": {Status: 400, Error: "top_k: Extra inputs are not permitted"}}}
-	later := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}},
-		Errors: []string{"sampling.top_k: Service Unavailable"}}
-	for i, p := range []*Probes{first, later} {
+	run := func(at time.Time) []byte {
+		t.Helper()
 		prev, err := readPublished(dir)
 		if err != nil {
 			t.Fatal(err)
 		}
-		now := testNow.Add(time.Duration(i) * time.Hour)
-		if _, err := publish(dir, testRun(now, obs), prev, nil, nil, func(*Snapshot) *Probes { c := *p; return &c }); err != nil {
+		if _, err := publish(dir, testRun(at, docsObs("claude-fable-5-2", fable52)), prev, nil, nil, probe); err != nil {
 			t.Fatal(err)
 		}
+		data, err := os.ReadFile(filepath.Join(dir, "claude-fable-5-2", "snapshot.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
 	}
-	tl := readTimeline(t, dir, "claude-fable-5-2")
-	if len(tl.Steps) != 1 {
-		t.Errorf("steps = %+v", tl.Steps)
+	first := run(testNow)
+	if !strings.Contains(string(first), `"stream_events"`) || !strings.Contains(string(first), `"sampling.top_k"`) {
+		t.Fatalf("the first run did not observe the response, its stream and top_k:\n%s", first)
 	}
-	var s Snapshot
-	_ = readOptional(dir+"/claude-fable-5-2/snapshot.json", &s)
-	if r := s.API.Probes.Params["sampling.top_k"]; r.Status != 400 || !s.API.Probes.At.Equal(testNow) {
-		t.Errorf("top_k = %+v, at %v", r, s.API.Probes.At)
+	overloaded = true
+	if later := run(testNow.Add(24 * time.Hour)); !bytes.Equal(first, later) {
+		t.Errorf("a partly unanswered re-probe changed the snapshot:\n%s", later)
+	}
+	if tl := readTimeline(t, dir, "claude-fable-5-2"); len(tl.Steps) != 1 {
+		t.Errorf("a partly unanswered re-probe made a step: %+v", tl.Steps[0])
 	}
 }
 

@@ -157,29 +157,14 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 			if s.API == nil {
 				s.API = &API{}
 			}
-			// Probes that saw what the ones before saw keep their time: a run that only confirms
-			// them changes no file.
+			// What this run did not observe keeps what was observed before, and probes that saw what
+			// the ones before saw are kept whole, their time included: a run that only confirms them
+			// changes no file.
 			p.At = r.now
-			if old := s.API.Probes; old != nil {
-				// A case the API did not answer this time (overloaded, the network) keeps what it
-				// answered before: not observed is no change.
-				for _, e := range p.Errors {
-					name, _, _ := strings.Cut(e, ": ")
-					if r, ok := old.Params[name]; ok {
-						if _, now := p.Params[name]; !now {
-							p.Params[name] = r
-						}
-					}
-				}
-				if p.Tokens == nil {
-					// The corpus not counted this time (a refusal of the counting endpoint) is not
-					// counted as something else.
-					p.Tokens = old.Tokens
-				}
-				if reflectEqual(probeView(old), probeView(p)) {
-					p.At = old.At
-				}
+			for _, e := range p.Errors {
+				fmt.Fprintf(os.Stderr, "modelref: %s: not observed: %s\n", s.ID, e)
 			}
+			p = keepUnobserved(s.API.Probes, p)
 			s.API.Probes = p
 		}
 	}

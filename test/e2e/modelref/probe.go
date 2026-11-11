@@ -52,7 +52,7 @@ type probeTarget struct {
 
 // runProbes probes one model.
 func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, now time.Time) *Probes {
-	p := &Probes{At: now, Endpoint: endpoint, Params: map[string]ProbeResult{}}
+	p := &Probes{At: now, Endpoint: endpoint, Params: map[string]ProbeResult{}, unanswered: map[string]bool{}}
 	for _, pc := range t.cases {
 		body := merge(t.base, pc.body)
 		url := t.url
@@ -61,10 +61,12 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 		}
 		resp, err := c.post(ctx, url, t.headers, body)
 		if err != nil {
+			p.unanswered[pc.name] = true
 			p.Errors = append(p.Errors, pc.name+": not answered")
 			continue
 		}
 		if retryable(resp.Status) {
+			p.unanswered[pc.name] = true
 			p.Errors = append(p.Errors, pc.name+": "+http.StatusText(resp.Status))
 			continue
 		}
@@ -90,6 +92,9 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 		url, body := t.stream(t.base)
 		if resp, err := c.post(ctx, url, t.headers, body); err == nil && resp.Status/100 == 2 {
 			p.Response.StreamEvents = streamEvents(resp.Body)
+		} else {
+			p.streamMissed = true
+			p.Errors = append(p.Errors, "stream: not read")
 		}
 	}
 	if t.count != nil {
@@ -103,6 +108,37 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 			}
 			p.Tokens[text.name] = n
 		}
+	}
+	return p
+}
+
+// keepUnobserved is p with what this run did not observe taken from old, the model's probes
+// before: a case the API did not answer, the plain answer and its stream where those were not
+// read, the corpus where it was not counted. Not observed is no change; where nothing differs
+// from old after that, old itself is kept, its time included, so a run that only confirms the
+// probes writes the same bytes.
+func keepUnobserved(old, p *Probes) *Probes {
+	if old == nil {
+		return p
+	}
+	for name := range p.unanswered {
+		if r, ok := old.Params[name]; ok {
+			p.Params[name] = r
+		}
+	}
+	switch {
+	case p.Response == nil && p.unanswered["baseline"]:
+		p.Response = old.Response
+	case p.Response != nil && p.streamMissed && old.Response != nil:
+		p.Response.StreamEvents = old.Response.StreamEvents
+	}
+	if p.Tokens == nil {
+		p.Tokens = old.Tokens
+	}
+	if reflectEqual(probeView(old), probeView(p)) {
+		kept := *old
+		kept.Errors = p.Errors
+		return &kept
 	}
 	return p
 }

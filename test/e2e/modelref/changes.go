@@ -49,11 +49,7 @@ func probeView(p *Probes) map[string]any {
 		pv["tokens"] = p.Tokens
 	}
 	if p.Response != nil {
-		// Why one short answer stopped is the run's (a model that thought more ran out of
-		// tokens): the response's shape is what is compared.
-		r := *p.Response
-		r.StopReason = ""
-		pv["response"] = r
+		pv["response"] = p.Response
 	}
 	return pv
 }

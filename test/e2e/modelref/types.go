@@ -116,7 +116,15 @@ type Probes struct {
 	// TokenizerLike are the other models that count every text of the corpus the same.
 	TokenizerLike []string       `json:"tokenizer_like,omitempty"`
 	Response      *ResponseShape `json:"response,omitempty"`
-	Errors        []string       `json:"errors,omitempty"`
+
+	// Errors are what this run's probes could not observe (a case the API did not answer, the
+	// corpus not counted), for the run's log: never published, as they are the run's and not the
+	// model's.
+	Errors []string `json:"-"`
+	// unanswered are the cases the API did not answer this run, and streamMissed says the stream
+	// was not read: what they said before stands (keepUnobserved).
+	unanswered   map[string]bool
+	streamMissed bool
 }
 
 // ProbeResult is what the API did with one probe request.
@@ -126,16 +134,15 @@ type ProbeResult struct {
 	Error    string `json:"error,omitempty"`
 }
 
-// ResponseShape is what a plain answer from the model carries: the keys of its usage, the
-// stop reason it gave, the model it said answered, the response headers it sent (names only),
-// and the event types its stream sent, in order.
+// ResponseShape is what a plain answer from the model carries: the keys of its usage, the model
+// it said answered, the response headers it sent (names only), and the event types its stream
+// sent, in order. Why one short answer stopped, and a backend's fingerprint, are the run's, and
+// not kept.
 type ResponseShape struct {
 	Model        string   `json:"model,omitempty"`
-	StopReason   string   `json:"stop_reason,omitempty"`
 	UsageKeys    []string `json:"usage_keys,omitempty"`
 	Headers      []string `json:"headers,omitempty"`
 	StreamEvents []string `json:"stream_events,omitempty"`
-	Fingerprint  string   `json:"fingerprint,omitempty"`
 }
 
 // HarnessUse is one way a harness uses a model, over the builds that do.

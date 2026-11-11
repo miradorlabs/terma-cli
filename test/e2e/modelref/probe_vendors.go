@@ -80,15 +80,7 @@ func anthropicProbe(ctx context.Context, c *client, key string, m *Snapshot) *Pr
 		"messages": []any{map[string]any{"role": "user", "content": probePrompt}}}
 	t := probeTarget{
 		url: "https://api.anthropic.com/v1/messages", headers: h, base: base, cases: cases,
-		shape: func(body []byte) ResponseShape {
-			var r struct {
-				Model      string         `json:"model"`
-				StopReason string         `json:"stop_reason"`
-				Usage      map[string]any `json:"usage"`
-			}
-			_ = json.Unmarshal(body, &r)
-			return ResponseShape{Model: r.Model, StopReason: r.StopReason, UsageKeys: usageKeys(r.Usage)}
-		},
+		shape: shapeOf("model", "usage"),
 		stream: func(base map[string]any) (string, map[string]any) {
 			return "https://api.anthropic.com/v1/messages", merge(base, map[string]any{"stream": true})
 		},
@@ -128,22 +120,7 @@ func openAIProbe(ctx context.Context, c *client, key string, m *Snapshot) *Probe
 	base := map[string]any{"model": m.ID, "input": probePrompt, "max_output_tokens": maxProbeOutput, "store": false}
 	t := probeTarget{
 		url: "https://api.openai.com/v1/responses", headers: h, base: base, cases: cases,
-		shape: func(body []byte) ResponseShape {
-			var r struct {
-				Model      string `json:"model"`
-				Status     string `json:"status"`
-				Incomplete *struct {
-					Reason string `json:"reason"`
-				} `json:"incomplete_details"`
-				Usage map[string]any `json:"usage"`
-			}
-			_ = json.Unmarshal(body, &r)
-			stop := r.Status
-			if r.Incomplete != nil && r.Incomplete.Reason != "" {
-				stop += ": " + r.Incomplete.Reason
-			}
-			return ResponseShape{Model: r.Model, StopReason: stop, UsageKeys: usageKeys(r.Usage)}
-		},
+		shape: shapeOf("model", "usage"),
 		stream: func(base map[string]any) (string, map[string]any) {
 			return "https://api.openai.com/v1/responses", merge(base, map[string]any{"stream": true})
 		},
@@ -184,21 +161,7 @@ func googleProbe(ctx context.Context, c *client, key string, m *Snapshot) *Probe
 	api := "https://generativelanguage.googleapis.com/v1beta/models/" + m.ID
 	t := probeTarget{
 		url: api + ":generateContent", headers: h, base: base, cases: cases,
-		shape: func(body []byte) ResponseShape {
-			var r struct {
-				ModelVersion string `json:"modelVersion"`
-				Candidates   []struct {
-					FinishReason string `json:"finishReason"`
-				} `json:"candidates"`
-				Usage map[string]any `json:"usageMetadata"`
-			}
-			_ = json.Unmarshal(body, &r)
-			s := ResponseShape{Model: r.ModelVersion, UsageKeys: usageKeys(r.Usage)}
-			if len(r.Candidates) > 0 {
-				s.StopReason = r.Candidates[0].FinishReason
-			}
-			return s
-		},
+		shape: shapeOf("modelVersion", "usageMetadata"),
 		count: func(ctx context.Context, c *client, text string) (int, error) {
 			resp, err := c.post(ctx, api+":countTokens", h,
 				map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []any{map[string]any{"text": text}}}}})
@@ -231,22 +194,7 @@ func xaiProbe(ctx context.Context, c *client, key string, m *Snapshot) *Probes {
 		"messages": []any{map[string]any{"role": "user", "content": probePrompt}}}
 	t := probeTarget{
 		url: "https://api.x.ai/v1/chat/completions", headers: h, base: base, cases: cases,
-		shape: func(body []byte) ResponseShape {
-			var r struct {
-				Model       string `json:"model"`
-				Fingerprint string `json:"system_fingerprint"`
-				Choices     []struct {
-					FinishReason string `json:"finish_reason"`
-				} `json:"choices"`
-				Usage map[string]any `json:"usage"`
-			}
-			_ = json.Unmarshal(body, &r)
-			s := ResponseShape{Model: r.Model, Fingerprint: r.Fingerprint, UsageKeys: usageKeys(r.Usage)}
-			if len(r.Choices) > 0 {
-				s.StopReason = r.Choices[0].FinishReason
-			}
-			return s
-		},
+		shape: shapeOf("model", "usage"),
 		stream: func(base map[string]any) (string, map[string]any) {
 			return "https://api.x.ai/v1/chat/completions", merge(base, map[string]any{"stream": true})
 		},
@@ -268,6 +216,17 @@ func xaiProbe(ctx context.Context, c *client, key string, m *Snapshot) *Probes {
 		},
 	}
 	return runProbes(ctx, c, t, "POST /v1/chat/completions", time.Now().UTC())
+}
+
+// shapeOf reads a plain answer's shape from its body: the model it names under modelKey, and the
+// keys of the usage object under usageKey.
+func shapeOf(modelKey, usageKey string) func(body []byte) ResponseShape {
+	return func(body []byte) ResponseShape {
+		var r map[string]any
+		_ = json.Unmarshal(body, &r)
+		model, _ := r[modelKey].(string)
+		return ResponseShape{Model: model, UsageKeys: usageKeys(r[usageKey])}
+	}
 }
 
 // countFrom is the count a token-counting endpoint answered with, in its field key.
