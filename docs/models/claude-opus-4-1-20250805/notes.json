@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "claude-opus-4-1-20250805",
+  "predecessor": "claude-opus-4-20250514",
+  "whats_new": null,
+  "vendor_highlights": [
+    "We’ve launched Claude Opus 4.1, an incremental update to Claude Opus 4 with enhanced capabilities and performance improvements."
+  ],
+  "changelog": [
+    {
+      "date": "2026-08-05",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve retired the Claude Opus 4.1 model (`claude-opus-4-1-20250805`). All requests to this model on the Claude API will now return an error. We recommend upgrading to [Claude Opus 5](https://platform.claude.com/docs/en/models/opus-5/overview). Researchers can request ongoing access through the [External Researcher Access Program](https://support.claude.com/en/articles/9125743-what-is-the-external-researcher-access-program)."
+    },
+    {
+      "date": "2026-06-05",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We announced the deprecation of the Claude Opus 4.1 model (`claude-opus-4-1-20250805`), with retirement on the Claude API scheduled for August 5, 2026. We recommend migrating to [Claude Opus 4.8](https://platform.claude.com/docs/en/models/opus-4-8/overview). Read more in [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)."
+    },
+    {
+      "date": "2025-11-14",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) in beta, providing guaranteed schema conformance for Claude’s responses. Use JSON outputs for structured data responses or strict tool use for validated tool inputs. Available for Claude Sonnet 4.5 and Claude Opus 4.1. To enable, use the beta header `structured-outputs-2025-11-13`."
+    },
+    {
+      "date": "2025-08-05",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched [Claude Opus 4.1](https://www.anthropic.com/news/claude-opus-4-1), an incremental update to Claude Opus 4 with enhanced capabilities and performance improvements. Opus 4.1 does not allow both `temperature` and `top_p` parameters to be specified. Use only one. Learn more in [Models overview](https://platform.claude.com/docs/en/models/overview)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3.1-pro-preview",
+  "vendor": "google",
+  "name": "Gemini 3.1 Pro preview",
+  "family": "gemini-pro",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 1048576,
+    "default_effort": "medium",
+    "description": "Built to refine the performance and reliability of the Gemini 3 Pro series, Gemini 3.1 Pro Preview provides better thinking, improved token efficiency, and a more grounded, factually consistent experience. It's optimized for software engineering behavior and usability, as well as agentic workflows requiring precise tool usage and reliable multi-step execution across real-world domains.",
+    "features": [
+      "code execution",
+      "context caching",
+      "file search",
+      "function calling",
+      "grounding with google maps",
+      "grounding with google search",
+      "structured outputs",
+      "thinking",
+      "url context"
+    ],
+    "input_modalities": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "knowledge_cutoff": "2025-01",
+    "max_input": 1048576,
+    "max_output": 65536,
+    "name": "Gemini 3.1 Pro preview",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "released_at": "2026-02-19",
+    "sampling_parameters": true,
+    "snapshots": [
+      "gemini-3.1-pro-preview",
+      "gemini-3.1-pro-preview-customtools"
+    ],
+    "status": "preview",
+    "structured_outputs": true,
+    "tool_calling": true,
+    "unsupported_features": [
+      "audio generation",
+      "image generation",
+      "live api"
+    ]
+  },
+  "provenance": {
+    "context_window": {
+      "models.dev": 1048576,
+      "openrouter": 1048576
+    },
+    "default_effort": {
+      "openrouter": "medium"
+    },
+    "description": {
+      "google-docs": "Built to refine the performance and reliability of the Gemini 3 Pro series, Gemini 3.1 Pro Preview provides better thinking, improved token efficiency, and a more grounded, factually consistent experience. It's optimized for software engineering behavior and usability, as well as agentic workflows requiring precise tool usage and reliable multi-step execution across real-world domains."
+    },
+    "features": {
+      "google-docs": [
+        "code execution",
+        "context caching",
+        "file search",
+        "function calling",
+        "grounding with google maps",
+        "grounding with google search",
+        "structured outputs",
+        "thinking",
+        "url context"
+      ]
+    },
+    "input_modalities": {
+      "google-docs": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "models.dev": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "openrouter": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ]
+    },
+    "knowledge_cutoff": {
+      "models.dev": "2025-01"
+    },
+    "max_input": {
+      "google-docs": 1048576
+    },
+    "max_output": {
+      "google-docs": 65536,
+      "models.dev": 65536,
+      "openrouter": 65536
+    },
+    "name": {
+      "google-docs": "Gemini 3.1 Pro preview",
+      "models.dev": "Gemini 3.1 Pro Preview",
+      "openrouter": "Gemini 3.1 Pro Preview"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "google-docs": [
+        "text"
+      ],
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "google-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "openrouter": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "released_at": {
+      "google-docs": "2026-02-19",
+      "models.dev": "2026-02-19"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "snapshots": {
+      "google-docs": [
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-pro-preview-customtools"
+      ]
+    },
+    "status": {
+      "google-docs": "preview"
+    },
+    "structured_outputs": {
+      "google-docs": true,
+      "models.dev": true
+    },
+    "tool_calling": {
+      "google-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "unsupported_features": {
+      "google-docs": [
+        "audio generation",
+        "image generation",
+        "live api"
+      ]
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview",
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/google/gemini-3.1-pro-preview"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview",
+      "text": "> ## AI Agent Context\n> Get the complete documentation index at: https://aistudio.google.com/llms.txt\n> Use this file to discover all available pages.\n> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt\n\n# Gemini 3.1 Pro preview\n\nBuilt to refine the performance and reliability of the Gemini 3 Pro series,\nGemini 3.1 Pro Preview provides better thinking, improved token\nefficiency, and a more grounded, factually consistent experience. It's optimized\nfor software engineering behavior and usability, as well as agentic workflows\nrequiring precise tool usage and reliable multi-step execution across real-world\ndomains.\n\n{% button href=\"https://aistudio.google.com/prompts/new_chat?model=gemini-3.1-pro-preview\" variant=\"ais\" %}\n  Try in Google AI Studio\n\n{% /button %}\n\n## Documentation  {% id=\"documentation\" %}\n\nVisit the [Gemini 3 Developer Guide](/docs/latest-model) page for full coverage\nof features and capabilities.\n\n## gemini-3.1-pro-preview  {% id=\"gemini-31-pro-preview\" %}\n\n{% table variant=\"model\" %}\n  * Property\n  * Description\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model code\n\n    {% /section %}\n\n  * `gemini-3.1-pro-preview`\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"save\" /%}Supported data types\n\n    {% /section %}\n\n  *     **Inputs** Text, Image, Video, Audio, and PDF\n\n    **Output** Text\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"token_auto\" /%}Token limits{% sup %}[[*]](/docs/tokens){% /sup %}\n\n    {% /section %}\n\n  *     **Input token limit** 1,048,576\n\n    **Output token limit** 65,536\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"handyman\" /%}Capabilities\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Audio generation**](/docs/speech-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Code execution**](/docs/code-execution)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Context caching**](/docs/caching)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**File search**](/docs/file-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Function calling**](/docs/function-calling)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Maps**](/docs/maps-grounding)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Search**](/docs/google-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Image generation**](/docs/image-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Live API**](/docs/live-api)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Structured outputs**](/docs/structured-output)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Thinking**](/docs/thinking)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**URL context**](/docs/url-context)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"speed\" /%}Consumption options\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Batch API**](/docs/batch-api)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Flex inference**](/docs/flex-inference)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Priority inference**](/docs/priority-inference)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"123\" /%}Versions\n\n    {% /section %}\n\n  *     Read the [model version patterns](/docs/models#model-versions) for more details.\n\n    *   Preview: `gemini-3.1-pro-preview`\n    *   Preview: [`gemini-3.1-pro-preview-customtools`](/docs/models/gemini-3.1-pro-preview#gemini-31-pro-preview-customtools)\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"calendar_month\" /%}Latest update\n\n    {% /section %}\n\n  * February 2026\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model card\n\n    {% /section %}\n\n  * [Model card](https://deepmind.google/models/model-cards/gemini-3-1-pro/)\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"paid\" /%}Pricing\n\n    {% /section %}\n\n  * [Pricing](/docs/pricing#gemini-3.1-pro-preview)\n{% /table %}\n\n#### gemini-3.1-pro-preview-customtools  {% id=\"gemini-31-pro-preview-customtools\" %}\n\nFor those building with a mix of bash and custom tools, Gemini 3.1 Pro\nPreview comes with a separate endpoint available via the API called\n`gemini-3.1-pro-preview-customtools`. This endpoint is better at prioritizing\nyour custom tools (for example `view_file` or `search_code`).\n\nNote that while `gemini-3.1-pro-preview-customtools` is optimized for agentic\nworkflows that use custom tools and bash, you may see quality fluctuations in\nsome use cases which don't benefit from such tools.\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

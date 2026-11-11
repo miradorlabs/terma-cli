@@ -1,0 +1,449 @@
+{
+  "schema_version": 1,
+  "id": "claude-fable-5-2",
+  "vendor": "anthropic",
+  "name": "Claude Fable 5.2",
+  "family": "claude-fable",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "aliases": [
+      "claude-fable-5-2"
+    ],
+    "context_window": 1000000,
+    "default_effort": "high",
+    "description": "For demanding reasoning and long-horizon agentic work",
+    "input_modalities": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "knowledge_cutoff": "2026-06",
+    "latency": "moderate",
+    "max_output": 128000,
+    "name": "Claude Fable 5.2",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "platform_ids": {
+      "Amazon Bedrock": "anthropic.claude-fable-5-2",
+      "Claude Models on Google Cloud (Anthropic managed)": "claude-fable-5-2",
+      "Claude Models on Google Cloud (Google managed)": "claude-fable-5-2",
+      "Claude Platform on AWS": "claude-fable-5-2",
+      "Microsoft Foundry": "claude-fable-5-2"
+    },
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "released_at": "2026-11-09",
+    "retires_not_before": "2027-11-09",
+    "sampling_parameters": false,
+    "status": "active",
+    "structured_outputs": true,
+    "thinking": "adaptive (always on)",
+    "tool_calling": true,
+    "training_cutoff": "2026-06"
+  },
+  "provenance": {
+    "aliases": {
+      "anthropic-docs": [
+        "claude-fable-5-2"
+      ]
+    },
+    "context_window": {
+      "anthropic-api": 1000000,
+      "anthropic-docs": 1000000,
+      "models.dev": 1000000,
+      "openrouter": 1000000
+    },
+    "default_effort": {
+      "anthropic-docs": "high",
+      "openrouter": "high"
+    },
+    "description": {
+      "anthropic-docs": "For demanding reasoning and long-horizon agentic work"
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ]
+    },
+    "knowledge_cutoff": {
+      "anthropic-docs": "2026-06",
+      "models.dev": "2026-06"
+    },
+    "latency": {
+      "anthropic-docs": "moderate"
+    },
+    "max_output": {
+      "anthropic-api": 128000,
+      "anthropic-docs": 128000,
+      "models.dev": 128000,
+      "openrouter": 128000
+    },
+    "name": {
+      "anthropic-api": "Claude Fable 5.2",
+      "anthropic-docs": "Claude Fable 5.2",
+      "models.dev": "Claude Fable 5.2",
+      "openrouter": "Claude Fable 5.2"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "platform_ids": {
+      "anthropic-docs": {
+        "Amazon Bedrock": "anthropic.claude-fable-5-2",
+        "Claude Models on Google Cloud (Anthropic managed)": "claude-fable-5-2",
+        "Claude Models on Google Cloud (Google managed)": "claude-fable-5-2",
+        "Claude Platform on AWS": "claude-fable-5-2",
+        "Microsoft Foundry": "claude-fable-5-2"
+      }
+    },
+    "reasoning": {
+      "anthropic-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "openrouter": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "released_at": {
+      "anthropic-api": "2026-11-09",
+      "anthropic-docs": "2026-11-09",
+      "models.dev": "2026-11-09"
+    },
+    "retires_not_before": {
+      "anthropic-docs": "2027-11-09"
+    },
+    "sampling_parameters": {
+      "models.dev": false
+    },
+    "status": {
+      "anthropic-docs": "active"
+    },
+    "structured_outputs": {
+      "models.dev": true
+    },
+    "thinking": {
+      "anthropic-docs": "adaptive (always on)"
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true
+    },
+    "training_cutoff": {
+      "anthropic-docs": "2026-06"
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "anthropic-api": "https://api.anthropic.com/v1/models/claude-fable-5-2",
+    "anthropic-docs": "https://platform.claude.com/docs/en/models/fable-5-2/overview",
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/anthropic/claude-fable-5.2"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://platform.claude.com/docs/en/models/fable-5-2/overview",
+      "text": "---\ntitle: Claude Fable 5.2\nurl: https://platform.claude.com/docs/en/models/fable-5-2/overview\ndescription: \"An overview of Claude Fable 5.2: what it's for, model IDs on every platform, context window, output limits, pricing, availability, and resources for building with it.\"\n---\n\n**Latest.** Released November 9, 2026.\n\nFor demanding reasoning and long-horizon agentic work\n\nModel ID: `claude-fable-5-2`\n\nContext window: 1M tokens · Max output: 128K tokens · Input pricing: $8 / MTok · Output pricing: $40 / MTok\n\n[Announcement](https://www.anthropic.com/claude-fable-and-mythos-5-2) · [What’s new](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2) · [Migration guide](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide)\n\n## Overview\n\nClaude Fable 5.2 is built for demanding reasoning and long-horizon agentic work. Typical uses include agent sessions that run for hours, multistep deep research, and analysis carried through to a finished document, spreadsheet, or deck.\n\n## Claude Fable 5.2 and Claude Mythos 5.2\n\n[Claude Mythos 5.2](https://platform.claude.com/docs/en/models/mythos-5-2/overview) offers the same capabilities only to organizations verified through Anthropic’s verification programs, such as the [Cyber Verification Program](https://support.claude.com/en/articles/14604842). It shares Claude Fable 5.2’s specifications and pricing. To request access, apply to the program that covers your use case, or contact your account team.\n\n## How it compares\n\n| Model                                                                               | Context | Max output | Price / MTok       | Latency  | Thinking             | Default effort | Knowledge cutoff |\n| :---------------------------------------------------------------------------------- | :------ | :--------- | :----------------- | :------- | :------------------- | :------------- | :--------------- |\n| **Claude Fable 5.2** (this model)                                                   | 1M      | 128K       | $8 / $40           | Moderate | Adaptive (always on) | `high`         | Jun 2026         |\n| [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview)     | 1M      | 128K       | $4 / $20           | Moderate | Adaptive (always on) | `medium`       | Jun 2026         |\n| [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview) | 1M      | 128K       | $2 / $10           | Fast     | Adaptive             | `high`         | Jun 2026         |\n| [Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview)   | 1M      | 128K       | From $0.10 / $0.50 | Fastest  | Adaptive             | `medium`       | Jun 2026         |\n\n* **Context:** 1M tokens is roughly 555k words or 2.5M Unicode characters on the current tokenizer (introduced with Claude Opus 4.7); models before it fit about 750k words in 1M tokens. 200k tokens is roughly 150k words.\n* **Max output:** Synchronous Messages API limit. On the Message Batches API, Claude Opus 5.5, Claude Opus 5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 5.5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, and Claude Sonnet 4.6 support up to 300k output tokens with the output-300k-2026-03-24 beta header.\n* **Price / MTok:** Input / output, base price per million tokens. Batch API requests are 50% off; prompt caching reads cost 10% of the base input price (2.5% on Claude Fable 5.2, Claude Mythos 5.2, Claude Fable 5.1, and Claude Mythos 5.1, 5% on Claude Opus 5.5 and Claude Sonnet 5.5). See Pricing for the full list.\n* **Latency:** Comparative latency, relative to the current lineup, as published in the models overview. Actual latency depends on prompt length, output length, and thinking effort.\n* **Thinking:** Adaptive thinking lets the model decide how much to think, steered by effort. Extended thinking is the manual budget\\_tokens mode on earlier models.\n* **Default effort:** The effort parameter’s default on the Claude API. Models without a value don’t support the parameter.\n* **Knowledge cutoff:** Reliable knowledge cutoff: the date through which the model’s knowledge is most extensive and reliable.\n\n## Specifications\n\n### Model IDs\n\n| Platform                                                                                                                                                   | Model ID                     |\n| :--------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------- |\n| Claude API                                                                                                                                                 | `claude-fable-5-2`           |\n| [Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock)                                                           | `anthropic.claude-fable-5-2` |\n| [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed)       | `claude-fable-5-2`           |\n| [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry)                                                     | `claude-fable-5-2`           |\n| [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws)                                                     | `claude-fable-5-2`           |\n| [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) | `claude-fable-5-2`           |\n\n### Pricing\n\n| Feature                                                                                | Value                            |\n| :------------------------------------------------------------------------------------- | :------------------------------- |\n| Input                                                                                  | $8 / MTok                        |\n| Output                                                                                 | $40 / MTok                       |\n| [5m cache write](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | $10 / MTok                       |\n| [1h cache write](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | $16 / MTok                       |\n| [Cache read](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)     | $0.20 / MTok                     |\n| [Batch API](https://platform.claude.com/docs/en/build-with-claude/batch-processing)    | 50% discount on input and output |\n\n[Full price list](https://platform.claude.com/docs/en/about-claude/pricing)\n\n### Capabilities\n\n| Feature                                                                                 | Value                  |\n| :-------------------------------------------------------------------------------------- | :--------------------- |\n| [Context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) | 1M tokens              |\n| Max output                                                                              | 128K tokens            |\n| [Thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)              | Adaptive (always on)   |\n| [Default effort](https://platform.claude.com/docs/en/build-with-claude/effort)          | `high`                 |\n| Comparative latency                                                                     | Moderate               |\n| Input → output                                                                          | Text and images → text |\n| Reliable knowledge cutoff                                                               | Jun 2026               |\n| Training data cutoff                                                                    | Jun 2026               |\n\n### Availability\n\n| Feature                                                                       | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |\n| :---------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| [Status](https://platform.claude.com/docs/en/about-claude/model-deprecations) | Active (latest)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |\n| Released                                                                      | November 9, 2026                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |\n| Retirement                                                                    | Not sooner than November 9, 2027                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |\n| Platforms                                                                     | Claude API, [Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) |\n\n## Good to know\n\n* Adaptive thinking is always on and can’t be turned off. Control thinking depth with the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort).\n* Forced tool use (`tool_choice` types `any` and `tool`) returns a 400 error. See [Thinking and tool choice](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#thinking-and-tool-choice).\n* Omit `temperature`, `top_p`, and `top_k`. See [Sampling parameters](https://platform.claude.com/docs/en/build-with-claude/thinking#sampling-parameters) for the values that return a 400 error.\n* Claude Fable 5.2 requires 30-day data retention and isn’t available under zero data retention unless expressly authorized by Anthropic. See [Model-specific data retention requirements](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#model-specific-data-retention-requirements).\n* Query limits and capabilities programmatically with the [Models API](https://platform.claude.com/docs/en/api/models/list).\n\n## Resources\n\n<CardGroup cols={3}>\n  <Card title=\"Prompting Claude Fable 5.2\" icon=\"lightbulb\" href=\"https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2\">\n    Behavioral differences and prompting patterns specific to Claude Fable 5.2.\n  </Card>\n\n  <Card title=\"Claude Fable 5.2 migration guide\" icon=\"arrow-right\" href=\"https://platform.claude.com/docs/en/models/fable-5-2/migration-guide\">\n    What changes when you move from Claude Fable 5.1 or from a Claude Opus model.\n  </Card>\n\n  <Card title=\"Preserved thinking\" icon=\"brain\" href=\"https://platform.claude.com/docs/en/build-with-claude/preserved-thinking\">\n    Editing earlier turns invalidates thinking blocks, for every account.\n  </Card>\n\n  <Card title=\"Adaptive thinking\" icon=\"brain\" href=\"https://platform.claude.com/docs/en/build-with-claude/thinking\">\n    How adaptive thinking works. It’s the only thinking mode on Claude Fable 5.2.\n  </Card>\n\n  <Card title=\"Effort\" icon=\"sliders\" href=\"https://platform.claude.com/docs/en/build-with-claude/effort\">\n    The control for thinking depth, latency, and cost. Choose a level for each workload.\n  </Card>\n\n  <Card title=\"Refusals and fallback\" icon=\"shield\" href=\"https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback\">\n    Handle classifier refusals and retry on another Claude model.\n  </Card>\n\n  <Card title=\"Fast mode\" icon=\"lightning\" href=\"https://platform.claude.com/docs/en/build-with-claude/fast-mode\">\n    Faster output from Claude Fable 5.2 in Messages API requests, at premium pricing.\n  </Card>\n</CardGroup>\n\n## Reference\n\n<CardGroup cols={3}>\n  <Card title=\"System prompt\" icon=\"text\" href=\"https://platform.claude.com/docs/en/release-notes/system-prompts/claude-fable-5-2\">\n    The system prompt Claude Fable 5.2 uses on claude.ai and the Claude apps.\n  </Card>\n\n  <Card title=\"System card\" icon=\"file\" href=\"https://www.anthropic.com/document/claude-fable-5-2-mythos-5-2-system-card\">\n    Safety evaluations and deployment decisions for Claude Fable 5.2 and Claude Mythos 5.2.\n  </Card>\n\n  <Card title=\"Pricing\" icon=\"coins\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\">\n    Full price list, including batch discounts and prompt caching rates.\n  </Card>\n\n  <Card title=\"Model IDs and versioning\" icon=\"fingerprint\" href=\"https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions\">\n    How model IDs, aliases, and pinned snapshots work.\n  </Card>\n\n  <Card title=\"Model deprecations\" icon=\"clock\" href=\"https://platform.claude.com/docs/en/about-claude/model-deprecations\">\n    Lifecycle status and retirement commitments for every Claude model.\n  </Card>\n</CardGroup>\n"
+    },
+    "whats_new": {
+      "title": "What's new",
+      "url": "https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2",
+      "text": "---\ntitle: What's new in Claude Fable 5.2\nurl: https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2\ndescription: Breaking changes, feature support, pricing, and availability for Claude Fable 5.2 and Claude Mythos 5.2, compared with Claude Fable 5.1 and Claude Mythos 5.1.\n---\n\nClaude Fable 5.2 is built for demanding reasoning and long-horizon agentic work. For most workloads, start with the latest Claude Opus model (see [Choosing the right model](https://platform.claude.com/docs/en/about-claude/models/choosing-a-model)), and move to Claude Fable 5.2 when your evals on a Claude Opus model at higher effort still don’t meet your requirements.\n\nFour changes from Claude Fable 5.1 can break your code:\n\n* [The prefix check applies to every account](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#editing-earlier-turns-invalidates-thinking-blocks).\n* [Only Claude Fable 5.2 and Claude Mythos 5.2 read Claude Fable 5.2 thinking blocks](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#thinking-blocks-are-tied-to-the-model-that-produced-them).\n* The earlier [`computer_20251124` computer use tool returns an error](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#computer-20251124-is-not-supported) on every platform except Amazon Bedrock.\n* With the advisor tool, a Claude Fable 5.2 executor [needs a Claude Fable 5.2 or Claude Mythos 5.2 advisor](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#advisor-tool-pairs).\n\n## Models\n\n| Model             | Claude API ID     | Description                                           | Availability                                                                                                                                                |\n| ----------------- | ----------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| Claude Fable 5.2  | claude-fable-5-2  | For demanding reasoning and long-horizon agentic work | All customers on the Claude API (see each platform’s page for partner platforms)                                                                            |\n| Claude Mythos 5.2 | claude-mythos-5-2 | Same capabilities as Claude Fable 5.2                 | Organizations verified through Anthropic’s verification programs, such as the [Cyber Verification Program](https://support.claude.com/en/articles/14604842) |\n\nClaude Fable 5.2 and Claude Mythos 5.2 share these specs:\n\n* **Context window and output:** a [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) (default and maximum) and 128k max output tokens.\n* **Thinking:** [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) is always on. Use the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort) to control thinking depth.\n* **Tokenizer:** the tokenizer introduced with Claude Opus 4.7. See [Token counting](https://platform.claude.com/docs/en/build-with-claude/token-counting#token-counts-on-claude-fable-5).\n\nFor all current models, see [Models overview](https://platform.claude.com/docs/en/models/overview).\n\n## Breaking changes\n\n### Editing earlier turns invalidates thinking blocks on every account\n\nThe API’s prefix check (see [Keeping the prefix unchanged](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#prefix-check)) tests whether anything before a Claude Fable 5.2 or Claude Mythos 5.2 thinking block has changed since the model produced it: the `system` prompt, the `tools`, or an earlier message. On Claude Fable 5.2 and Claude Mythos 5.2, a request that sends back an invalid thinking block and leaves `prefix_mismatch_behavior` unset gets a 400 error, whatever the account’s age (see [When `prefix_mismatch_behavior` is unset](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#enforcement)). On Claude Fable 5.1, such a request gets the error on accounts created on or after August 31, 2026. On the Claude API, Claude Mythos 5.1 already returns it on every account. So code on Claude Fable 5.1 that edits its history can run without errors on an older account before the switch and fail after it.\n\nWhen the check fails, the request returns a 400 error whose message says `The block is bound to a different conversation`. To drop the affected blocks and continue instead, send the `thinking-binding-controls-2026-08-01` beta header and set `thinking.block_binding.prefix_mismatch_behavior` to `\"drop_block\"`. The response then lists each dropped block in a top-level `input_transformations` array. Treat `\"drop_block\"` as a stopgap while you fix the edit, because [dropping blocks can raise output tokens](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#drop-block-cost).\n\nNothing changes for you if Claude Code, claude.ai, [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview), or the [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview) builds your requests.\n\nIf your own code builds your requests, nothing changes for you either, as long as all of these are true:\n\n* Your code keeps `system` and `tools` the same for the whole conversation.\n* Your code only adds to `messages`. It never changes, reorders, or removes an earlier message.\n* Your code [sends each assistant turn back exactly as the API returned it](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#append-assistant-turns-exactly-as-returned): every block, in the same order.\n* Your code does none of the things listed in [What to check in your integration](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#what-to-check).\n\nOtherwise, test your code before you switch:\n\n* **Code on Claude Fable 5.1:** Follow the [prefix check section](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#fable-5-2-preserved-thinking) of the migration guide.\n* **Code on Claude Mythos 5.1:** Follow [Migrating to Claude Mythos 5.2 from Claude Mythos 5.1](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#migrating-from-claude-mythos-5-1-to-claude-mythos-5-2).\n\n[Preserved thinking](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking) explains what counts as an edit. It also shows how to make each change without an edit.\n\n### Only Claude Fable 5.2 and Claude Mythos 5.2 read Claude Fable 5.2 thinking blocks\n\nEvery thinking block records which model produced it, and a model reads only its own blocks and some other models’ blocks. On the Claude API and Claude Models on Google Cloud (Google managed), Claude Fable 5.2 and Claude Mythos 5.2 read each other’s thinking blocks and those from Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5, Claude Fable 5.1, Claude Mythos 5.1, Claude Opus 5, Claude Fable 5, and Claude Mythos 5, and from earlier Opus, Sonnet, and Haiku models. No other model reads their blocks.\n\n* **Moving onto Claude Fable 5.2 or Claude Mythos 5.2** from one of those models keeps the conversation’s reasoning on the Claude API and Claude Models on Google Cloud (Google managed). So does moving between Claude Fable 5.2 and Claude Mythos 5.2.\n* **Moving from Claude Fable 5.2 or Claude Mythos 5.2 to any other model** loses their reasoning for the turns that run there. That includes Claude Opus 5.5, Claude Fable 5.1, Claude Mythos 5.1, and Claude Fable 5.2’s fallback models (Claude Opus 4.8 and Claude Opus 5).\n\nWhen a request carries a block the current model can’t read, the API drops the block before the model receives it. The request succeeds, and dropped blocks aren’t billed. With the `thinking-binding-controls-2026-08-01` beta header, the response lists the drop in `input_transformations`. See [Switching models mid-conversation](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#switching-models).\n\n### Use the computer use toolset instead of `computer_20251124`\n\nClaude Fable 5.1 accepts [computer use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool) both as the `computer_toolset_20260801` toolset and, with the `computer-use-2025-11-24` beta header, as the earlier `computer_20251124` tool. Claude Fable 5.2 and Claude Mythos 5.2 support computer use through the toolset. A request to either model that declares a `computer_20251124` tool returns a 400 `invalid_request_error` on every platform except Amazon Bedrock, where the earlier tool works as it does on Claude Fable 5.1.\n\nTo move an existing integration, follow [Migrate from `computer_20251124`](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool#migrate-from-computer-20251124).\n\n### A Claude Fable 5.2 executor needs a Claude Fable 5.2 or Claude Mythos 5.2 advisor\n\nWith the [advisor tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool), which is in beta, the advisor must be at least as capable as the executor. A Claude Fable 5.2 or Claude Mythos 5.2 executor accepts only Claude Fable 5.2 or Claude Mythos 5.2 as its advisor. Any other advisor, including Claude Fable 5.1 and Claude Mythos 5.1, returns a 400 `invalid_request_error`.\n\nIf you use the advisor tool and move the executor to one of these models, set the `model` in the advisor tool definition to `claude-fable-5-2` or `claude-mythos-5-2` in the same change. Changing the advisor’s `model` is an edit to `tools`, so make the change in new conversations. A request that sends earlier thinking blocks back after the change fails the [prefix check](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#editing-earlier-turns-invalidates-thinking-blocks) and returns a 400 error, unless you set `thinking.block_binding.prefix_mismatch_behavior` to `\"drop_block\"` (beta, `thinking-binding-controls-2026-08-01` header). To keep your current executor and change only the advisor, set the advisor’s `model` to `claude-fable-5-2`: every executor model accepts it. A Claude Fable 5.2 advisor returns its advice encrypted, so if your code reads the advice text, see [Result variants](https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool#result-variants). See also [Model compatibility](https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool#model-compatibility).\n\n## Thinking and tool choice\n\nTwo Messages API rules apply to every Claude Fable 5.2 request. Neither is a change if you come from Claude Fable 5.1, Claude Mythos 5.1, or Claude Opus 5.5. From Claude Fable 5 or Claude Mythos 5, where adaptive thinking is already always on, only the forced tool use rule is a breaking change. From Claude Opus 5 or an earlier Claude Opus model, both are. The [Claude Fable 5.2 and Claude Mythos 5.2 migration guide](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide) covers each path.\n\n* **Adaptive thinking is always on.** `thinking: {\"type\": \"enabled\"}` with `budget_tokens` and `thinking: {\"type\": \"disabled\"}` both return a 400 error. Omit `thinking` or send `{\"type\": \"adaptive\"}`, and use [effort](https://platform.claude.com/docs/en/build-with-claude/effort) to control thinking depth.\n* **Forced tool use isn’t supported.** `tool_choice` set to `{\"type\": \"any\"}` or `{\"type\": \"tool\", \"name\": \"...\"}` returns a 400 `invalid_request_error`. For schema-valid JSON, keep `tool_choice: {\"type\": \"auto\"}` and set `strict: true` with [strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use), or use [JSON outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#usage). In an organization with [customer-managed encryption keys](https://platform.claude.com/docs/en/manage-claude/cmek), [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) aren’t available for Claude Fable 5.2 or Claude Mythos 5.2. That covers both strict tool use and JSON outputs. There, leave out `strict` and validate the tool input in your code.\n\n## Feature support\n\nClaude Fable 5.2 supports these API features, among others:\n\n* **Effort:** all five [effort levels](https://platform.claude.com/docs/en/build-with-claude/effort#effort-levels): `low`, `medium`, `high`, `xhigh`, and `max`. The API default is `high`. Start there, because most of the gain in capability is already present at `high`. Step up to `xhigh` for your hardest long-running coding and agentic work, where you’ve measured a gain. Reserve `max` for measuring the model’s ceiling and for the rare task where time and tokens don’t matter. See [Recommended effort levels for Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/effort#recommended-effort-levels-for-claude-fable-5-2).\n* **Compaction on demand (beta):** with the `compact-2026-09-04` beta header, you choose when to replace older turns with a summary. See [Compaction on demand](https://platform.claude.com/docs/en/build-with-claude/compaction-on-demand).\n* **Mid-conversation tool changes (beta):** you add or remove tools in a `role: \"system\"` message instead of editing `tools`. On the Claude API, Claude Platform on AWS, and Claude Models on Google Cloud (Anthropic managed), send the `inline-tools-2026-09-15` beta header. The `mid-conversation-tool-changes-2026-07-01` header works for changes that name a tool by reference, on the platforms that [Mid-conversation system messages and tool changes](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages) lists. See [Mid-conversation tool changes](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages#mid-conversation-tool-changes).\n* **Computer use:** through the `computer_toolset_20260801` toolset. The earlier `computer_20251124` tool returns a 400 error on every platform except Amazon Bedrock, where both models also accept the earlier tool (see the [computer use breaking change](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#computer-20251124-is-not-supported)). See [Computer use tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool).\n\nCompaction on demand and mid-conversation tool changes help you keep the history append-only, which the [prefix check](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#editing-earlier-turns-invalidates-thinking-blocks) requires. See each feature’s page for model and platform availability.\n\n[Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) is available for Claude Fable 5.2 in Messages API requests on the Claude API.\n\nFast mode is also available for Claude Fable 5.2 on [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed).\n\nFast mode is also available for Claude Fable 5.2 on [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed).\n\nFast mode is also available for Claude Fable 5.2 on [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry) for deployments hosted on Anthropic, as a separate model, `claude-fable-5-2-fast`.\n\nFast mode is also available for Claude Mythos 5.2 in Messages API requests on the Claude API. [Availability of fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode#feature-availability) lists every platform where Claude Mythos 5.2 has fast mode.\n\n### Thinking blocks stay with the account that produced them\n\nThinking blocks that Claude Fable 5.2 and Claude Mythos 5.2 produce work only in the account that produced them, or in an account linked to it. When another account sends one of these blocks, the API drops the block before the model receives it, and the request succeeds. On the Claude API and Claude Models on Google Cloud (Google managed), with the `thinking-binding-controls-2026-08-01` beta header, the response lists each dropped block in `input_transformations` with `reason: \"organization_binding_mismatch\"`. See [Thinking blocks stay with the account that produced them](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#account-bound-thinking) in Preserved thinking.\n\n## Behavior differences\n\nA few Claude Fable 5.2 behaviors show up without any code change. Check them when you carry prompts over. [Prompting Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2) has guidance for each:\n\n* **Prompt lines that ask for less thinking don’t stop the model from thinking at `medium` effort and above.** Claude Fable 5.1 usually follows a line such as “answer directly without deliberating.” In Anthropic’s testing, such a line didn’t stop Claude Fable 5.2 from thinking at `medium` and above. At `high` and above, the model thinks before almost every reply. If easy requests take too long or cost too much, use a lower effort level for those turns. See [Calibrate effort](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2#calibrate-effort).\n* **A turn can end before the work is done.** On long, multistep tasks, the model sometimes ends a turn with a list of what remains, an offer to continue, or a stop at an ordinary obstacle. This occurs more often at `low` and `medium` effort. See [Finish the whole task](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2#finish-the-whole-task).\n* **What the prompt says about code ownership matters.** In Anthropic’s testing on small coding tasks, when a prompt said nothing about who owns the code, the model tended to add to the existing structure and to report nearby problems instead of fixing them. See [Say who owns the code](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2#say-who-owns-the-code).\n* **Long runs of tool calls can pass with little user-facing text.** The model might also make its first tool call without saying what it’s about to do. See [Keep users informed during long turns](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2#keep-users-informed-during-long-turns).\n* **How much the model delegates to subagents depends on your harness and tasks.** In an agentic coding product whose prompts invite delegation, the model delegates readily. Subagents can account for a large part of what a session costs. See [Set expectations for subagents](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2#set-expectations-for-subagents).\n* **The model follows style rules closely.** A hard limit on sentence length can make the model’s prose choppy. See [Review instructions written for earlier models](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2#review-instructions-written-for-earlier-models).\n\n## Refusals, fallback, and billing\n\nClaude Fable 5.2 runs safety classifiers, and everything in [Refusals and fallback](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback) applies.\n\n* **Refusals:** a declined request returns HTTP 200 with `stop_reason: \"refusal\"` and a [`stop_details`](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#refusal-response) object naming the policy area that fired.\n* **Fallback:** retry a refused request on another model with [server-side fallback](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback), the [SDK middleware](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#client-side-fallback), or your own retry. Server-side fallback is in beta on the Claude API and Claude Models on Google Cloud (Anthropic managed). With it, `fallbacks: \"default\"` retries a declined request on the model Anthropic recommends for that category. For categories with no recommended fallback, such as `reasoning_extraction`, the refusal stands. The permitted fallback targets for Claude Fable 5.2 are Claude Opus 4.8 and Claude Opus 5.\n* **Billing:** whether a refusal that arrives before any output is billed depends on its refusal category, and it counts against your rate limits either way. See [How refusals are billed](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#how-refusals-are-billed). [Fallback credit](https://platform.claude.com/docs/en/build-with-claude/fallback-credit) refunds the prompt-cache cost of switching models.\n\n## Pricing\n\nClaude Fable 5.2 and Claude Mythos 5.2 share these prices, in USD:\n\n| Base input | 5m cache writes | 1h cache writes | Cache reads  | Output     |\n| ---------- | --------------- | --------------- | ------------ | ---------- |\n| $8 / MTok  | $10 / MTok      | $16 / MTok      | $0.20 / MTok | $40 / MTok |\n\nInput and output cost less than on Claude Fable 5.1 and Claude Mythos 5.1, which cost $10 USD per million input tokens and $50 USD per million output tokens. Cache reads (hits and refreshes) cost 0.025 times the base input price, the same multiplier as on those models. [Batch processing](https://platform.claude.com/docs/en/build-with-claude/batch-processing) is $4 USD per million input tokens and $20 USD per million output tokens. [Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Fable 5.2 costs $16 USD per million input tokens and $80 USD per million output tokens. See [Fast mode pricing](https://platform.claude.com/docs/en/about-claude/pricing#fast-mode-pricing). Fast mode for Claude Mythos 5.2 costs $16 USD per million input tokens and $80 USD per million output tokens. See [Pricing](https://platform.claude.com/docs/en/about-claude/pricing) for data residency and tool pricing.\n\n## Availability\n\nClaude Fable 5.2 is available on:\n\n* **Claude API:** all customers, as `claude-fable-5-2`\n* **AWS:** [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), as `anthropic.claude-fable-5-2`, and [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), as `claude-fable-5-2`\n* **Google Cloud:** [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed), as `claude-fable-5-2`, and [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), as `claude-fable-5-2`\n* **Microsoft Foundry:** [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry), as `claude-fable-5-2`, on Anthropic infrastructure (see [Hosting options](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry#hosting-options))\n\nClaude Mythos 5.2 is available only to organizations verified through Anthropic’s verification programs, such as the [Cyber Verification Program](https://support.claude.com/en/articles/14604842). It’s available on:\n\n* **Claude API:** as `claude-mythos-5-2`\n* **AWS:** [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), as `anthropic.claude-mythos-5-2`\n* **Google Cloud:** [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed), as `claude-mythos-5-2`, and [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), as `claude-mythos-5-2`\n* **Microsoft Foundry:** [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry), as `claude-mythos-5-2`, on Anthropic infrastructure\n\nTo request access, apply to the program that covers your use case, or contact your account team.\n\nClaude Fable 5.2 and Claude Mythos 5.2 require 30-day data retention and aren’t available under zero data retention unless expressly authorized by Anthropic. Both are [Covered Models](https://support.claude.com/en/articles/15425695). See [Model-specific data retention requirements](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#model-specific-data-retention-requirements).\n\n## Migrate from Claude Fable 5.1\n\nTo migrate from Claude Fable 5.1, update your model ID:\n\n<CodeGroup exclude=\"shell\">\n  <CodeGroupItem language=\"cURL\">\n    Set the `model` field in the request body to `claude-fable-5-2`.\n  </CodeGroupItem>\n\n  <CodeGroupItem language=\"CLI\">\n    Set the `--model` flag to `claude-fable-5-2`.\n  </CodeGroupItem>\n\n  ```python Python\n  model = \"claude-fable-5-1\"  # Before\n  model = \"claude-fable-5-2\"  # After\n  ```\n\n  ```typescript TypeScript\n  let model = \"claude-fable-5-1\"; // Before\n  model = \"claude-fable-5-2\"; // After\n  ```\n\n  ```csharp C#\n  var model = Model.ClaudeFable5_1; // Before\n  model = Model.ClaudeFable5_2; // After\n  ```\n\n  ```go Go\n  model := anthropic.ModelClaudeFable5_1 // Before\n  model = anthropic.ModelClaudeFable5_2  // After\n  ```\n\n  ```java Java\n  Model model = Model.CLAUDE_FABLE_5_1; // Before\n  model = Model.CLAUDE_FABLE_5_2; // After\n  ```\n\n  ```php PHP\n  $model = Model::CLAUDE_FABLE_5_1; // Before\n  $model = Model::CLAUDE_FABLE_5_2; // After\n  ```\n\n  ```ruby Ruby\n  model = Anthropic::Model::CLAUDE_FABLE_5_1 # Before\n  model = Anthropic::Model::CLAUDE_FABLE_5_2 # After\n  ```\n</CodeGroup>\n\nThen review these items:\n\n1. **Check whether your code edits history.** If your code builds the `messages` array itself, run the test in the migration guide’s [prefix check section](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#fable-5-2-preserved-thinking), even if Claude Fable 5.1 has never returned the error for your account.\n2. **Check model switches.** If a router or fallback moves conversations between models, expect every model except Claude Mythos 5.2 to drop Claude Fable 5.2’s thinking blocks, Claude Fable 5.1 and Claude Opus 5.5 included. See [Only Claude Fable 5.2 and Claude Mythos 5.2 read Claude Fable 5.2 thinking blocks](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#thinking-blocks-are-tied-to-the-model-that-produced-them).\n3. **Move computer use to the toolset.** If you use the `computer_20251124` tool anywhere except Amazon Bedrock, Claude Fable 5.2 returns a 400 error for that tool. Declare `computer_toolset_20260801` instead. For the change itself, see [Use the computer use toolset instead of `computer_20251124`](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#computer-20251124-is-not-supported).\n4. **Update the advisor.** If you use the advisor tool with Claude Fable 5.2 as the executor, set the advisor’s `model` to `claude-fable-5-2` or `claude-mythos-5-2`. See [A Claude Fable 5.2 executor needs a Claude Fable 5.2 or Claude Mythos 5.2 advisor](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#advisor-tool-pairs).\n5. **Re-run your evals.** Include an effort sweep that starts at the default, `high`. See [Recommended effort levels for Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/effort#recommended-effort-levels-for-claude-fable-5-2).\n\nSee the [Claude Fable 5.2 and Claude Mythos 5.2 migration guide](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide) for step-by-step instructions, including from Claude Mythos 5.1 and from Claude Opus models. For model-specific prompting patterns, see [Prompting Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2).\n\n## Next steps\n\n<CardGroup cols={3}>\n  <Card title=\"Models overview\" icon=\"arrow-right\" href=\"https://platform.claude.com/docs/en/models/overview\">\n    Specs and pricing for every current Claude model.\n  </Card>\n\n  <Card title=\"Migration guide\" icon=\"code\" href=\"https://platform.claude.com/docs/en/models/fable-5-2/migration-guide\">\n    Move code from Claude Fable 5.1, Claude Mythos 5.1, and Claude Opus models to Claude Fable 5.2 or Claude Mythos 5.2.\n  </Card>\n\n  <Card title=\"Prompting Claude Fable 5.2\" icon=\"terminal\" href=\"https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2\">\n    Prompting patterns specific to Claude Fable 5.2.\n  </Card>\n</CardGroup>\n"
+    }
+  },
+  "api": {
+    "listing": {
+      "capabilities": {
+        "batch": {
+          "supported": true
+        },
+        "citations": {
+          "supported": true
+        },
+        "code_execution": {
+          "supported": true
+        },
+        "context_management": {
+          "clear_thinking_20251015": {
+            "supported": true
+          },
+          "clear_tool_uses_20250919": {
+            "supported": true
+          },
+          "compact_20260112": {
+            "supported": true
+          },
+          "supported": true
+        },
+        "effort": {
+          "high": {
+            "supported": true
+          },
+          "low": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "supported": true,
+          "xhigh": {
+            "supported": true
+          }
+        },
+        "image_input": {
+          "supported": true
+        },
+        "pdf_input": {
+          "supported": true
+        },
+        "server_tools": {
+          "code_execution": {
+            "supported": true
+          },
+          "supported": true,
+          "web_search": {
+            "supported": true
+          }
+        },
+        "structured_outputs": {
+          "supported": true
+        },
+        "thinking": {
+          "supported": true,
+          "types": {
+            "adaptive": {
+              "supported": true
+            },
+            "between_tools": {
+              "supported": false
+            },
+            "disabled": {
+              "supported": false
+            },
+            "enabled": {
+              "supported": false
+            }
+          }
+        }
+      },
+      "created_at": "2026-11-09T18:30:00Z",
+      "deprecated_at": null,
+      "display_name": "Claude Fable 5.2",
+      "id": "claude-fable-5-2",
+      "lifecycle": "active",
+      "line": "fable",
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "retires_at": null,
+      "type": "model"
+    },
+    "probes": {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "endpoint": "POST /v1/messages (anthropic-version 2026-10-21)",
+      "params": {
+        "baseline": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.high": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.low": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.max": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.medium": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.xhigh": {
+          "accepted": true,
+          "status": 200
+        },
+        "inference_geo.us": {
+          "accepted": true,
+          "status": 200
+        },
+        "max_tokens.over_stated_limit": {
+          "accepted": false,
+          "status": 400,
+          "error": "max_tokens: 128001 > 128000, which is the maximum allowed number of output tokens for claude-fable-5-2"
+        },
+        "prefill": {
+          "accepted": false,
+          "status": 400,
+          "error": "This model does not support assistant message prefill. The conversation must end with a user message."
+        },
+        "sampling.temperature": {
+          "accepted": false,
+          "status": 400,
+          "error": "temperature: Extra inputs are not permitted"
+        },
+        "sampling.top_k": {
+          "accepted": false,
+          "status": 400,
+          "error": "top_k: Extra inputs are not permitted"
+        },
+        "sampling.top_p": {
+          "accepted": false,
+          "status": 400,
+          "error": "top_p: Extra inputs are not permitted"
+        },
+        "speed.fast": {
+          "accepted": true,
+          "status": 200
+        },
+        "stop_sequences": {
+          "accepted": true,
+          "status": 200
+        },
+        "structured_output": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.adaptive": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.adaptive.display_summarized": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.between_tools": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.between_tools\" is not supported for this model."
+        },
+        "thinking.budget_tokens": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.enabled\" is not supported for this model. Use \"thinking.type.adaptive\" and \"output_config.effort\" to control thinking behavior."
+        },
+        "thinking.disabled": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.disabled\" is not supported for this model. Use \"thinking.type.adaptive\" and \"output_config.effort\" to control thinking behavior."
+        },
+        "tool_choice.any": {
+          "accepted": false,
+          "status": 400,
+          "error": "tool_choice: type \"tool\" and \"any\" are not supported for this model."
+        },
+        "tool_choice.auto": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.none": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.tool": {
+          "accepted": false,
+          "status": 400,
+          "error": "tool_choice: type \"tool\" and \"any\" are not supported for this model."
+        }
+      },
+      "tokens": {
+        "cjk": 87,
+        "code": 159,
+        "indented": 56,
+        "json": 154,
+        "prose": 110,
+        "symbols": 127
+      },
+      "tokenizer_like": [
+        "claude-fable-5-1",
+        "claude-haiku-5-5",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5"
+      ],
+      "response": {
+        "model": "claude-fable-5-2",
+        "usage_keys": [
+          "cache_creation.ephemeral_1h_input_tokens",
+          "cache_creation.ephemeral_5m_input_tokens",
+          "cache_creation_input_tokens",
+          "cache_read_input_tokens",
+          "inference_geo",
+          "input_tokens",
+          "output_tokens",
+          "output_tokens_details.thinking_tokens",
+          "service_tier",
+          "speed"
+        ],
+        "headers": [
+          "anthropic-organization-id",
+          "anthropic-ratelimit-input-tokens-limit",
+          "anthropic-ratelimit-input-tokens-remaining",
+          "anthropic-ratelimit-input-tokens-reset",
+          "anthropic-ratelimit-output-tokens-limit",
+          "anthropic-ratelimit-output-tokens-remaining",
+          "anthropic-ratelimit-output-tokens-reset",
+          "anthropic-ratelimit-requests-limit",
+          "anthropic-ratelimit-requests-remaining",
+          "anthropic-ratelimit-requests-reset",
+          "anthropic-ratelimit-tokens-limit",
+          "anthropic-ratelimit-tokens-remaining",
+          "anthropic-ratelimit-tokens-reset",
+          "anthropic-workspace-id",
+          "request-id"
+        ],
+        "stream_events": [
+          "message_start",
+          "content_block_start",
+          "ping",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ]
+      }
+    }
+  },
+  "harnesses": []
+}

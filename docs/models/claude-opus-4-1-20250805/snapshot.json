@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "id": "claude-opus-4-1-20250805",
+  "vendor": "anthropic",
+  "name": "Claude Opus 4.1",
+  "family": "claude-opus",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 200000,
+    "deprecated_at": "2026-06-05",
+    "input_modalities": [
+      "image",
+      "text",
+      "file"
+    ],
+    "knowledge_cutoff": "2025-01-31",
+    "max_output": 32000,
+    "name": "Claude Opus 4.1",
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "retires_at": "2026-08-05",
+    "status": "retired",
+    "tool_calling": true
+  },
+  "provenance": {
+    "context_window": {
+      "openrouter": 200000
+    },
+    "deprecated_at": {
+      "anthropic-docs": "2026-06-05"
+    },
+    "input_modalities": {
+      "openrouter": [
+        "image",
+        "text",
+        "file"
+      ]
+    },
+    "knowledge_cutoff": {
+      "openrouter": "2025-01-31"
+    },
+    "max_output": {
+      "openrouter": 32000
+    },
+    "name": {
+      "openrouter": "Claude Opus 4.1"
+    },
+    "output_modalities": {
+      "openrouter": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "openrouter": true
+    },
+    "retires_at": {
+      "anthropic-docs": "2026-08-05"
+    },
+    "status": {
+      "anthropic-docs": "retired"
+    },
+    "tool_calling": {
+      "openrouter": true
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "anthropic-docs": "https://platform.claude.com/docs/en/about-claude/model-deprecations",
+    "openrouter": "https://openrouter.ai/anthropic/claude-opus-4.1"
+  },
+  "docs": {},
+  "api": null,
+  "harnesses": []
+}

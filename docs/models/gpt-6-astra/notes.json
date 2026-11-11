@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "id": "gpt-6-astra",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-6 Astra, our most capable model, built for the hardest end-to-end work.",
+    "GPT-6 Astra does not support the none reasoning effort level.",
+    "GPT-6 Astra does not support custom temperature or top_p values or log probabilities (logprobs).",
+    "Misalignment monitoring asynchronously checks for potential issues during agent work in supported Responses API requests.",
+    "Added new controls for long-running work with GPT-6 Astra in the Responses API:"
+  ],
+  "changelog": [
+    {
+      "date": "2026-10-26",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-6.1-terra · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-6.1 Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra), a fast, efficient model for visual reasoning, precise computer use, and clear, natural writing.\n\nSee the [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#gpt-61-terra) for prompting and migration guidance."
+    },
+    {
+      "date": "2026-09-29",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-6.1-sol · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) (`gpt-6.1-sol`) for complex coding and professional work at a lower cost than GPT-6 Astra.\n\nStandard pricing per 1M tokens for prompts with up to 272K input tokens is $2 input, $0.10 cached input, $2.50 cache write, and $10 output.\n\nGPT-6.1 Sol also supports [Multi-agent](https://developers.openai.com/api/docs/guides/responses-multi-agent) in beta. Let the model delegate work to subagents in a Responses API request.\n\nUse the Responses API for tool calling. See [GPT-6 model guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#gpt-61-sol) for reasoning settings and [pricing](https://developers.openai.com/api/docs/pricing) for available processing tiers."
+    },
+    {
+      "date": "2026-09-29",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-6-astra · API: v1/responses\n\nAdded [Ultrafast mode](https://developers.openai.com/api/docs/guides/ultrafast-mode) for GPT-6 Astra in the Responses API. Use `gpt-6-astra` with `service_tier: \"ultrafast\"` to reduce the time between generated output tokens. It is available to API customers, subject to rate limits, with global processing and US data residency. EU and other regional inference residency aren't supported. See [Ultrafast pricing](https://developers.openai.com/api/docs/pricing?latest-pricing=ultrafast)."
+    },
+    {
+      "date": "2026-09-03",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-6-astra · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), our most capable model, built for the hardest end-to-end work.\n\nUse GPT-6 Astra for reasoning, coding, computer use, research, and document creation. It combines these capabilities to carry complex tasks from an initial request to a finished result, using the context and tools you provide.\n\nKey changes to consider when migrating:"
+    },
+    {
+      "date": "2026-09-03",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "- GPT-6 Astra does not support the `none` reasoning effort level."
+    },
+    {
+      "date": "2026-09-03",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "- GPT-6 Astra does not support custom `temperature` or `top_p` values or log probabilities (`logprobs`)."
+    },
+    {
+      "date": "2026-09-03",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "- [Misalignment monitoring](https://developers.openai.com/api/docs/guides/safety-checks/misalignment-monitoring) asynchronously checks for potential issues during agent work in supported Responses API requests. Checks can trigger safety alerts or stop a conversation for review.\n\nStart with [Using GPT-6 Astra](https://developers.openai.com/api/docs/guides/latest-model) for capabilities, prompting, and migration guidance. Explore [computer use](https://developers.openai.com/api/docs/guides/tools-computer-use) for browser and desktop workflows, and see [pricing](https://developers.openai.com/api/docs/pricing) for available inference tiers."
+    },
+    {
+      "date": "2026-09-03",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · API: v1/responses\n\nAdded new controls for long-running work with GPT-6 Astra in the Responses API:"
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

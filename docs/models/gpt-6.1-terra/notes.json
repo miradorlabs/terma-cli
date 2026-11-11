@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "gpt-6.1-terra",
+  "predecessor": "gpt-5.6-terra",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-6.1 Terra, a fast, efficient model for visual reasoning, precise computer use, and clear, natural writing."
+  ],
+  "changelog": [
+    {
+      "date": "2026-10-26",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-6.1-terra · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-6.1 Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra), a fast, efficient model for visual reasoning, precise computer use, and clear, natural writing.\n\nSee the [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#gpt-61-terra) for prompting and migration guidance."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2026-02-16 → 2026-06-01",
+      "impact": "notable",
+      "before": "2026-02-16",
+      "after": "2026-06-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Knowledge cutoff: 2026-02-16 → 2026-06-01"
+  ]
+}

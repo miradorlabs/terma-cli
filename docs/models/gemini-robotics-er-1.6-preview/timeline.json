@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "gemini-robotics-er-1.6-preview",
+  "steps": [
+    {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "event": "listed",
+      "changes": []
+    }
+  ]
+}

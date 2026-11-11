@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.20-0309-non-reasoning",
+  "steps": [
+    {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "event": "listed",
+      "changes": []
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.4",
+  "predecessor": "gpt-5.2",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-5.4, our newest frontier model for professional work, to the Chat Completions and Responses API, and released GPT-5.4 Pro to the Responses API for…",
+    "Built-in Computer use support in GPT-5.4 through the Responses API computer tool for screenshot-based UI interaction."
+  ],
+  "changelog": [
+    {
+      "date": "2026-06-01",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.4 · Model: gpt-5.5 · API: v1/responses\n\nOpenAI models are now available in Amazon Bedrock through an OpenAI-compatible Responses API endpoint. Supported models and features vary by AWS Region. [Learn more](https://developers.openai.com/api/docs/guides/amazon-bedrock)."
+    },
+    {
+      "date": "2026-03-17",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.4-mini · Model: gpt-5.4-nano · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini) and [GPT-5.4 nano](https://developers.openai.com/api/docs/models/gpt-5.4-nano) to the Chat Completions and Responses API. GPT-5.4 mini brings GPT-5.4-class capabilities to a faster, more efficient model for high-volume workloads, while GPT-5.4 nano is optimized for simple high-volume tasks where speed and cost matter most.\n\nGPT-5.4 mini supports [tool search](https://developers.openai.com/api/docs/guides/tools-tool-search), built-in [computer use](https://developers.openai.com/api/docs/guides/tools-computer-use), and [compaction](https://developers.openai.com/api/docs/guides/compaction). GPT-5.4 nano supports compaction, but does not support tool search or computer use."
+    },
+    {
+      "date": "2026-03-13",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Fix · Model: gpt-5.4 · API: v1/responses · API: v1/chat/completions\n\nUpdated our image encoder to fix a small bug with `input_image` inputs in GPT-5.4. Some image understanding use cases may now see improved quality. No action is required."
+    },
+    {
+      "date": "2026-03-05",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.4 · Model: gpt-5.4-pro · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-5.4](https://developers.openai.com/api/docs/models/gpt-5.4), our newest frontier model for professional work, to the Chat Completions and Responses API, and released [GPT-5.4 Pro](https://developers.openai.com/api/docs/models/gpt-5.4-pro) to the Responses API for tougher problems that benefit from more compute.\n\nAlso released:"
+    },
+    {
+      "date": "2026-03-05",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "- Built-in [Computer use](https://developers.openai.com/api/docs/guides/tools-computer-use) support in GPT-5.4 through the Responses API `computer` tool for screenshot-based UI interaction."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/context_window",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "context_window"
+      ],
+      "title": "Context window: 400K → 1050K",
+      "impact": "notable",
+      "before": 400000,
+      "after": 1050000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_input",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_input"
+      ],
+      "title": "Max input: 272K → 922K",
+      "impact": "notable",
+      "before": 272000,
+      "after": 922000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/tool_search",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "tool_search"
+      ],
+      "title": "Built-in tool added: tool_search",
+      "impact": "notable",
+      "before": null,
+      "after": "tool_search",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/computer_use",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "computer_use"
+      ],
+      "title": "Built-in tool added: computer_use",
+      "impact": "notable",
+      "before": null,
+      "after": "computer_use",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Context window: 400K → 1050K",
+    "Max input: 272K → 922K",
+    "Built-in tool added: tool_search",
+    "Built-in tool added: computer_use"
+  ]
+}

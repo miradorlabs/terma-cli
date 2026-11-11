@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "id": "gemini-2.5-flash",
+  "predecessor": "gemini-2.0-flash",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released gemini-2.5-flash-preview-04-17, a Gemini preview model optimized for price-performance and adaptive thinking."
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-02",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   **Gemini 2.5 Flash deprecation**:\n  [`gemini-2.5-flash`](/docs/models/gemini-2.5-flash) is\n  [deprecated](/docs/deprecations#gemini-2.5-flash-models) and is no longer\n  available to select in Google AI Studio. Effective December 1, 2026, all API\n  requests to `gemini-2.5-flash` will automatically route to\n  [`gemini-3.5-flash-lite`](/docs/models/gemini-3.5-flash-lite) and be billed\n  at [Gemini 3.5 Flash-Lite rates](/docs/pricing#gemini-3.5-flash-lite).\n  Before December 1, 2026, update your model string to `gemini-3.5-flash-lite`\n  and review the\n  [Gemini 3.5 Flash-Lite migration guide](/docs/whats-new-gemini-3.6#migrate-to-gemini-3-5-flash-lite).\n  Breaking API changes include function calling and `thought_signature`\n  validation, `thinking_level` replacing `thinking_budget`, and removed\n  sampling parameters and prefilled model turns."
+    },
+    {
+      "date": "2025-12-12",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-flash-native-audio-preview-12-2025`, a new native audio\n  model for the Live API. This update improves the model's ability to handle\n  complex workflows. To learn more, see the [Live API\n  guide](/docs/live-api/capabilities) and [Gemini 2.5 Flash Native\n  Audio](/docs/models/gemini-2.5-flash-native-audio-preview-12-2025)."
+    },
+    {
+      "date": "2025-12-10",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Launched enhancements to our [text-to-speech\n  models](/docs/speech-generation), Gemini 2.5 Flash TTS preview (optimized\n  for low latency) and Gemini 2.5 Pro TTS preview (optimized for quality),\n  including enhanced expressivity, precision pacing, and seamless dialogue."
+    },
+    {
+      "date": "2025-11-04",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     For [Gemini 2.5 Flash Image](/docs/image-generation), the input token count\n  for images has been reduced from 1290 to 258, lowering the cost of image\n  editing."
+    },
+    {
+      "date": "2025-10-02",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Launched Gemini 2.5 Flash Image GA: [Image Generation with Gemini](/docs/image-generation)"
+    },
+    {
+      "date": "2025-09-23",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-flash-native-audio-preview-09-2025`, a new native audio\n  model for the Live API with improved function calling and speech cut off\n  handling. To learn more, see the [Live API\n  guide](/docs/live-api/capabilities) and [Gemini 2.5 Flash Native\n  Audio](/docs/models)."
+    },
+    {
+      "date": "2025-06-17",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released `gemini-2.5-flash`, our first stable 2.5 Flash model. To learn\n  more, see [Gemini 2.5 Flash](/docs/models#gemini-25-flash).\n  `gemini-2.5-flash-preview-04-17` will be deprecated on July 15, 2025."
+    },
+    {
+      "date": "2025-05-20",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released `gemini-2.5-flash-preview-05-20`, a Gemini\n  [preview](/docs/models#model-versions) model optimized for price-performance\n  and adaptive thinking. To learn more, see [Gemini 2.5 Flash\n  Preview](/docs/models) and\n  [Thinking](/docs/thinking)."
+    },
+    {
+      "date": "2025-05-20",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released `gemini-2.5-flash-preview-native-audio-dialog` and\n  `gemini-2.5-flash-exp-native-audio-thinking-dialog`, new Gemini models for\n  the Live API with native audio output capabilities. To learn more, see the\n  [Live API guide](/docs/live-api/capabilities#native-audio-output) and\n  [Gemini 2.5 Flash Native Audio](/docs/models)."
+    },
+    {
+      "date": "2025-04-17",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-flash-preview-04-17`, a Gemini\n  [preview](/docs/models#model-versions) model optimized for price-performance\n  and adaptive thinking. To learn more, see [Gemini 2.5 Flash\n  Preview](/docs/models) and\n  [Thinking](/docs/thinking)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/features/file search",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "file search"
+      ],
+      "title": "Feature added: file search",
+      "impact": "notable",
+      "before": null,
+      "after": "file search",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/thinking",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "thinking"
+      ],
+      "title": "Feature added: thinking",
+      "impact": "notable",
+      "before": null,
+      "after": "thinking",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/url context",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "url context"
+      ],
+      "title": "Feature added: url context",
+      "impact": "notable",
+      "before": null,
+      "after": "url context",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2024-08 → 2025-01",
+      "impact": "notable",
+      "before": "2024-08",
+      "after": "2025-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_output",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_output"
+      ],
+      "title": "Max output: 8,192 → 65,536",
+      "impact": "notable",
+      "before": 8192,
+      "after": 65536,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/reasoning",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "reasoning"
+      ],
+      "title": "Reasoning: no → yes",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/file search",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "file search"
+      ],
+      "title": "Unsupported feature removed: file search",
+      "impact": "notable",
+      "before": "file search",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/url context",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "url context"
+      ],
+      "title": "Unsupported feature removed: url context",
+      "impact": "notable",
+      "before": "url context",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Feature added: file search",
+    "Feature added: thinking",
+    "Feature added: url context",
+    "Knowledge cutoff: 2024-08 → 2025-01",
+    "Max output: 8,192 → 65,536"
+  ]
+}

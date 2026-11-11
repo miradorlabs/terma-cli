@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "id": "claude-opus-4-8",
+  "predecessor": "claude-opus-4-7",
+  "whats_new": null,
+  "vendor_highlights": [
+    "We announced the deprecation of the Claude Sonnet 4 model (claude-sonnet-4-20250514) and the Claude Opus 4 model (claude-opus-4-20250514), with retirement on…"
+  ],
+  "changelog": [
+    {
+      "date": "2026-10-30",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve deprecated [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Opus 4.8, with removal on November 30, 2026. After removal, requests to `claude-opus-4-8` with `speed: \"fast\"` will return an error. To continue using fast mode, migrate to [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#migrating-from-claude-opus-4-8). Read more in [Fast mode model availability](https://platform.claude.com/docs/en/build-with-claude/fast-mode#supported-models)."
+    },
+    {
+      "date": "2026-10-15",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) is out of research preview for Claude Opus 5.5, and you no longer need to request access. Requests to Claude Opus 5.5 no longer require the `fast-mode-2026-02-01` beta header, and requests that still send it keep working. Claude Opus 5.5 now has a default fast mode rate limit in the Start, Build, and Scale usage tiers. Fast mode for Claude Opus 5 and Claude Opus 4.8 remains in research preview. Keep sending the beta header with fast mode requests to those models."
+    },
+    {
+      "date": "2026-09-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Code written for Claude Sonnet 5 can break on Claude Sonnet 5.5 in five ways. To turn off up-front thinking, send `thinking: {\"type\": \"between_tools\"}` instead of `\"disabled\"`, at `high` effort or below. Forced tool use (`tool_choice` types `any` and `tool`) returns a 400 error. Thinking blocks are tied to the model and the conversation. On the Claude API and Google Cloud, the earlier `computer_20251124` computer use tool isn’t accepted. The advisor tool rejects Claude Opus 4.8, Claude Opus 4.7, and Claude Sonnet 5 as advisors. See [What’s new in Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5) for each change and the [Claude Sonnet 5.5 migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide) for before-and-after requests. For model-specific prompting patterns, see [Prompting Claude Sonnet 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5)."
+    },
+    {
+      "date": "2026-08-20",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The [computer use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool) and [browser use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/browser-use-tool) toolsets (`computer_toolset_20260801` and `browser_toolset_20260801`) are now available on [Google Cloud](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed) for Claude Fable 5, Claude Mythos 5, Claude Opus 5, Claude Sonnet 5, and Claude Opus 4.8. Requests use the same `tools` entries as on the Claude API."
+    },
+    {
+      "date": "2026-08-19",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Both toolsets are available for Claude Fable 5, Claude Mythos 5, Claude Opus 5, Claude Sonnet 5, and Claude Opus 4.8 on the Claude API."
+    },
+    {
+      "date": "2026-07-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched **Claude Opus 5** (`claude-opus-5`), a step-change improvement over Claude Opus 4.8. Claude Opus 5 supports a [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) (both the default and the maximum), 128k max output tokens, and [thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) on by default, at $5 / $25 USD per MTok, the same pricing as Claude Opus 4.8. It’s available on the Claude API, [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), and [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry). See [What’s new in Claude Opus 5](https://platform.claude.com/docs/en/models/opus-5/overview) for new features, behavior changes, and migration guidance, and the [models overview](https://platform.claude.com/docs/en/models/overview) for complete specs."
+    },
+    {
+      "date": "2026-07-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On Claude Opus 5, disabling thinking is allowed only at effort `high` or below: `thinking: {\"type\": \"disabled\"}` with effort `xhigh` or `max` returns a 400 error, a breaking change from Claude Opus 4.8. See [What’s new in Claude Opus 5](https://platform.claude.com/docs/en/models/opus-5/overview)."
+    },
+    {
+      "date": "2026-07-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Mid-conversation tool changes are now in beta on Claude Fable 5, Claude Mythos 5, Claude Opus 4.8, and Claude Opus 5: add or remove tools between turns of a conversation while preserving the prompt cache. Include the `mid-conversation-tool-changes-2026-07-01` beta header in your requests."
+    },
+    {
+      "date": "2026-07-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve removed [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Opus 4.7. Requests to `claude-opus-4-7` with `speed: \"fast\"` now return an error; unlike Claude Opus 4.6, they do not fall back to standard speed. Claude Opus 4.7 itself remains available at standard speed. To continue using fast mode, migrate to [Claude Opus 5](https://platform.claude.com/docs/en/models/opus-5/overview) or Claude Opus 4.8. Read more in [Fast mode model availability](https://platform.claude.com/docs/en/build-with-claude/fast-mode#supported-models)."
+    },
+    {
+      "date": "2026-07-15",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Mid-conversation system messages](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages) are available on Claude Fable 5, Claude Mythos 5, and Claude Opus 4.8, on the Claude API, [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), and [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed). No beta header is required. This corrects earlier availability notes."
+    },
+    {
+      "date": "2026-06-29",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve removed [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Opus 4.6. Requests to `claude-opus-4-6` with `speed: \"fast\"` no longer run at fast speed or premium pricing: they run at standard speed, are billed at standard rates, and do not return an error. The response’s `usage.speed` field reports the speed used. To continue using fast mode, migrate to [Claude Opus 4.8](https://platform.claude.com/docs/en/models/opus-4-8/overview). Read more in [Fast mode model availability](https://platform.claude.com/docs/en/build-with-claude/fast-mode#supported-models)."
+    },
+    {
+      "date": "2026-06-25",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve deprecated [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Opus 4.7, with removal on July 24, 2026. After removal, requests to `claude-opus-4-7` with `speed: \"fast\"` will return an error. Migrate to fast mode for Claude Opus 4.8. Read more in [Fast mode model availability](https://platform.claude.com/docs/en/build-with-claude/fast-mode#supported-models)."
+    },
+    {
+      "date": "2026-06-15",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve retired the Claude Sonnet 4 model (`claude-sonnet-4-20250514`) and the Claude Opus 4 model (`claude-opus-4-20250514`). All requests to these models on the Claude API will now return an error. We recommend upgrading to [Claude Sonnet 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) and [Claude Opus 4.8](https://platform.claude.com/docs/en/models/opus-4-8/overview) respectively. Researchers can request ongoing access through the [External Researcher Access Program](https://support.claude.com/en/articles/9125743-what-is-the-external-researcher-access-program)."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On Claude Fable 5 and Claude Mythos 5, `thinking.display` defaults to `\"omitted\"`, the same as Claude Opus 4.8, Claude Opus 4.7, and Claude Mythos Preview; set `display: \"summarized\"` to receive readable thinking summaries. The raw chain of thought is never returned; pass thinking blocks back unchanged in multi-turn conversations on the same model. See [Thinking output on Claude Fable 5 and Claude Mythos 5](https://platform.claude.com/docs/en/build-with-claude/thinking#thinking-output-on-claude-fable-5-and-claude-mythos-5)."
+    },
+    {
+      "date": "2026-06-05",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We announced the deprecation of the Claude Opus 4.1 model (`claude-opus-4-1-20250805`), with retirement on the Claude API scheduled for August 5, 2026. We recommend migrating to [Claude Opus 4.8](https://platform.claude.com/docs/en/models/opus-4-8/overview). Read more in [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched **Claude Opus 4.8** (claude-opus-4-8), our most capable model. Claude Opus 4.8 supports a [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) by default on the Claude API, Amazon Bedrock, Google Cloud, and Microsoft Foundry, 128k max output tokens, and the same set of tools and platform features as Claude Opus 4.7. See the [migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide) for baseline settings, features, and migration guidance."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched [mid-conversation system messages](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages). On Claude Opus 4.8, you can send `role: \"system\"` messages after a user turn (subject to [placement rules](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages#limitations)) in the `messages` array, preserving prompt cache hits when instructions change during a long-running session. No beta header is required."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On Claude Opus 4.8, the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort) defaults to `high` across all surfaces, including Claude Code and the Messages API."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On Claude Opus 4.8, the minimum cacheable prompt length for [prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) is 1,024 tokens, lower than on Claude Opus 4.7."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* With [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) enabled, Claude Opus 4.8 triggers reasoning only when a turn needs it, reducing wasted thinking tokens compared to Claude Opus 4.7 at the same effort level."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Claude Opus 4.8 supports [high-resolution image input](https://platform.claude.com/docs/en/build-with-claude/vision#high-resolution-image-support-on-claude-opus-4-7) (up to 2,576 pixels on the long edge), same as Claude Opus 4.7."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Task budgets](https://platform.claude.com/docs/en/build-with-claude/task-budgets) now support Claude Opus 4.8."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The [advisor tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool) now supports Claude Opus 4.8."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Computer use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool) now supports Claude Opus 4.8."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Opus 4.8 is available as a research preview on the Claude API only."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Setting the sampling parameters `temperature`, `top_p`, or `top_k` to a non-default value returns a 400 error on Claude Opus 4.8, same as on Claude Opus 4.7. See the [migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide) for details."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* In Claude Code, Max plan users now default to [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) on Claude Opus 4.8. See the [Claude Code documentation](https://code.claude.com/docs)."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve deprecated [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for Claude Opus 4.6, with removal approximately 30 days after launch. Migrate to fast mode for Claude Opus 4.8 or Claude Opus 4.7. Read more in [Fast mode model availability](https://platform.claude.com/docs/en/build-with-claude/fast-mode#supported-models)."
+    },
+    {
+      "date": "2026-04-14",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We announced the deprecation of the Claude Sonnet 4 model (`claude-sonnet-4-20250514`) and the Claude Opus 4 model (`claude-opus-4-20250514`), with retirement on the Claude API scheduled for June 15, 2026. We recommend migrating to [Claude Sonnet 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) and [Claude Opus 4.8](https://platform.claude.com/docs/en/models/opus-4-8/overview) respectively. Read more in [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)."
+    }
+  ],
+  "changes": [],
+  "highlights": [
+    "Counts 4% fewer tokens than Claude Opus 4.7 for the same text"
+  ]
+}

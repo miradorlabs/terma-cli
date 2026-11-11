@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3.1-pro-preview",
+  "predecessor": "gemini-3-pro-preview",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released Gemini 3.1 Pro Preview, our latest iteration in the new Gemini 3 series family."
+  ],
+  "changelog": [
+    {
+      "date": "2026-03-09",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   The Gemini 3 Pro Preview model has been [shut down](/docs/deprecations). The\n  `gemini-3-pro-preview` now points to\n  [`gemini-3.1-pro-preview`](/docs/models/gemini-3.1-pro-preview)."
+    },
+    {
+      "date": "2026-02-19",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released [Gemini 3.1 Pro Preview](/docs/models/gemini-3.1-pro-preview), our\n  latest iteration in the new Gemini 3 series family."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/features/grounding with google maps",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "grounding with google maps"
+      ],
+      "title": "Feature added: grounding with google maps",
+      "impact": "notable",
+      "before": null,
+      "after": "grounding with google maps",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/computer use",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "computer use"
+      ],
+      "title": "Unsupported feature removed: computer use",
+      "impact": "notable",
+      "before": "computer use",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/grounding with google maps",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "grounding with google maps"
+      ],
+      "title": "Unsupported feature removed: grounding with google maps",
+      "impact": "notable",
+      "before": "grounding with google maps",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Feature added: grounding with google maps",
+    "Unsupported feature removed: computer use",
+    "Unsupported feature removed: grounding with google maps"
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "id": "claude-fable-5",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "We’ve launched Claude Fable 5 (claude-fable-5), our most capable model open to all customers, alongside Claude Mythos 5 (claude-mythos-5) for Project Glasswing…",
+    "Claude Fable 5 and Claude Mythos 5 use the tokenizer introduced with Claude Opus 4.7. Compared to models before Claude Opus 4.7, the same text produces roughly…",
+    "Claude Fable 5 runs safety classifiers on requests and during response generation.",
+    "The stop_details.category field on refusal responses now includes \"reasoning_extraction\" on Claude Fable 5, returned when a request is blocked under…",
+    "On Claude Fable 5 and Claude Mythos 5, adaptive thinking is the only thinking mode: thinking: {\"type\": \"disabled\"} is not supported, and manual extended…"
+  ],
+  "changelog": [
+    {
+      "date": "2026-09-01",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched **Claude Fable 5.1** (`claude-fable-5-1`), the successor to Claude Fable 5 for long-running agentic coding, knowledge work, and research, alongside **Claude Mythos 5.1** (`claude-mythos-5-1`) for Project Glasswing participants. Both models support a [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) by default, 128k max output tokens, and always-on [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking), at $10 / $50 USD per MTok, the same as Claude Fable 5, with cache reads cut to $0.25 USD per MTok. Claude Fable 5.1 is available on the Claude API, [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), and [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry). See [What’s new in Claude Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1) for capabilities, API changes, and migration guidance."
+    },
+    {
+      "date": "2026-09-01",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Thinking blocks produced by Claude Fable 5.1 and Claude Mythos 5.1 are preserved only for the model that produced them or a newer one: earlier models can’t read them, and the API drops one replayed to an earlier model. Claude Fable 5.1 accepts thinking blocks from Claude Opus 5, Claude Fable 5, Claude Mythos 5, and earlier Claude models. On Claude Fable 5.1, the API also [checks that nothing before a block has changed](https://platform.claude.com/docs/en/build-with-claude/thinking#preserved-in-conversation): for new accounts created on or after August 31, 2026, replaying one after the `system` prompt, `tools`, or an earlier message changed returns a 400 error. With the `thinking-binding-controls-2026-08-01` beta header, dropped blocks are reported in an `input_transformations` response field, and `thinking.block_binding.prefix_mismatch_behavior` chooses between rejecting and dropping blocks whose history changed. See [Preserved thinking](https://platform.claude.com/docs/en/build-with-claude/thinking#preserved-thinking)."
+    },
+    {
+      "date": "2026-09-01",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* `thinking.display` accepts a third value, `\"updates\"`, in beta (`thinking-display-updates-2026-08-18` header). Reasoning comes back with an empty `thinking` field, as under `\"omitted\"`, and the short progress updates that Claude Fable 5.1, Claude Mythos 5.1, and Claude Fable 5 write between tool calls come back as text, at most one `thinking` block before a tool call. See [Progress updates between tool calls](https://platform.claude.com/docs/en/build-with-claude/thinking#progress-updates)."
+    },
+    {
+      "date": "2026-09-01",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Like Claude Fable 5, both models require 30-day data retention and aren’t available under zero data retention unless expressly authorized by Anthropic. See [Model-specific data retention requirements](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#model-specific-data-retention-requirements)."
+    },
+    {
+      "date": "2026-08-20",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The [computer use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool) and [browser use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/browser-use-tool) toolsets (`computer_toolset_20260801` and `browser_toolset_20260801`) are now available on [Google Cloud](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed) for Claude Fable 5, Claude Mythos 5, Claude Opus 5, Claude Sonnet 5, and Claude Opus 4.8. Requests use the same `tools` entries as on the Claude API."
+    },
+    {
+      "date": "2026-08-19",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Both toolsets are available for Claude Fable 5, Claude Mythos 5, Claude Opus 5, Claude Sonnet 5, and Claude Opus 4.8 on the Claude API."
+    },
+    {
+      "date": "2026-07-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Mid-conversation tool changes are now in beta on Claude Fable 5, Claude Mythos 5, Claude Opus 4.8, and Claude Opus 5: add or remove tools between turns of a conversation while preserving the prompt cache. Include the `mid-conversation-tool-changes-2026-07-01` beta header in your requests."
+    },
+    {
+      "date": "2026-07-15",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Mid-conversation system messages](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages) are available on Claude Fable 5, Claude Mythos 5, and Claude Opus 4.8, on the Claude API, [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), and [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed). No beta header is required. This corrects earlier availability notes."
+    },
+    {
+      "date": "2026-07-10",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Dreams](https://platform.claude.com/docs/en/managed-agents/dreams) (research preview) now supports Claude Fable 5 and Claude Sonnet 5. See [Supported models](https://platform.claude.com/docs/en/managed-agents/dreams#feature-availability)."
+    },
+    {
+      "date": "2026-07-01",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve restored access to Claude Fable 5 and Claude Mythos 5. See [our statement](https://www.anthropic.com/news/redeploying-fable-5) for more information."
+    },
+    {
+      "date": "2026-06-18",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The Python, TypeScript, Go, Java, Ruby, PHP, and C# SDKs now include support for `code_execution_20260120`, the [code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) version that adds REPL state persistence and is the minimum version for [programmatic tool calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling). To adopt it, set the tool’s `type` to `code_execution_20260120`; no beta header is required. It’s available on Claude Fable 5, Claude Mythos 5, Claude Opus 4.5 and newer, and Claude Sonnet 4.5 and newer; see the code execution tool’s [API support](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool#availability-feature-support) section."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched **Claude Fable 5** (`claude-fable-5`), our most capable model open to all customers, alongside **Claude Mythos 5** (`claude-mythos-5`) for Project Glasswing participants. Both models support a [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) by default, 128k max output tokens, and always-on [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking). See [Claude Fable 5](https://platform.claude.com/docs/en/models/fable-5/overview) for specifications, pricing, and availability."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Claude Fable 5 and Claude Mythos 5 use the tokenizer introduced with Claude Opus 4.7. Compared to models before Claude Opus 4.7, the same text produces roughly 30% more tokens. The exact increase depends on the content and workload shape. Use the token counting API with `model: \"claude-fable-5\"` to measure your prompts under the new tokenizer. See [Token counts on Claude Fable and Claude Mythos models](https://platform.claude.com/docs/en/build-with-claude/token-counting#token-counts-on-claude-fable-5)."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Claude Fable 5 runs safety classifiers on requests and during response generation. When a classifier declines a request, the Messages API returns `stop_reason: \"refusal\"`. You are not billed for a request refused before any output is generated. An opt-in `fallbacks` parameter (in beta on the Claude API and Claude Platform on AWS; not supported on the Message Batches API) re-runs refused requests on another model, billed at the fallback model’s rates. See [Handling stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons)."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The [`stop_details.category`](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#refusal-response) field on refusal responses now includes `\"reasoning_extraction\"` on Claude Fable 5, returned when a request is blocked under Anthropic’s Terms of Service restrictions on reverse engineering or duplicating model outputs. The existing `\"cyber\"` and `\"bio\"` categories are unchanged. No beta header is required."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On Claude Fable 5 and Claude Mythos 5, [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) is the only thinking mode: `thinking: {\"type\": \"disabled\"}` is not supported, and manual extended thinking budgets and assistant prefill are not supported (both return a 400 error)."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On Claude Fable 5 and Claude Mythos 5, `thinking.display` defaults to `\"omitted\"`, the same as Claude Opus 4.8, Claude Opus 4.7, and Claude Mythos Preview; set `display: \"summarized\"` to receive readable thinking summaries. The raw chain of thought is never returned; pass thinking blocks back unchanged in multi-turn conversations on the same model. See [Thinking output on Claude Fable 5 and Claude Mythos 5](https://platform.claude.com/docs/en/build-with-claude/thinking#thinking-output-on-claude-fable-5-and-claude-mythos-5)."
+    },
+    {
+      "date": "2026-06-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Claude Fable 5 requires 30-day data retention and is not available under zero data retention. See [Model-specific data retention requirements](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#model-specific-data-retention-requirements)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

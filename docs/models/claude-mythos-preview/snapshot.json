@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "claude-mythos-preview",
+  "vendor": "anthropic",
+  "name": "claude-mythos-preview",
+  "family": "claude-mythos",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "deprecated_at": "2026-06-09",
+    "status": "deprecated"
+  },
+  "provenance": {
+    "deprecated_at": {
+      "anthropic-docs": "2026-06-09"
+    },
+    "status": {
+      "anthropic-docs": "deprecated"
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "anthropic-docs": "https://platform.claude.com/docs/en/about-claude/model-deprecations"
+  },
+  "docs": {},
+  "api": {
+    "probes": {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "endpoint": "POST /v1/messages (anthropic-version 2026-10-21)",
+      "unavailable": "404 model: claude-mythos-preview",
+      "params": {}
+    }
+  },
+  "harnesses": []
+}

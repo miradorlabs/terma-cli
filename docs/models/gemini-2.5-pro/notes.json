@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "gemini-2.5-pro",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released gemini-2.5-pro-exp-03-25, a public experimental Gemini model with thinking mode always on by default."
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-02",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   **Gemini 2.5 Pro deprecation**:\n  [`gemini-2.5-pro`](/docs/models/gemini-2.5-pro) is\n  [deprecated](/docs/deprecations#gemini-2.5-pro-models) and is no longer\n  available to select in Google AI Studio. Effective December 1, 2026, all API\n  requests to `gemini-2.5-pro` will automatically route to\n  [`gemini-3.8-flash`](/docs/models/gemini-3.8-flash) and be billed at\n  [Gemini 3.8 Flash rates](/docs/pricing#gemini-3.8-flash). Before December 1,\n  2026, update your model string to `gemini-3.8-flash` and review the\n  [Gemini 3.8 Flash migration guide](/docs/whats-new-gemini-3.8#migrate-to-gemini-3-8-flash).\n  Breaking API changes include function calling and `thought_signature`\n  validation, `thinking_level` replacing `thinking_budget`, and removed\n  sampling parameters and prefilled model turns."
+    },
+    {
+      "date": "2025-12-10",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Launched enhancements to our [text-to-speech\n  models](/docs/speech-generation), Gemini 2.5 Flash TTS preview (optimized\n  for low latency) and Gemini 2.5 Pro TTS preview (optimized for quality),\n  including enhanced expressivity, precision pacing, and seamless dialogue."
+    },
+    {
+      "date": "2025-06-26",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     The preview models `gemini-2.5-pro-preview-05-06` and\n  `gemini-2.5-pro-preview-03-25` are now redirecting to the latest stable\n  version `gemini-2.5-pro`."
+    },
+    {
+      "date": "2025-06-17",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released `gemini-2.5-pro`, the stable version of our most powerful model,\n  now with adaptive thinking. To learn more, see [Gemini 2.5\n  Pro](/docs/models#gemini-25-pro) and [Thinking](/docs/thinking).\n  `gemini-2.5-pro-preview-05-06` will be redirected to `gemini-2.5-pro` on\n  June 26, 2025."
+    },
+    {
+      "date": "2025-06-05",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-pro-preview-06-05`, a new version of our most powerful\n  model, now with adaptive thinking. To learn more, see [Gemini 2.5 Pro\n  Preview](/docs/models) and\n  [Thinking](/docs/thinking). `gemini-2.5-pro-preview-05-06` will be\n  redirected to `gemini-2.5-pro` on June 26, 2025."
+    },
+    {
+      "date": "2025-04-04",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-pro-preview-03-25`, a public preview Gemini 2.5 Pro\n  version with billing enabled. You can continue to use\n  `gemini-2.5-pro-exp-03-25` on sthe free tier."
+    },
+    {
+      "date": "2025-03-25",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-pro-exp-03-25`, a public experimental Gemini model with\n  thinking mode always on by default. To learn more, see [Gemini 2.5 Pro\n  Experimental](/docs/models)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

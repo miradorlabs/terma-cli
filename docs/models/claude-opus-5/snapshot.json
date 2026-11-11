@@ -1,0 +1,491 @@
+{
+  "schema_version": 1,
+  "id": "claude-opus-5",
+  "vendor": "anthropic",
+  "name": "Claude Opus 5",
+  "family": "claude-opus",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 1000000,
+    "default_effort": "high",
+    "input_modalities": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "knowledge_cutoff": "2026-05",
+    "max_output": 128000,
+    "name": "Claude Opus 5",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "platform_ids": {
+      "Amazon Bedrock": "anthropic.claude-opus-5",
+      "Claude Models on Google Cloud (Anthropic managed)": "claude-opus-5",
+      "Claude Models on Google Cloud (Google managed)": "claude-opus-5",
+      "Claude Platform on AWS": "claude-opus-5",
+      "Microsoft Foundry": "claude-opus-5"
+    },
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "released_at": "2026-07-24",
+    "retires_not_before": "2027-07-24",
+    "sampling_parameters": false,
+    "status": "active",
+    "structured_outputs": true,
+    "thinking": "adaptive",
+    "tool_calling": true
+  },
+  "provenance": {
+    "context_window": {
+      "anthropic-api": 1000000,
+      "anthropic-docs": 1000000,
+      "models.dev": 1000000,
+      "openrouter": 1000000
+    },
+    "default_effort": {
+      "anthropic-docs": "high",
+      "openrouter": "high"
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ]
+    },
+    "knowledge_cutoff": {
+      "anthropic-docs": "2026-05",
+      "models.dev": "2026-05"
+    },
+    "max_output": {
+      "anthropic-api": 128000,
+      "anthropic-docs": 128000,
+      "models.dev": 128000,
+      "openrouter": 128000
+    },
+    "name": {
+      "anthropic-api": "Claude Opus 5",
+      "anthropic-docs": "Claude Opus 5",
+      "models.dev": "Claude Opus 5",
+      "openrouter": "Claude Opus 5"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "platform_ids": {
+      "anthropic-docs": {
+        "Amazon Bedrock": "anthropic.claude-opus-5",
+        "Claude Models on Google Cloud (Anthropic managed)": "claude-opus-5",
+        "Claude Models on Google Cloud (Google managed)": "claude-opus-5",
+        "Claude Platform on AWS": "claude-opus-5",
+        "Microsoft Foundry": "claude-opus-5"
+      }
+    },
+    "reasoning": {
+      "anthropic-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "openrouter": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low",
+        "none"
+      ]
+    },
+    "released_at": {
+      "anthropic-api": "2026-07-24",
+      "anthropic-docs": "2026-07-24",
+      "models.dev": "2026-07-24"
+    },
+    "retires_not_before": {
+      "anthropic-docs": "2027-07-24"
+    },
+    "sampling_parameters": {
+      "models.dev": false
+    },
+    "status": {
+      "anthropic-docs": "active"
+    },
+    "structured_outputs": {
+      "models.dev": true
+    },
+    "thinking": {
+      "anthropic-docs": "adaptive"
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "anthropic-api": "https://api.anthropic.com/v1/models/claude-opus-5",
+    "anthropic-docs": "https://platform.claude.com/docs/en/models/opus-5/overview",
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/anthropic/claude-opus-5"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://platform.claude.com/docs/en/models/opus-5/overview",
+      "text": "---\ntitle: Claude Opus 5\nurl: https://platform.claude.com/docs/en/models/opus-5/overview\ndescription: \"Claude Opus 5 reference: lifecycle status, model IDs on every platform, context window, output limits, pricing, and migration resources. Claude Opus 5 is a legacy model; Claude Opus 5.5 is the current Opus model.\"\n---\n\n**Legacy.** Released July 24, 2026.\n\nAlthough Claude Opus 5 is still available, you should consider migrating to Claude Opus 5.5. [See Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview) · [Migrate to Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#migrating-from-claude-opus-5)\n\nModel ID: `claude-opus-5`\n\nContext window: 1M tokens · Max output: 128K tokens · Input pricing: $5 / MTok · Output pricing: $25 / MTok\n\n[Announcement](https://www.anthropic.com/news/claude-opus-5)\n\n## How it compares to the current lineup\n\n| Model                                                                               | Context | Max output | Price / MTok       | Thinking             | Default effort | Knowledge cutoff |\n| :---------------------------------------------------------------------------------- | :------ | :--------- | :----------------- | :------------------- | :------------- | :--------------- |\n| [Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview)   | 1M      | 128K       | $8 / $40           | Adaptive (always on) | `high`         | Jun 2026         |\n| [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview)     | 1M      | 128K       | $4 / $20           | Adaptive (always on) | `medium`       | Jun 2026         |\n| **Claude Opus 5** (this model)                                                      | 1M      | 128K       | $5 / $25           | Adaptive             | `high`         | May 2026         |\n| [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview) | 1M      | 128K       | $2 / $10           | Adaptive             | `high`         | Jun 2026         |\n| [Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview)   | 1M      | 128K       | From $0.10 / $0.50 | Adaptive             | `medium`       | Jun 2026         |\n\n* **Context:** 1M tokens is roughly 555k words or 2.5M Unicode characters on the current tokenizer (introduced with Claude Opus 4.7); models before it fit about 750k words in 1M tokens. 200k tokens is roughly 150k words.\n* **Max output:** Synchronous Messages API limit. On the Message Batches API, Claude Opus 5.5, Claude Opus 5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 5.5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, and Claude Sonnet 4.6 support up to 300k output tokens with the output-300k-2026-03-24 beta header.\n* **Price / MTok:** Input / output, base price per million tokens. Batch API requests are 50% off; prompt caching reads cost 10% of the base input price (2.5% on Claude Fable 5.2, Claude Mythos 5.2, Claude Fable 5.1, and Claude Mythos 5.1, 5% on Claude Opus 5.5 and Claude Sonnet 5.5). See Pricing for the full list.\n* **Thinking:** Adaptive thinking lets the model decide how much to think, steered by effort. Extended thinking is the manual budget\\_tokens mode on earlier models.\n* **Default effort:** The effort parameter’s default on the Claude API. Models without a value don’t support the parameter.\n* **Knowledge cutoff:** Reliable knowledge cutoff: the date through which the model’s knowledge is most extensive and reliable.\n\n## Specifications\n\n### Model IDs\n\n| Platform                                                                                                                                                   | Model ID                  |\n| :--------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------ |\n| Claude API                                                                                                                                                 | `claude-opus-5`           |\n| [Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock)                                                           | `anthropic.claude-opus-5` |\n| [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed)       | `claude-opus-5`           |\n| [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry)                                                     | `claude-opus-5`           |\n| [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws)                                                     | `claude-opus-5`           |\n| [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) | `claude-opus-5`           |\n\n### Pricing\n\n| Feature                                                                                | Value                            |\n| :------------------------------------------------------------------------------------- | :------------------------------- |\n| Input                                                                                  | $5 / MTok                        |\n| Output                                                                                 | $25 / MTok                       |\n| [5m cache write](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | $6.25 / MTok                     |\n| [1h cache write](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | $10 / MTok                       |\n| [Cache read](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)     | $0.50 / MTok                     |\n| [Batch API](https://platform.claude.com/docs/en/build-with-claude/batch-processing)    | 50% discount on input and output |\n\n[Full price list](https://platform.claude.com/docs/en/about-claude/pricing)\n\n### Capabilities\n\n| Feature                                                                                                                     | Value                  |\n| :-------------------------------------------------------------------------------------------------------------------------- | :--------------------- |\n| [Context window](https://platform.claude.com/docs/en/build-with-claude/context-windows)                                     | 1M tokens              |\n| Max output                                                                                                                  | 128K tokens            |\n| [Max output (Batch API, beta)](https://platform.claude.com/docs/en/build-with-claude/batch-processing#extended-output-beta) | 300K tokens            |\n| [Thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)                                                  | Adaptive               |\n| [Default effort](https://platform.claude.com/docs/en/build-with-claude/effort)                                              | `high`                 |\n| Input → output                                                                                                              | Text and images → text |\n| Reliable knowledge cutoff                                                                                                   | May 2026               |\n| Training data cutoff                                                                                                        | May 2026               |\n\n### Availability\n\n| Feature                                                                       | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |\n| :---------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| [Status](https://platform.claude.com/docs/en/about-claude/model-deprecations) | Active (legacy)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |\n| Released                                                                      | July 24, 2026                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |\n| Retirement                                                                    | Not sooner than July 24, 2027                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |\n| Platforms                                                                     | Claude API, [Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) |\n\n## Good to know\n\n* On the [Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing#extended-output-beta), Claude Opus 5 supports up to 300k output tokens with the `output-300k-2026-03-24` beta header.\n* The minimum cacheable prompt length is 512 tokens. See [Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#cache-limitations).\n* Query limits and capabilities programmatically with the [Models API](https://platform.claude.com/docs/en/api/models/list).\n\n## Resources\n\n<CardGroup cols={3}>\n  <Card title=\"Migrate to Claude Opus 5.5\" icon=\"arrows-left-right\" href=\"https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#migrating-from-claude-opus-5\">\n    What changes when moving from Claude Opus 5 to Claude Opus 5.5.\n  </Card>\n\n  <Card title=\"Claude Opus 5.5\" icon=\"arrow-right\" href=\"https://platform.claude.com/docs/en/models/opus-5-5/overview\">\n    The current Opus model: overview, specs, and resources.\n  </Card>\n\n  <Card title=\"Prompting Claude Opus 5\" icon=\"lightbulb\" href=\"https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5\">\n    Model-specific prompting guidance.\n  </Card>\n</CardGroup>\n\n## Reference\n\n<CardGroup cols={3}>\n  <Card title=\"System prompt\" icon=\"text\" href=\"https://platform.claude.com/docs/en/release-notes/system-prompts/overview#claude-opus-5\">\n    The system prompt Claude Opus 5 uses on claude.ai and the Claude apps.\n  </Card>\n\n  <Card title=\"System card\" icon=\"file\" href=\"https://www.anthropic.com/claude-opus-5-system-card\">\n    Safety evaluations and deployment decisions for Claude Opus 5.\n  </Card>\n\n  <Card title=\"Pricing\" icon=\"coins\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\">\n    Full price list, including batch discounts and prompt caching rates.\n  </Card>\n\n  <Card title=\"Model IDs and versioning\" icon=\"fingerprint\" href=\"https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions\">\n    How model IDs, aliases, and pinned snapshots work.\n  </Card>\n\n  <Card title=\"Model deprecations\" icon=\"clock\" href=\"https://platform.claude.com/docs/en/about-claude/model-deprecations\">\n    Lifecycle status and retirement commitments for every Claude model.\n  </Card>\n</CardGroup>\n"
+    }
+  },
+  "api": {
+    "listing": {
+      "capabilities": {
+        "batch": {
+          "supported": true
+        },
+        "citations": {
+          "supported": true
+        },
+        "code_execution": {
+          "supported": true
+        },
+        "context_management": {
+          "clear_thinking_20251015": {
+            "supported": true
+          },
+          "clear_tool_uses_20250919": {
+            "supported": true
+          },
+          "compact_20260112": {
+            "supported": true
+          },
+          "supported": true
+        },
+        "effort": {
+          "high": {
+            "supported": true
+          },
+          "low": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "supported": true,
+          "xhigh": {
+            "supported": true
+          }
+        },
+        "image_input": {
+          "supported": true
+        },
+        "pdf_input": {
+          "supported": true
+        },
+        "server_tools": {
+          "code_execution": {
+            "supported": true
+          },
+          "supported": true,
+          "web_search": {
+            "supported": true
+          }
+        },
+        "structured_outputs": {
+          "supported": true
+        },
+        "thinking": {
+          "supported": true,
+          "types": {
+            "adaptive": {
+              "supported": true
+            },
+            "between_tools": {
+              "supported": false
+            },
+            "disabled": {
+              "supported": true
+            },
+            "enabled": {
+              "supported": false
+            }
+          }
+        }
+      },
+      "created_at": "2026-07-24T00:00:00Z",
+      "deprecated_at": null,
+      "display_name": "Claude Opus 5",
+      "id": "claude-opus-5",
+      "lifecycle": "active",
+      "line": "opus",
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "retires_at": null,
+      "type": "model"
+    },
+    "probes": {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "endpoint": "POST /v1/messages (anthropic-version 2026-10-21)",
+      "params": {
+        "baseline": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.high": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.low": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.max": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.medium": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.xhigh": {
+          "accepted": true,
+          "status": 200
+        },
+        "inference_geo.us": {
+          "accepted": true,
+          "status": 200
+        },
+        "max_tokens.over_stated_limit": {
+          "accepted": false,
+          "status": 400,
+          "error": "max_tokens: 128001 > 128000, which is the maximum allowed number of output tokens for claude-opus-5"
+        },
+        "prefill": {
+          "accepted": false,
+          "status": 400,
+          "error": "This model does not support assistant message prefill. The conversation must end with a user message."
+        },
+        "sampling.temperature": {
+          "accepted": false,
+          "status": 400,
+          "error": "temperature: Extra inputs are not permitted"
+        },
+        "sampling.top_k": {
+          "accepted": false,
+          "status": 400,
+          "error": "top_k: Extra inputs are not permitted"
+        },
+        "sampling.top_p": {
+          "accepted": false,
+          "status": 400,
+          "error": "top_p: Extra inputs are not permitted"
+        },
+        "speed.fast": {
+          "accepted": false,
+          "status": 400,
+          "error": "To use the `speed` parameter with 'claude-opus-5', send the `anthropic-beta: fast-mode-2026-02-01` header."
+        },
+        "stop_sequences": {
+          "accepted": true,
+          "status": 200
+        },
+        "structured_output": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.adaptive": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.adaptive.display_summarized": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.between_tools": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.between_tools\" is not supported for this model."
+        },
+        "thinking.budget_tokens": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.enabled\" is not supported for this model. Use \"thinking.type.adaptive\" and \"output_config.effort\" to control thinking behavior."
+        },
+        "thinking.disabled": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.any": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.auto": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.none": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.tool": {
+          "accepted": true,
+          "status": 200
+        }
+      },
+      "tokens": {
+        "cjk": 85,
+        "code": 157,
+        "indented": 54,
+        "json": 152,
+        "prose": 108,
+        "symbols": 125
+      },
+      "response": {
+        "model": "claude-opus-5",
+        "usage_keys": [
+          "cache_creation.ephemeral_1h_input_tokens",
+          "cache_creation.ephemeral_5m_input_tokens",
+          "cache_creation_input_tokens",
+          "cache_read_input_tokens",
+          "inference_geo",
+          "input_tokens",
+          "output_tokens",
+          "output_tokens_details.thinking_tokens",
+          "service_tier",
+          "speed"
+        ],
+        "headers": [
+          "anthropic-organization-id",
+          "anthropic-ratelimit-input-tokens-limit",
+          "anthropic-ratelimit-input-tokens-remaining",
+          "anthropic-ratelimit-input-tokens-reset",
+          "anthropic-ratelimit-output-tokens-limit",
+          "anthropic-ratelimit-output-tokens-remaining",
+          "anthropic-ratelimit-output-tokens-reset",
+          "anthropic-ratelimit-requests-limit",
+          "anthropic-ratelimit-requests-remaining",
+          "anthropic-ratelimit-requests-reset",
+          "anthropic-ratelimit-tokens-limit",
+          "anthropic-ratelimit-tokens-remaining",
+          "anthropic-ratelimit-tokens-reset",
+          "anthropic-workspace-id",
+          "request-id"
+        ],
+        "stream_events": [
+          "message_start",
+          "content_block_start",
+          "ping",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ]
+      }
+    }
+  },
+  "harnesses": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "role": "default",
+      "first": "2.1.219",
+      "last": "2.1.278",
+      "builds": 51,
+      "current": false,
+      "params": {
+        "context_management": {
+          "edits": [
+            {
+              "keep": "all",
+              "type": "clear_thinking_20251015"
+            }
+          ]
+        },
+        "output_config": {
+          "effort": "high"
+        },
+        "thinking": {
+          "display": "omitted",
+          "type": "adaptive"
+        }
+      }
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "role": "alias",
+      "label": "opus",
+      "first": "2.1.219",
+      "last": "2.1.278",
+      "builds": 51,
+      "current": false
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "role": "alias",
+      "label": "opus[1m]",
+      "first": "2.1.219",
+      "last": "2.1.278",
+      "builds": 51,
+      "current": false
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "role": "subagents",
+      "first": "2.1.219",
+      "last": "2.1.278",
+      "builds": 51,
+      "current": false
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "role": "compaction",
+      "first": "2.1.269",
+      "last": "2.1.270",
+      "builds": 2,
+      "current": false
+    },
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "role": "side_request",
+      "first": "2.1.268",
+      "last": "2.1.276",
+      "builds": 9,
+      "current": false
+    }
+  ]
+}

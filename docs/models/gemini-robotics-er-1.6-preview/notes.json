@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "gemini-robotics-er-1.6-preview",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released gemini-robotics-er-1.6-preview, our updated robotics model."
+  ],
+  "changelog": [
+    {
+      "date": "2026-07-30",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     **Deprecation announcement**: The `gemini-robotics-er-1.6-preview` model\n  will be [shut down](/docs/deprecations) on August 31, 2026."
+    },
+    {
+      "date": "2026-04-30",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   The `gemini-robotics-er-1.5-preview` model has been [shut\n  down](/docs/deprecations). Use\n  [`gemini-robotics-er-1.6-preview`](/docs/models/gemini-robotics-er-1.6-preview)\n  instead."
+    },
+    {
+      "date": "2026-04-14",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released `gemini-robotics-er-1.6-preview`, our updated robotics model. It\n  now has new capabilities like instrument reading, improved spatial and\n  physical reasoning capabilities. To learn more, see [Gemini\n  Robotics-ER](/docs/robotics-overview) page and the\n  [blog](https://deepmind.google/blog/gemini-robotics-er-1-6)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

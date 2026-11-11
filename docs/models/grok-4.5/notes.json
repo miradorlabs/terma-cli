@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.5",
+  "predecessor": "grok-4.3",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Grok 4.5 is now available in the API console for EU users.",
+    "Grok 4.5, SpaceXSI's model for coding, agentic tasks, and knowledge work, is now available on the xAI API."
+  ],
+  "changelog": [
+    {
+      "date": "2026-07",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### Grok 4.5 available in the EU\n\nGrok 4.5 is now available in the API console for EU users. See the [Grok 4.5 overview](/developers/grok-4-5)."
+    },
+    {
+      "date": "2026-07",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### Grok 4.5\n\nGrok 4.5, SpaceXSI's model for coding, agentic tasks, and knowledge work, is now available on the xAI API. Priced at $2 / 1M input tokens and $6 / 1M output tokens, with configurable reasoning effort (low, medium, or high; default high). See the [Grok 4.5 overview](/developers/grok-4-5) and the [announcement](https://x.ai/news/grok-4-5)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/context_window",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "context_window"
+      ],
+      "title": "Context window: 1M → 500K",
+      "impact": "breaking",
+      "before": 1000000,
+      "after": 500000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/default_effort",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "default_effort"
+      ],
+      "title": "Default effort: low → high",
+      "impact": "notable",
+      "before": "low",
+      "after": "high",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_output",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_output"
+      ],
+      "title": "Max output: 30K → 500K",
+      "impact": "notable",
+      "before": 30000,
+      "after": 500000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/reasoning_efforts/none",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "reasoning_efforts",
+        "none"
+      ],
+      "title": "Reasoning effort removed: none",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/regions/eu-west-1",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "regions",
+        "eu-west-1"
+      ],
+      "title": "Region removed: eu-west-1",
+      "impact": "notable",
+      "before": "eu-west-1",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Context window: 1M → 500K",
+    "Default effort: low → high",
+    "Max output: 30K → 500K",
+    "Reasoning effort removed: none",
+    "Region removed: eu-west-1"
+  ]
+}

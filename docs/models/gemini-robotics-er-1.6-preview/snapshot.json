@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "id": "gemini-robotics-er-1.6-preview",
+  "vendor": "google",
+  "name": "Gemini Robotics ER 1.6",
+  "family": "gemini-robotics-er",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "description": "Gemini Robotics ER 1.6 is a vision-language model (VLM) that brings Gemini's agentic capabilities to robotics. It's designed for advanced reasoning in the physical world, allowing robots to interpret complex visual data, perform spatial reasoning, and plan actions from natural language commands.",
+    "input_modalities": [
+      "text",
+      "images",
+      "video",
+      "audio"
+    ],
+    "knowledge_cutoff": "2025-01",
+    "max_input": 131072,
+    "max_output": 65536,
+    "name": "Gemini Robotics ER 1.6",
+    "output_modalities": [
+      "text"
+    ],
+    "released_at": "2026-04-14",
+    "replacement": "gemini-robotics-er-2-preview",
+    "retires_at": "2026-08-31",
+    "snapshots": [
+      "gemini-robotics-er-1.6-preview"
+    ],
+    "status": "retired"
+  },
+  "provenance": {
+    "description": {
+      "google-docs": "Gemini Robotics ER 1.6 is a vision-language model (VLM) that brings Gemini's agentic capabilities to robotics. It's designed for advanced reasoning in the physical world, allowing robots to interpret complex visual data, perform spatial reasoning, and plan actions from natural language commands."
+    },
+    "input_modalities": {
+      "google-docs": [
+        "text",
+        "images",
+        "video",
+        "audio"
+      ]
+    },
+    "knowledge_cutoff": {
+      "google-docs": "2025-01"
+    },
+    "max_input": {
+      "google-docs": 131072
+    },
+    "max_output": {
+      "google-docs": 65536
+    },
+    "name": {
+      "google-docs": "Gemini Robotics ER 1.6"
+    },
+    "output_modalities": {
+      "google-docs": [
+        "text"
+      ]
+    },
+    "released_at": {
+      "google-docs": "2026-04-14"
+    },
+    "replacement": {
+      "google-docs": "gemini-robotics-er-2-preview"
+    },
+    "retires_at": {
+      "google-docs": "2026-08-31"
+    },
+    "snapshots": {
+      "google-docs": [
+        "gemini-robotics-er-1.6-preview"
+      ]
+    },
+    "status": {
+      "google-docs": "retired"
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-robotics-er-1.6-preview"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-robotics-er-1.6-preview",
+      "text": "> ## AI Agent Context\n> Get the complete documentation index at: https://aistudio.google.com/llms.txt\n> Use this file to discover all available pages.\n> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt\n\n# Gemini Robotics ER 1.6\n\n{% callout type=\"note\" %}\n  This version is deprecated. Migrate to\n  [Gemini Robotics ER 2](/docs/models/gemini-robotics-er-2-preview)\n  (`gemini-robotics-er-2-preview`). See the [deprecations](/docs/deprecations)\n  page for details.\n\n{% /callout %}\n\nGemini Robotics ER 1.6 is a vision-language model (VLM) that brings Gemini's\nagentic capabilities to robotics. It's designed for advanced reasoning in the\nphysical world, allowing robots to interpret complex visual data, perform\nspatial reasoning, and plan actions from natural language commands.\n\n## Documentation  {% id=\"documentation\" %}\n\nVisit the [Robotics](/docs/robotics-overview) page for full coverage\nof features and capabilities.\n\n## gemini-robotics-er-1.6-preview  {% id=\"gemini-robotics-er-16-preview\" %}\n\n{% table variant=\"model\" %}\n  * Property\n  * Description\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model code\n\n    {% /section %}\n\n  * `gemini-robotics-er-1.6-preview`\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"save\" /%}Supported data types\n\n    {% /section %}\n\n  * **Inputs**\n    Text, images, video, audio\n    **Output**\n    Text\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"token_auto\" /%}Token limits[[*]](/docs/tokens)\n\n    {% /section %}\n\n  * **Input token limit**\n    131,072\n    **Output token limit**\n    65,536\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"handyman\" /%}Capabilities\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Audio generation**](/docs/speech-generation) Not supported\n\n  {% /section %}\n\n  {% section %}\n  [**Code execution**](/docs/code-execution) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Computer use**](/docs/computer-use) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Context caching**](/docs/caching) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**File search**](/docs/file-search) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Function calling**](/docs/function-calling) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Maps**](/docs/maps-grounding) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Search**](/docs/google-search) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Image generation**](/docs/image-generation) Not supported\n\n  {% /section %}\n\n  {% section %}\n  [**Live API**](/docs/live-api) Not supported\n\n  {% /section %}\n\n  {% section %}\n  [**Structured outputs**](/docs/structured-output) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Thinking**](/docs/thinking) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**URL context**](/docs/url-context) Supported\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"speed\" /%}Consumption options\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Batch API**](/docs/batch-api) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Flex inference**](/docs/flex-inference) Supported\n\n  {% /section %}\n\n  {% section %}\n  [**Priority inference**](/docs/priority-inference) Supported\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"123\" /%}Versions\n\n    {% /section %}\n\n  * Read the [model version patterns](/docs/models#model-versions) for more details.\n    Shut down: `gemini-robotics-er-1.6-preview`\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"calendar_month\" /%}Latest update\n\n    {% /section %}\n\n  * December 2025\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"cognition_2\" /%}Knowledge cutoff\n\n    {% /section %}\n\n  * January 2025\n{% /table %}\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.7",
+  "vendor": "xai",
+  "name": "Grok 4.7",
+  "family": "grok",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "batch": true,
+    "context_window": 500000,
+    "default_effort": "high",
+    "description": "SpaceXSI's frontier model for coding, agentic tasks, and knowledge work.",
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "knowledge_cutoff": "2026-05",
+    "max_output": 500000,
+    "name": "Grok 4.7",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "regions": [
+      "us-east-1",
+      "us-west-2",
+      "us-central-1"
+    ],
+    "released_at": "2026-09-21",
+    "sampling_parameters": true,
+    "structured_outputs": true,
+    "tool_calling": true
+  },
+  "provenance": {
+    "batch": {
+      "xai-docs": true
+    },
+    "context_window": {
+      "models.dev": 500000,
+      "openrouter": 500000,
+      "xai-docs": 500000
+    },
+    "default_effort": {
+      "openrouter": "high",
+      "xai-docs": "high"
+    },
+    "description": {
+      "xai-docs": "SpaceXSI's frontier model for coding, agentic tasks, and knowledge work."
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ],
+      "xai-docs": [
+        "text",
+        "image"
+      ]
+    },
+    "knowledge_cutoff": {
+      "models.dev": "2026-05"
+    },
+    "max_output": {
+      "models.dev": 500000,
+      "openrouter": 450000
+    },
+    "name": {
+      "models.dev": "Grok 4.7",
+      "openrouter": "Grok 4.7",
+      "xai-docs": "Grok 4.7"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ],
+      "xai-docs": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "openrouter": [
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "xai-docs": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "regions": {
+      "xai-docs": [
+        "us-east-1",
+        "us-west-2",
+        "us-central-1"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-09-21"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "structured_outputs": {
+      "models.dev": true,
+      "xai-docs": true
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    }
+  },
+  "disagreements": [
+    "max_output"
+  ],
+  "sources": {
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/x-ai/grok-4.7",
+    "xai-docs": "https://docs.x.ai/developers/models/grok-4.7"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://docs.x.ai/developers/models/grok-4.7",
+      "text": "# Grok 4.7\n\nSpaceXSI's frontier model for coding, agentic tasks, and knowledge work.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 500,000 tokens\n- **Model name:** `grok-4.7`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n- **Reasoning efforts (supported):** `low`, `medium`, `high`, `xhigh`\n- **Reasoning efforts (default):** `high`\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $2.00 | $4.00 |\n| Cached input | $0.50 | $1.00 |\n| Output | $6.00 | $12.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 150 |\n| Tokens per minute | 50,000,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2, us-central-1\n"
+    },
+    "whats_new": {
+      "title": "Get started",
+      "url": "https://docs.x.ai/developers/grok-4-7",
+      "text": "#### Get Started\n\n# Grok 4.7\n\nGrok 4.7 is SpaceXSI's frontier model built for coding, agentic tasks, and knowledge work.\n\n## Using the API\n\nIf you already have an [API key](https://console.x.ai/team/default/api-keys?utm_source=docs\\&utm_medium=referral\\&utm_campaign=developers-grok-4-7\\&utm_content=api-keys), set the model name to `grok-4.7`:\n\n```javascript customLanguage=\"javascriptAISDK\"\nimport { xai } from '@ai-sdk/xai';\nimport { generateText } from 'ai';\n\nconst { text } = await generateText({\n  model: xai.responses('grok-4.7'),\n  prompt:\n    'Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}',\n});\n\nconsole.log(text);\n```\n\n```javascript customLanguage=\"javascriptOpenAISDK\"\nimport OpenAI from 'openai';\n\nconst client = new OpenAI({\n  apiKey: process.env.XAI_API_KEY,\n  baseURL: 'https://api.x.ai/v1',\n});\n\nconst response = await client.responses.create({\n  model: 'grok-4.7',\n  input: [\n    {\n      role: 'user',\n      content:\n        'Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}',\n    },\n  ],\n});\n\nconsole.log(response.output_text);\n```\n\n```bash customLanguage=\"bash\"\ncurl https://api.x.ai/v1/responses \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $XAI_API_KEY\" \\\n  -d '{\n    \"model\": \"grok-4.7\",\n    \"input\": \"Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}\"\n  }'\n```\n\n```python customLanguage=\"pythonXAI\"\nimport os\nfrom xai_sdk import Client\nfrom xai_sdk.chat import user\n\nclient = Client(api_key=os.getenv(\"XAI_API_KEY\"))\n\nchat = client.chat.create(model=\"grok-4.7\")\nchat.append(user(\"Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}\"))\n\nresponse = chat.sample()\nprint(response.content)\n```\n\nNew to the xAI API? Follow the [Quickstart](/developers/quickstart) to create an account and make your first request.\n\n## At a glance\n\n| Property | Value |\n|----------|-------|\n| Model name | `grok-4.7` |\n| Context window | 500,000 tokens |\n| Knowledge cutoff | May 2026 |\n| Modalities | Text and image input; text output |\n| Output limit | No text output limit |\n| Input price | $2.00 / 1M tokens |\n| Output price | $6.00 / 1M tokens |\n| Reasoning | Low, medium, high (default), or xhigh  |\n| APIs | [Responses API](/developers/rest-api-reference/inference/responses#create-new-response) |\n| Tools | [Function calling](/developers/tools/function-calling), [web search](/developers/tools/web-search), [X search](/developers/tools/x-search), [code execution](/developers/tools/code-execution) |\n\nRate limits and live pricing for your team are on the [model detail page](/developers/models/grok-4.7) and [Pricing](/developers/pricing).\n\n## Important details\n\n* **We highly recommend setting a [`prompt_cache_key`](/developers/advanced-api-usage/prompt-caching/maximizing-cache-hits)** (Responses API; `x-grok-conv-id` header on Chat Completions). It routes a conversation's requests to the same server, making cache hits reliable; without it you often pay full input price on a cache-cold server. See [What Breaks Caching](/developers/advanced-api-usage/prompt-caching/multi-turn) for common mistakes.\n* **Long agent loops** additionally benefit from [context compaction](/developers/advanced-api-usage/context-compaction); for tool-heavy workloads see [function calling](/developers/tools/function-calling).\n* **Encrypted reasoning is always returned on the Responses API.** `POST /v1/responses` responses from `grok-4.7` include `reasoning.encrypted_content` even when `include` does not list it, so multi-turn conversations keep the model's reasoning without extra configuration. Pass the reasoning items back unchanged in the next request's `input`; see [Encrypted reasoning content](/developers/model-capabilities/text/reasoning#encrypted-reasoning-content). Chat Completions is unchanged.\n\n## Fast variant\n\nGrok 4.7 Fast is the same model served on faster infrastructure. It costs 2x the standard token rates, or 1.5x for long-context requests. It's available only in Cursor and [Grok Build](/build/overview), and is billed through your plan there. It is not included in Grok Build's free tier. It is not available on the public xAI API. Rates are on the [Pricing](/developers/pricing#grok-47-fast-pricing-cursor-and-grok-build-only) page.\n\n## Where it runs\n\n* **xAI API**: get a key from the [console](https://console.x.ai/?utm_source=docs\\&utm_medium=referral\\&utm_campaign=developers-grok-4-7\\&utm_content=console-home)\n* **US regional endpoint**: also served at `https://us.api.x.ai/v1`, which keeps inference in the United States, with token usage priced at a 10% premium; see [Regional Endpoints](/developers/advanced-api-usage/regions)\n* **Grok Build**: the default model of the [coding agent](/build/overview)\n* **Cursor**: available on all plans\n* **Model gateways**: OpenRouter, Vercel, and Cloudflare\n\n## Learn more\n\n* [Reasoning](/developers/model-capabilities/text/reasoning#the-reasoning_effort-parameter) - controlling `reasoning_effort`, including `\"xhigh\"`\n* [Announcement](https://x.ai/news/grok-4-7) - launch post with demos and full benchmark figures\n* [Models](/developers/models) - compare available models and their capabilities\n* [Pricing](/developers/pricing) - token pricing for all models\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

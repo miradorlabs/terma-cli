@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.5",
+  "predecessor": "gpt-5.4",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-5.5, a new frontier model for complex professional work, to the Chat Completions and Responses API, and released GPT-5.5 Pro for Responses API…",
+    "When image_detail is unset or set to auto, the model now uses original behavior.",
+    "Caching for GPT-5.5 only works with extended prompt caching."
+  ],
+  "changelog": [
+    {
+      "date": "2026-06-24",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Update · Model: chat-latest\n\nUpdated the `chat-latest` snapshot, which points to the latest Instant model currently used in ChatGPT. We recommend leveraging [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5) for production API usage, but feel free to use this model to test the latest improvements for chat use cases. The underlying model snapshot will be regularly updated. Read more [here](https://developers.openai.com/api/docs/models/chat-latest)."
+    },
+    {
+      "date": "2026-06-01",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.4 · Model: gpt-5.5 · API: v1/responses\n\nOpenAI models are now available in Amazon Bedrock through an OpenAI-compatible Responses API endpoint. Supported models and features vary by AWS Region. [Learn more](https://developers.openai.com/api/docs/guides/amazon-bedrock)."
+    },
+    {
+      "date": "2026-05-28",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Update · Model: chat-latest\n\nReleased `chat-latest` snapshot which points to the latest Instant model currently used in ChatGPT. We recommend leveraging [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5) for production API usage, but feel free to use this model to test the latest improvements for chat use cases. The underlying model snapshot will be regularly updated. Read more [here](https://developers.openai.com/api/docs/models/chat-latest)."
+    },
+    {
+      "date": "2026-05-05",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Update · Model: chat-latest\n\nReleased `chat-latest` snapshot which points to the latest Instant model currently used in ChatGPT. We recommend leveraging [GPT-5.5](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.5) for production API usage, but feel free to use this model to test our latest improvements for chat use cases. The underlying model snapshot will be regularly updated. Read more [here](https://developers.openai.com/api/docs/models/chat-latest)."
+    },
+    {
+      "date": "2026-04-24",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.5 · Model: gpt-5.5-pro · API: v1/responses · API: v1/chat/completions · API: v1/batch\n\nReleased [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5), a new frontier model for complex professional work, to the Chat Completions and Responses API, and released [GPT-5.5 Pro](https://developers.openai.com/api/docs/models/gpt-5.5-pro) for Responses API requests for tougher problems that benefit from more compute.\n\nGPT-5.5 supports a 1M token context window, image input, structured outputs, function calling, prompt caching, Batch, tool search, built-in computer use, hosted shell, apply patch, Skills, MCP, and web search. Key updates include:"
+    },
+    {
+      "date": "2026-04-24",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "- When `image_detail` is unset or set to `auto`, the model now uses [original behavior](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.5#behavioral-changes)."
+    },
+    {
+      "date": "2026-04-24",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "- Caching for GPT-5.5 only works with extended prompt caching. In-memory prompt caching is not supported.\nLearn more [here](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.5#behavioral-changes)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2025-08-31 → 2025-12-01",
+      "impact": "notable",
+      "before": "2025-08-31",
+      "after": "2025-12-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/sampling_parameters",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "sampling_parameters"
+      ],
+      "title": "Sampling parameters: yes → no",
+      "impact": "notable",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Knowledge cutoff: 2025-08-31 → 2025-12-01",
+    "Sampling parameters: yes → no"
+  ]
+}

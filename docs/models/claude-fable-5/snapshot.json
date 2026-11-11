@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "id": "claude-fable-5",
+  "vendor": "anthropic",
+  "name": "Claude Fable 5",
+  "family": "claude-fable",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 1000000,
+    "default_effort": "high",
+    "input_modalities": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "knowledge_cutoff": "2026-01",
+    "max_output": 128000,
+    "name": "Claude Fable 5",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "platform_ids": {
+      "Amazon Bedrock": "anthropic.claude-fable-5",
+      "Claude Models on Google Cloud (Anthropic managed)": "claude-fable-5",
+      "Claude Models on Google Cloud (Google managed)": "claude-fable-5",
+      "Claude Platform on AWS": "claude-fable-5",
+      "Microsoft Foundry": "claude-fable-5"
+    },
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "released_at": "2026-06-07",
+    "retires_not_before": "2027-06-09",
+    "sampling_parameters": false,
+    "status": "active",
+    "structured_outputs": true,
+    "thinking": "adaptive (always on)",
+    "tool_calling": true
+  },
+  "provenance": {
+    "context_window": {
+      "anthropic-api": 1000000,
+      "anthropic-docs": 1000000,
+      "models.dev": 1000000,
+      "openrouter": 1000000
+    },
+    "default_effort": {
+      "anthropic-docs": "high",
+      "openrouter": "high"
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ]
+    },
+    "knowledge_cutoff": {
+      "anthropic-docs": "2026-01"
+    },
+    "max_output": {
+      "anthropic-api": 128000,
+      "anthropic-docs": 128000,
+      "models.dev": 128000,
+      "openrouter": 128000
+    },
+    "name": {
+      "anthropic-api": "Claude Fable 5",
+      "anthropic-docs": "Claude Fable 5",
+      "models.dev": "Claude Fable 5",
+      "openrouter": "Claude Fable 5"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "platform_ids": {
+      "anthropic-docs": {
+        "Amazon Bedrock": "anthropic.claude-fable-5",
+        "Claude Models on Google Cloud (Anthropic managed)": "claude-fable-5",
+        "Claude Models on Google Cloud (Google managed)": "claude-fable-5",
+        "Claude Platform on AWS": "claude-fable-5",
+        "Microsoft Foundry": "claude-fable-5"
+      }
+    },
+    "reasoning": {
+      "anthropic-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "openrouter": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "released_at": {
+      "anthropic-api": "2026-06-07",
+      "anthropic-docs": "2026-06-09",
+      "models.dev": "2026-06-07"
+    },
+    "retires_not_before": {
+      "anthropic-docs": "2027-06-09"
+    },
+    "sampling_parameters": {
+      "models.dev": false
+    },
+    "status": {
+      "anthropic-docs": "active"
+    },
+    "structured_outputs": {
+      "models.dev": true
+    },
+    "thinking": {
+      "anthropic-docs": "adaptive (always on)"
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true
+    }
+  },
+  "disagreements": [
+    "released_at"
+  ],
+  "sources": {
+    "anthropic-api": "https://api.anthropic.com/v1/models/claude-fable-5",
+    "anthropic-docs": "https://platform.claude.com/docs/en/models/fable-5/overview",
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/anthropic/claude-fable-5"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://platform.claude.com/docs/en/models/fable-5/overview",
+      "text": "---\ntitle: Claude Fable 5\nurl: https://platform.claude.com/docs/en/models/fable-5/overview\ndescription: \"Claude Fable 5 reference: lifecycle status, model IDs on every platform, context window, output limits, pricing, and migration resources. Claude Fable 5 is a legacy model, and Claude Fable 5.2 is the current Fable model.\"\n---\n\n**Legacy.** Released June 9, 2026.\n\nAlthough Claude Fable 5 is still available, you should consider migrating to Claude Fable 5.2. [See Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview) · [Migrate to Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide)\n\nModel ID: `claude-fable-5`\n\nContext window: 1M tokens · Max output: 128K tokens · Input pricing: $10 / MTok · Output pricing: $50 / MTok\n\n[Announcement](https://www.anthropic.com/news/claude-fable-5-mythos-5)\n\n## Fable versus Mythos\n\n[Claude Mythos 5](https://platform.claude.com/docs/en/models/mythos-5/overview) is offered separately for defensive cybersecurity workflows and is available only to organizations verified through Anthropic’s verification programs, such as the [Cyber Verification Program](https://support.claude.com/en/articles/14604842). It shares Claude Fable 5’s specifications and pricing.\n\n## How it compares to the current lineup\n\n| Model                                                                               | Context | Max output | Price / MTok       | Thinking             | Default effort | Knowledge cutoff |\n| :---------------------------------------------------------------------------------- | :------ | :--------- | :----------------- | :------------------- | :------------- | :--------------- |\n| [Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview)   | 1M      | 128K       | $8 / $40           | Adaptive (always on) | `high`         | Jun 2026         |\n| **Claude Fable 5** (this model)                                                     | 1M      | 128K       | $10 / $50          | Adaptive (always on) | `high`         | Jan 2026         |\n| [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview)     | 1M      | 128K       | $4 / $20           | Adaptive (always on) | `medium`       | Jun 2026         |\n| [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview) | 1M      | 128K       | $2 / $10           | Adaptive             | `high`         | Jun 2026         |\n| [Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview)   | 1M      | 128K       | From $0.10 / $0.50 | Adaptive             | `medium`       | Jun 2026         |\n\n* **Context:** 1M tokens is roughly 555k words or 2.5M Unicode characters on the current tokenizer (introduced with Claude Opus 4.7); models before it fit about 750k words in 1M tokens. 200k tokens is roughly 150k words.\n* **Max output:** Synchronous Messages API limit. On the Message Batches API, Claude Opus 5.5, Claude Opus 5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 5.5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, and Claude Sonnet 4.6 support up to 300k output tokens with the output-300k-2026-03-24 beta header.\n* **Price / MTok:** Input / output, base price per million tokens. Batch API requests are 50% off; prompt caching reads cost 10% of the base input price (2.5% on Claude Fable 5.2, Claude Mythos 5.2, Claude Fable 5.1, and Claude Mythos 5.1, 5% on Claude Opus 5.5 and Claude Sonnet 5.5). See Pricing for the full list.\n* **Thinking:** Adaptive thinking lets the model decide how much to think, steered by effort. Extended thinking is the manual budget\\_tokens mode on earlier models.\n* **Default effort:** The effort parameter’s default on the Claude API. Models without a value don’t support the parameter.\n* **Knowledge cutoff:** Reliable knowledge cutoff: the date through which the model’s knowledge is most extensive and reliable.\n\n## Specifications\n\n### Model IDs\n\n| Platform                                                                                                                                                   | Model ID                   |\n| :--------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------- |\n| Claude API                                                                                                                                                 | `claude-fable-5`           |\n| [Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock)                                                           | `anthropic.claude-fable-5` |\n| [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed)       | `claude-fable-5`           |\n| [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry)                                                     | `claude-fable-5`           |\n| [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws)                                                     | `claude-fable-5`           |\n| [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) | `claude-fable-5`           |\n\n### Pricing\n\n| Feature                                                                                | Value                            |\n| :------------------------------------------------------------------------------------- | :------------------------------- |\n| Input                                                                                  | $10 / MTok                       |\n| Output                                                                                 | $50 / MTok                       |\n| [5m cache write](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | $12.50 / MTok                    |\n| [1h cache write](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | $20 / MTok                       |\n| [Cache read](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)     | $1 / MTok                        |\n| [Batch API](https://platform.claude.com/docs/en/build-with-claude/batch-processing)    | 50% discount on input and output |\n\n[Full price list](https://platform.claude.com/docs/en/about-claude/pricing)\n\n### Capabilities\n\n| Feature                                                                                 | Value                  |\n| :-------------------------------------------------------------------------------------- | :--------------------- |\n| [Context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) | 1M tokens              |\n| Max output                                                                              | 128K tokens            |\n| [Thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)              | Adaptive (always on)   |\n| [Default effort](https://platform.claude.com/docs/en/build-with-claude/effort)          | `high`                 |\n| Input → output                                                                          | Text and images → text |\n| Reliable knowledge cutoff                                                               | Jan 2026               |\n| Training data cutoff                                                                    | Jan 2026               |\n\n### Availability\n\n| Feature                                                                       | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |\n| :---------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| [Status](https://platform.claude.com/docs/en/about-claude/model-deprecations) | Active (legacy)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |\n| Released                                                                      | June 9, 2026                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |\n| Retirement                                                                    | Not sooner than June 9, 2027                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |\n| Platforms                                                                     | Claude API, [Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) |\n\n## Resources\n\n<CardGroup cols={3}>\n  <Card title=\"Migrate to Claude Fable 5.2\" icon=\"arrows-left-right\" href=\"https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#migrating-from-claude-fable-5-to-claude-fable-5-2\">\n    What changes when moving from Claude Fable 5 to Claude Fable 5.2.\n  </Card>\n\n  <Card title=\"Claude Fable 5.2\" icon=\"arrow-right\" href=\"https://platform.claude.com/docs/en/models/fable-5-2/overview\">\n    The current Fable model: overview, specs, and resources.\n  </Card>\n\n  <Card title=\"Prompting Claude Fable 5\" icon=\"lightbulb\" href=\"https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5\">\n    Model-specific prompting guidance for long-horizon and agentic work.\n  </Card>\n\n  <Card title=\"Refusals and fallback\" icon=\"shield\" href=\"https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback\">\n    Handle classifier refusals and retry on another Claude model with the `fallbacks` parameter.\n  </Card>\n</CardGroup>\n\n## Reference\n\n<CardGroup cols={3}>\n  <Card title=\"System prompt\" icon=\"text\" href=\"https://platform.claude.com/docs/en/release-notes/system-prompts/overview#claude-fable-5\">\n    The system prompt Claude Fable 5 uses on claude.ai and the Claude apps.\n  </Card>\n\n  <Card title=\"System card\" icon=\"file\" href=\"https://www.anthropic.com/claude-fable-5-mythos-5-system-card\">\n    Safety evaluations and deployment decisions for Claude Fable 5 and Claude Mythos 5.\n  </Card>\n\n  <Card title=\"Pricing\" icon=\"coins\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\">\n    Full price list, including batch discounts and prompt caching rates.\n  </Card>\n\n  <Card title=\"Model IDs and versioning\" icon=\"fingerprint\" href=\"https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions\">\n    How model IDs, aliases, and pinned snapshots work.\n  </Card>\n\n  <Card title=\"Model deprecations\" icon=\"clock\" href=\"https://platform.claude.com/docs/en/about-claude/model-deprecations\">\n    Lifecycle status and retirement commitments for every Claude model.\n  </Card>\n</CardGroup>\n"
+    }
+  },
+  "api": {
+    "listing": {
+      "capabilities": {
+        "batch": {
+          "supported": true
+        },
+        "citations": {
+          "supported": true
+        },
+        "code_execution": {
+          "supported": true
+        },
+        "context_management": {
+          "clear_thinking_20251015": {
+            "supported": true
+          },
+          "clear_tool_uses_20250919": {
+            "supported": true
+          },
+          "compact_20260112": {
+            "supported": true
+          },
+          "supported": true
+        },
+        "effort": {
+          "high": {
+            "supported": true
+          },
+          "low": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "supported": true,
+          "xhigh": {
+            "supported": true
+          }
+        },
+        "image_input": {
+          "supported": true
+        },
+        "pdf_input": {
+          "supported": true
+        },
+        "server_tools": {
+          "code_execution": {
+            "supported": true
+          },
+          "supported": true,
+          "web_search": {
+            "supported": true
+          }
+        },
+        "structured_outputs": {
+          "supported": true
+        },
+        "thinking": {
+          "supported": true,
+          "types": {
+            "adaptive": {
+              "supported": true
+            },
+            "between_tools": {
+              "supported": false
+            },
+            "disabled": {
+              "supported": false
+            },
+            "enabled": {
+              "supported": false
+            }
+          }
+        }
+      },
+      "created_at": "2026-06-07T00:00:00Z",
+      "deprecated_at": null,
+      "display_name": "Claude Fable 5",
+      "id": "claude-fable-5",
+      "lifecycle": "active",
+      "line": "fable",
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "retires_at": null,
+      "type": "model"
+    },
+    "probes": {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "endpoint": "POST /v1/messages (anthropic-version 2026-10-21)",
+      "params": {
+        "baseline": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.high": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.low": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.max": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.medium": {
+          "accepted": true,
+          "status": 200
+        },
+        "effort.xhigh": {
+          "accepted": true,
+          "status": 200
+        },
+        "inference_geo.us": {
+          "accepted": true,
+          "status": 200
+        },
+        "max_tokens.over_stated_limit": {
+          "accepted": false,
+          "status": 400,
+          "error": "max_tokens: 128001 > 128000, which is the maximum allowed number of output tokens for claude-fable-5"
+        },
+        "prefill": {
+          "accepted": false,
+          "status": 400,
+          "error": "This model does not support assistant message prefill. The conversation must end with a user message."
+        },
+        "sampling.temperature": {
+          "accepted": false,
+          "status": 400,
+          "error": "temperature: Extra inputs are not permitted"
+        },
+        "sampling.top_k": {
+          "accepted": false,
+          "status": 400,
+          "error": "top_k: Extra inputs are not permitted"
+        },
+        "sampling.top_p": {
+          "accepted": false,
+          "status": 400,
+          "error": "top_p: Extra inputs are not permitted"
+        },
+        "speed.fast": {
+          "accepted": false,
+          "status": 400,
+          "error": "'claude-fable-5' does not support the `speed` parameter. This feature is only available on supported models."
+        },
+        "stop_sequences": {
+          "accepted": true,
+          "status": 200
+        },
+        "structured_output": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.adaptive": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.adaptive.display_summarized": {
+          "accepted": true,
+          "status": 200
+        },
+        "thinking.between_tools": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.between_tools\" is not supported for this model."
+        },
+        "thinking.budget_tokens": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.enabled\" is not supported for this model. Use \"thinking.type.adaptive\" and \"output_config.effort\" to control thinking behavior."
+        },
+        "thinking.disabled": {
+          "accepted": false,
+          "status": 400,
+          "error": "\"thinking.type.disabled\" is not supported for this model. Use \"thinking.type.adaptive\" and \"output_config.effort\" to control thinking behavior."
+        },
+        "tool_choice.any": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.auto": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.none": {
+          "accepted": true,
+          "status": 200
+        },
+        "tool_choice.tool": {
+          "accepted": true,
+          "status": 200
+        }
+      },
+      "tokens": {
+        "cjk": 85,
+        "code": 157,
+        "indented": 55,
+        "json": 152,
+        "prose": 108,
+        "symbols": 125
+      },
+      "tokenizer_like": [
+        "claude-opus-4-8",
+        "claude-sonnet-5"
+      ],
+      "response": {
+        "model": "claude-fable-5",
+        "usage_keys": [
+          "cache_creation.ephemeral_1h_input_tokens",
+          "cache_creation.ephemeral_5m_input_tokens",
+          "cache_creation_input_tokens",
+          "cache_read_input_tokens",
+          "inference_geo",
+          "input_tokens",
+          "output_tokens",
+          "output_tokens_details.thinking_tokens",
+          "service_tier",
+          "speed"
+        ],
+        "headers": [
+          "anthropic-organization-id",
+          "anthropic-ratelimit-input-tokens-limit",
+          "anthropic-ratelimit-input-tokens-remaining",
+          "anthropic-ratelimit-input-tokens-reset",
+          "anthropic-ratelimit-output-tokens-limit",
+          "anthropic-ratelimit-output-tokens-remaining",
+          "anthropic-ratelimit-output-tokens-reset",
+          "anthropic-ratelimit-requests-limit",
+          "anthropic-ratelimit-requests-remaining",
+          "anthropic-ratelimit-requests-reset",
+          "anthropic-ratelimit-tokens-limit",
+          "anthropic-ratelimit-tokens-remaining",
+          "anthropic-ratelimit-tokens-reset",
+          "anthropic-workspace-id",
+          "request-id"
+        ],
+        "stream_events": [
+          "message_start",
+          "content_block_start",
+          "ping",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ]
+      }
+    }
+  },
+  "harnesses": []
+}

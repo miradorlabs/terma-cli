@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "id": "claude-opus-4-5-20251101",
+  "predecessor": "claude-opus-4-1-20250805",
+  "whats_new": null,
+  "vendor_highlights": [
+    "We’ve launched Claude Opus 4.5, our most intelligent model combining maximum capability with practical performance.",
+    "We’ve launched the effort parameter in beta for Claude Opus 4.5, allowing you to control token usage by trading off between response thoroughness and…"
+  ],
+  "changelog": [
+    {
+      "date": "2026-10-01",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve added a `line` field to the [Models API](https://platform.claude.com/docs/en/api/models/list). `GET /v1/models` and `GET /v1/models/{model_id}` now return the model line each model belongs to. Claude Opus 4.5 and Claude Opus 4.6 both report `opus`, for example. Use `line` to group models without parsing their IDs. `line` is `null` for a model that belongs to no line. See [Using the Models API](https://platform.claude.com/docs/en/models/overview#using-the-models-api)."
+    },
+    {
+      "date": "2026-06-18",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The Python, TypeScript, Go, Java, Ruby, PHP, and C# SDKs now include support for `code_execution_20260120`, the [code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) version that adds REPL state persistence and is the minimum version for [programmatic tool calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling). To adopt it, set the tool’s `type` to `code_execution_20260120`; no beta header is required. It’s available on Claude Fable 5, Claude Mythos 5, Claude Opus 4.5 and newer, and Claude Sonnet 4.5 and newer; see the code execution tool’s [API support](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool#availability-feature-support) section."
+    },
+    {
+      "date": "2026-01-29",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) are out of beta on the Claude API for Claude Sonnet 4.5, Claude Opus 4.5, and Claude Haiku 4.5. This release includes expanded schema support, improved grammar compilation latency, and a simplified integration path with no beta header required. The `output_format` parameter has moved to `output_config.format`. Existing beta users can continue using the beta header during the transition period. Structured outputs remain in beta on Amazon Bedrock and Microsoft Foundry."
+    },
+    {
+      "date": "2026-01-05",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve retired the Claude Opus 3 model (`claude-3-opus-20240229`). All requests to this model will now return an error. We recommend upgrading to [Claude Opus 4.5](https://platform.claude.com/docs/en/models/overview#latest-models-comparison), which offers significantly improved intelligence at a third of the cost. Researchers can request ongoing access to Claude Opus 3 on the API through the [External Researcher Access Program](https://support.claude.com/en/articles/9125743-what-is-the-external-researcher-access-program)."
+    },
+    {
+      "date": "2025-11-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve [launched Claude Opus 4.5](https://www.anthropic.com/news/claude-opus-4-5), our most intelligent model combining maximum capability with practical performance. Ideal for complex specialized tasks, professional software engineering, and advanced agents. Features step-change improvements in vision, coding, and computer use at a more accessible price point than previous Opus models. Learn more in [Models overview](https://platform.claude.com/docs/en/models/overview)."
+    },
+    {
+      "date": "2025-11-24",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort) in beta for Claude Opus 4.5, allowing you to control token usage by trading off between response thoroughness and efficiency."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/input_modalities/pdf",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "input_modalities",
+        "pdf"
+      ],
+      "title": "Input added: pdf",
+      "impact": "notable",
+      "before": null,
+      "after": "pdf",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/file",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "input_modalities",
+        "file"
+      ],
+      "title": "Input removed: file",
+      "impact": "notable",
+      "before": "file",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2025-01-31 → 2025-05",
+      "impact": "notable",
+      "before": "2025-01-31",
+      "after": "2025-05",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_output",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_output"
+      ],
+      "title": "Max output: 32K → 64K",
+      "impact": "notable",
+      "before": 32000,
+      "after": 64000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Input added: pdf",
+    "Input removed: file",
+    "Knowledge cutoff: 2025-01-31 → 2025-05",
+    "Max output: 32K → 64K"
+  ]
+}

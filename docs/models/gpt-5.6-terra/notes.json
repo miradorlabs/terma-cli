@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.6-terra",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released the GPT-5.6 model family, including GPT-5.6 Sol for frontier capability, GPT-5.6 Terra for a balance of intelligence and cost, and GPT-5.6 Luna for…"
+  ],
+  "changelog": [
+    {
+      "date": "2026-08-05",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Update · Model: gpt-5.6-sol · Model: gpt-5.6-terra · Model: gpt-5.6-luna\n\nFast mode now supports long-context requests for GPT-5.6 Sol, GPT-5.6 Terra, and GPT-5.6 Luna. As of today, long-context prompts exceeding 272K tokens can run in [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode), delivering speeds up to 2.5× faster than the Standard tier. See [pricing details](https://developers.openai.com/api/docs/pricing)."
+    },
+    {
+      "date": "2026-07-30",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Update · Model: gpt-5.6-sol · Model: gpt-5.6-terra · Model: gpt-5.6-luna · API: v1/responses · API: v1/chat/completions\n\nStarting July 30, GPT-5.6 Luna costs 80% less, while GPT-5.6 Terra costs 20% less. See [pricing details](https://developers.openai.com/api/docs/pricing).\n\nWe're also introducing [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) in the API, which replaces our Priority Processing offering. For GPT-5.6 Sol, Fast mode now delivers up to 2.5× faster speeds than standard processing at twice the price. This change is backward compatible: requests tagged priority will automatically use Fast mode."
+    },
+    {
+      "date": "2026-07-09",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.6-sol · Model: gpt-5.6-terra · Model: gpt-5.6-luna · API: v1/responses · API: v1/chat/completions · API: v1/batch\n\nReleased the [GPT-5.6 model family](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6), including GPT-5.6 Sol for frontier capability, GPT-5.6 Terra for a balance of intelligence and cost, and GPT-5.6 Luna for efficient, high-volume workloads. The `gpt-5.6` alias routes requests to `gpt-5.6-sol`.\n\nGPT-5.6 adds [Programmatic Tool Calling](https://developers.openai.com/api/docs/guides/tools-programmatic-tool-calling), [explicit prompt caching controls](https://developers.openai.com/api/docs/guides/prompt-caching), [persisted reasoning, `max` reasoning effort, and Pro mode](https://developers.openai.com/api/docs/guides/reasoning), and [Multi-agent orchestration in beta for the Responses API](https://developers.openai.com/api/docs/guides/responses-multi-agent). GPT-5.6 also accepts images at their original dimensions with `original` or `auto` image detail."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

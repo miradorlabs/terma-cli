@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.2",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-5.2, the newest flagship model in the GPT-5 model family."
+  ],
+  "changelog": [
+    {
+      "date": "2026-02-03",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Update · Model: gpt-5.2 · Model: gpt-5.2-codex\n\nWe have optimized our inference stack for API customers and [GPT-5.2](https://platform.openai.com/docs/models/gpt-5.2) and [GPT-5.2-Codex](https://platform.openai.com/docs/models/gpt-5.2-codex) now run ~40% faster. Model and model weights are unchanged."
+    },
+    {
+      "date": "2026-01-14",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.2-codex · API: v1/responses\n\nReleased `gpt-5.2-codex` to the Responses API. GPT-5.2-Codex is a version of GPT-5.2 optimized for agentic coding tasks in Codex or similar environments. Read more [here](https://platform.openai.com/docs/models/gpt-5.2-codex)."
+    },
+    {
+      "date": "2025-12-11",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.2 · Model: gpt-5.2-chat-latest · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-5.2](https://platform.openai.com/docs/models/gpt-5.2), the newest flagship model in the GPT-5 model family. GPT-5.2 shows improvements over the previous GPT-5.1 in:"
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

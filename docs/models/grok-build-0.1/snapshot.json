@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "id": "grok-build-0.1",
+  "vendor": "xai",
+  "name": "Grok Build 0.1",
+  "family": "grok-build",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "batch": false,
+    "context_window": 256000,
+    "description": "SpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks.",
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "max_output": 256000,
+    "name": "Grok Build 0.1",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "regions": [
+      "us-east-1",
+      "us-west-2"
+    ],
+    "released_at": "2026-04-16",
+    "sampling_parameters": true,
+    "structured_outputs": true,
+    "tool_calling": true
+  },
+  "provenance": {
+    "batch": {
+      "xai-docs": false
+    },
+    "context_window": {
+      "models.dev": 256000,
+      "openrouter": 256000,
+      "xai-docs": 256000
+    },
+    "description": {
+      "xai-docs": "SpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks."
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ],
+      "xai-docs": [
+        "text",
+        "image"
+      ]
+    },
+    "max_output": {
+      "models.dev": 256000,
+      "openrouter": 230400
+    },
+    "name": {
+      "models.dev": "Grok Build 0.1",
+      "openrouter": "Grok Build 0.1",
+      "xai-docs": "Grok Build 0.1"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ],
+      "xai-docs": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    },
+    "regions": {
+      "xai-docs": [
+        "us-east-1",
+        "us-west-2"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-04-16"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "structured_outputs": {
+      "models.dev": true,
+      "xai-docs": true
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    }
+  },
+  "disagreements": [
+    "max_output"
+  ],
+  "sources": {
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/x-ai/grok-build-0.1",
+    "xai-docs": "https://docs.x.ai/developers/models/grok-build-0.1"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://docs.x.ai/developers/models/grok-build-0.1",
+      "text": "# Grok Build 0.1\n\nSpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 256,000 tokens\n- **Model name:** `grok-build-0.1`\n- **Aliases:** `grok-code-fast-1`, `grok-code-fast`, `grok-code-fast-1-0825`\n- **Batch API:** Not supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $1.00 | $2.00 |\n| Cached input | $0.20 | $0.40 |\n| Output | $2.00 | $4.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 37 |\n| Tokens per minute | 10,000,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

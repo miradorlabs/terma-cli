@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3.8-flash",
+  "vendor": "google",
+  "name": "Gemini 3.8 Flash",
+  "family": "gemini-flash",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 1048576,
+    "default_effort": "medium",
+    "description": "Gemini 3.8 Flash is our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows—all with the speed and cost efficiency of Flash.",
+    "features": [
+      "code execution",
+      "computer use",
+      "context caching",
+      "file search",
+      "function calling",
+      "grounding with google maps",
+      "grounding with google search",
+      "structured outputs",
+      "thinking",
+      "url context"
+    ],
+    "input_modalities": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "max_input": 1048576,
+    "max_output": 65536,
+    "name": "Gemini 3.8 Flash",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "released_at": "2026-09-02",
+    "sampling_parameters": true,
+    "snapshots": [
+      "gemini-3.8-flash"
+    ],
+    "status": "active",
+    "structured_outputs": true,
+    "tool_calling": true,
+    "unsupported_features": [
+      "audio generation",
+      "image generation",
+      "live api"
+    ]
+  },
+  "provenance": {
+    "context_window": {
+      "models.dev": 1048576,
+      "openrouter": 1048576
+    },
+    "default_effort": {
+      "openrouter": "medium"
+    },
+    "description": {
+      "google-docs": "Gemini 3.8 Flash is our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows—all with the speed and cost efficiency of Flash."
+    },
+    "features": {
+      "google-docs": [
+        "code execution",
+        "computer use",
+        "context caching",
+        "file search",
+        "function calling",
+        "grounding with google maps",
+        "grounding with google search",
+        "structured outputs",
+        "thinking",
+        "url context"
+      ]
+    },
+    "input_modalities": {
+      "google-docs": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "models.dev": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "video",
+        "file",
+        "audio"
+      ]
+    },
+    "max_input": {
+      "google-docs": 1048576
+    },
+    "max_output": {
+      "google-docs": 65536,
+      "models.dev": 65536,
+      "openrouter": 65536
+    },
+    "name": {
+      "google-docs": "Gemini 3.8 Flash",
+      "models.dev": "Gemini 3.8 Flash",
+      "openrouter": "Gemini 3.8 Flash"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "google-docs": [
+        "text"
+      ],
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "google-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "openrouter": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "released_at": {
+      "google-docs": "2026-09-02",
+      "models.dev": "2026-09-02"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "snapshots": {
+      "google-docs": [
+        "gemini-3.8-flash"
+      ]
+    },
+    "status": {
+      "google-docs": "active"
+    },
+    "structured_outputs": {
+      "google-docs": true,
+      "models.dev": true
+    },
+    "tool_calling": {
+      "google-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "unsupported_features": {
+      "google-docs": [
+        "audio generation",
+        "image generation",
+        "live api"
+      ]
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/google/gemini-3.8-flash"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+      "text": "> ## AI Agent Context\n> Get the complete documentation index at: https://aistudio.google.com/llms.txt\n> Use this file to discover all available pages.\n> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt\n\n# Gemini 3.8 Flash\n\nGemini 3.8 Flash is our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows—all with the speed and cost efficiency of Flash.\n\n{% button href=\"https://aistudio.google.com/prompts/new_chat?model=gemini-3.8-flash\" variant=\"ais\" %}Try in Google AI Studio{% /button %}\n\n## Documentation  {% id=\"documentation\" %}\n\nVisit the\n[What's new in Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\npage for full coverage of features and capabilities.\n\n## gemini-3.8-flash  {% id=\"gemini-38-flash\" %}\n\n{% table variant=\"model\" %}\n  * Property\n  * Description\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model code\n\n    {% /section %}\n\n  * `gemini-3.8-flash`\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"save\" /%}Supported data types\n\n    {% /section %}\n\n  *     **Inputs** Text, Image, Video, Audio, and PDF\n\n    **Output** Text\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"token_auto\" /%}Token limits{% sup %}[[*]](/docs/tokens){% /sup %}\n\n    {% /section %}\n\n  *     **Input token limit** 1,048,576\n\n    **Output token limit** 65,536\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"handyman\" /%}Capabilities\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Audio generation**](/docs/speech-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Code execution**](/docs/code-execution)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Computer use**](/docs/computer-use)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Context caching**](/docs/caching)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**File search**](/docs/file-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Function calling**](/docs/function-calling)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Maps**](/docs/maps-grounding)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Search**](/docs/google-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Image generation**](/docs/image-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Live API**](/docs/live-api)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Structured outputs**](/docs/structured-output)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Thinking**](/docs/thinking)\n\n  {% badge label=Supported (low, medium, high) type=\"supported\" /%}\n\n  Note: `minimal` is not supported and returns an error.\n\n  {% /section %}\n\n  {% section %}\n  [**URL context**](/docs/url-context)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"speed\" /%}Consumption options\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Batch API**](/docs/batch-api)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Flex inference**](/docs/flex-inference)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Priority inference**](/docs/priority-inference)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"123\" /%}Versions\n\n    {% /section %}\n\n  *     Read the [model version patterns](/docs/models#model-versions) for more details.\n\n    *   Stable: `gemini-3.8-flash`\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"calendar_month\" /%}Latest update\n\n    {% /section %}\n\n  * September 2026\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model card\n\n    {% /section %}\n\n  * [Model card](https://deepmind.google/models/model-cards/gemini-3-8-flash/)\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"paid\" /%}Pricing\n\n    {% /section %}\n\n  * [Pricing](/docs/pricing#gemini-3.8-flash)\n{% /table %}\n"
+    },
+    "whats_new": {
+      "title": "What's new",
+      "url": "https://ai.google.dev/gemini-api/docs/whats-new-gemini-3.8",
+      "text": "> ## AI Agent Context\n> Get the complete documentation index at: https://aistudio.google.com/llms.txt\n> Use this file to discover all available pages.\n> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt\n\n# What's new in Gemini 3.8 Flash\n\n{% button href=\"/docs/latest-model\" variant=\"ais\" %}Latest model{% /button %} {% button href=\"/docs/whats-new-gemini-3.8#other-models\" variant=\"ais\" %}Other models{% /button %}\n\nGemini 3.8 Flash (`gemini-3.8-flash`) is our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows.\n\nThis guide explains what's new in Gemini 3.8 Flash, API changes, code examples, and migration guidance.\n\n## New model  {% id=\"new-model\" %}\n\n| Model | Model ID | Default thinking level | Pricing | Description |\n| :--- | :--- | :---: | --- | :--- |\n| Gemini 3.8 Flash | `gemini-3.8-flash` | `medium` | 3.8 Flash is available through the end of year at an introductory price of $0.75/1M input tokens and $3.75/1M output tokens; see [pricing](/docs/pricing) for more details. | Our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows. |\n\nGemini 3.8 Flash supports a 1M token context window, 64k max output tokens, tunable thinking levels (`low`, `medium`, `high`), and the same suite of built-in tools.\n\nFor complete specs, see the [Gemini 3.8 Flash model page](/docs/models/gemini-3.8-flash). For introductory pricing details, see the [pricing section](/docs/whats-new-gemini-3.8#pricing) later on this page or the [pricing page](/docs/pricing#gemini-3.8-flash).\n\n## Quickstart  {% id=\"quickstart\" %}\n\n{% tabs %}\n  {% tab label=\"Python\" %}\n  ```python\n  from google import genai\n  \n  client = genai.Client()\n  \n  interaction = client.interactions.create(\n      model=\"gemini-3.8-flash\",\n      input=\"Write a three.js script that renders a realistic 3D black hole.\"\n  )\n  \n  print(interaction.output_text)\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"JavaScript\" %}\n  ```javascript\n  import { GoogleGenAI } from \"@google/genai\";\n  \n  const client = new GoogleGenAI({});\n  \n  const interaction = await client.interactions.create({\n    model: \"gemini-3.8-flash\",\n    input: \"Write a three.js script that renders a realistic 3D black hole.\",\n  });\n  \n  console.log(interaction.output_text);\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"Java\" %}\n  ```java\n  import com.google.genai.Client;\n  import com.google.genai.gaos.models.interactions.CreateModelInteraction;\n  import com.google.genai.gaos.models.interactions.Interaction;\n  import com.google.genai.gaos.models.interactions.InteractionsInput;\n  import com.google.genai.gaos.models.interactions.Model;\n  import com.google.genai.gaos.models.operations.CreateInteractionRequestBody;\n  \n  Client client = new Client();\n  \n  CreateModelInteraction params =\n      CreateModelInteraction.builder()\n          .model(Model.of(\"gemini-3.8-flash\"))\n          .input(\n              InteractionsInput.of(\n                  \"Write a three.js script that renders a realistic 3D black hole.\"))\n          .build();\n  \n  Interaction interaction =\n      client.interactions.create(CreateInteractionRequestBody.of(params)).interaction().get();\n  \n  System.out.println(interaction.outputText().orElse(\"\"));\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"Go\" %}\n  ```go\n  package main\n  \n  import (\n      \"context\"\n      \"fmt\"\n      \"log\"\n  \n      \"google.golang.org/genai\"\n      \"google.golang.org/genai/interactions/models/interactions\"\n      \"google.golang.org/genai/interactions/models/operations\"\n  )\n  \n  func main() {\n      ctx := context.Background()\n      client, err := genai.NewClient(ctx, nil)\n      if err != nil {\n          log.Fatal(err)\n      }\n  \n      res, err := client.Interactions.Create(ctx, operations.CreateInteractionRequest{\n          Body: operations.NewCreateInteractionRequestBody(interactions.CreateModelInteraction{\n              Model: interactions.Model(\"gemini-3.8-flash\"),\n              Input: interactions.NewInteractionsInput(\"Write a three.js script that renders a realistic 3D black hole.\"),\n          }),\n      })\n      if err != nil {\n          log.Fatal(err)\n      }\n      if res.Interaction.OutputText != nil {\n          fmt.Println(*res.Interaction.OutputText)\n      }\n  }\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"REST\" %}\n  ```bash\n  curl \"https://generativelanguage.googleapis.com/v1beta/interactions\" \\\n    -H \"x-goog-api-key: $GEMINI_API_KEY\" \\\n    -H 'Content-Type: application/json' \\\n    -X POST \\\n    -d '{\n      \"model\": \"gemini-3.8-flash\",\n      \"input\": \"Write a three.js script that renders a realistic 3D black hole.\"\n    }'\n  ```\n\n  {% /tab %}\n\n{% /tabs %}\n\n## What's new in Gemini 3.8 Flash  {% id=\"whats-new-gemini-3-8-flash\" %}\n\n* **Long-horizon software engineering:** Delivers strong results on real-world coding benchmarks, complex multi-file refactoring, and deterministic tool execution. See the [evaluation methodology](https://deepmind.google/models/evals-methodology/gemini-3-8-flash/) for details.\n* **Autonomous agents:** Lets you build resilient multi-step planning and tool orchestration workflows, substantially reducing failed loops and errors.\n* **Complex enterprise workflows:** Delivers superior accuracy, deep reasoning, and high factual rigor across demanding domain tasks and large-scale data pipelines.\n* **Default model for Managed Agents:** The default agent for managed agents: the [Antigravity agent](/docs/antigravity-agent), now uses Gemini 3.8 Flash. The [Antigravity SDK](https://antigravity.google/docs/sdk/overview/) also uses Gemini 3.8 Flash by default.\n* **Introductory pricing:** Gemini 3.8 Flash is available at an introductory rate of $0.75/1M input tokens and $3.75/1M output tokens through December 31, 2026. Standard pricing of $1.50/1M input tokens and $7.50/1M output tokens takes effect January 1, 2027.\n\nGemini 3.8 Flash can use more tokens on longer running and complex tasks, by design. To deliver higher-quality results on difficult, multi-step goals, the model takes smaller reasoning steps, calls tools iteratively, and verifies its work along the way. Not every workflow needs this level of verification. For everyday tasks, you can lower the [reasoning](/docs/whats-new-gemini-3.8#understanding-reasoning-levels) effort to reduce token consumption. Alternatively, Gemini 3.6 Flash remains supported.\n\n## Understanding reasoning levels  {% id=\"understanding-reasoning-levels\" %}\n\nGemini 3.8 Flash gives you flexible control over latency and intelligence by adjusting the model's thinking level:\n\n* **Low thinking effort**: Reduces time-to-answer for latency-critical tasks like incident response pipelines, real-time chat, writing drafts, and fast data analysis.\n* **Medium (default):** Best quality for most tasks. Recommended for complex code and agentic use cases, providing higher first-pass accuracy.\n* **High thinking effort**: Maximizes the model's reasoning and tool orchestration capabilities. Best for deep reasoning, mathematics, and difficult multi-step tasks.\n\nNote: `minimal` thinking level is not supported for Gemini 3.8 Flash and will return an error.\n\nThe following example sets `thinking_level` to `medium` for a complex code analysis request:\n\n{% tabs %}\n  {% tab label=\"Python\" %}\n  ```python\n  from google import genai\n  \n  client = genai.Client()\n  \n  interaction = client.interactions.create(\n      model=\"gemini-3.8-flash\",\n      input=\"Analyze this payment processing pipeline for race conditions during retry attempts and rewrite the transaction locks safely.\",\n      generation_config={\n          \"thinking_level\": \"medium\"  # Balanced reasoning effort for complex tasks\n      }\n  )\n  \n  print(interaction.output_text)\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"JavaScript\" %}\n  ```javascript\n  import { GoogleGenAI } from \"@google/genai\";\n  \n  const client = new GoogleGenAI({});\n  \n  const interaction = await client.interactions.create({\n    model: \"gemini-3.8-flash\",\n    input: \"Analyze this payment processing pipeline for race conditions during retry attempts and rewrite the transaction locks safely.\",\n    generation_config: {\n      thinking_level: \"medium\"\n    }\n  });\n  \n  console.log(interaction.output_text);\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"Java\" %}\n  ```java\n  import com.google.genai.Client;\n  import com.google.genai.gaos.models.interactions.CreateModelInteraction;\n  import com.google.genai.gaos.models.interactions.GenerationConfig;\n  import com.google.genai.gaos.models.interactions.Interaction;\n  import com.google.genai.gaos.models.interactions.InteractionsInput;\n  import com.google.genai.gaos.models.interactions.Model;\n  import com.google.genai.gaos.models.interactions.ThinkingLevel;\n  import com.google.genai.gaos.models.operations.CreateInteractionRequestBody;\n  \n  Client client = new Client();\n  \n  CreateModelInteraction params =\n      CreateModelInteraction.builder()\n          .model(Model.of(\"gemini-3.8-flash\"))\n          .input(\n              InteractionsInput.of(\n                  \"Analyze this payment processing pipeline for race conditions during retry attempts and rewrite the transaction locks safely.\"))\n          .generationConfig(\n              GenerationConfig.builder()\n                  .thinkingLevel(ThinkingLevel.MEDIUM) // Balanced reasoning effort for complex tasks\n                  .build())\n          .build();\n  \n  Interaction interaction =\n      client.interactions.create(CreateInteractionRequestBody.of(params)).interaction().get();\n  \n  System.out.println(interaction.outputText().orElse(\"\"));\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"Go\" %}\n  ```go\n  package main\n  \n  import (\n      \"context\"\n      \"fmt\"\n      \"log\"\n  \n      \"google.golang.org/genai\"\n      \"google.golang.org/genai/interactions/models/interactions\"\n      \"google.golang.org/genai/interactions/models/operations\"\n  )\n  \n  func main() {\n      ctx := context.Background()\n      client, err := genai.NewClient(ctx, nil)\n      if err != nil {\n          log.Fatal(err)\n      }\n  \n      res, err := client.Interactions.Create(ctx, operations.CreateInteractionRequest{\n          Body: operations.NewCreateInteractionRequestBody(interactions.CreateModelInteraction{\n              Model: interactions.Model(\"gemini-3.8-flash\"),\n              Input: interactions.NewInteractionsInput(\"Analyze this payment processing pipeline for race conditions during retry attempts and rewrite the transaction locks safely.\"),\n              GenerationConfig: &interactions.GenerationConfig{\n                  ThinkingLevel: interactions.ThinkingLevelMedium.ToPointer(), // Balanced reasoning effort for complex tasks\n              },\n          }),\n      })\n      if err != nil {\n          log.Fatal(err)\n      }\n      if res.Interaction.OutputText != nil {\n          fmt.Println(*res.Interaction.OutputText)\n      }\n  }\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"REST\" %}\n  ```bash\n  curl \"https://generativelanguage.googleapis.com/v1beta/interactions\" \\\n    -H \"x-goog-api-key: $GEMINI_API_KEY\" \\\n    -H 'Content-Type: application/json' \\\n    -X POST \\\n    -d '{\n      \"model\": \"gemini-3.8-flash\",\n      \"input\": \"Analyze this payment processing pipeline for race conditions during retry attempts and rewrite the transaction locks safely.\",\n      \"generation_config\": {\n        \"thinking_level\": \"medium\"\n      }\n    }'\n  ```\n\n  {% /tab %}\n\n{% /tabs %}\n\n## Updated Antigravity agent  {% id=\"updated-antigravity-agent\" %}\n\nDue to its improved performance and reasoning, the [Antigravity agent](/docs/antigravity-agent) in Gemini Managed Agents is now built with Gemini 3.8 Flash by default.\n\n{% tabs %}\n  {% tab label=\"Python\" %}\n  ```python\n  from google import genai\n  \n  client = genai.Client(http_options={\"api_version\": \"v1beta\"})\n  \n  interaction = client.interactions.create(\n      agent=\"antigravity-preview-09-2026\",\n      input=(\n          \"Audit https://web.dev for performance, Core Web Vitals, and SEO. \"\n          \"Query Google's PageSpeed Insights API for both Mobile and Desktop strategies. \"\n          \"Check search indexing with Google Search for site:web.dev. \"\n          \"Format the output as a side-by-side scorecard table with prioritized fixes.\"\n      ),\n      environment=\"remote\",\n  )\n  \n  print(interaction.output_text)\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"JavaScript\" %}\n  ```javascript\n  import { GoogleGenAI } from \"@google/genai\";\n  \n  const client = new GoogleGenAI({ httpOptions: { apiVersion: \"v1beta\" } });\n  \n  const interaction = await client.interactions.create({\n    agent: \"antigravity-preview-09-2026\",\n    input: \"Audit https://web.dev for performance, Core Web Vitals, and SEO. Query Google's PageSpeed Insights API for both Mobile and Desktop strategies. Check search indexing with Google Search for site:web.dev. Format the output as a side-by-side scorecard table with prioritized fixes.\",\n    environment: \"remote\",\n  }, { timeout: 300000 });\n  \n  console.log(interaction.output_text);\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"Java\" %}\n  ```java\n  import com.google.genai.Client;\n  import com.google.genai.types.HttpOptions;\n  import com.google.genai.gaos.models.interactions.AgentOption;\n  import com.google.genai.gaos.models.interactions.CreateAgentInteraction;\n  import com.google.genai.gaos.models.interactions.CreateAgentInteractionEnvironment;\n  import com.google.genai.gaos.models.interactions.Interaction;\n  import com.google.genai.gaos.models.interactions.InteractionsInput;\n  import com.google.genai.gaos.models.operations.CreateInteractionRequestBody;\n  \n  Client client = Client.builder().httpOptions(HttpOptions.builder().apiVersion(\"v1beta\").build()).build();\n  \n  CreateAgentInteraction params =\n      CreateAgentInteraction.builder()\n          .agent(AgentOption.of(\"antigravity-preview-09-2026\"))\n          .input(\n              InteractionsInput.of(\n                  \"Audit https://web.dev for performance, Core Web Vitals, and SEO. \"\n                      + \"Query Google's PageSpeed Insights API for both Mobile and Desktop strategies. \"\n                      + \"Check search indexing with Google Search for site:web.dev. \"\n                      + \"Format the output as a side-by-side scorecard table with prioritized fixes.\"))\n          .environment(CreateAgentInteractionEnvironment.of(\"remote\"))\n          .build();\n  \n  Interaction interaction =\n      client.interactions.create(CreateInteractionRequestBody.of(params)).interaction().get();\n  \n  System.out.println(interaction.outputText().orElse(\"\"));\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"Go\" %}\n  ```go\n  package main\n  \n  import (\n      \"context\"\n      \"fmt\"\n      \"log\"\n  \n      \"google.golang.org/genai\"\n      \"google.golang.org/genai/interactions/models/interactions\"\n      \"google.golang.org/genai/interactions/models/operations\"\n  )\n  \n  func main() {\n      ctx := context.Background()\n      client, err := genai.NewClient(ctx, &genai.ClientConfig{HTTPOptions: genai.HTTPOptions{APIVersion: \"v1beta\"}})\n      if err != nil {\n          log.Fatal(err)\n      }\n  \n      res, err := client.Interactions.Create(ctx, operations.CreateInteractionRequest{\n          Body: operations.NewCreateInteractionRequestBody(interactions.CreateAgentInteraction{\n              Agent: interactions.AgentOption(\"antigravity-preview-09-2026\"),\n              Input: interactions.NewInteractionsInput(\n                  \"Audit https://web.dev for performance, Core Web Vitals, and SEO. \" +\n                      \"Query Google's PageSpeed Insights API for both Mobile and Desktop strategies. \" +\n                      \"Check search indexing with Google Search for site:web.dev. \" +\n                      \"Format the output as a side-by-side scorecard table with prioritized fixes.\",\n              ),\n              Environment: genai.Ptr(interactions.NewCreateAgentInteractionEnvironment(\"remote\")),\n          }),\n      })\n      if err != nil {\n          log.Fatal(err)\n      }\n      if res.Interaction.OutputText != nil {\n          fmt.Println(*res.Interaction.OutputText)\n      }\n  }\n  ```\n\n  {% /tab %}\n\n  {% tab label=\"REST\" %}\n  ```shell\n  curl -X POST \"https://generativelanguage.googleapis.com/v1beta/interactions\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"x-goog-api-key: $GEMINI_API_KEY\" \\\n  -d '{\n      \"agent\": \"antigravity-preview-09-2026\",\n      \"input\": \"Audit https://web.dev for performance, Core Web Vitals, and SEO. Query Google'\\''s PageSpeed Insights API for both Mobile and Desktop strategies. Check search indexing with Google Search for site:web.dev. Format the output as a side-by-side scorecard table with prioritized fixes.\",\n      \"environment\": \"remote\"\n  }'\n  ```\n\n  {% /tab %}\n\n{% /tabs %}\n\nThe underlying Gemini model [can be configured](/docs/antigravity-agent#model-selection) using `agent_config`.\n\n## Migration checklist  {% id=\"migration-checklist\" %}\n\n{% callout type=\"note\" %}\n  **Automate this migration with a coding agent.** If you use a coding agent that supports skills (like Antigravity),\n  install the [gemini-api-dev skill](/docs/coding-agents#gemini-api-dev) and run:\n\n  `/gemini-api-dev migrate my app to Gemini 3.8 Flash`\n\n{% /callout %}\n\n### Migrate to gemini-3.8-flash  {% id=\"migrate-to-gemini-3-8-flash\" %}\n\n* **Update Model ID:** Change your target model string to `gemini-3.8-flash`.\n* **Configure thinking level:** Replace `thinking_budget` with the string enum `thinking_level`. Note that `minimal` is not supported on Gemini 3.8 Flash; choose `low`, `medium` (default), or `high`.\n* **Apply Gemini 3 API parameter changes:** Remove deprecated sampling parameters (`temperature`, `top_p`, `top_k`), `candidate_count` (unsupported in Gemini 3 and later), and prefilled model turns. See [Gemini 3.6 API changes and parameter updates](/docs/whats-new-gemini-3.6#api-changes-and-parameter-updates).\n* **Enforce turn validation rules:** Standardize multi-turn conversations on server-side `previous_interaction_id` and remove prefilled model turns.\n* **Audit function calling:**  * Place multimodal assets inside the response payload.\n  * Format inline instructions using `\\n\\n`.\n  * If you see `Malformed_Function_Call` errors tied to pre-tool text, see [Workarounds for pre-tool text requirements](/docs/function-calling#workarounds-for-pre-tool-text-requirements).\n  * Only if using generateContent API: Ensure all `FunctionResponse` objects include `call_id` and `name`.\n\n* **Baseline Gemini 3 requirements:** For SDK updates and thought signature preservation, see [Thought signatures](/docs/thinking#signatures).\n\n## Pricing  {% id=\"pricing\" %}\n\nTake advantage of introductory pricing across Google AI Studio and Gemini Enterprise Agent Platform through December 31, 2026 for Gemini 3.8 Flash and Gemini 3.6 Flash. Standard pricing takes effect January 1, 2027. For complete pricing tiers, see the [pricing page](/docs/pricing#gemini-3.8-flash).\n\n## Other models  {% id=\"other-models\" %}\n\n* [Latest Gemini models](/docs/latest-model)\n* [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n* [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n* [Gemini 3.6 Flash and 3.5 Flash-Lite](/docs/whats-new-gemini-3.6)\n* [See all models](/docs/models)\n\n## What's next  {% id=\"whats-next\" %}\n\n* Review API specs on the [Models Overview](/docs/models).\n* Explore multi-agent orchestration in the [Interactions API Overview](/docs/interactions-overview).\n* Test and refine prompts in [Google AI Studio](https://aistudio.google.com/prompts/new_chat?model=gemini-3.8-flash).\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

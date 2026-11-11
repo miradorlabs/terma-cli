@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.5-pro",
+  "predecessor": "gpt-5.4-pro",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-5.5, a new frontier model for complex professional work, to the Chat Completions and Responses API, and released GPT-5.5 Pro for Responses API…"
+  ],
+  "changelog": [
+    {
+      "date": "2026-04-24",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.5 · Model: gpt-5.5-pro · API: v1/responses · API: v1/chat/completions · API: v1/batch\n\nReleased [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5), a new frontier model for complex professional work, to the Chat Completions and Responses API, and released [GPT-5.5 Pro](https://developers.openai.com/api/docs/models/gpt-5.5-pro) for Responses API requests for tougher problems that benefit from more compute.\n\nGPT-5.5 supports a 1M token context window, image input, structured outputs, function calling, prompt caching, Batch, tool search, built-in computer use, hosted shell, apply patch, Skills, MCP, and web search. Key updates include:"
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/endpoints/v1/batch",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "endpoints",
+        "v1/batch"
+      ],
+      "title": "Endpoint added: v1/batch",
+      "impact": "notable",
+      "before": null,
+      "after": "v1/batch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/structured_outputs",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "structured_outputs"
+      ],
+      "title": "Feature added: structured_outputs",
+      "impact": "notable",
+      "before": null,
+      "after": "structured_outputs",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/streaming",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "features",
+        "streaming"
+      ],
+      "title": "Feature removed: streaming",
+      "impact": "notable",
+      "before": "streaming",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2025-08-31 → 2025-12-01",
+      "impact": "notable",
+      "before": "2025-08-31",
+      "after": "2025-12-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/structured_outputs",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "structured_outputs"
+      ],
+      "title": "Structured outputs: no → yes",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/code_interpreter",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "code_interpreter"
+      ],
+      "title": "Built-in tool added: code_interpreter",
+      "impact": "notable",
+      "before": null,
+      "after": "code_interpreter",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/hosted_shell",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "hosted_shell"
+      ],
+      "title": "Built-in tool added: hosted_shell",
+      "impact": "notable",
+      "before": null,
+      "after": "hosted_shell",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/tool_search",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "tools",
+        "tool_search"
+      ],
+      "title": "Built-in tool removed: tool_search",
+      "impact": "notable",
+      "before": "tool_search",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/apply_patch",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "tools",
+        "apply_patch"
+      ],
+      "title": "Built-in tool removed: apply_patch",
+      "impact": "notable",
+      "before": "apply_patch",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/computer_use",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "tools",
+        "computer_use"
+      ],
+      "title": "Built-in tool removed: computer_use",
+      "impact": "notable",
+      "before": "computer_use",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Endpoint added: v1/batch",
+    "Feature added: structured_outputs",
+    "Feature removed: streaming",
+    "Knowledge cutoff: 2025-08-31 → 2025-12-01",
+    "Structured outputs: no → yes"
+  ]
+}

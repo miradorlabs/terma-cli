@@ -1,0 +1,351 @@
+{
+  "schema_version": 1,
+  "id": "gemini-2.5-flash-lite",
+  "predecessor": "gemini-2.0-flash-lite",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released gemini-2.5-flash-lite-preview-06-17, a low-cost, high-performance Gemini 2.5 model."
+  ],
+  "changelog": [
+    {
+      "date": "2025-07-22",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Released `gemini-2.5-flash-lite`, our fast, low-cost, high-performance\n  Gemini\n  2.5 model. To learn more, see [Gemini 2.5\n  Flash-Lite](/docs/models#gemini-25-flash-lite)."
+    },
+    {
+      "date": "2025-06-17",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Released `gemini-2.5-flash-lite-preview-06-17`, a low-cost, high-performance\n  Gemini 2.5 model. To learn more, see [Gemini 2.5 Flash-Lite\n  Preview](/docs/models#gemini-25-flash-lite)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/features/code execution",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "code execution"
+      ],
+      "title": "Feature added: code execution",
+      "impact": "notable",
+      "before": null,
+      "after": "code execution",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/file search",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "file search"
+      ],
+      "title": "Feature added: file search",
+      "impact": "notable",
+      "before": null,
+      "after": "file search",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/grounding with google maps",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "grounding with google maps"
+      ],
+      "title": "Feature added: grounding with google maps",
+      "impact": "notable",
+      "before": null,
+      "after": "grounding with google maps",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/grounding with google search",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "grounding with google search"
+      ],
+      "title": "Feature added: grounding with google search",
+      "impact": "notable",
+      "before": null,
+      "after": "grounding with google search",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/thinking",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "thinking"
+      ],
+      "title": "Feature added: thinking",
+      "impact": "notable",
+      "before": null,
+      "after": "thinking",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/url context",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "url context"
+      ],
+      "title": "Feature added: url context",
+      "impact": "notable",
+      "before": null,
+      "after": "url context",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/image",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "input_modalities",
+        "image"
+      ],
+      "title": "Input added: image",
+      "impact": "notable",
+      "before": null,
+      "after": "image",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/pdf",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "input_modalities",
+        "pdf"
+      ],
+      "title": "Input added: pdf",
+      "impact": "notable",
+      "before": null,
+      "after": "pdf",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/images",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "input_modalities",
+        "images"
+      ],
+      "title": "Input removed: images",
+      "impact": "notable",
+      "before": "images",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2024-08 → 2025-01",
+      "impact": "notable",
+      "before": "2024-08",
+      "after": "2025-01",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_output",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_output"
+      ],
+      "title": "Max output: 8,192 → 65,536",
+      "impact": "notable",
+      "before": 8192,
+      "after": 65536,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/reasoning",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "reasoning"
+      ],
+      "title": "Reasoning: no → yes",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/code execution",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "code execution"
+      ],
+      "title": "Unsupported feature removed: code execution",
+      "impact": "notable",
+      "before": "code execution",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/file search",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "file search"
+      ],
+      "title": "Unsupported feature removed: file search",
+      "impact": "notable",
+      "before": "file search",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/grounding with google maps",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "grounding with google maps"
+      ],
+      "title": "Unsupported feature removed: grounding with google maps",
+      "impact": "notable",
+      "before": "grounding with google maps",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/grounding with google search",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "grounding with google search"
+      ],
+      "title": "Unsupported feature removed: grounding with google search",
+      "impact": "notable",
+      "before": "grounding with google search",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/thinking",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "thinking"
+      ],
+      "title": "Unsupported feature removed: thinking",
+      "impact": "notable",
+      "before": "thinking",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/unsupported_features/url context",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "url context"
+      ],
+      "title": "Unsupported feature removed: url context",
+      "impact": "notable",
+      "before": "url context",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Feature added: code execution",
+    "Feature added: file search",
+    "Feature added: grounding with google maps",
+    "Feature added: grounding with google search",
+    "Feature added: thinking"
+  ]
+}

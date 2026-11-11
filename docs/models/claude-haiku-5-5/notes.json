@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "id": "claude-haiku-5-5",
+  "predecessor": "claude-haiku-4-5-20251001",
+  "whats_new": {
+    "title": "What's new",
+    "url": "https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5",
+    "text": "---\ntitle: What's new in Claude Haiku 5.5\nurl: https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5\ndescription: Overview of new capabilities, breaking changes, and behavior changes in Claude Haiku 5.5, with a link to each feature's guide and to the migration guide for code changes.\n---\n\nClaude Haiku 5.5 is built for high-volume, latency-sensitive work such as classification, routing, extraction, and subagent tasks. It supports adaptive thinking with the effort parameter, a 1M token context window, and up to 128k output tokens. It uses the same newer tokenizer as Claude 4.7 and later models, so the same text counts as approximately 30 percent more tokens than on Claude Haiku 4.5. Its thinking blocks work only in the account that produced them, or in an account linked to it.\n\nFor code changes, see the [migration guide](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide). For model IDs, pricing, and limits, see the [Claude Haiku 5.5 overview](https://platform.claude.com/docs/en/models/haiku-5-5/overview). For prompting guidance, see [Prompting Claude Haiku 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5).\n\n## Summary of changes from Claude Haiku 4.5\n\nEach row names one change, whether it is new, changed, or breaking, and what your code has to do.\n\n| Change                                                                                                                                                          | Type     | Action needed                                                                                                                                                                                                                              |\n| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |\n| [Adaptive thinking and effort](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5#adaptive-thinking-and-effort)                           | New      | Optional: set `effort` to trade response quality against speed and cost.                                                                                                                                                                   |\n| [Larger context window and output](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5#larger-context-window-and-output)                   | New      | None. Existing `max_tokens` values stay valid, but thinking tokens count toward them. Long prompts are billed at higher prices; see [Long context pricing](https://platform.claude.com/docs/en/about-claude/pricing#long-context-pricing). |\n| [Browser use tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/browser-use-tool)                                                              | New      | None.                                                                                                                                                                                                                                      |\n| [Safety classifiers can decline a request](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#refusal-response)                        | New      | Handle `stop_reason: \"refusal\"` in your client. Server-side fallback isn’t available.                                                                                                                                                      |\n| [Manual extended thinking returns an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#configure-thinking)                            | Breaking | Replace `budget_tokens` with adaptive thinking.                                                                                                                                                                                            |\n| [Sampling parameters can return an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#remove-sampling-parameters)                      | Breaking | Omit `temperature`, `top_p`, and `top_k`.                                                                                                                                                                                                  |\n| [Assistant message prefill returns an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#replace-assistant-prefill)                    | Breaking | End `messages` with a user turn.                                                                                                                                                                                                           |\n| [`computer_20250124` returns an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#computer-use-toolset)                               | Breaking | Replace it with `computer_toolset_20260801`. On Amazon Bedrock, `computer_20251124` also works.                                                                                                                                            |\n| [Changing earlier turns invalidates thinking blocks](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#keep-earlier-turns-unchanged)         | Breaking | Keep conversations append-only if you send thinking blocks back.                                                                                                                                                                           |\n| [Responses can start with thinking blocks](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5#responses-can-begin-with-thinking-blocks)   | Changed  | Select content blocks by `type`, not by position.                                                                                                                                                                                          |\n| [Thinking text is omitted by default](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#configure-thinking)                                  | Changed  | To receive summarized thinking, set `thinking.display` to `\"summarized\"`.                                                                                                                                                                  |\n| [Same text counts as more tokens](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5#same-text-counts-as-more-tokens)                     | Changed  | Recount prompts and revisit `max_tokens` and cost estimates.                                                                                                                                                                               |\n| [Replaying thinking blocks across accounts](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5#replaying-thinking-blocks-across-accounts) | Changed  | If you replay stored conversations through a different account, replay each through the account that produced it.                                                                                                                          |\n| [Earlier thinking blocks stay in context](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5#earlier-thinking-blocks-stay-in-context)     | Changed  | Expect more input tokens in multi-turn conversations. To remove older blocks, use [thinking block clearing](https://platform.claude.com/docs/en/build-with-claude/context-editing#thinking-block-clearing).                                |\n| [Shorter prompts can be cached](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#cache-limitations)                                         | Changed  | None. The minimum cacheable prompt length is 512 tokens, down from 4,096 on Claude Haiku 4.5, so a prompt in between that sets `cache_control` is cached on Claude Haiku 5.5.                                                              |\n| [Context awareness tags aren’t injected](https://platform.claude.com/docs/en/build-with-claude/context-windows#context-awareness)                               | Changed  | To give the model an explicit budget for an agentic loop, use [task budgets](https://platform.claude.com/docs/en/build-with-claude/task-budgets) (beta).                                                                                   |\n\n## New capabilities\n\n### Adaptive thinking and effort\n\nWith [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking), Claude Haiku 5.5 determines when and how much to think. Adaptive thinking is on by default. Although you can still turn thinking off with `thinking: {\"type\": \"disabled\"}` at `high` effort or below, the better way to trade response quality against speed and cost is to use the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort).\n\n### Larger context window and output\n\nClaude Haiku 5.5 has a 1M token [context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) and returns up to 128k output tokens, up from 200k and 64k on Claude Haiku 4.5. Existing `max_tokens` values stay valid, but thinking tokens count toward `max_tokens`, so a small limit can stop after a `thinking` block and before any text. See [Configure thinking](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#configure-thinking). Long prompts are billed at higher prices; see [Long context pricing](https://platform.claude.com/docs/en/about-claude/pricing#long-context-pricing).\n\n## Behavior changes\n\n### Responses can start with thinking blocks\n\nAdaptive thinking is on by default, so a response can start with one or more `thinking` blocks even when the request doesn’t mention thinking. Code that reads the first content block as the answer needs to select blocks by their `type` field. See [Configure thinking](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#configure-thinking) in the migration guide.\n\n### Earlier thinking blocks stay in context\n\nClaude Haiku 5.5 keeps thinking blocks from all earlier assistant turns in context, and they count as input tokens. Claude Haiku 4.5 kept only the latest turn’s blocks. Multi-turn conversations therefore carry more input tokens than the tokenizer change alone explains. To remove older blocks, use [thinking block clearing](https://platform.claude.com/docs/en/build-with-claude/context-editing#thinking-block-clearing). See [Thinking block preservation by model](https://platform.claude.com/docs/en/build-with-claude/thinking#thinking-block-preservation-by-model).\n\n### Same text counts as more tokens\n\nClaude Haiku 5.5 uses the same newer tokenizer as Claude 4.7 and later models. As with all models that use this tokenizer, the same input text produces approximately 30 percent more tokens on Claude Haiku 5.5 than on Claude Haiku 4.5. The exact increase depends on the content. The shape of requests and responses doesn’t depend on the tokenizer, but anything you measure or budget in tokens changes. See [Recount tokens](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#recount-tokens) in the migration guide.\n\n### Replaying thinking blocks across accounts\n\nThinking blocks from Claude Haiku 5.5 work only in the account that produced them, or in an account linked to it. This matters only if you store conversations and replay them through a different account. See [Replay thinking blocks through the account that produced them](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#replay-thinking-blocks-through-the-producing-account).\n"
+  },
+  "vendor_highlights": [
+    "Responses can start with thinking blocks",
+    "Earlier thinking blocks stay in context",
+    "Same text counts as more tokens",
+    "Replaying thinking blocks across accounts"
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-09",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* On the Claude API and Claude Models on Google Cloud (Google managed), a conversation that moves onto Claude Fable 5.2 or Claude Mythos 5.2 keeps the reasoning from other models, including Claude Opus 5.5, Claude Sonnet 5.5, and Claude Haiku 5.5. When the conversation moves the other way, to any other model, including Claude Opus 5.5 and Claude Fable 5.1, the API drops the thinking blocks that Claude Fable 5.2 or Claude Mythos 5.2 produced, and the request still succeeds. See [Switching models mid-conversation](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#switching-models)."
+    },
+    {
+      "date": "2026-10-07",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched **Claude Haiku 5.5** (`claude-haiku-5-5`), our most capable model tuned for high-volume and latency-sensitive work. It has a [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows), 128k max output tokens, and [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) with the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort). It’s available on the Claude API, [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), and [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry). See [What’s new in Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5)."
+    },
+    {
+      "date": "2026-10-07",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* Code written for Claude Haiku 4.5 can break on Claude Haiku 5.5. Manual extended thinking (`budget_tokens`), the sampling parameters `temperature`, `top_p`, and `top_k`, and assistant message prefill can each return a 400 error. `computer_20250124` also returns a 400 error: use the `computer_toolset_20260801` toolset on the Claude API and Google Cloud, or `computer_20251124` on Amazon Bedrock. A request that sends thinking blocks back after a change to `system`, `tools`, or earlier turns can also return a 400 error. Adaptive thinking is on by default, so a response can begin with `thinking` blocks, and their text is omitted unless you set `thinking.display` to `\"summarized\"`. Claude Haiku 5.5 also uses a tokenizer that produces more tokens for the same text. See the [Claude Haiku 5.5 migration guide](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide) for each change. For model-specific prompting patterns, see [Prompting Claude Haiku 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/context_window",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "context_window"
+      ],
+      "title": "Context window: 200K → 1M",
+      "impact": "notable",
+      "before": 200000,
+      "after": 1000000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2025-02 → 2026-06",
+      "impact": "notable",
+      "before": "2025-02",
+      "after": "2026-06",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_output",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_output"
+      ],
+      "title": "Max output: 64K → 128K",
+      "impact": "notable",
+      "before": 64000,
+      "after": 128000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/sampling_parameters",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "sampling_parameters"
+      ],
+      "title": "Sampling parameters: yes → no",
+      "impact": "notable",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/thinking",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "thinking"
+      ],
+      "title": "Thinking: extended → adaptive",
+      "impact": "notable",
+      "before": "extended",
+      "after": "adaptive",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/effort.high/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "effort.high",
+        "accepted"
+      ],
+      "title": "Accepts effort.high (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/effort.low/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "effort.low",
+        "accepted"
+      ],
+      "title": "Accepts effort.low (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/effort.max/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "effort.max",
+        "accepted"
+      ],
+      "title": "Accepts effort.max (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/effort.medium/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "effort.medium",
+        "accepted"
+      ],
+      "title": "Accepts effort.medium (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/effort.xhigh/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "effort.xhigh",
+        "accepted"
+      ],
+      "title": "Accepts effort.xhigh (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/inference_geo.us/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "inference_geo.us",
+        "accepted"
+      ],
+      "title": "Accepts inference_geo.us (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/prefill/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "prefill",
+        "accepted"
+      ],
+      "title": "Rejects prefill (Claude Haiku 4.5 accepts it)",
+      "impact": "breaking",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/thinking.adaptive/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "thinking.adaptive",
+        "accepted"
+      ],
+      "title": "Accepts thinking.adaptive (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/thinking.adaptive.display_summarized/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "thinking.adaptive.display_summarized",
+        "accepted"
+      ],
+      "title": "Accepts thinking.adaptive.display_summarized (Claude Haiku 4.5 rejects it)",
+      "impact": "notable",
+      "before": false,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "api/probes/params/thinking.budget_tokens/accepted",
+      "category": "api",
+      "op": "changed",
+      "path": [
+        "api",
+        "probes",
+        "params",
+        "thinking.budget_tokens",
+        "accepted"
+      ],
+      "title": "Rejects thinking.budget_tokens (Claude Haiku 4.5 accepts it)",
+      "impact": "breaking",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Counts 16% more tokens than Claude Haiku 4.5 for the same text",
+    "Rejects prefill (Claude Haiku 4.5 accepts it)",
+    "Rejects thinking.budget_tokens (Claude Haiku 4.5 accepts it)",
+    "Context window: 200K → 1M",
+    "Knowledge cutoff: 2025-02 → 2026-06",
+    "Max output: 64K → 128K"
+  ]
+}

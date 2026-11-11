@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "id": "gpt-6-cyber",
+  "predecessor": "gpt-5.6-cyber",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Use GPT-6-Cyber to investigate vulnerabilities, reproduce them in an authorized test environment, and verify fixes."
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-05",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-6-cyber\n\nUse [GPT-6-Cyber](https://developers.openai.com/api/docs/models/gpt-6-cyber) to investigate vulnerabilities, reproduce them in an authorized test environment, and verify fixes. See [Daybreak setup](https://developers.openai.com/api/docs/guides/daybreak#set-up-gpt-6-cyber) before sending your first request."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/context_window",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "context_window"
+      ],
+      "title": "Context window: 400K → 1050K",
+      "impact": "notable",
+      "before": 400000,
+      "after": 1050000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/endpoints/v1/chat/completions",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "endpoints",
+        "v1/chat/completions"
+      ],
+      "title": "Endpoint added: v1/chat/completions",
+      "impact": "notable",
+      "before": null,
+      "after": "v1/chat/completions",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/file_search",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "features",
+        "file_search"
+      ],
+      "title": "Feature removed: file_search",
+      "impact": "notable",
+      "before": "file_search",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/features/image_input",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "features",
+        "image_input"
+      ],
+      "title": "Feature removed: image_input",
+      "impact": "notable",
+      "before": "image_input",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_input",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_input"
+      ],
+      "title": "Max input: 272K → 922K",
+      "impact": "notable",
+      "before": 272000,
+      "after": 922000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/function_calling",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "function_calling"
+      ],
+      "title": "Built-in tool added: function_calling",
+      "impact": "notable",
+      "before": null,
+      "after": "function_calling",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Context window: 400K → 1050K",
+    "Endpoint added: v1/chat/completions",
+    "Feature removed: file_search",
+    "Feature removed: image_input",
+    "Max input: 272K → 922K"
+  ]
+}

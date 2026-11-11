@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "claude-3-7-sonnet-20250219",
+  "steps": [
+    {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "event": "listed",
+      "changes": []
+    }
+  ]
+}

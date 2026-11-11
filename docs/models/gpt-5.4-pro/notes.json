@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.4-pro",
+  "predecessor": "gpt-5.2-pro",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-5.4, our newest frontier model for professional work, to the Chat Completions and Responses API, and released GPT-5.4 Pro to the Responses API for…"
+  ],
+  "changelog": [
+    {
+      "date": "2026-03-05",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.4 · Model: gpt-5.4-pro · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-5.4](https://developers.openai.com/api/docs/models/gpt-5.4), our newest frontier model for professional work, to the Chat Completions and Responses API, and released [GPT-5.4 Pro](https://developers.openai.com/api/docs/models/gpt-5.4-pro) to the Responses API for tougher problems that benefit from more compute.\n\nAlso released:"
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/context_window",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "context_window"
+      ],
+      "title": "Context window: 400K → 1050K",
+      "impact": "notable",
+      "before": 400000,
+      "after": 1050000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/max_input",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "max_input"
+      ],
+      "title": "Max input: 272K → 922K",
+      "impact": "notable",
+      "before": 272000,
+      "after": 922000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/tool_search",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "tool_search"
+      ],
+      "title": "Built-in tool added: tool_search",
+      "impact": "notable",
+      "before": null,
+      "after": "tool_search",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/apply_patch",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "apply_patch"
+      ],
+      "title": "Built-in tool added: apply_patch",
+      "impact": "notable",
+      "before": null,
+      "after": "apply_patch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/tools/computer_use",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "tools",
+        "computer_use"
+      ],
+      "title": "Built-in tool added: computer_use",
+      "impact": "notable",
+      "before": null,
+      "after": "computer_use",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Context window: 400K → 1050K",
+    "Max input: 272K → 922K",
+    "Built-in tool added: tool_search",
+    "Built-in tool added: apply_patch",
+    "Built-in tool added: computer_use"
+  ]
+}

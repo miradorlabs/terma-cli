@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "claude-opus-4-20250514",
+  "vendor": "anthropic",
+  "name": "claude-opus-4-20250514",
+  "family": "claude-opus",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "deprecated_at": "2026-04-14",
+    "retires_at": "2026-06-15",
+    "status": "retired"
+  },
+  "provenance": {
+    "deprecated_at": {
+      "anthropic-docs": "2026-04-14"
+    },
+    "retires_at": {
+      "anthropic-docs": "2026-06-15"
+    },
+    "status": {
+      "anthropic-docs": "retired"
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "anthropic-docs": "https://platform.claude.com/docs/en/about-claude/model-deprecations"
+  },
+  "docs": {},
+  "api": null,
+  "harnesses": []
+}

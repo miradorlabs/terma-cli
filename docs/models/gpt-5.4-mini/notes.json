@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.4-mini",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Released GPT-5.4 mini and GPT-5.4 nano to the Chat Completions and Responses API."
+  ],
+  "changelog": [
+    {
+      "date": "2026-03-17",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.4-mini · Model: gpt-5.4-nano · API: v1/responses · API: v1/chat/completions\n\nReleased [GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini) and [GPT-5.4 nano](https://developers.openai.com/api/docs/models/gpt-5.4-nano) to the Chat Completions and Responses API. GPT-5.4 mini brings GPT-5.4-class capabilities to a faster, more efficient model for high-volume workloads, while GPT-5.4 nano is optimized for simple high-volume tasks where speed and cost matter most.\n\nGPT-5.4 mini supports [tool search](https://developers.openai.com/api/docs/guides/tools-tool-search), built-in [computer use](https://developers.openai.com/api/docs/guides/tools-computer-use), and [compaction](https://developers.openai.com/api/docs/guides/compaction). GPT-5.4 nano supports compaction, but does not support tool search or computer use."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

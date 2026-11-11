@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.20-0309-reasoning",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Grok 4.20 and Grok 4.20 Multi-agent are live",
+    "For more details on Grok 4.20 Multi-agent, check out the docs"
+  ],
+  "changelog": [
+    {
+      "date": "2026-03",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### Grok 4.20 and Grok 4.20 Multi-agent are live"
+    },
+    {
+      "date": "2026-03",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "* For more details on Grok 4.20 Multi-agent, check out the [docs](/developers/model-capabilities/text/multi-agent)"
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

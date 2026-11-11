@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.5",
+  "vendor": "xai",
+  "name": "Grok 4.5",
+  "family": "grok",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "batch": true,
+    "context_window": 500000,
+    "default_effort": "high",
+    "description": "SpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks. Trained in SpaceXSI's data centers in Memphis with new datasets spanning science, engineering, and math.",
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "max_output": 500000,
+    "name": "Grok 4.5",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "regions": [
+      "us-east-1",
+      "us-west-2"
+    ],
+    "released_at": "2026-07-08",
+    "sampling_parameters": true,
+    "structured_outputs": true,
+    "tool_calling": true
+  },
+  "provenance": {
+    "batch": {
+      "xai-docs": true
+    },
+    "context_window": {
+      "models.dev": 500000,
+      "openrouter": 500000,
+      "xai-docs": 500000
+    },
+    "default_effort": {
+      "openrouter": "high",
+      "xai-docs": "high"
+    },
+    "description": {
+      "xai-docs": "SpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks. Trained in SpaceXSI's data centers in Memphis with new datasets spanning science, engineering, and math."
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ],
+      "xai-docs": [
+        "text",
+        "image"
+      ]
+    },
+    "max_output": {
+      "models.dev": 500000,
+      "openrouter": 450000
+    },
+    "name": {
+      "models.dev": "Grok 4.5",
+      "openrouter": "Grok 4.5",
+      "xai-docs": "Grok 4.5"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ],
+      "xai-docs": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "openrouter": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "xai-docs": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "regions": {
+      "xai-docs": [
+        "us-east-1",
+        "us-west-2"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-07-08"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "structured_outputs": {
+      "models.dev": true,
+      "xai-docs": true
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    }
+  },
+  "disagreements": [
+    "max_output"
+  ],
+  "sources": {
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/x-ai/grok-4.5",
+    "xai-docs": "https://docs.x.ai/developers/models/grok-4.5"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://docs.x.ai/developers/models/grok-4.5",
+      "text": "# Grok 4.5\n\nSpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks. Trained in SpaceXSI's data centers in Memphis with new datasets spanning science, engineering, and math.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 500,000 tokens\n- **Model name:** `grok-4.5`\n- **Aliases:** `grok-4.5-latest`, `grok-build-latest`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n- **Reasoning efforts (supported):** `low`, `medium`, `high`, `xhigh`\n- **Reasoning efforts (default):** `high`\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $2.00 | $4.00 |\n| Cached input | $0.30 | $0.60 |\n| Output | $6.00 | $12.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 150 |\n| Tokens per minute | 50,000,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

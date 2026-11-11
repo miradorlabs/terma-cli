@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3.1-flash-lite",
+  "vendor": "google",
+  "name": "Gemini 3.1 Flash-Lite",
+  "family": "gemini-flash-lite",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 1048576,
+    "default_effort": "minimal",
+    "description": "Gemini 3.1 Flash-Lite is a low-latency, cost-effective multimodal model optimized for high-frequency, lightweight tasks. The model supports text, image, video, audio, and PDF inputs, and is designed for high-volume agentic workflows, simple data extraction, and applications where latency and API cost are the primary constraints.",
+    "features": [
+      "code execution",
+      "context caching",
+      "file search",
+      "function calling",
+      "grounding with google maps",
+      "grounding with google search",
+      "structured outputs",
+      "thinking",
+      "url context"
+    ],
+    "input_modalities": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "knowledge_cutoff": "2025-01",
+    "max_input": 1048576,
+    "max_output": 65536,
+    "name": "Gemini 3.1 Flash-Lite",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "minimal",
+      "low",
+      "medium",
+      "high"
+    ],
+    "released_at": "2026-05-07",
+    "replacement": "gemini-3.5-flash-lite",
+    "retires_at": "2027-05-07",
+    "sampling_parameters": true,
+    "snapshots": [
+      "Stable: gemini-3.1-flash-lite"
+    ],
+    "status": "active",
+    "structured_outputs": true,
+    "tool_calling": true,
+    "unsupported_features": [
+      "audio generation",
+      "computer use",
+      "image generation",
+      "live api"
+    ]
+  },
+  "provenance": {
+    "context_window": {
+      "models.dev": 1048576,
+      "openrouter": 1048576
+    },
+    "default_effort": {
+      "openrouter": "minimal"
+    },
+    "description": {
+      "google-docs": "Gemini 3.1 Flash-Lite is a low-latency, cost-effective multimodal model optimized for high-frequency, lightweight tasks. The model supports text, image, video, audio, and PDF inputs, and is designed for high-volume agentic workflows, simple data extraction, and applications where latency and API cost are the primary constraints."
+    },
+    "features": {
+      "google-docs": [
+        "code execution",
+        "context caching",
+        "file search",
+        "function calling",
+        "grounding with google maps",
+        "grounding with google search",
+        "structured outputs",
+        "thinking",
+        "url context"
+      ]
+    },
+    "input_modalities": {
+      "google-docs": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "models.dev": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "video",
+        "file",
+        "audio"
+      ]
+    },
+    "knowledge_cutoff": {
+      "models.dev": "2025-01"
+    },
+    "max_input": {
+      "google-docs": 1048576
+    },
+    "max_output": {
+      "google-docs": 65536,
+      "models.dev": 65536,
+      "openrouter": 65536
+    },
+    "name": {
+      "google-docs": "Gemini 3.1 Flash-Lite",
+      "models.dev": "Gemini 3.1 Flash Lite",
+      "openrouter": "Gemini 3.1 Flash Lite"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "google-docs": [
+        "text"
+      ],
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "google-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "openrouter": [
+        "high",
+        "medium",
+        "low",
+        "minimal",
+        "none"
+      ]
+    },
+    "released_at": {
+      "google-docs": "2026-05-07",
+      "models.dev": "2026-05-07"
+    },
+    "replacement": {
+      "google-docs": "gemini-3.5-flash-lite"
+    },
+    "retires_at": {
+      "google-docs": "2027-05-07"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "snapshots": {
+      "google-docs": [
+        "Stable: gemini-3.1-flash-lite"
+      ]
+    },
+    "status": {
+      "google-docs": "active"
+    },
+    "structured_outputs": {
+      "google-docs": true,
+      "models.dev": true
+    },
+    "tool_calling": {
+      "google-docs": true,
+      "models.dev": true,
+      "openrouter": true
+    },
+    "unsupported_features": {
+      "google-docs": [
+        "audio generation",
+        "computer use",
+        "image generation",
+        "live api"
+      ]
+    }
+  },
+  "disagreements": [
+    "name"
+  ],
+  "sources": {
+    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite",
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/google/gemini-3.1-flash-lite"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite",
+      "text": "> ## AI Agent Context\n> Get the complete documentation index at: https://aistudio.google.com/llms.txt\n> Use this file to discover all available pages.\n> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt\n\n# Gemini 3.1 Flash-Lite\n\nGemini 3.1 Flash-Lite is a low-latency, cost-effective multimodal model\noptimized for high-frequency, lightweight tasks. The model supports text, image,\nvideo, audio, and PDF inputs, and is designed for high-volume agentic workflows,\nsimple data extraction, and applications where latency and API cost are the\nprimary constraints.\n\n{% button href=\"https://aistudio.google.com/prompts/new_chat?model=gemini-3.1-flash-lite\" variant=\"ais\" %}Try in Google AI Studio{% /button %}\n\n## gemini-3.1-flash-lite  {% id=\"gemini-31-flash-lite\" %}\n\n{% table variant=\"model\" %}\n  * Property\n  * Description\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model code\n\n    {% /section %}\n\n  * `gemini-3.1-flash-lite`\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"save\" /%}Supported data types\n\n    {% /section %}\n\n  *     **Inputs** Text, Image, Video, Audio, and PDF\n\n    **Output** Text\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"token_auto\" /%}Token limits{% sup %}[[*]](/docs/tokens){% /sup %}\n\n    {% /section %}\n\n  *     **Input token limit** 1,048,576\n\n    **Output token limit** 65,536\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"handyman\" /%}Capabilities\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Audio generation**](/docs/speech-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Code execution**](/docs/code-execution)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Computer use**](/docs/computer-use)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Context caching**](/docs/caching)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**File search**](/docs/file-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Function calling**](/docs/function-calling)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Maps**](/docs/maps-grounding)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Search**](/docs/google-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Image generation**](/docs/image-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Live API**](/docs/live-api)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Structured outputs**](/docs/structured-output)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Thinking**](/docs/thinking)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**URL context**](/docs/url-context)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"speed\" /%}Consumption options\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Batch API**](/docs/batch-api)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Flex inference**](/docs/flex-inference)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Priority inference**](/docs/priority-inference)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"123\" /%}Versions\n\n    {% /section %}\n\n  *     Read the [model version patterns](/docs/models#model-versions) for more details.\n\n    *   `Stable: gemini-3.1-flash-lite`\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"calendar_month\" /%}Latest update\n\n    {% /section %}\n\n  * May 2026\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model card\n\n    {% /section %}\n\n  * [Model card](https://deepmind.google/models/model-cards/gemini-3-1-flash-lite/)\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"paid\" /%}Pricing\n\n    {% /section %}\n\n  * [Pricing](/docs/pricing#gemini-3.1-flash-lite)\n{% /table %}\n\n## Developer guide  {% id=\"developer-guide\" %}\n\nGemini 3.1 Flash-Lite is best at handling straightforward tasks at significant\nscale. Here are some use cases best suited for Gemini 3.1 Flash-Lite:\n\n*   **Translation**: Fast, cheap, high-volume translation, such as processing\n  chat messages, reviews, and support tickets at scale. You can use system\n  instructions to constrain output to only the translated text with no extra\n  commentary:\n\n  ```python\n  from google import genai\n  \n  client = genai.Client()\n  text = \"Hey, are you down to grab some pizza later? I'm starving!\"\n  \n  response = client.models.generate_content(\n      model=\"gemini-3.1-flash-lite\",\n      config={\n          \"system_instruction\": \"Only output the translated text\"\n      },\n      contents=f\"Translate the following text to German: {text}\"\n  )\n  \n  print(response.text)\n  ```\n\n*   **Transcription**: Process recordings, voice notes, or any audio content\n  where you need a text transcript without spinning up a separate\n  speech-to-text pipeline. Supports multimodal inputs, so you can pass audio\n  files directly for transcription:\n\n  ```python\n  from google import genai\n  \n  client = genai.Client()\n  \n  uploaded_file = client.files.upload(file='sample.mp3')\n  \n  prompt = 'Generate a transcript of the audio.'\n  \n  response = client.models.generate_content(\n    model=\"gemini-3.1-flash-lite\",\n    contents=[prompt, uploaded_file]\n  )\n  \n  print(response.text)\n  ```\n\n*   **Lightweight agentic tasks and data extraction**: Entity extraction,\n  classification, and lightweight data processing pipelines supported with\n  structured JSON output. For example, extracting structured data from an\n  e-commerce customer review:\n\n  ```python\n  from google import genai\n  from pydantic import BaseModel, Field\n  \n  client = genai.Client()\n  \n  prompt = \"Analyze the user review and determine the aspect, sentiment score, summary quote, and return risk\"\n  input_text = \"The boots look amazing and the leather is high quality, but they run way too small. I'm sending them back.\"\n  \n  class ReviewAnalysis(BaseModel):\n      aspect: str = Field(description=\"The feature mentioned (e.g., Price, Comfort, Style, Shipping)\")\n      summary_quote: str = Field(description=\"The specific phrase from the review about this aspect\")\n      sentiment_score: int = Field(description=\"1 to 5 (1=worst, 5=best)\")\n      is_return_risk: bool = Field(description=\"True if the user mentions returning the item\")\n  \n  response = client.models.generate_content(\n      model=\"gemini-3.1-flash-lite\",\n      contents=[prompt, input_text],\n      config={\n          \"response_mime_type\": \"application/json\",\n          \"response_json_schema\": ReviewAnalysis.model_json_schema(),\n      },\n  )\n  \n  print(response.text)\n  ```\n\n*   **Document processing and summarization**: Parse PDFs and return concise\n  summaries, like for building a document processing pipeline or quickly\n  triaging incoming files:\n\n  ```python\n  from google import genai\n  from google.genai import types\n  import httpx\n  \n  client = genai.Client()\n  \n  doc_url = \"https://storage.googleapis.com/generativeai-downloads/data/med_gemini.pdf\"\n  doc_data = httpx.get(doc_url).content\n  \n  prompt = \"Summarize this document\"\n  response = client.models.generate_content(\n      model=\"gemini-3.1-flash-lite\",\n      contents=[\n          types.Part.from_bytes(\n              data=doc_data,\n              mime_type='application/pdf',\n          ),\n          prompt\n      ]\n  )\n  \n  print(response.text)\n  ```\n\n*   **Model routing**: Use a low-latency and low-cost model as a classifier that\n  routes queries to the appropriate model based on task complexity. This is a\n  real pattern in production - the open-source [Gemini CLI](https://geminicli.com/docs/core/#model-fallback) uses Flash-Lite to\n  classify task complexity and route to Flash or Pro accordingly.\n\n  ```python\n  from google import genai\n  \n  client = genai.Client()\n  \n  FLASH_MODEL = 'flash'\n  PRO_MODEL = 'pro'\n  \n  CLASSIFIER_SYSTEM_PROMPT = f\"\"\"\n  You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between `{FLASH_MODEL}` (SIMPLE) or `{PRO_MODEL}` (COMPLEX).\n  \n  1. `{FLASH_MODEL}`: A fast, efficient model for simple, well-defined tasks.\n  2. `{PRO_MODEL}`: A powerful, advanced model for complex, open-ended, or multi-step tasks.\n  \n  A task is COMPLEX if it meets ONE OR MORE of the following criteria:\n  \n  1. High Operational Complexity (Est. 4+ Steps/Tool Calls)\n  2. Strategic Planning and Conceptual Design\n  3. High Ambiguity or Large Scope\n  4. Deep Debugging and Root Cause Analysis\n  \n  A task is SIMPLE if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls).\n  \"\"\"\n  \n  user_input = \"I'm getting an error 'Cannot read property 'map' of undefined' when I click the save button. Can you fix it?\"\n  \n  response_schema = {\n    \"type\": \"object\",\n    \"properties\": {\n      \"reasoning\": {\n        \"type\": \"string\",\n        \"description\": \"A brief, step-by-step explanation for the model choice, referencing the rubric.\"\n      },\n      \"model_choice\": {\n        \"type\": \"string\",\n        \"enum\": [FLASH_MODEL, PRO_MODEL]\n      }\n    },\n    \"required\": [\"reasoning\", \"model_choice\"]\n  }\n  \n  response = client.models.generate_content(\n      model=\"gemini-3.1-flash-lite\",\n      contents=user_input,\n      config={\n          \"system_instruction\": CLASSIFIER_SYSTEM_PROMPT,\n          \"response_mime_type\": \"application/json\",\n          \"response_json_schema\": response_schema\n      },\n  )\n  \n  print(response.text)\n  ```\n\n*   **Thinking**: For better accuracy for tasks that benefit from step-by-step\n  reasoning, configure thinking so the model spends additional compute on\n  internal reasoning before producing the final output:\n\n  ```python\n  from google import genai\n  from google.genai import types\n  \n  client = genai.Client()\n  \n  response = client.models.generate_content(\n      model=\"gemini-3.1-flash-lite\",\n      contents=\"How does AI work?\",\n      config=types.GenerateContentConfig(\n          thinking_config=types.ThinkingConfig(thinking_level=\"high\")\n      ),\n  )\n  \n  print(response.text)\n  ```\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

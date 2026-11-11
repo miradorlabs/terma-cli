@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3-pro-preview",
+  "vendor": "google",
+  "name": "Gemini 3 Pro preview",
+  "family": "gemini-pro",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "description": "---",
+    "features": [
+      "code execution",
+      "context caching",
+      "file search",
+      "function calling",
+      "grounding with google search",
+      "structured outputs",
+      "thinking",
+      "url context"
+    ],
+    "input_modalities": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "max_input": 1048576,
+    "max_output": 65536,
+    "name": "Gemini 3 Pro preview",
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "released_at": "2025-11-18",
+    "replacement": "gemini-3.1-pro-preview",
+    "retires_at": "2026-03-09",
+    "snapshots": [
+      "gemini-3-pro-preview"
+    ],
+    "status": "retired",
+    "structured_outputs": true,
+    "tool_calling": true,
+    "unsupported_features": [
+      "audio generation",
+      "computer use",
+      "grounding with google maps",
+      "image generation",
+      "live api"
+    ]
+  },
+  "provenance": {
+    "description": {
+      "google-docs": "---"
+    },
+    "features": {
+      "google-docs": [
+        "code execution",
+        "context caching",
+        "file search",
+        "function calling",
+        "grounding with google search",
+        "structured outputs",
+        "thinking",
+        "url context"
+      ]
+    },
+    "input_modalities": {
+      "google-docs": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    "max_input": {
+      "google-docs": 1048576
+    },
+    "max_output": {
+      "google-docs": 65536
+    },
+    "name": {
+      "google-docs": "Gemini 3 Pro preview"
+    },
+    "output_modalities": {
+      "google-docs": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "google-docs": true
+    },
+    "released_at": {
+      "google-docs": "2025-11-18"
+    },
+    "replacement": {
+      "google-docs": "gemini-3.1-pro-preview"
+    },
+    "retires_at": {
+      "google-docs": "2026-03-09"
+    },
+    "snapshots": {
+      "google-docs": [
+        "gemini-3-pro-preview"
+      ]
+    },
+    "status": {
+      "google-docs": "retired"
+    },
+    "structured_outputs": {
+      "google-docs": true
+    },
+    "tool_calling": {
+      "google-docs": true
+    },
+    "unsupported_features": {
+      "google-docs": [
+        "audio generation",
+        "computer use",
+        "grounding with google maps",
+        "image generation",
+        "live api"
+      ]
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-3-pro-preview"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-3-pro-preview",
+      "text": "> ## AI Agent Context\n> Get the complete documentation index at: https://aistudio.google.com/llms.txt\n> Use this file to discover all available pages.\n> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt\n\n# Gemini 3 Pro preview\n\n{% callout type=\"warning\" %}\n  Gemini 3 Pro Preview is [deprecated](/docs/deprecations) and was shut down on\n  March 9, 2026. Migrate to [Gemini 4 Carbon](/docs/models/gemini-4-carbon) to avoid\n  service disruption.\n\n{% /callout %}\n\n## gemini-3-pro-preview  {% id=\"gemini-3-pro-preview\" %}\n\n{% table variant=\"model\" %}\n  * Property\n  * Description\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model code\n\n    {% /section %}\n\n  * `gemini-3-pro-preview`\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"save\" /%}Supported data types\n\n    {% /section %}\n\n  *     **Inputs** Text, Image, Video, Audio, and PDF\n\n    **Output** Text\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"token_auto\" /%}Token limits{% sup %}[[*]](/docs/tokens){% /sup %}\n\n    {% /section %}\n\n  *     **Input token limit** 1,048,576\n\n    **Output token limit** 65,536\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"handyman\" /%}Capabilities\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Audio generation**](/docs/speech-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Code execution**](/docs/code-execution)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Computer use**](/docs/computer-use)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Context caching**](/docs/caching)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**File search**](/docs/file-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Function calling**](/docs/function-calling)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Maps**](/docs/maps-grounding)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Grounding with Google Search**](/docs/google-search)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Image generation**](/docs/image-generation)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Live API**](/docs/live-api)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Structured outputs**](/docs/structured-output)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Thinking**](/docs/thinking)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**URL context**](/docs/url-context)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"speed\" /%}Consumption options\n\n    {% /section %}\n\n  *     {% section class=\"three-column-grid\" %}\n  {% section %}\n  [**Batch API**](/docs/batch-api)\n\n  {% badge type=\"supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Flex inference**](/docs/flex-inference)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n  {% section %}\n  [**Priority inference**](/docs/priority-inference)\n\n  {% badge type=\"not-supported\" /%}\n\n  {% /section %}\n\n    {% /section %}\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"123\" /%}Versions\n\n    {% /section %}\n\n  *     Read the [model version patterns](/docs/models#model-versions) for more details.\n\n    *   *Shut down*: `gemini-3-pro-preview`\n\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"calendar_month\" /%}Latest update\n\n    {% /section %}\n\n  * November 2025\n\n  ---\n\n  *     {% section class=\"model-property\" %}\n  {% icon name=\"id_card\" /%}Model card\n\n    {% /section %}\n\n  * [Model card](https://deepmind.google/models/model-cards/gemini-3-pro/)\n{% /table %}\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

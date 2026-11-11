@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "id": "gpt-6.1-sol",
+  "vendor": "openai",
+  "name": "GPT-6.1 Sol",
+  "family": "gpt-sol",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 1050000,
+    "default_effort": "medium",
+    "description": "Near-Astra performance for complex work at a lower cost.",
+    "endpoints": [
+      "v1/chat/completions",
+      "v1/responses",
+      "v1/batch"
+    ],
+    "features": [
+      "streaming",
+      "structured_outputs",
+      "function_calling",
+      "file_search",
+      "image_input",
+      "web_search",
+      "prompt_caching"
+    ],
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "knowledge_cutoff": "2026-04-30",
+    "max_input": 922000,
+    "max_output": 128000,
+    "name": "GPT-6.1 Sol",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "platform_ids": {
+      "Amazon Bedrock": "openai.gpt-6.1-sol",
+      "Google Cloud": "gpt-6.1-sol"
+    },
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "released_at": "2026-09-29",
+    "sampling_parameters": false,
+    "snapshots": [
+      "gpt-6.1-sol"
+    ],
+    "structured_outputs": true,
+    "tool_calling": true,
+    "tools": [
+      "web_search",
+      "file_search",
+      "image_generation",
+      "code_interpreter",
+      "hosted_shell",
+      "apply_patch",
+      "skills",
+      "computer_use",
+      "mcp",
+      "tool_search"
+    ],
+    "unsupported_features": [
+      "fine_tuning",
+      "predicted_outputs"
+    ]
+  },
+  "provenance": {
+    "context_window": {
+      "models.dev": 1050000,
+      "openai-docs": 1050000,
+      "openrouter": 1050000
+    },
+    "default_effort": {
+      "openai-docs": "medium",
+      "openrouter": "medium"
+    },
+    "description": {
+      "openai-docs": "Near-Astra performance for complex work at a lower cost."
+    },
+    "endpoints": {
+      "openai-docs": [
+        "v1/chat/completions",
+        "v1/responses",
+        "v1/batch"
+      ]
+    },
+    "features": {
+      "openai-docs": [
+        "streaming",
+        "structured_outputs",
+        "function_calling",
+        "file_search",
+        "image_input",
+        "web_search",
+        "prompt_caching"
+      ]
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openai-docs": [
+        "text",
+        "image"
+      ],
+      "openrouter": [
+        "file",
+        "image",
+        "text"
+      ]
+    },
+    "knowledge_cutoff": {
+      "models.dev": "2026-04-30",
+      "openai-docs": "2026-04-30"
+    },
+    "max_input": {
+      "models.dev": 922000,
+      "openai-docs": 922000
+    },
+    "max_output": {
+      "models.dev": 128000,
+      "openai-docs": 128000,
+      "openrouter": 128000
+    },
+    "name": {
+      "models.dev": "GPT-6.1 Sol",
+      "openai-docs": "GPT-6.1 Sol",
+      "openrouter": "GPT-6.1 Sol"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openai-docs": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "platform_ids": {
+      "openai-docs": {
+        "Amazon Bedrock": "openai.gpt-6.1-sol",
+        "Google Cloud": "gpt-6.1-sol"
+      }
+    },
+    "reasoning": {
+      "models.dev": true,
+      "openai-docs": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "openai-docs": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "openrouter": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-09-29"
+    },
+    "sampling_parameters": {
+      "models.dev": false
+    },
+    "snapshots": {
+      "openai-docs": [
+        "gpt-6.1-sol"
+      ]
+    },
+    "structured_outputs": {
+      "models.dev": true,
+      "openai-docs": true
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openai-docs": true,
+      "openrouter": true
+    },
+    "tools": {
+      "openai-docs": [
+        "web_search",
+        "file_search",
+        "image_generation",
+        "code_interpreter",
+        "hosted_shell",
+        "apply_patch",
+        "skills",
+        "computer_use",
+        "mcp",
+        "tool_search"
+      ]
+    },
+    "unsupported_features": {
+      "openai-docs": [
+        "fine_tuning",
+        "predicted_outputs"
+      ]
+    }
+  },
+  "disagreements": [],
+  "sources": {
+    "models.dev": "https://models.dev",
+    "openai-docs": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "openrouter": "https://openrouter.ai/openai/gpt-6.1-sol"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+      "text": "# GPT-6.1 Sol\n\n> For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n\n> Near-Astra performance for complex work at a lower cost.\n\nModel ID: `gpt-6.1-sol`\n\nUse GPT-6.1 Sol for complex coding, computer use, and professional work.\n\n`reasoning.effort` supports `low`, `medium` (default), `high`, `xhigh`, and\n`max`.\n\nTool calling requires the Responses API.\n\nSee the [GPT-6 guide](/api/docs/guides/latest-model?model=gpt-6-astra#gpt-61-sol)\nfor prompting and migration guidance.\n\n## Model details\n\n- Default snapshot: `gpt-6.1-sol`\n- Input modalities: text, image\n- Output modalities: text\n- Unsupported modalities: audio, video\n- 1,050,000 context window\n- Maximum input tokens: 922,000\n- 128,000 max output tokens\n- Apr 30, 2026 knowledge cutoff\n- Reasoning token support\n\n## Pricing\n\nPricing is based on the number of tokens used, or other metrics based on the model type. For tool-specific models, like search and computer use, there’s a fee per tool call. See details in the [pricing page](/api/docs/pricing).\n\n### Text tokens\n\n| Metric | Price | Unit |\n| --- | ---: | --- |\n| Input | $2 | 1M tokens |\n| Cached input | $0.1 | 1M tokens |\n| Cache writes | $2.5 | 1M tokens |\n| Output | $10 | 1M tokens |\n\n- Cached input tokens are priced at 5% of the uncached input token rate.\n- Cache writes are billed at 1.25x the uncached input token rate.\n- API prompts with more than 272K input tokens are priced at 2x input and cache rates and 1.5x output for the full request.\n- Fast mode prices are 2x Standard. Batch and Flex prices are 50% lower than Standard.\n- Ultrafast mode prices are 6x Standard.\n- Regional processing adds a 10% premium where available.\n- GPT-6.1 Sol uses a default context window of 500K tokens in Codex and ChatGPT Work. Usage drawn from your subscription has no long-context surcharge. See [Codex pricing](/codex/pricing).\n\n## Endpoints\n\n| Endpoint | Route | Support |\n| --- | --- | --- |\n| Live | `v1/live/sessions` | Not supported |\n| Chat Completions | `v1/chat/completions` | Supported |\n| Responses | `v1/responses` | Supported |\n| Realtime | `v1/realtime` | Not supported |\n| Realtime translation | `v1/realtime/translations` | Not supported |\n| Realtime transcription | `v1/realtime/transcription_sessions` | Not supported |\n| Assistants | `v1/assistants` | Not supported |\n| Batch | `v1/batch` | Supported |\n| Fine-tuning | `v1/fine-tuning` | Not supported |\n| Embeddings | `v1/embeddings` | Not supported |\n| Image generation | `v1/images/generations` | Not supported |\n| Videos | `v1/videos` | Not supported |\n| Image edit | `v1/images/edits` | Not supported |\n| Speech generation | `v1/audio/speech` | Not supported |\n| Transcription | `v1/audio/transcriptions` | Not supported |\n| Translation | `v1/audio/translations` | Not supported |\n| Moderation | `v1/moderations` | Not supported |\n| Completions (legacy) | `v1/completions` | Not supported |\n\n## Supported features\n\n- streaming\n- structured_outputs\n- function_calling\n- file_search\n- image_input\n- web_search\n- prompt_caching\n\n## Unsupported features\n\n- fine_tuning\n- predicted_outputs\n\n## Supported tools\n\nTools supported by this model when using the Responses API.\n\n- web_search\n- file_search\n- image_generation\n- code_interpreter\n- hosted_shell\n- apply_patch\n- skills\n- computer_use\n- mcp\n- tool_search\n\n## Snapshots\n\nSnapshots let you lock in a specific version of the model so that performance and behavior remain consistent. Below is a list of all available snapshots and aliases for GPT-6.1 Sol.\n\n- `gpt-6.1-sol`\n\n## Cloud providers\n\nModel IDs across cloud providers.\n\n| Provider | Model ID |\n| --- | --- |\n| [Amazon Bedrock](/api/docs/guides/amazon-bedrock) | `openai.gpt-6.1-sol` |\n| [Google Cloud](/api/docs/guides/google-cloud)<br>Private preview | `gpt-6.1-sol` |\n\n## Rate limits\n\nRate limits ensure fair and reliable access to the API by placing specific caps on requests, tokens, audio duration, or other usage within a given time period. Your usage tier determines how high these limits are set and automatically increases as you send more requests and spend more on the API.\n\n### Standard\n\n| Tier | RPM | TPM |\n| --- | ---: | ---: |\n| Build | 5,000 | 1,000,000 |\n| Launch | 10,000 | 4,000,000 |\n| Grow | 15,000 | 40,000,000 |\n"
+    }
+  },
+  "api": null,
+  "harnesses": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "role": "default",
+      "first": "0.159.1",
+      "last": "0.167.1",
+      "builds": 14,
+      "current": true,
+      "params": {
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "parallel_tool_calls": false,
+        "reasoning": {
+          "context": "all_turns",
+          "effort": "low"
+        },
+        "text": {
+          "verbosity": "low"
+        },
+        "tool_choice": "auto"
+      }
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "role": "subagents",
+      "first": "0.159.1",
+      "last": "0.167.1",
+      "builds": 13,
+      "current": true
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "role": "compaction",
+      "first": "0.159.1",
+      "last": "0.167.1",
+      "builds": 14,
+      "current": true
+    },
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "role": "default",
+      "first": "26.1029.70936",
+      "last": "26.1103.60933",
+      "builds": 2,
+      "current": true,
+      "params": {
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "parallel_tool_calls": false,
+        "reasoning": {
+          "context": "all_turns",
+          "effort": "low"
+        },
+        "text": {
+          "verbosity": "low"
+        },
+        "tool_choice": "auto"
+      }
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3.1-flash-lite-preview",
+  "predecessor": "gemini-2.5-flash-lite",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Launched Gemini 3.1 Flash-Lite Preview, the first Flash-Lite model in the Gemini 3 series."
+  ],
+  "changelog": [
+    {
+      "date": "2026-05-25",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   The `gemini-3.1-flash-lite-preview` model has been [shut\n  down](/docs/deprecations). Use\n  [`gemini-3.1-flash-lite`](/docs/models/gemini-3.1-flash-lite) instead."
+    },
+    {
+      "date": "2026-05-07",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Deprecation announcement: The `gemini-3.1-flash-lite-preview` model is\n  deprecating on 5/11/26 and will be [shut down](/docs/deprecations) on May\n  25, 2026."
+    },
+    {
+      "date": "2026-03-31",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     The `gemini-2.5-flash-lite-preview-09-2025` model has been shut down. Use\n  [`gemini-3.1-flash-lite-preview`](/docs/models/gemini-3.1-flash-lite-preview)\n  instead."
+    },
+    {
+      "date": "2026-03-03",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Launched Gemini 3.1 Flash-Lite Preview, the first Flash-Lite model in the\n  Gemini 3 series. Read the [model\n  page](/docs/models/gemini-3.1-flash-lite-preview) for specs, specific\n  updates, and developer guidance."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/unsupported_features/computer use",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "unsupported_features",
+        "computer use"
+      ],
+      "title": "Unsupported feature added: computer use",
+      "impact": "notable",
+      "before": null,
+      "after": "computer use",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Unsupported feature added: computer use"
+  ]
+}

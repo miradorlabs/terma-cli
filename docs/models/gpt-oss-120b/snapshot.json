@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "id": "gpt-oss-120b",
+  "vendor": "openai",
+  "name": "gpt-oss-120b",
+  "family": "gpt-oss-120b",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "context_window": 131072,
+    "default_effort": "medium",
+    "description": "Most powerful open-weight model, fits into an H100 GPU",
+    "endpoints": [
+      "v1/responses",
+      "v1/batch"
+    ],
+    "features": [
+      "streaming",
+      "structured_outputs",
+      "function_calling"
+    ],
+    "input_modalities": [
+      "text"
+    ],
+    "knowledge_cutoff": "2024-06-01",
+    "max_output": 131072,
+    "name": "gpt-oss-120b",
+    "output_modalities": [
+      "text"
+    ],
+    "platform_ids": {
+      "Amazon Bedrock": "openai.gpt-oss-120b"
+    },
+    "reasoning": true,
+    "reasoning_efforts": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "snapshots": [
+      "gpt-oss-120b"
+    ],
+    "structured_outputs": true,
+    "tool_calling": true,
+    "tools": [
+      "function_calling",
+      "code_interpreter",
+      "mcp",
+      "web_search"
+    ]
+  },
+  "provenance": {
+    "context_window": {
+      "openai-docs": 131072,
+      "openrouter": 131072
+    },
+    "default_effort": {
+      "openrouter": "medium"
+    },
+    "description": {
+      "openai-docs": "Most powerful open-weight model, fits into an H100 GPU"
+    },
+    "endpoints": {
+      "openai-docs": [
+        "v1/responses",
+        "v1/batch"
+      ]
+    },
+    "features": {
+      "openai-docs": [
+        "streaming",
+        "structured_outputs",
+        "function_calling"
+      ]
+    },
+    "input_modalities": {
+      "openai-docs": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "knowledge_cutoff": {
+      "openai-docs": "2024-06-01",
+      "openrouter": "2024-06-30"
+    },
+    "max_output": {
+      "openai-docs": 131072,
+      "openrouter": 65536
+    },
+    "name": {
+      "openai-docs": "gpt-oss-120b",
+      "openrouter": "gpt-oss-120b"
+    },
+    "output_modalities": {
+      "openai-docs": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ]
+    },
+    "platform_ids": {
+      "openai-docs": {
+        "Amazon Bedrock": "openai.gpt-oss-120b"
+      }
+    },
+    "reasoning": {
+      "openai-docs": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "openrouter": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "snapshots": {
+      "openai-docs": [
+        "gpt-oss-120b"
+      ]
+    },
+    "structured_outputs": {
+      "openai-docs": true
+    },
+    "tool_calling": {
+      "openai-docs": true,
+      "openrouter": true
+    },
+    "tools": {
+      "openai-docs": [
+        "function_calling",
+        "code_interpreter",
+        "mcp",
+        "web_search"
+      ]
+    }
+  },
+  "disagreements": [
+    "knowledge_cutoff",
+    "max_output"
+  ],
+  "sources": {
+    "openai-docs": "https://developers.openai.com/api/docs/models/gpt-oss-120b",
+    "openrouter": "https://openrouter.ai/openai/gpt-oss-120b"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://developers.openai.com/api/docs/models/gpt-oss-120b",
+      "text": "# gpt-oss-120b\n\n> For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n\n> Most powerful open-weight model, fits into an H100 GPU\n\nModel ID: `gpt-oss-120b`\n\n`gpt-oss-120b`is our most powerful open-weight model, which fits into a single \nH100 GPU (117B parameters with 5.1B active parameters).\n\n[Download gpt-oss-120b on HuggingFace](https://huggingface.co/openai/gpt-oss-120b).\n\n**Key features**\n\n-   **Permissive Apache 2.0 license:** Build freely without copyleft restrictions or patent risk—ideal for experimentation, customization, and commercial deployment.\n-   **Configurable reasoning effort:** Easily adjust the reasoning effort (low, medium, high) based on your specific use case and latency needs.\n-   **Full chain-of-thought:** Gain complete access to the model's reasoning process, facilitating easier debugging and increased trust in outputs.\n-   **Fine-tunable:** Fully customize models to your specific use case through parameter fine-tuning.\n-   **Agentic capabilities:** Use the models' native capabilities for function calling, web browsing, Python code execution, and structured outputs.\n\n## Model details\n\n- Default snapshot: `gpt-oss-120b`\n- Input modalities: text\n- Output modalities: text\n- 131,072 context window\n- 131,072 max output tokens\n- Jun 01, 2024 knowledge cutoff\n- Reasoning token support\n\n## Endpoints\n\n| Endpoint | Route | Support |\n| --- | --- | --- |\n| Live | `v1/live/sessions` | Not supported |\n| Chat Completions | `v1/chat/completions` | Not supported |\n| Responses | `v1/responses` | Supported |\n| Realtime | `v1/realtime` | Not supported |\n| Realtime translation | `v1/realtime/translations` | Not supported |\n| Realtime transcription | `v1/realtime/transcription_sessions` | Not supported |\n| Assistants | `v1/assistants` | Not supported |\n| Batch | `v1/batch` | Supported |\n| Fine-tuning | `v1/fine-tuning` | Not supported |\n| Embeddings | `v1/embeddings` | Not supported |\n| Image generation | `v1/images/generations` | Not supported |\n| Videos | `v1/videos` | Not supported |\n| Image edit | `v1/images/edits` | Not supported |\n| Speech generation | `v1/audio/speech` | Not supported |\n| Transcription | `v1/audio/transcriptions` | Not supported |\n| Translation | `v1/audio/translations` | Not supported |\n| Moderation | `v1/moderations` | Not supported |\n| Completions (legacy) | `v1/completions` | Not supported |\n\n## Supported features\n\n- streaming\n- structured_outputs\n- function_calling\n\n## Supported tools\n\nTools supported by this model when using the Responses API.\n\n- function_calling\n- code_interpreter\n- mcp\n- web_search\n\n## Snapshots\n\nSnapshots let you lock in a specific version of the model so that performance and behavior remain consistent. Below is a list of all available snapshots and aliases for gpt-oss-120b.\n\n- `gpt-oss-120b`\n\n## Cloud providers\n\nModel IDs across cloud providers.\n\n| Provider | Model ID |\n| --- | --- |\n| [Amazon Bedrock](/api/docs/guides/amazon-bedrock) | `openai.gpt-oss-120b` |\n\n## Rate limits\n\nRate limits ensure fair and reliable access to the API by placing specific caps on requests, tokens, audio duration, or other usage within a given time period. Your usage tier determines how high these limits are set and automatically increases as you send more requests and spend more on the API.\n\n### default\n\n| Tier | RPM | TPM | Batch queue limit |\n| --- | ---: | ---: | ---: |\n| Build | 0 | 0 | 0 |\n| Launch | 0 | 0 | 0 |\n| Grow | 0 | 0 | 0 |\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

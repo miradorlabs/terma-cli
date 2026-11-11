@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "grok-build-0.1",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "SpaceXSI's coding model, trained specifically for agentic coding workflows."
+  ],
+  "changelog": [
+    {
+      "date": "2026-05",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### Grok Build 0.1\n\nSpaceXSI's coding model, trained specifically for agentic coding workflows. Currently in early access.\n\nThe model slug is [`grok-build-0.1`](/developers/models/grok-build-0.1)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

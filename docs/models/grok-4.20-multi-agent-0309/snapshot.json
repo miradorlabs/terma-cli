@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.20-multi-agent-0309",
+  "vendor": "xai",
+  "name": "Grok 4.20 Multi-Agent Beta",
+  "family": "grok-multi-agent",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "batch": true,
+    "context_window": 1000000,
+    "description": "Multiple agents collaborate in parallel to perform deep research tasks.",
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "max_output": 30000,
+    "name": "Grok 4.20 Multi-Agent Beta",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "regions": [
+      "us-east-1",
+      "us-west-2"
+    ],
+    "released_at": "2026-03-09",
+    "sampling_parameters": true,
+    "structured_outputs": true,
+    "tool_calling": true
+  },
+  "provenance": {
+    "batch": {
+      "xai-docs": true
+    },
+    "context_window": {
+      "models.dev": 1000000,
+      "xai-docs": 1000000
+    },
+    "description": {
+      "xai-docs": "Multiple agents collaborate in parallel to perform deep research tasks."
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "xai-docs": [
+        "text",
+        "image"
+      ]
+    },
+    "max_output": {
+      "models.dev": 30000
+    },
+    "name": {
+      "models.dev": "Grok 4.20 Multi-Agent",
+      "xai-docs": "Grok 4.20 Multi-Agent Beta"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "xai-docs": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "models.dev": true,
+      "xai-docs": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "regions": {
+      "xai-docs": [
+        "us-east-1",
+        "us-west-2"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-03-09"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "structured_outputs": {
+      "models.dev": true,
+      "xai-docs": true
+    },
+    "tool_calling": {
+      "models.dev": false,
+      "xai-docs": true
+    }
+  },
+  "disagreements": [
+    "name",
+    "tool_calling"
+  ],
+  "sources": {
+    "models.dev": "https://models.dev",
+    "xai-docs": "https://docs.x.ai/developers/models/grok-4.20-multi-agent-0309"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://docs.x.ai/developers/models/grok-4.20-multi-agent-0309",
+      "text": "# Grok 4.20 Multi-Agent Beta\n\nMultiple agents collaborate in parallel to perform deep research tasks.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 1,000,000 tokens\n- **Model name:** `grok-4.20-multi-agent-0309`\n- **Aliases:** `grok-4.20-multi-agent`, `grok-4.20-multi-agent-latest`, `grok-4.20-multi-agent-beta-latest`, `grok-4.20-multi-agent-experimental-beta-0304`, `grok-4.20-multi-agent-experimental-beta-latest`, `grok-4.20-multi-agent-beta-0309`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $1.25 | $2.50 |\n| Cached input | $0.20 | $0.40 |\n| Output | $2.50 | $5.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 9 |\n| Tokens per minute | 2,500,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

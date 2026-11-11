@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.6",
+  "predecessor": "grok-4.5",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Grok 4.6, SpaceXSI's frontier model for coding, agentic tasks, and knowledge work, is now available on the xAI API."
+  ],
+  "changelog": [
+    {
+      "date": "2026-08",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### Grok 4.6\n\nGrok 4.6, SpaceXSI's frontier model for coding, agentic tasks, and knowledge work, is now available on the xAI API. It has a 500k context window, text and image inputs with text-only output, and no text output limit. Pricing is $2 / $0.50 / $6 per 1M tokens (input / cached input / output) below 200k prompt tokens, and $4 / $1 / $12 above. Reasoning effort supports low, medium, high (default), and xhigh. See the [Grok 4.6 overview](/developers/grok-4-6) and the [announcement](https://x.ai/news/grok-4-6)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/regions/us-central-1",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "regions",
+        "us-central-1"
+      ],
+      "title": "Region added: us-central-1",
+      "impact": "notable",
+      "before": null,
+      "after": "us-central-1",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Region added: us-central-1"
+  ]
+}

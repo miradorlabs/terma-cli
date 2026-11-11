@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "gpt-oss-120b",
+  "steps": [
+    {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "event": "listed",
+      "changes": []
+    }
+  ]
+}

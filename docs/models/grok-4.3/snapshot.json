@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.3",
+  "vendor": "xai",
+  "name": "Grok 4.3",
+  "family": "grok",
+  "first_seen": "2026-11-11T14:15:45.0307666Z",
+  "listed": true,
+  "facts": {
+    "batch": true,
+    "context_window": 1000000,
+    "default_effort": "low",
+    "description": "Fast, reliable model with strong tool calling and instruction following capabilities.",
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "max_output": 30000,
+    "name": "Grok 4.3",
+    "open_weights": false,
+    "output_modalities": [
+      "text"
+    ],
+    "reasoning": true,
+    "reasoning_efforts": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "regions": [
+      "us-east-1",
+      "eu-west-1",
+      "us-west-2"
+    ],
+    "released_at": "2026-04-17",
+    "sampling_parameters": true,
+    "structured_outputs": true,
+    "tool_calling": true
+  },
+  "provenance": {
+    "batch": {
+      "xai-docs": true
+    },
+    "context_window": {
+      "models.dev": 1000000,
+      "openrouter": 1000000,
+      "xai-docs": 1000000
+    },
+    "default_effort": {
+      "openrouter": "low",
+      "xai-docs": "low"
+    },
+    "description": {
+      "xai-docs": "Fast, reliable model with strong tool calling and instruction following capabilities."
+    },
+    "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "openrouter": [
+        "text",
+        "image",
+        "file"
+      ],
+      "xai-docs": [
+        "text",
+        "image"
+      ]
+    },
+    "max_output": {
+      "models.dev": 30000,
+      "openrouter": 900000
+    },
+    "name": {
+      "models.dev": "Grok 4.3",
+      "openrouter": "Grok 4.3",
+      "xai-docs": "Grok 4.3"
+    },
+    "open_weights": {
+      "models.dev": false
+    },
+    "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
+      "openrouter": [
+        "text"
+      ],
+      "xai-docs": [
+        "text"
+      ]
+    },
+    "reasoning": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "openrouter": [
+        "high",
+        "medium",
+        "low",
+        "none"
+      ],
+      "xai-docs": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "regions": {
+      "xai-docs": [
+        "us-east-1",
+        "eu-west-1",
+        "us-west-2"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-04-17"
+    },
+    "sampling_parameters": {
+      "models.dev": true
+    },
+    "structured_outputs": {
+      "models.dev": true,
+      "xai-docs": true
+    },
+    "tool_calling": {
+      "models.dev": true,
+      "openrouter": true,
+      "xai-docs": true
+    }
+  },
+  "disagreements": [
+    "max_output"
+  ],
+  "sources": {
+    "models.dev": "https://models.dev",
+    "openrouter": "https://openrouter.ai/x-ai/grok-4.3",
+    "xai-docs": "https://docs.x.ai/developers/models/grok-4.3"
+  },
+  "docs": {
+    "overview": {
+      "title": "Model page",
+      "url": "https://docs.x.ai/developers/models/grok-4.3",
+      "text": "# Grok 4.3\n\nFast, reliable model with strong tool calling and instruction following capabilities.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 1,000,000 tokens\n- **Model name:** `grok-4.3`\n- **Aliases:** `grok-4.3-latest`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n- **Reasoning efforts (supported):** `none`, `low`, `medium`, `high`, `xhigh`\n- **Reasoning efforts (default):** `low`\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $1.25 | $2.50 |\n| Cached input | $0.20 | $0.40 |\n| Output | $2.50 | $5.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 37 |\n| Tokens per minute | 10,000,000 |\n\n## Regions\n\nAvailable in: us-east-1, eu-west-1, us-west-2\n"
+    }
+  },
+  "api": null,
+  "harnesses": []
+}

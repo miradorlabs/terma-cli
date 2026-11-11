@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "claude-3-7-sonnet-20250219",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "We’ve retired the Claude Sonnet 3.7 model (claude-3-7-sonnet-20250219) and the Claude Haiku 3.5 model (claude-3-5-haiku-20241022)."
+  ],
+  "changelog": [
+    {
+      "date": "2026-02-19",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve retired the Claude Sonnet 3.7 model (`claude-3-7-sonnet-20250219`) and the Claude Haiku 3.5 model (`claude-3-5-haiku-20241022`). All requests to Claude Sonnet 3.7 will now return an error. Requests to Claude Haiku 3.5 on the Claude API will now return an error; it remains available on Amazon Bedrock and Google Cloud. We recommend upgrading to [Claude Sonnet 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) and [Claude Haiku 4.5](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) respectively. Researchers can request ongoing access through the [External Researcher Access Program](https://support.claude.com/en/articles/9125743-what-is-the-external-researcher-access-program)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

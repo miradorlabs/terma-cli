@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "id": "gemini-3-flash-preview",
+  "predecessor": "gemini-2.5-flash",
+  "whats_new": null,
+  "vendor_highlights": [
+    "Launched Gemini 3 Flash Preview, gemini-3-flash-preview, delivering fast frontier-class performance that rivals larger models at a fraction of the cost."
+  ],
+  "changelog": [
+    {
+      "date": "2026-01-29",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*   Launched support for the Computer Use tool in `gemini-3-pro-preview` and\n  `gemini-3-flash-preview`."
+    },
+    {
+      "date": "2026-01-21",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Changed the `latest` aliases:\n\n  *   `gemini-pro-latest` switched to `gemini-3-pro-preview`\n  *   `gemini-flash-latest` switched to `gemini-3-flash-preview`"
+    },
+    {
+      "date": "2025-12-17",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "text": "*     Launched Gemini 3 Flash Preview, `gemini-3-flash-preview`, delivering fast\n  frontier-class performance that rivals larger models at a fraction of the\n  cost. With upgraded visual and spatial reasoning, and agentic coding\n  capabilities. Read the documentation on some new features, including:\n\n  *   [Multimodal function responses](/docs/function-calling#multimodal)\n  *   [Code execution with images](/docs/code-execution#images)"
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/features/computer use",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "computer use"
+      ],
+      "title": "Feature added: computer use",
+      "impact": "notable",
+      "before": null,
+      "after": "computer use",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/image",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "input_modalities",
+        "image"
+      ],
+      "title": "Input added: image",
+      "impact": "notable",
+      "before": null,
+      "after": "image",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/pdf",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "input_modalities",
+        "pdf"
+      ],
+      "title": "Input added: pdf",
+      "impact": "notable",
+      "before": null,
+      "after": "pdf",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "facts/input_modalities/images",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "input_modalities",
+        "images"
+      ],
+      "title": "Input removed: images",
+      "impact": "notable",
+      "before": "images",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Feature added: computer use",
+    "Input added: image",
+    "Input added: pdf",
+    "Input removed: images"
+  ]
+}

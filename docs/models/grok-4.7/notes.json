@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "grok-4.7",
+  "predecessor": "grok-4.6",
+  "whats_new": {
+    "title": "Get started",
+    "url": "https://docs.x.ai/developers/grok-4-7",
+    "text": "#### Get Started\n\n# Grok 4.7\n\nGrok 4.7 is SpaceXSI's frontier model built for coding, agentic tasks, and knowledge work.\n\n## Using the API\n\nIf you already have an [API key](https://console.x.ai/team/default/api-keys?utm_source=docs\\&utm_medium=referral\\&utm_campaign=developers-grok-4-7\\&utm_content=api-keys), set the model name to `grok-4.7`:\n\n```javascript customLanguage=\"javascriptAISDK\"\nimport { xai } from '@ai-sdk/xai';\nimport { generateText } from 'ai';\n\nconst { text } = await generateText({\n  model: xai.responses('grok-4.7'),\n  prompt:\n    'Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}',\n});\n\nconsole.log(text);\n```\n\n```javascript customLanguage=\"javascriptOpenAISDK\"\nimport OpenAI from 'openai';\n\nconst client = new OpenAI({\n  apiKey: process.env.XAI_API_KEY,\n  baseURL: 'https://api.x.ai/v1',\n});\n\nconst response = await client.responses.create({\n  model: 'grok-4.7',\n  input: [\n    {\n      role: 'user',\n      content:\n        'Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}',\n    },\n  ],\n});\n\nconsole.log(response.output_text);\n```\n\n```bash customLanguage=\"bash\"\ncurl https://api.x.ai/v1/responses \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $XAI_API_KEY\" \\\n  -d '{\n    \"model\": \"grok-4.7\",\n    \"input\": \"Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}\"\n  }'\n```\n\n```python customLanguage=\"pythonXAI\"\nimport os\nfrom xai_sdk import Client\nfrom xai_sdk.chat import user\n\nclient = Client(api_key=os.getenv(\"XAI_API_KEY\"))\n\nchat = client.chat.create(model=\"grok-4.7\")\nchat.append(user(\"Find and fix the bug, then explain it: function median(a){a.sort();return a[a.length/2]}\"))\n\nresponse = chat.sample()\nprint(response.content)\n```\n\nNew to the xAI API? Follow the [Quickstart](/developers/quickstart) to create an account and make your first request.\n\n## At a glance\n\n| Property | Value |\n|----------|-------|\n| Model name | `grok-4.7` |\n| Context window | 500,000 tokens |\n| Knowledge cutoff | May 2026 |\n| Modalities | Text and image input; text output |\n| Output limit | No text output limit |\n| Input price | $2.00 / 1M tokens |\n| Output price | $6.00 / 1M tokens |\n| Reasoning | Low, medium, high (default), or xhigh  |\n| APIs | [Responses API](/developers/rest-api-reference/inference/responses#create-new-response) |\n| Tools | [Function calling](/developers/tools/function-calling), [web search](/developers/tools/web-search), [X search](/developers/tools/x-search), [code execution](/developers/tools/code-execution) |\n\nRate limits and live pricing for your team are on the [model detail page](/developers/models/grok-4.7) and [Pricing](/developers/pricing).\n\n## Important details\n\n* **We highly recommend setting a [`prompt_cache_key`](/developers/advanced-api-usage/prompt-caching/maximizing-cache-hits)** (Responses API; `x-grok-conv-id` header on Chat Completions). It routes a conversation's requests to the same server, making cache hits reliable; without it you often pay full input price on a cache-cold server. See [What Breaks Caching](/developers/advanced-api-usage/prompt-caching/multi-turn) for common mistakes.\n* **Long agent loops** additionally benefit from [context compaction](/developers/advanced-api-usage/context-compaction); for tool-heavy workloads see [function calling](/developers/tools/function-calling).\n* **Encrypted reasoning is always returned on the Responses API.** `POST /v1/responses` responses from `grok-4.7` include `reasoning.encrypted_content` even when `include` does not list it, so multi-turn conversations keep the model's reasoning without extra configuration. Pass the reasoning items back unchanged in the next request's `input`; see [Encrypted reasoning content](/developers/model-capabilities/text/reasoning#encrypted-reasoning-content). Chat Completions is unchanged.\n\n## Fast variant\n\nGrok 4.7 Fast is the same model served on faster infrastructure. It costs 2x the standard token rates, or 1.5x for long-context requests. It's available only in Cursor and [Grok Build](/build/overview), and is billed through your plan there. It is not included in Grok Build's free tier. It is not available on the public xAI API. Rates are on the [Pricing](/developers/pricing#grok-47-fast-pricing-cursor-and-grok-build-only) page.\n\n## Where it runs\n\n* **xAI API**: get a key from the [console](https://console.x.ai/?utm_source=docs\\&utm_medium=referral\\&utm_campaign=developers-grok-4-7\\&utm_content=console-home)\n* **US regional endpoint**: also served at `https://us.api.x.ai/v1`, which keeps inference in the United States, with token usage priced at a 10% premium; see [Regional Endpoints](/developers/advanced-api-usage/regions)\n* **Grok Build**: the default model of the [coding agent](/build/overview)\n* **Cursor**: available on all plans\n* **Model gateways**: OpenRouter, Vercel, and Cloudflare\n\n## Learn more\n\n* [Reasoning](/developers/model-capabilities/text/reasoning#the-reasoning_effort-parameter) - controlling `reasoning_effort`, including `\"xhigh\"`\n* [Announcement](https://x.ai/news/grok-4-7) - launch post with demos and full benchmark figures\n* [Models](/developers/models) - compare available models and their capabilities\n* [Pricing](/developers/pricing) - token pricing for all models\n"
+  },
+  "vendor_highlights": [
+    "We highly recommend setting a prompt_cache_key",
+    "Long agent loops",
+    "Encrypted reasoning is always returned on the Responses API."
+  ],
+  "changelog": [
+    {
+      "date": "2026-09",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### Grok 4.7\n\nGrok 4.7, SpaceXSI's frontier model for coding, agentic tasks, and knowledge work, is now available on the xAI API as `grok-4.7`. It has a 500k context window, text and image inputs with text-only output, and no text output limit. Pricing is $2 / $0.50 / $6 per 1M tokens (input / cached input / output) below 200k prompt tokens, and $4 / $1 / $12 above. Reasoning effort supports low, medium, high (default), and xhigh. On the Responses API, `grok-4.7` always returns `reasoning.encrypted_content`, even when `include` does not list it. It is also served on the [US regional endpoint](/developers/advanced-api-usage/regions). Grok 4.7 Fast is the same model and costs 2x the standard token rates, or 1.5x for long-context requests. It's available only in Cursor and Grok Build, not on the public xAI API, and is billed through your plan there. See the [Grok 4.7 overview](/developers/grok-4-7) and the [announcement](https://x.ai/news/grok-4-7)."
+    }
+  ],
+  "changes": [
+    {
+      "id": "facts/knowledge_cutoff",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "knowledge_cutoff"
+      ],
+      "title": "Knowledge cutoff: 2026-02-01 → 2026-05",
+      "impact": "notable",
+      "before": "2026-02-01",
+      "after": "2026-05",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Knowledge cutoff: 2026-02-01 → 2026-05"
+  ]
+}

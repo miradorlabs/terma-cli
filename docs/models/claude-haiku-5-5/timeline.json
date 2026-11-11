@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "claude-haiku-5-5",
+  "steps": [
+    {
+      "at": "2026-11-11T14:15:45.0307666Z",
+      "event": "listed",
+      "changes": []
+    }
+  ]
+}

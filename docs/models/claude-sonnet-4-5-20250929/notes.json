@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "id": "claude-sonnet-4-5-20250929",
+  "predecessor": "claude-sonnet-4-20250514",
+  "whats_new": null,
+  "vendor_highlights": [
+    "We announced the deprecation of the Claude Sonnet 3.5 models (claude-3-5-sonnet-20240620 and claude-3-5-sonnet-20241022)."
+  ],
+  "changelog": [
+    {
+      "date": "2026-09-30",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We announced the deprecation of the Claude Sonnet 4.5 model (`claude-sonnet-4-5-20250929`), with retirement on the Claude API scheduled for November 30, 2026. We recommend migrating to [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide#migrating-from-sonnet-45). Read more in [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)."
+    },
+    {
+      "date": "2026-06-18",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The Python, TypeScript, Go, Java, Ruby, PHP, and C# SDKs now include support for `code_execution_20260120`, the [code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool) version that adds REPL state persistence and is the minimum version for [programmatic tool calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling). To adopt it, set the tool’s `type` to `code_execution_20260120`; no beta header is required. It’s available on Claude Fable 5, Claude Mythos 5, Claude Opus 4.5 and newer, and Claude Sonnet 4.5 and newer; see the code execution tool’s [API support](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool#availability-feature-support) section."
+    },
+    {
+      "date": "2026-04-30",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve retired the 1M token context window beta (`context-1m-2025-08-07`) for Claude Sonnet 4.5 and Claude Sonnet 4. The beta header now has no effect on these models, and requests exceeding the standard 200k-token context window return an error. To use the 1M context window, migrate to [Claude Sonnet 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) or [Claude Opus 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison), where it’s included at standard pricing with no beta header required."
+    },
+    {
+      "date": "2026-03-30",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’re retiring the 1M token context window beta for Claude Sonnet 4.5 and Claude Sonnet 4 on **April 30, 2026**. After that date, the `context-1m-2025-08-07` beta header will have no effect on these models, and requests that exceed the standard 200k-token context window will return an error. To continue using 1M context windows, migrate to [Claude Sonnet 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) or [Claude Opus 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison), which support the full 1M token context window at standard pricing with no beta header required."
+    },
+    {
+      "date": "2026-03-13",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* The [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) is out of beta for Claude Opus 4.6 and Sonnet 4.6, at standard pricing. Requests over 200k tokens work automatically for these models with no beta header required. The 1M token context window remains in beta for Claude Sonnet 4.5 and Sonnet 4."
+    },
+    {
+      "date": "2026-01-29",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* [Structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) are out of beta on the Claude API for Claude Sonnet 4.5, Claude Opus 4.5, and Claude Haiku 4.5. This release includes expanded schema support, improved grammar compilation latency, and a simplified integration path with no beta header required. The `output_format` parameter has moved to `output_config.format`. Existing beta users can continue using the beta header during the transition period. Structured outputs remain in beta on Amazon Bedrock and Microsoft Foundry."
+    },
+    {
+      "date": "2025-11-14",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) in beta, providing guaranteed schema conformance for Claude’s responses. Use JSON outputs for structured data responses or strict tool use for validated tool inputs. Available for Claude Sonnet 4.5 and Claude Opus 4.1. To enable, use the beta header `structured-outputs-2025-11-13`."
+    },
+    {
+      "date": "2025-09-29",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched [Claude Sonnet 4.5](https://www.anthropic.com/news/claude-sonnet-4-5), our best model for complex agents and coding, with the highest intelligence across most tasks. Learn more in the [models overview](https://platform.claude.com/docs/en/models/overview)."
+    },
+    {
+      "date": "2025-08-13",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We announced the deprecation of the Claude Sonnet 3.5 models (`claude-3-5-sonnet-20240620` and `claude-3-5-sonnet-20241022`). These models will be retired on October 28, 2025. We recommend migrating to Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) for improved performance and capabilities. Read more in [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "gpt-5.6-cyber",
+  "predecessor": null,
+  "whats_new": null,
+  "vendor_highlights": [
+    "Daybreak now offers two access tiers for approved defenders: Daybreak Blue and Daybreak Red."
+  ],
+  "changelog": [
+    {
+      "date": "2026-08-07",
+      "url": "https://developers.openai.com/api/docs/changelog",
+      "text": "Feature · Model: gpt-5.6-cyber · Model: gpt-daybreak-red-latest · Model: gpt-daybreak-blue-latest · API: v1/responses\n\nDaybreak now offers two access tiers for approved defenders: Daybreak Blue and Daybreak Red. Use them to move from security findings to validated fixes in explicitly authorized engagements.\n\nStart with Daybreak Blue for most defensive security work. It provides access to general-purpose models such as GPT-5.6 Sol for vulnerability discovery, secure code review, detection engineering, incident response, malware analysis, and patch validation. Read more [here](https://developers.openai.com/api/docs/models/gpt-daybreak-blue-latest).\n\nDaybreak Red provides separately approved access to purpose-trained models such as [GPT-5.6 Cyber](https://developers.openai.com/api/docs/models/gpt-5.6-cyber) for authorized vulnerability reproduction, exploit validation, penetration testing, red teaming, and complex system analysis.\n\nThese models require separate approval and provisioning. You can apply to join the Daybreak program [here](https://openai.com/daybreak/). More details on pricing [here](https://developers.openai.com/api/docs/pricing)."
+    }
+  ],
+  "changes": [],
+  "highlights": []
+}
