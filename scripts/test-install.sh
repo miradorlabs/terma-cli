@@ -168,8 +168,10 @@ out="$(install_as /bin/bash "$home")"
 clean "$out"
 grep -qF "in ~/.bashrc and ~/.profile, for bash (your login shell)" <<<"$out" || fail "bash said: $out"
 [ "$(reloads /bin/bash "$home" "$out")" = "$home/.local/bin/terma" ] || fail "bash's source step does not find terma: $out"
+# The last line is `command -v`'s: the system's bashrc may print first, as Ubuntu's does its
+# "To run a command as administrator" hint for a user in the sudo group.
 for mode in -ic -lc; do
-  [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash "$mode" 'command -v terma' 2>/dev/null)" = "$home/.local/bin/terma" ] \
+  [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash "$mode" 'command -v terma' 2>/dev/null | tail -n 1)" = "$home/.local/bin/terma" ] \
     || fail "bash $mode does not find terma: $(ls -A "$home")"
 done
 home="$(fresh_home)"
