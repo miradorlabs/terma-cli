@@ -113,3 +113,46 @@ func TestHarnessBuildsAreIncremental(t *testing.T) {
 		t.Errorf("an unreadable index lost codex's builds: %+v", second.Harnesses["codex"])
 	}
 }
+
+// A build published partial (no models captured) and captured again later is read again, so
+// its models count and it becomes the newest build that uses them; a missing harness index keeps
+// what was read before.
+func TestHarnessBuildCapturedAgainIsReadAgain(t *testing.T) {
+	var mu sync.Mutex
+	files := map[string]string{
+		"index.json":                  `{"harnesses":[{"id":"claude","name":"Claude Code"}]}`,
+		"claude/index.json":           `{"versions":[{"version":"2.1.9","captured_at":"2026-11-09T01:00:00Z"},{"version":"2.1.10","captured_at":"2026-11-10T01:00:00Z"}]}`,
+		"claude/versions/2.1.9.json":  `{"model":{"default":"claude-opus-5-5"}}`,
+		"claude/versions/2.1.10.json": `{"network":{}}`,
+	}
+	src := func(_ context.Context, path string) ([]byte, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if f, ok := files[path]; ok {
+			return []byte(f), nil
+		}
+		return nil, fmt.Errorf("%s: %w", path, errNotFound)
+	}
+	first, _ := readHarnessBuilds(context.Background(), src, nil)
+	if first.Harnesses["claude"].Builds["2.1.10"].Captured {
+		t.Fatal("a partial build counted as captured")
+	}
+	files["claude/index.json"] = `{"versions":[{"version":"2.1.9","captured_at":"2026-11-09T01:00:00Z"},{"version":"2.1.10","captured_at":"2026-11-10T05:00:00Z"}]}`
+	files["claude/versions/2.1.10.json"] = `{"model":{"default":"claude-fable-5-2"}}`
+	second, errs := readHarnessBuilds(context.Background(), src, first)
+	if len(errs) > 0 || !second.Harnesses["claude"].Builds["2.1.10"].Captured {
+		t.Fatalf("a build captured again was not read again: %+v %v", second.Harnesses["claude"].Builds["2.1.10"], errs)
+	}
+	uses := harnessUses(second)
+	if u := uses[norm("claude-fable-5-2")]; len(u) != 1 || !u[0].Current {
+		t.Errorf("fable uses = %+v", u)
+	}
+	if u := uses[norm("claude-opus-5-5")]; len(u) != 1 || u[0].Current {
+		t.Errorf("opus uses = %+v", u)
+	}
+	delete(files, "index.json")
+	third, errs := readHarnessBuilds(context.Background(), src, second)
+	if len(errs) != 1 || len(third.Harnesses["claude"].Builds) != 2 {
+		t.Errorf("a missing index lost the builds: %+v %v", third.Harnesses, errs)
+	}
+}

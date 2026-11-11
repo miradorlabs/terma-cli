@@ -99,7 +99,9 @@ func main() {
 			if key == "" || (len(wanted) > 0 && !wanted[v.id]) {
 				return nil
 			}
-			if *probeMode == "new" && s.API != nil && s.API.Probes != nil {
+			// A model whose probes saw something (an answer, or the plain request refused) is not
+			// new; one whose every case went unanswered is probed again.
+			if pr := s.API; *probeMode == "new" && pr != nil && pr.Probes != nil && (len(pr.Probes.Params) > 0 || pr.Probes.Unavailable != "") {
 				return nil
 			}
 			return v.probe(ctx, c, key, s)

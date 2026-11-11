@@ -214,3 +214,19 @@ func TestAPIErrorCutsAtACharacter(t *testing.T) {
 		t.Errorf("cut to %d runes, valid %v", utf8.RuneCountInString(msg), utf8.ValidString(msg))
 	}
 }
+
+// A stream the API refuses is an answer (no events), unlike one it did not answer.
+func TestRefusedStreamIsObserved(t *testing.T) {
+	old := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}},
+		Response: &ResponseShape{Model: "m", StreamEvents: []string{"message_start"}}}
+	refused := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}},
+		Response: &ResponseShape{Model: "m"}, unanswered: map[string]bool{}}
+	if got := keepUnobserved(old, refused); got.Response.StreamEvents != nil {
+		t.Errorf("a refused stream kept the old events: %v", got.Response.StreamEvents)
+	}
+	missed := &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}},
+		Response: &ResponseShape{Model: "m"}, unanswered: map[string]bool{}, streamMissed: true}
+	if got := keepUnobserved(old, missed); len(got.Response.StreamEvents) != 1 {
+		t.Errorf("an unanswered stream lost the old events: %v", got.Response.StreamEvents)
+	}
+}

@@ -64,8 +64,11 @@ type harnessOfBuilds struct {
 // buildModels is what one build uses. A build whose models were not captured (a capture that
 // failed, a build only listed) says nothing of them: Captured false.
 type buildModels struct {
-	Captured bool       `json:"captured"`
-	Uses     []buildUse `json:"uses,omitempty"`
+	// CapturedAt is when the Harness Reference last captured the build, as its index says: a build
+	// captured again (a partial capture the night completes) is read again.
+	CapturedAt string     `json:"captured_at,omitempty"`
+	Captured   bool       `json:"captured"`
+	Uses       []buildUse `json:"uses,omitempty"`
 }
 
 // harnessSource reads a file of the Harness Reference by its path below docs/harnesses: from a
@@ -108,11 +111,14 @@ func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBui
 	if err == nil {
 		err = json.Unmarshal(data, &index)
 	}
-	if errors.Is(err, errNotFound) {
-		return out, nil
-	}
 	if err != nil {
+		// Not there, or not read: either way nothing new is known of the harnesses, and what was
+		// read of them before stands (a missing index is a CDN's hiccup or a move, not every
+		// harness gone).
 		cache.SchemaVersion = schemaVersion
+		if errors.Is(err, errNotFound) && len(cache.Harnesses) == 0 {
+			return cache, nil
+		}
 		return cache, []error{err}
 	}
 	var errs []error
@@ -123,7 +129,8 @@ func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBui
 		before := cache.Harnesses[h.ID]
 		var hi struct {
 			Versions []struct {
-				Version string `json:"version"`
+				Version    string `json:"version"`
+				CapturedAt string `json:"captured_at"`
 			} `json:"versions"`
 		}
 		data, err := src(ctx, h.ID+"/index.json")
@@ -141,11 +148,13 @@ func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBui
 		}
 		now := &harnessOfBuilds{Name: h.Name, Builds: map[string]*buildModels{}}
 		var todo []string
+		capturedAt := map[string]string{}
 		for _, v := range hi.Versions {
 			if !validID.MatchString(v.Version) {
 				continue
 			}
-			if before != nil && before.Builds[v.Version] != nil {
+			capturedAt[v.Version] = v.CapturedAt
+			if before != nil && before.Builds[v.Version] != nil && before.Builds[v.Version].CapturedAt == v.CapturedAt {
 				now.Builds[v.Version] = before.Builds[v.Version]
 			} else {
 				todo = append(todo, v.Version)
@@ -166,9 +175,13 @@ func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBui
 		for i, v := range todo {
 			switch {
 			case readErrs[i] != nil:
-				// Read again next time.
+				// Read again next time; what was read of it before stands meanwhile.
 				errs = append(errs, readErrs[i])
+				if before != nil && before.Builds[v] != nil {
+					now.Builds[v] = before.Builds[v]
+				}
 			case read[i] != nil:
+				read[i].CapturedAt = capturedAt[v]
 				now.Builds[v] = read[i]
 			}
 		}

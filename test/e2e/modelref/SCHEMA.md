@@ -225,7 +225,8 @@ Each archive lists `file`, the times of its `first` and `last` step, and how man
 
 ## harness-builds.json
 
-What each build the Harness Reference tracks uses, by harness id and version: `captured` false for a
+What each build the Harness Reference tracks uses, by harness id and version: `captured_at` the Harness Reference's own capture time (a build captured again is read again),
+`captured` false for a
 build whose models were not captured, else its `uses` (`model` as the harness writes it, `role`,
 `label`, the `params` a default model is sent with). It lets a run read only the builds it has not
 read before; a model's `harnesses` are derived from it.

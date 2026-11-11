@@ -90,12 +90,16 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 	}
 	if p.Response != nil && t.stream != nil {
 		url, body := t.stream(t.base)
-		if resp, err := c.post(ctx, url, t.headers, body); err == nil && resp.Status/100 == 2 {
-			p.Response.StreamEvents = streamEvents(resp.Body)
-		} else {
+		resp, err := c.post(ctx, url, t.headers, body)
+		switch {
+		case err != nil || retryable(resp.Status):
+			// Not answered: what the stream sent before stands.
 			p.streamMissed = true
-			p.Errors = append(p.Errors, "stream: not read")
+			p.Errors = append(p.Errors, "stream: not answered")
+		case resp.Status/100 == 2:
+			p.Response.StreamEvents = streamEvents(resp.Body)
 		}
+		// A refused stream is an answer: no events.
 	}
 	if t.count != nil {
 		p.Tokens = map[string]int{}
