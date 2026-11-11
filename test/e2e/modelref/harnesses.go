@@ -183,6 +183,9 @@ func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBui
 			case read[i] != nil:
 				read[i].CapturedAt = capturedAt[v]
 				now.Builds[v] = read[i]
+			case before != nil && before.Builds[v] != nil:
+				// Its file not there this time: what was read of it before stands.
+				now.Builds[v] = before.Builds[v]
 			}
 		}
 		out.Harnesses[h.ID] = now
@@ -190,11 +193,14 @@ func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBui
 	return out, errs
 }
 
-// readBuild is what one build's snapshot says it uses; nil for a build listed without one.
+// readBuild is what one build's snapshot says it uses; nil, and no error, for a build whose file is
+// not there.
 func readBuild(ctx context.Context, src harnessSource, harness, version string) (*buildModels, error) {
 	data, err := src(ctx, harness+"/versions/"+version+".json")
 	if errors.Is(err, errNotFound) {
-		return &buildModels{}, nil
+		// Listed and not there (yet, or for now): nothing read, so nothing kept; read again next
+		// run.
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

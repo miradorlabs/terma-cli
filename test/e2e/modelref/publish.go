@@ -181,7 +181,9 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 			fmt.Printf("::warning::%s refused the reference's key, its models not probed this run: %s\n", v, refused[v])
 		}
 		for i, p := range probed {
-			if p != nil && !p.unanswered["baseline"] {
+			// Observed: the plain request answered, and the key not refused partway (the rest is
+			// due again next run).
+			if p != nil && !p.unanswered["baseline"] && !p.keyRefused {
 				observed = append(observed, todo[i].ID)
 			}
 		}

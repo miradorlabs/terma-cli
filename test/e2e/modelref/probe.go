@@ -97,6 +97,14 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 			p.keyRefused = true
 			return unanswered(p, t)
 		}
+		if !r.Accepted && keyRefusal(r.Status, r.Error) {
+			// The key refused partway (its credit ran out, it was revoked): this case and the ones
+			// after it are not the model's answers; what the probes saw of them before stands, and
+			// no other request is sent with the key this run.
+			p.Errors = append(p.Errors, fmt.Sprintf("%s: %d %s", pc.name, r.Status, http.StatusText(r.Status)))
+			p.keyRefused = true
+			return unansweredFrom(p, t)
+		}
 		p.Params[pc.name] = r
 		if pc.name == "baseline" && r.Accepted && t.shape != nil {
 			s := t.shape(resp.Body)
@@ -144,6 +152,18 @@ func unanswered(p *Probes, t probeTarget) *Probes {
 	return p
 }
 
+// unansweredFrom is p with every case it has no answer for yet, the stream and the corpus not
+// observed: the probes stopped partway, and what they saw of the rest before stands.
+func unansweredFrom(p *Probes, t probeTarget) *Probes {
+	for _, c := range t.cases {
+		if _, ok := p.Params[c.name]; !ok {
+			p.unanswered[c.name] = true
+		}
+	}
+	p.streamMissed = true
+	return p
+}
+
 // keyRefusal says a refusal of the plain request is the key's, not the model's: 401 (a key the
 // vendor does not take), 402, or a refusal that speaks of the key itself or of the account's
 // credit, billing or quota (Anthropic's low-credit 400, Google's and xAI's 400 for a bad key). Any other refusal (404 not served to this key, 403, a 400 about
@@ -172,6 +192,10 @@ func keyRefusal(status int, msg string) bool {
 func keepUnobserved(old, p *Probes) *Probes {
 	if old == nil {
 		return p
+	}
+	if p.unanswered["baseline"] && p.Unavailable == "" {
+		// The plain request not answered: a model known to be unavailable still is.
+		p.Unavailable = old.Unavailable
 	}
 	for name := range p.unanswered {
 		if r, ok := old.Params[name]; ok {

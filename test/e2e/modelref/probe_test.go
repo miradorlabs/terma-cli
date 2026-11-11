@@ -423,3 +423,59 @@ func TestKeyRefusal(t *testing.T) {
 		}
 	}
 }
+
+// The key refused partway through a model's cases (its credit ran out): those cases are not the
+// model's answers, the probes before stand for them, no other request is sent, and the model is
+// not counted observed.
+func TestAKeyRefusedPartwayIsNoChange(t *testing.T) {
+	var mu sync.Mutex
+	calls, broke := 0, false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		data, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(data, &body)
+		mu.Lock()
+		calls++
+		if body["temperature"] != nil {
+			broke = true // the credit runs out here
+		}
+		out := broke
+		mu.Unlock()
+		if out {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Your credit balance is too low to access the Anthropic API."}}`))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"model": body["model"], "usage": map[string]any{"input_tokens": 1}})
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient()
+	c.wait, c.tries = time.Millisecond, 1
+	c.rewrite = func(u string) string { return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+	p := anthropicProbe(context.Background(), c, "k", &Snapshot{ID: "m", Facts: map[string]any{}})
+	if !p.keyRefused || p.Params["baseline"].Status != 200 {
+		t.Fatalf("keyRefused %v, baseline %+v", p.keyRefused, p.Params["baseline"])
+	}
+	for name, r := range p.Params {
+		if !r.Accepted {
+			t.Errorf("%s recorded as the model's refusal: %+v", name, r)
+		}
+	}
+	if calls != 2 {
+		t.Errorf("%d requests, want the baseline and the one refused", calls)
+	}
+	old := &Probes{Endpoint: p.Endpoint, Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200},
+		"sampling.temperature": {Status: 400, Error: "temperature: Extra inputs are not permitted"}, "effort.max": {Accepted: true, Status: 200}}}
+	if got := keepUnobserved(old, p); got.Params["sampling.temperature"] != old.Params["sampling.temperature"] || got.Params["effort.max"] != old.Params["effort.max"] {
+		t.Errorf("the cases after the refusal lost what the probes saw before: %+v", got.Params)
+	}
+}
+
+// A model known to be unavailable to the key still is when its plain request is not answered.
+func TestUnavailableStaysWhenNotAnswered(t *testing.T) {
+	old := &Probes{Endpoint: "e", Unavailable: "404 model: claude-mythos-5-2", Params: map[string]ProbeResult{}}
+	p := &Probes{Endpoint: "e", Params: map[string]ProbeResult{}, unanswered: map[string]bool{"baseline": true}, streamMissed: true}
+	if got := keepUnobserved(old, p); got.Unavailable != old.Unavailable {
+		t.Errorf("unavailable lost to an unanswered request: %+v", got)
+	}
+}

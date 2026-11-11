@@ -156,3 +156,35 @@ func TestHarnessBuildCapturedAgainIsReadAgain(t *testing.T) {
 		t.Errorf("a missing index lost the builds: %+v %v", third.Harnesses, errs)
 	}
 }
+
+// A build the index lists whose file is not there this run is not taken for a build without
+// models: it is read again next run, and what was read of it before stands meanwhile.
+func TestAMissingBuildFileIsReadAgain(t *testing.T) {
+	var mu sync.Mutex
+	files := map[string]string{
+		"index.json":        `{"harnesses":[{"id":"claude","name":"Claude Code"}]}`,
+		"claude/index.json": `{"versions":[{"version":"2.1.10","captured_at":"2026-11-10T01:00:00Z"}]}`,
+	}
+	src := func(_ context.Context, path string) ([]byte, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if f, ok := files[path]; ok {
+			return []byte(f), nil
+		}
+		return nil, fmt.Errorf("%s: %w", path, errNotFound)
+	}
+	first, _ := readHarnessBuilds(context.Background(), src, nil)
+	if _, ok := first.Harnesses["claude"].Builds["2.1.10"]; ok {
+		t.Fatal("a build whose file was not there was kept as read")
+	}
+	files["claude/versions/2.1.10.json"] = `{"model":{"default":"claude-fable-5-2"}}`
+	second, _ := readHarnessBuilds(context.Background(), src, first)
+	if b := second.Harnesses["claude"].Builds["2.1.10"]; b == nil || !b.Captured {
+		t.Fatalf("not read again once there: %+v", b)
+	}
+	delete(files, "claude/versions/2.1.10.json")
+	third, _ := readHarnessBuilds(context.Background(), src, second)
+	if b := third.Harnesses["claude"].Builds["2.1.10"]; b == nil || !b.Captured {
+		t.Errorf("a file not there this time lost what was read of it: %+v", b)
+	}
+}
