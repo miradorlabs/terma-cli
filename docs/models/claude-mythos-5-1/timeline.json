@@ -3,6 +3,33 @@
   "id": "claude-mythos-5-1",
   "steps": [
     {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+214 −212 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -12,7 +12,7 @@\n \n Context window: 1M tokens · Max output: 128K tokens · Input pricing: $10 / MTok · Output pricing: $50 / MTok\n \n-[Announcement](https://www.anthropic.com/claude-fable-and-mythos-5-1) · [Migration guide](https://platform.claude.com/docs/en/models/fable-5-1/migration-guide#migrating-from-claude-mythos-5-to-claude-mythos-5-1)\n+[Announcement](https://www.anthropic.com/claude-fable-and-mythos-5-1) · [Migration guide](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#migrating-from-claude-mythos-5-1-to-claude-mythos-5-2)\n \n Claude Mythos 5.1 is available only to organizations verified through Anthropic’s verification programs, such as the [Cyber Verification Program](https://support.claude.com/en/articles/14604842).\n It has the same specifications and pricing as Claude Fable 5.1.\n",
+          "stats": {
+            "added_chars": 214,
+            "removed_chars": 212
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

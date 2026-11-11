@@ -1,7 +1,98 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T14:15:45.0307666Z",
+  "generated_at": "2026-11-11T17:23:42.167641842Z",
   "events": [
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-sonnet-4-6",
+      "vendor": "anthropic",
+      "name": "Claude Sonnet 4.6",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock (InvokeModel)",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+6242 −6133 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-sonnet-4-5-20250929",
+      "vendor": "anthropic",
+      "name": "Claude Sonnet 4.5",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock (InvokeModel)",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+7296 −7176 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-opus-4-6",
+      "vendor": "anthropic",
+      "name": "Claude Opus 4.6",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock (InvokeModel)",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+6248 −6139 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-opus-4-5-20251101",
+      "vendor": "anthropic",
+      "name": "Claude Opus 4.5",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock (InvokeModel)",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+6545 −6429 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-mythos-5-2",
+      "vendor": "anthropic",
+      "name": "Claude Mythos 5.2",
+      "event": "changed",
+      "changes": 4,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+5141 −4942 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-haiku-4-5-20251001",
+      "vendor": "anthropic",
+      "name": "Claude Haiku 4.5",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock (InvokeModel)",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+7358 −7251 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "model": "claude-fable-5-2",
+      "vendor": "anthropic",
+      "name": "Claude Fable 5.2",
+      "event": "changed",
+      "changes": 4,
+      "highlights": [
+        "Platform id removed: Amazon Bedrock",
+        "Platform id added: Amazon Bedrock (bedrock-runtime)",
+        "Model page changed (+5954 −5748 chars)"
+      ]
+    },
     {
       "at": "2026-11-11T14:15:45.0307666Z",
       "model": "grok-build-0.1",

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T14:15:45.0307666Z",
+  "generated_at": "2026-11-11T17:23:42.167641842Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -65,7 +65,10 @@
       "knowledge_cutoff": "2026-06",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 4
+      },
       "probed": true
     },
     {
@@ -83,7 +86,10 @@
       "knowledge_cutoff": "2026-06",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 4
+      },
       "probed": false
     },
     {
@@ -181,7 +187,10 @@
       "harnesses": [
         "claude"
       ],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -240,7 +249,10 @@
         "claude",
         "claude-desktop"
       ],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -312,7 +324,10 @@
       "knowledge_cutoff": "2026-06",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -330,7 +345,10 @@
       "knowledge_cutoff": "2026-06",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -510,7 +528,10 @@
       "knowledge_cutoff": "2026-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -528,7 +549,10 @@
       "knowledge_cutoff": "2026-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -834,7 +858,10 @@
       "knowledge_cutoff": "2025-08",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 3
+      },
       "probed": true
     },
     {
@@ -852,7 +879,10 @@
       "knowledge_cutoff": "2025-05",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 3
+      },
       "probed": true
     },
     {
@@ -924,7 +954,10 @@
       "knowledge_cutoff": "2025-05",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 3
+      },
       "probed": true
     },
     {
@@ -960,7 +993,10 @@
       "knowledge_cutoff": "2025-02",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 3
+      },
       "probed": true
     },
     {
@@ -980,7 +1016,10 @@
       "harnesses": [
         "copilot"
       ],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-11T17:23:42.167641842Z",
+        "changes": 3
+      },
       "probed": true
     },
     {

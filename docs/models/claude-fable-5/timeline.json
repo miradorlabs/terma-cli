@@ -3,6 +3,33 @@
   "id": "claude-fable-5",
   "steps": [
     {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+332 −283 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -6,7 +6,8 @@\n \n **Legacy.** Released June 9, 2026.\n \n-Although Claude Fable 5 is still available, you should consider migrating to Claude Fable 5.2. [See Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview) · [Migrate to Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide)\n+Although Claude Fable 5 is still available, you should consider migrating to Claude Fable 5.2.\n+[See Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview) · [Migrate to Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#migrating-from-claude-fable-5-to-claude-fable-5-2)\n \n Model ID: `claude-fable-5`\n \n",
+          "stats": {
+            "added_chars": 332,
+            "removed_chars": 283
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

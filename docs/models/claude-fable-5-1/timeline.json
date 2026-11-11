@@ -3,6 +3,33 @@
   "id": "claude-fable-5-1",
   "steps": [
     {
+      "at": "2026-11-11T17:23:42.167641842Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+466 −492 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -6,9 +6,8 @@\n \n **Legacy.** Released September 1, 2026.\n \n-For demanding reasoning and long-horizon agentic work\n-\n-Although Claude Fable 5.1 is still available, you should consider migrating to Claude Fable 5.2. [See Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview) · [Migrate to Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide)\n+Although Claude Fable 5.1 is still available, you should consider migrating to Claude Fable 5.2.\n+[See Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview) · [Migrate to Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide#migrating-from-claude-fable-5-1-to-claude-fable-5-2)\n \n Model ID: `claude-fable-5-1`\n \n@@ -108,7 +107,7 @@\n     When this model’s thinking blocks stay usable: across model switches and across changes to the conversation.\n   </Card>\n \n-  <Card title=\"Per-message effort\" icon=\"sliders\" href=\"https://platform.claude.com/docs/en/build-with-claude/effort#change-effort-mid-conversation-beta\">\n+  <Card title=\"Per-message effort\" icon=\"sliders\" href=\"https://platform.claude.com/docs/en/build-with-claude/effort-per-message\">\n     Change the effort level partway through a conversation without invalidating the prompt cache.\n   </Card>\n \n",
+          "stats": {
+            "added_chars": 466,
+            "removed_chars": 492
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []
