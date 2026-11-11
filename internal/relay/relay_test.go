@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -104,6 +105,7 @@ type fixture struct {
 	now      time.Time
 	warnings []string
 	version  string
+	mirrors  []shape.Mirror
 }
 
 func (f *fixture) warned() []string {
@@ -136,6 +138,7 @@ func (f *fixture) clock() time.Time {
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
 	r := newRelay(Options{Dir: t.TempDir(),
 		Version: f.version,
+		Mirrors: f.mirrors,
 		Token:   token,
 		Hold:    time.Minute,
 		Lookup:  f.lookup,

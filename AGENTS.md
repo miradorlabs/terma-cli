@@ -118,7 +118,10 @@ machine: it admits every repository, a hook outside git claims its session for t
 policy's default project, and the relay sends what no claim places there too, except a
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
-never on disk, and a stopping relay drops it.
+never on disk, and a stopping relay drops it. An agent whose exporter also carries its
+vendor's own telemetry (Muse's, `shape.Mirror`) keeps sending its vendor all of it: the
+relay passes the vendor an exact copy of every export, claimed or not, with the agent's
+own credential, which goes nowhere else.
 
 ## Rules
 

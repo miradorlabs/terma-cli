@@ -30,6 +30,8 @@ type Deps struct {
 	Version     string
 	Correlators []shape.Correlator
 	Capturers   []shape.Capturer
+	// Mirrors are the agents' vendor telemetry paths (shape.Mirror).
+	Mirrors []shape.Mirror
 	// AgentName is the agent behind a tool label.
 	AgentName func(tool string) string
 	// RelayTargets names the agents among the developer's choices that send through the relay.
@@ -86,7 +88,7 @@ func Prepare(cfg *config.Config) {
 // only when a claim asks for a key, until ctx ends.
 func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s Settings, logw io.Writer) relay.Options {
 	minter := NewKeyMinter(ctx, cfg, d.CreateKey)
-	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
+	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers, Mirrors: d.Mirrors,
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,

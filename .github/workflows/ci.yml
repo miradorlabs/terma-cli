@@ -180,6 +180,9 @@ jobs:
       TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
+      # Meta's channel names its current build alone; a pinned one keeps the check the same
+      # from run to run, its download (about 470 MB) cached below.
+      TERMA_E2E_MUSE_VERSIONS: "1.4.15-R8339.1"
       # Copilot CLI runs against GitHub's service on this job's token, in the copilot shard
       # alone. A fork's pull request gets a read-only one, so there the Copilot tests skip
       # rather than fail.
@@ -201,6 +204,13 @@ jobs:
             test/e2e/go.sum
       - name: Build Terma
         run: go build -o test/e2e/bin/terma ./cmd/terma
+      # Muse's builds are large and come from Meta's download host: one download a build.
+      - name: Cache the pinned Muse build
+        if: matrix.shard == 'others'
+        uses: actions/cache@v6
+        with:
+          path: test/e2e/versions/muse/${{ env.TERMA_E2E_MUSE_VERSIONS }}
+          key: muse-${{ runner.os }}-${{ runner.arch }}-${{ env.TERMA_E2E_MUSE_VERSIONS }}
       # Pi has no exporter; terma's extension is one, tested only on the installed
       # build (test/e2e/pi.go).
       - uses: actions/setup-node@v5

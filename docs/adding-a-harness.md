@@ -37,9 +37,10 @@ and a live run (step 5).
 | The harness has | terma uses | Examples |
 |---|---|---|
 | OTLP with content, endpoint in a settings file | The relay: `RelayExporter`, plus a `Correlator` and `Capturer` (`internal/relay/shape`), plus hooks for the claim and commits | Claude Code, Codex, Gemini |
+| OTLP to its vendor, endpoint in a settings file | The relay as above, plus a `shape.Mirror`: the relay takes the agent's own paths and passes the vendor an exact copy, the agent's credential with it, so pointing it at the relay never takes the vendor's copy away | Muse Code (`telemetry.endpoint`) |
 | OTLP read only from its environment | `Launched`: setup's shell function starts it through `terma launch <name>` | Copilot CLI |
 | A plugin or extension API | terma's plugin, exporting OTLP to the relay and calling `terma hook <event>` for the claim | OpenCode, Pi, omp, Hermes, dsh |
-| Hooks only (no usable OTLP) | Hook events spooled and delivered: `terma.session.start`, `terma.tool.call`, `terma.files.touched`, `terma.user.message`, `terma.assistant.message`, `terma.model.call`, `terma.session.observation` | Antigravity, Muse Code, Cursor |
+| Hooks only (no usable OTLP) | Hook events spooled and delivered: `terma.session.start`, `terma.tool.call`, `terma.files.touched`, `terma.user.message`, `terma.assistant.message`, `terma.model.call`, `terma.session.observation` | Antigravity, Cursor; Muse Code beside its OTLP |
 | A session API beside its hooks (timings, titles, its plan's usage) | A detached `terma hook <agent>-feed` that a turn's end starts (`hookrun.Env.Detach`), reading the API through a short-lived process of the agent's own; hooks still claim the session | Muse Code (MSP over `muse serve`) |
 | A desktop app that runs a CLI agent | `Surfaced`: the app is a surface of the agent, its pin tested as that agent's build | Claude Desktop, Codex app |
 

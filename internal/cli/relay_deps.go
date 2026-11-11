@@ -29,6 +29,7 @@ func (app *App) relayDeps() daemon.Deps {
 		Version:       app.version,
 		Correlators:   app.agents.With[shape.Correlator](),
 		Capturers:     app.agents.With[shape.Capturer](),
+		Mirrors:       mirrors(app.agents.With[shape.Mirrored]()),
 		AgentName:     app.agents.NameForTool,
 		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
@@ -157,4 +158,13 @@ func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsD
 		return fmt.Errorf("the ingest answered HTTP %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// mirrors are every agent's vendor telemetry paths.
+func mirrors(agents []shape.Mirrored) []shape.Mirror {
+	var out []shape.Mirror
+	for _, a := range agents {
+		out = append(out, a.Mirrors()...)
+	}
+	return out
 }
