@@ -18,16 +18,15 @@
     "last_change": {
       "from": "0.67.0",
       "to": "0.68.0",
-      "at": "2026-11-11T05:17:29.64320186Z",
+      "at": "2026-11-11T23:00:33.595186074Z",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "changes": 16,
+      "changes": 13,
       "categories": {
         "config": 3,
         "hooks": 1,
         "network": 7,
         "request": 1,
-        "storage": 1,
-        "telemetry": 3
+        "storage": 1
       }
     }
   },
@@ -35,60 +34,53 @@
     {
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.67.0",
-      "changes": 16,
+      "changes": 13,
       "categories": {
         "config": 3,
         "hooks": 1,
         "network": 7,
         "request": 1,
-        "storage": 1,
-        "telemetry": 3
+        "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
-        "notable": 13
+        "informational": 2,
+        "notable": 11
       },
-      "undocumented": 15,
+      "undocumented": 12,
       "highlights": [
         "Request endpoint changed",
-        "Telemetry export.interval_batches.traces removed",
-        "Telemetry export.interval_ms.traces removed"
+        "Default of modelConfigs: {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo… → {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo…",
+        "Default of modelConfigs.modelDefinitions: {\"auto\":{\"displayName\":\"Auto\",\"features\":{\"multimodalTool… → {\"auto\":{\"displayName\":\"Auto\",\"features\":{\"multimodalTool…"
       ],
       "signing": null
     },
     {
       "version": "0.67.0",
       "released_at": "2026-11-04T20:32:45.08Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.66.0",
-      "changes": 32,
-      "categories": {
-        "telemetry": 32
-      },
+      "changes": 0,
+      "categories": {},
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 32,
+        "informational": 0,
         "notable": 0
       },
-      "undocumented": 30,
-      "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
-        "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added"
-      ],
+      "undocumented": 0,
+      "highlights": [],
       "signing": null
     },
     {

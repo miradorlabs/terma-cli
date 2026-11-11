@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T05:17:29.64320186Z",
+  "generated_at": "2026-11-11T23:00:33.595186074Z",
   "harnesses": [
     {
       "id": "claude",
@@ -16,14 +16,13 @@
       "last_change": {
         "from": "2.1.321",
         "to": "2.1.322",
-        "at": "2026-11-11T05:17:29.64320186Z",
+        "at": "2026-11-11T23:00:33.595186074Z",
         "released_at": "2026-11-10T01:58:41.811Z",
-        "changes": 21,
+        "changes": 3,
         "categories": {
           "config": 1,
           "hooks": 1,
-          "network": 1,
-          "telemetry": 18
+          "network": 1
         }
       }
     },
@@ -60,20 +59,21 @@
         "language": "rust"
       },
       "changelog": "https://github.com/openai/codex/releases",
-      "latest": "0.167.1",
-      "support": "supported",
-      "versions_tracked": 102,
+      "latest": "0.167.2",
+      "support": "untested",
+      "versions_tracked": 103,
       "first_tracked": "2026-01-25",
       "last_change": {
-        "from": "0.167.0",
-        "to": "0.167.1",
-        "at": "2026-11-11T05:17:29.64320186Z",
-        "released_at": "2026-11-10T21:39:51.99Z",
-        "changes": 10,
+        "from": "0.167.1",
+        "to": "0.167.2",
+        "at": "2026-11-11T23:00:33.595186074Z",
+        "released_at": "2026-11-11T22:50:04.191Z",
+        "changes": 475,
         "categories": {
           "cli": 2,
           "config": 1,
-          "filesystem": 7
+          "filesystem": 8,
+          "telemetry": 464
         }
       }
     },
@@ -168,16 +168,15 @@
       "last_change": {
         "from": "0.67.0",
         "to": "0.68.0",
-        "at": "2026-11-11T05:17:29.64320186Z",
+        "at": "2026-11-11T23:00:33.595186074Z",
         "released_at": "2026-11-10T21:22:49.277Z",
-        "changes": 16,
+        "changes": 13,
         "categories": {
           "config": 3,
           "hooks": 1,
           "network": 7,
           "request": 1,
-          "storage": 1,
-          "telemetry": 3
+          "storage": 1
         }
       }
     },

@@ -11,47 +11,79 @@
       "language": "rust"
     },
     "changelog": "https://github.com/openai/codex/releases",
-    "latest": "0.167.1",
-    "support": "supported",
-    "versions_tracked": 102,
+    "latest": "0.167.2",
+    "support": "untested",
+    "versions_tracked": 103,
     "first_tracked": "2026-01-25",
     "last_change": {
-      "from": "0.167.0",
-      "to": "0.167.1",
-      "at": "2026-11-11T05:17:29.64320186Z",
-      "released_at": "2026-11-10T21:39:51.99Z",
-      "changes": 10,
+      "from": "0.167.1",
+      "to": "0.167.2",
+      "at": "2026-11-11T23:00:33.595186074Z",
+      "released_at": "2026-11-11T22:50:04.191Z",
+      "changes": 475,
       "categories": {
         "cli": 2,
         "config": 1,
-        "filesystem": 7
+        "filesystem": 8,
+        "telemetry": 464
       }
     }
   },
   "versions": [
     {
+      "version": "0.167.2",
+      "released_at": "2026-11-11T22:50:04.191Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "0.167.1",
+      "changes": 475,
+      "categories": {
+        "cli": 2,
+        "config": 1,
+        "filesystem": 8,
+        "telemetry": 464
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 38,
+        "informational": 268,
+        "notable": 169
+      },
+      "undocumented": 474,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
+    {
       "version": "0.167.1",
       "released_at": "2026-11-10T21:39:51.99Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 10,
+      "changes": 8,
       "categories": {
         "cli": 2,
         "config": 1,
-        "filesystem": 7
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 10,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 10,
+      "undocumented": 8,
       "highlights": [
         "Description of `codex cloud` changed",
         "Full help text of `cloud --help` changed (+88 −0 chars)",
@@ -62,32 +94,31 @@
     {
       "version": "0.167.0",
       "released_at": "2026-11-06T01:46:01.347Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 283,
+      "changes": 27,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 9,
-        "prompt": 1,
-        "telemetry": 255
+        "filesystem": 8,
+        "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 281,
-        "notable": 2
+        "informational": 21,
+        "notable": 6
       },
-      "undocumented": 117,
+      "undocumented": 17,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "Telemetry export added"
+        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
       ],
       "signing": "valid"
     },

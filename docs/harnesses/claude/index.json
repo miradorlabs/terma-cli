@@ -14,14 +14,13 @@
     "last_change": {
       "from": "2.1.321",
       "to": "2.1.322",
-      "at": "2026-11-11T05:17:29.64320186Z",
+      "at": "2026-11-11T23:00:33.595186074Z",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "changes": 21,
+      "changes": 3,
       "categories": {
         "config": 1,
         "hooks": 1,
-        "network": 1,
-        "telemetry": 18
+        "network": 1
       }
     }
   },
@@ -29,31 +28,30 @@
     {
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 21,
+      "changes": 3,
       "categories": {
         "config": 1,
         "hooks": 1,
-        "network": 1,
-        "telemetry": 18
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 20,
+        "informational": 2,
         "notable": 1
       },
-      "undocumented": 21,
+      "undocumented": 3,
       "highlights": [
         "New vendor telemetry event: tengu_startup_timing",
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added"
+        "FileChanged hook environment variable CLAUDE_ENV_FILE: <claude-config>/session-env/<uuid>/filechanged-hook-0.sh → <claude-config>/session-env/<session>/filechanged-hook-0.sh",
+        "fastMode description changed (+132 −72 chars)"
       ],
       "signing": "valid"
     },

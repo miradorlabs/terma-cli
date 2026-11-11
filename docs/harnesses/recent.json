@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T05:17:29.64320186Z",
+  "generated_at": "2026-11-11T23:00:33.595186074Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.167.2",
+      "released_at": "2026-11-11T22:50:04.191Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "0.167.1",
+      "changes": 475,
+      "categories": {
+        "cli": 2,
+        "config": 1,
+        "filesystem": 8,
+        "telemetry": 464
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 38,
+        "informational": 268,
+        "notable": 169
+      },
+      "undocumented": 474,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -60,26 +93,26 @@
       "name": "Codex CLI",
       "version": "0.167.1",
       "released_at": "2026-11-10T21:39:51.99Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 10,
+      "changes": 8,
       "categories": {
         "cli": 2,
         "config": 1,
-        "filesystem": 7
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 10,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 10,
+      "undocumented": 8,
       "highlights": [
         "Description of `codex cloud` changed",
         "Full help text of `cloud --help` changed (+88 −0 chars)",
@@ -92,32 +125,31 @@
       "name": "Gemini CLI",
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.67.0",
-      "changes": 16,
+      "changes": 13,
       "categories": {
         "config": 3,
         "hooks": 1,
         "network": 7,
         "request": 1,
-        "storage": 1,
-        "telemetry": 3
+        "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
-        "notable": 13
+        "informational": 2,
+        "notable": 11
       },
-      "undocumented": 15,
+      "undocumented": 12,
       "highlights": [
         "Request endpoint changed",
-        "Telemetry export.interval_batches.traces removed",
-        "Telemetry export.interval_ms.traces removed"
+        "Default of modelConfigs: {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo… → {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo…",
+        "Default of modelConfigs.modelDefinitions: {\"auto\":{\"displayName\":\"Auto\",\"features\":{\"multimodalTool… → {\"auto\":{\"displayName\":\"Auto\",\"features\":{\"multimodalTool…"
       ],
       "signing": null
     },
@@ -215,31 +247,30 @@
       "name": "Claude Code",
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 21,
+      "changes": 3,
       "categories": {
         "config": 1,
         "hooks": 1,
-        "network": 1,
-        "telemetry": 18
+        "network": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 20,
+        "informational": 2,
         "notable": 1
       },
-      "undocumented": 21,
+      "undocumented": 3,
       "highlights": [
         "New vendor telemetry event: tengu_startup_timing",
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added"
+        "FileChanged hook environment variable CLAUDE_ENV_FILE: <claude-config>/session-env/<uuid>/filechanged-hook-0.sh → <claude-config>/session-env/<session>/filechanged-hook-0.sh",
+        "fastMode description changed (+132 −72 chars)"
       ],
       "signing": "valid"
     },
@@ -475,32 +506,31 @@
       "name": "Codex CLI",
       "version": "0.167.0",
       "released_at": "2026-11-06T01:46:01.347Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 283,
+      "changes": 27,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 9,
-        "prompt": 1,
-        "telemetry": 255
+        "filesystem": 8,
+        "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 281,
-        "notable": 2
+        "informational": 21,
+        "notable": 6
       },
-      "undocumented": 117,
+      "undocumented": 17,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "Telemetry export added"
+        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -541,28 +571,22 @@
       "name": "Gemini CLI",
       "version": "0.67.0",
       "released_at": "2026-11-04T20:32:45.08Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-11T23:00:33.595186074Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.66.0",
-      "changes": 32,
-      "categories": {
-        "telemetry": 32
-      },
+      "changes": 0,
+      "categories": {},
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 32,
+        "informational": 0,
         "notable": 0
       },
-      "undocumented": 30,
-      "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
-        "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added"
-      ],
+      "undocumented": 0,
+      "highlights": [],
       "signing": null
     },
     {
@@ -6201,41 +6225,6 @@
         "Setting no longer read: experimental_thread_store.endpoint",
         "Setting no longer read: experimental_thread_store_endpoint",
         "New command: `codex remote-control`"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.129.0",
-      "released_at": "2026-05-07T17:05:37.553Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.128.0",
-      "changes": 123,
-      "categories": {
-        "behavior": 1,
-        "cli": 13,
-        "config": 95,
-        "filesystem": 11,
-        "hooks": 2,
-        "request": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 103,
-        "notable": 20
-      },
-      "undocumented": 93,
-      "highlights": [
-        "Now sends identifier header:thread_id",
-        "Behaviour: tool_output removed",
-        "New hook event: PostCompact"
       ],
       "signing": "revoked"
     }

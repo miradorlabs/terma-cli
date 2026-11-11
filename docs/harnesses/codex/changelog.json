@@ -370,6 +370,10 @@
       "url": "https://github.com/openai/codex/releases/tag/rust-v0.167.1",
       "text": "## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.167.0...rust-v0.167.1"
     },
+    "0.167.2": {
+      "url": "https://github.com/openai/codex/releases/tag/rust-v0.167.2",
+      "text": "## New Features\n\n- Codex now sends tool updates incrementally by default on Google Cloud Vertex AI. To opt out, set `incremental_tools_legacy_gcp = false` under `[features]` in `config.toml`. ([#60617](https://github.com/openai/codex/pull/60617), [#60848](https://github.com/openai/codex/pull/60848))\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.167.1...rust-v0.167.2"
+    },
     "0.91.0": {
       "url": "https://github.com/openai/codex/releases/tag/rust-v0.91.0",
       "text": "## Chores\r\n- Reduced the maximum allowed number of sub-agents to 6 to tighten resource usage and guardrails in agent fan-out behavior (#9861)\r\n\r\n## Changelog\r\n\r\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.90.0...rust-v0.91.0\r\n\r\n- #9861 chore: half max number of sub-agents @jif-oai"

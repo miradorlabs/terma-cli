@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.167.0",
   "to": "0.167.1",
-  "generated_at": "2026-11-11T05:17:29.64320186Z",
+  "generated_at": "2026-11-11T23:00:33.595186074Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.167.0...rust-v0.167.1"
   },
@@ -12,19 +12,19 @@
     "text": "## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.167.0...rust-v0.167.1"
   },
   "summary": {
-    "changes": 10,
+    "changes": 8,
     "categories": {
       "cli": 2,
       "config": 1,
-      "filesystem": 7
+      "filesystem": 5
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 10,
+      "informational": 8,
       "notable": 0
     },
-    "undocumented": 10
+    "undocumented": 8
   },
   "changes": [
     {
@@ -117,76 +117,6 @@
         ],
         "gone": false
       },
-      "documented": false
-    },
-    {
-      "id": "filesystem.darwin/arm64.exec.<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
-      "category": "filesystem",
-      "op": "removed",
-      "path": [
-        "filesystem",
-        "darwin/arm64",
-        "exec",
-        "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git"
-      ],
-      "title": "Command no longer run: `<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find gi …` (darwin/arm64)",
-      "impact": "informational",
-      "before": {
-        "argv": [
-          "<xcode>/usr/bin/xcodebuild",
-          "-sdk",
-          "<xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
-          "-find",
-          "git"
-        ],
-        "by": "sh",
-        "count": 1,
-        "parents": [
-          "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
-        ],
-        "phases": [
-          "turn"
-        ],
-        "role": "tool"
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "filesystem.darwin/arm64.exec.sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null",
-      "category": "filesystem",
-      "op": "removed",
-      "path": [
-        "filesystem",
-        "darwin/arm64",
-        "exec",
-        "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
-      ],
-      "title": "Command no longer run: `sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -f …` (darwin/arm64)",
-      "impact": "informational",
-      "before": {
-        "argv": [
-          "sh",
-          "-c",
-          "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
-        ],
-        "by": "git",
-        "count": 1,
-        "parents": [
-          "git status --short"
-        ],
-        "phases": [
-          "turn"
-        ],
-        "role": "tool"
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
       "documented": false
     },
     {
