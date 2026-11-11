@@ -151,15 +151,35 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		probed := make([]*Probes, len(todo))
 		var wg sync.WaitGroup
 		sem := make(chan struct{}, probeParallel)
+		// A vendor that refused its key once this run (revoked, out of credit) is not asked again
+		// for its other models: each would be refused the same.
+		var mu sync.Mutex
+		refused := map[string]string{}
 		for i, s := range todo {
 			wg.Go(func() {
 				sem <- struct{}{}
 				defer func() { <-sem }()
-				probed[i] = probe(s)
+				mu.Lock()
+				_, skip := refused[s.Vendor]
+				mu.Unlock()
+				if skip {
+					return
+				}
+				p := probe(s)
+				if p != nil && p.keyRefused {
+					mu.Lock()
+					refused[s.Vendor] = strings.Join(p.Errors, "; ")
+					mu.Unlock()
+				}
+				probed[i] = p
 			})
 		}
 		wg.Wait()
 		keyWide(todo, probed)
+		for _, v := range sortedKeys(refused) {
+			// A GitHub workflow command, so the run shows it: the key needs someone.
+			fmt.Printf("::warning::%s refused the reference's key, its models not probed this run: %s\n", v, refused[v])
+		}
 		for i, p := range probed {
 			if p != nil && !p.unanswered["baseline"] {
 				observed = append(observed, todo[i].ID)
@@ -274,6 +294,15 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		return nil, err
 	}
 	return res, nil
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // keyWide drops the probes of a vendor whose every probed model, two or more, was refused as

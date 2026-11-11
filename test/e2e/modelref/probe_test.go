@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -364,5 +365,39 @@ func TestTokenizerLikeIsAChange(t *testing.T) {
 	tl := readTimeline(t, dir, "claude-fable-5-1")
 	if len(tl.Steps) != 2 || tl.Steps[0].Changes[0].Title != "Counts tokens the same as claude-fable-5-2" {
 		t.Errorf("fable 5.1 timeline = %+v", tl.Steps)
+	}
+}
+
+// A vendor that refuses the key once is not asked again that run: its other models wait.
+func TestAKeyRefusedStopsTheVendor(t *testing.T) {
+	var mu sync.Mutex
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"invalid x-api-key"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient()
+	c.wait, c.tries = time.Millisecond, 1
+	c.rewrite = func(u string) string { return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+	probe := func(s *Snapshot) *Probes { return anthropicProbe(context.Background(), c, "k", s) }
+	var obs []observation
+	for _, id := range []string{"claude-a-1", "claude-b-1", "claude-c-1", "claude-d-1", "claude-e-1", "claude-f-1", "claude-g-1", "claude-h-1"} {
+		obs = append(obs, docsObs(id, map[string]any{}))
+	}
+	prev, _ := readPublished(t.TempDir())
+	res, err := publish(t.TempDir(), testRun(testNow, obs...), prev, nil, nil, probe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.observed) != 0 {
+		t.Errorf("observed %v", res.observed)
+	}
+	// At most the models already in flight when the first refusal came back (probeParallel).
+	if calls > probeParallel {
+		t.Errorf("%d requests for a refused key, want at most %d", calls, probeParallel)
 	}
 }

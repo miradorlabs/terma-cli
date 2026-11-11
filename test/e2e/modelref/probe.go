@@ -91,6 +91,7 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 			// Refused for the key's own reasons (revoked, out of credit, over its budget): nothing
 			// of the model was observed, and what the probes saw before stands.
 			p.Errors = append(p.Errors, fmt.Sprintf("baseline: %d %s", r.Status, r.Error))
+			p.keyRefused = true
 			return unanswered(p, t)
 		}
 		p.Params[pc.name] = r

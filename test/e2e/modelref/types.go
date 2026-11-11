@@ -125,6 +125,9 @@ type Probes struct {
 	// was not read: what they said before stands (keepUnobserved).
 	unanswered   map[string]bool
 	streamMissed bool
+	// keyRefused says the plain request was refused for the key's own reasons: the vendor's other
+	// models are not probed this run.
+	keyRefused bool
 }
 
 // ProbeResult is what the API did with one probe request.

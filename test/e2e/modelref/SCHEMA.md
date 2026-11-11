@@ -33,7 +33,8 @@ run (an outage, no key) keeps what it said before: a vendor's outage never reads
 going away. A model is "unlisted" only when every vendor list that named it (its docs, and its API
 where the API lists the models it serves) was read without it; a list whose model page could not be
 read that run still lists it, with what the page said before. A changelog not read keeps the
-entries the notes had of it.
+entries the notes had of it. (A Google page listing several model codes is known by the code its
+link names: a variant whose page is not read for a run is unlisted and listed again the next.)
 
 ## Layout
 
@@ -235,6 +236,12 @@ What each build the Harness Reference tracks uses, by harness id and version: `c
 build whose models were not captured, else its `uses` (`model` as the harness writes it, `role`,
 `label`, the `params` a default model is sent with). It lets a run read only the builds it has not
 read before; a model's `harnesses` are derived from it.
+
+## probes.json
+
+Run state, not reference data: by model id, when its probes last observed it (the plain request
+answered, or refused as the model's). `-probe daily` probes a model a day after that; a model the API
+keeps failing is due again next run. Readers have no use for it.
 
 ## recent.json
 
