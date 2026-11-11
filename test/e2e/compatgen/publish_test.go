@@ -99,10 +99,70 @@ func TestPublishTwoNights(t *testing.T) {
 	write(between, "docs/compat/history.json", "not to be published\n")
 	run(between, "bash", script, "publish-reference")
 
+	// The Model Reference publishes its own tree, twice: the second run starts from the first's,
+	// with the Harness Reference beside it to read, and changes nothing else.
+	for i, content := range []string{"models 1\n", "models 2\n"} {
+		models := filepath.Join(tmp, "models"+string(rune('1'+i)))
+		run(tmp, "git", "clone", "-q", "-b", "main", origin, models)
+		run(models, "bash", script, "restore-models")
+		if _, err := os.Stat(filepath.Join(models, "docs/harnesses")); err == nil {
+			t.Fatal("restore-models put back the Harness Reference, which it reads from where it is published")
+		}
+		if i == 1 {
+			if b, err := os.ReadFile(filepath.Join(models, "docs/models/index.json")); err != nil || string(b) != "models 1\n" {
+				t.Fatalf("restore-models put back %q (%v)", b, err)
+			}
+		}
+		write(models, "docs/models/index.json", content)
+		write(models, "docs/harnesses/index.json", "not to be published\n")
+		if s := run(models, "git", "status", "--porcelain"); s != "" {
+			t.Fatalf("the Model Reference is not ignored on main:\n%s", s)
+		}
+		if i == 1 {
+			// Another job publishes while this one renders: its publish starts from the branch as
+			// it is then, and keeps what the other published.
+			other := filepath.Join(tmp, "other")
+			run(tmp, "git", "clone", "-q", "-b", "main", origin, other)
+			run(other, "bash", script, "restore")
+			write(other, "docs/harnesses/claude/versions/1.0.3.json", "meanwhile\n")
+			run(other, "bash", script, "publish-reference")
+		}
+		run(models, "bash", script, "publish-models")
+	}
+	// A run that changed nothing commits nothing.
+	same := filepath.Join(tmp, "models-same")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, same)
+	run(same, "bash", script, "restore-models")
+	run(same, "bash", script, "publish-models")
+	// And the Harness Reference's next publish leaves the Model Reference where it is.
+	after := filepath.Join(tmp, "after")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, after)
+	run(after, "bash", script, "restore")
+	write(after, "docs/harnesses/claude/versions/1.0.1.json", "between\n")
+	write(after, "docs/harnesses/claude/versions/1.0.2.json", "after\n")
+	run(after, "bash", script, "publish-reference")
+
+	// An origin that cannot be read fails the restore: starting from nothing would publish every
+	// model as new.
+	lost := filepath.Join(tmp, "lost")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, lost)
+	run(lost, "git", "remote", "set-url", "origin", filepath.Join(tmp, "gone.git"))
+	cmd := exec.Command("bash", script, "restore-models")
+	cmd.Dir = lost
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "cannot read origin's compat-matrix") {
+		t.Errorf("restore-models went on without its origin (%v):\n%s", err, out)
+	}
+
 	check := filepath.Join(tmp, "check")
 	run(tmp, "git", "clone", "-q", "-b", "compat-matrix", origin, check)
-	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "3" {
-		t.Errorf("compat-matrix has %s commits, want one a night and the check's", n)
+	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "7" {
+		t.Errorf("compat-matrix has %s commits, want one a night, the checks' and two of the Model Reference's", n)
+	}
+	if b, err := os.ReadFile(filepath.Join(check, "docs/harnesses/claude/versions/1.0.3.json")); err != nil || string(b) != "meanwhile\n" {
+		t.Errorf("the Model Reference's publish lost what another job published meanwhile: %q (%v)", b, err)
+	}
+	if b, err := os.ReadFile(filepath.Join(check, "docs/models/index.json")); err != nil || string(b) != "models 2\n" {
+		t.Errorf("compat-matrix has the Model Reference as %q (%v)", b, err)
 	}
 	if b, err := os.ReadFile(filepath.Join(check, "docs/harnesses/claude/versions/1.0.1.json")); err != nil || string(b) != "between\n" {
 		t.Errorf("the check's reference was not published: %q (%v)", b, err)

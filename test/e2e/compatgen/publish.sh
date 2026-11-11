@@ -8,11 +8,30 @@
 #   publish-reference
 #            commits the reference alone (the frequent check's new builds, reference.yml),
 #            leaving the night's matrix and catalog as they are
+#   restore-models
+#            puts back the Model Reference (docs/models) as last published
+#   publish-models
+#            commits the Model Reference alone (models.yml), leaving the rest as it is
 #
 # What they write is generated, and git-ignored on every other branch.
 set -euo pipefail
 
 branch=compat-matrix
+
+# branch_exists says the branch is on origin: false (status 1) where origin answers that it is
+# not; any other failure to ask (the network, credentials) stops the script.
+branch_exists() {
+	local status=0
+	git ls-remote --exit-code --heads origin "$branch" >/dev/null || status=$?
+	case $status in
+	0) return 0 ;;
+	2) return 1 ;;
+	*)
+		echo "cannot read origin's $branch (git ls-remote exited $status)" >&2
+		exit 1
+		;;
+	esac
+}
 
 case "${1:-}" in
 restore)
@@ -83,8 +102,47 @@ publish-reference)
 	git commit -q -m "reference: ${TERMA_REFERENCE_BUILDS:-new builds}, $(date -u +%FT%RZ)"
 	git push -q origin "$branch"
 	;;
+restore-models)
+	# The Model Reference merges into what it last published: that alone, from the branch's
+	# newest commit (it reads the Harness Reference from where it is published).
+	# A branch not there yet is a first run; a branch that could not be read fails the run,
+	# which would otherwise start from nothing and publish every model as new.
+	branch_exists || exit 0
+	git fetch -q --depth=1 origin "$branch"
+	rm -rf docs/models
+	if git cat-file -e "origin/$branch:docs/models" 2>/dev/null; then
+		git archive "origin/$branch" docs/models | tar -x
+	fi
+	;;
+publish-models)
+	[ -d docs/models ] || exit 0
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' EXIT
+	cp -R docs/models "$tmp/"
+	rm -rf docs/models
+	git config user.name "terma-compat"
+	git config user.email "terma-compat@users.noreply.github.com"
+	# The branch as it is now (another job may have published since the restore), its newest
+	# commit, with only docs/models in the working tree: the rest of the branch is committed
+	# as it stands, never checked out.
+	if branch_exists; then
+		git fetch -q --depth=1 origin "$branch"
+		git sparse-checkout set --no-cone /docs/models/
+		git checkout -q -B "$branch" "origin/$branch"
+	else
+		git checkout -q --orphan "$branch"
+		git rm -rq --cached . && git clean -fdxq
+	fi
+	mkdir -p docs
+	rm -rf docs/models
+	cp -R "$tmp/models" docs/models
+	git add -A -f --sparse docs/models
+	if git diff --cached --quiet; then exit 0; fi
+	git commit -q -m "models: ${TERMA_MODELS_SUMMARY:-changes}, $(date -u +%FT%RZ)"
+	git push -q origin "$branch"
+	;;
 *)
-	echo "usage: $0 restore|publish|publish-reference" >&2
+	echo "usage: $0 restore|publish|publish-reference|restore-models|publish-models" >&2
 	exit 2
 	;;
 esac
