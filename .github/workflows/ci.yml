@@ -15,13 +15,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Linux jobs run on Blacksmith (Ubuntu 24.04), as mirador-platform's do: their apt mirrors
+# and network are not GitHub-hosted runners'. macOS and Windows stay on GitHub's.
 jobs:
   npm-installer:
+    # The check keeps its name (`npm-installer (ubuntu-latest)` is required): a matrix job's
+    # default name would list `runner` too.
+    name: npm-installer (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+            runner: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ${{ matrix.runner || matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
@@ -30,7 +38,7 @@ jobs:
       - run: npm test --prefix npm
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
 
@@ -116,7 +124,7 @@ jobs:
   # The same through the Secret Service a Linux desktop runs (GNOME Keyring), unlocked
   # in a D-Bus session of its own; macOS's Keychain is exercised by hand.
   keychain-linux:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -134,7 +142,7 @@ jobs:
 
   # The e2e suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: test/e2e
@@ -230,7 +238,7 @@ jobs:
   # plugin directory and ships in the release archives. `make test-plugin` skips it
   # wherever bun is absent, so CI is where it is actually run.
   opencode-plugin:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: internal/agents/opencode/plugin
@@ -244,7 +252,7 @@ jobs:
   # terma setup's git hook scripts run on every developer's machine: they must be
   # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
   shim-portability:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -262,7 +270,7 @@ jobs:
   # real release's does (a --snapshot build's would not, and `brew audit` rejects
   # it). Nothing is published. The two jobs after this one install what it built.
   release-dry-run:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
         with:
@@ -298,7 +306,7 @@ jobs:
   # scripts/test-install.sh.
   install-script:
     needs: release-dry-run
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
