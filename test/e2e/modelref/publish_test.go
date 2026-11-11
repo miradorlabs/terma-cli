@@ -203,6 +203,9 @@ func TestAnnouncements(t *testing.T) {
 	if !strings.HasPrefix(text, "Claude Fable 5.3 is out: 1M context, 128K output.\nNew since Claude Fable 5.2:") {
 		t.Errorf("post:\n%s", text)
 	}
+	if got := slackEscape("Use <tool> & `computer_20251124`"); got != "Use &lt;tool&gt; &amp; `computer_20251124`" {
+		t.Errorf("slackEscape = %q", got)
+	}
 	data, _ := json.Marshal(a[0].Slack)
 	if !strings.Contains(string(data), `"View the notes"`) || !strings.Contains(string(data), "Thinking is always on") {
 		t.Errorf("slack = %s", data)

@@ -182,8 +182,8 @@ func apiError(body []byte) string {
 		msg = strings.TrimSpace(string(body))
 	}
 	msg = reRequestID.ReplaceAllString(msg, "<id>")
-	if len(msg) > 400 {
-		msg = msg[:400] + "…"
+	if r := []rune(msg); len(r) > 400 {
+		msg = string(r[:400]) + "…"
 	}
 	return msg
 }

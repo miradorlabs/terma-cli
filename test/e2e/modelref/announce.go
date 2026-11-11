@@ -153,15 +153,15 @@ func nameOf(id string, snaps map[string]*Snapshot) string {
 // slackMessage is a as a Slack message: its headline, what is new against the model before, and
 // a button to its notes.
 func slackMessage(a Announcement, snaps map[string]*Snapshot) *SlackMessage {
-	summary := fmt.Sprintf("*%s* is out (%s)", a.Name, vendorName(a.Vendor))
+	summary := fmt.Sprintf("*%s* is out (%s)", slackEscape(a.Name), vendorName(a.Vendor))
 	if len(a.Facts) > 0 {
-		summary += ": " + strings.Join(a.Facts, " · ")
+		summary += ": " + slackEscape(strings.Join(a.Facts, " · "))
 	}
 	blocks := []SlackBlock{{Type: "section", Text: &SlackText{Type: "mrkdwn", Text: summary}}}
 	if len(a.Highlights) > 0 {
-		lines := []string{newsHead(a, snaps)}
+		lines := []string{slackEscape(newsHead(a, snaps))}
 		for _, h := range a.Highlights {
-			lines = append(lines, "• "+h)
+			lines = append(lines, "• "+slackEscape(h))
 		}
 		blocks = append(blocks, SlackBlock{Type: "section", Text: &SlackText{Type: "mrkdwn", Text: strings.Join(lines, "\n")}})
 	}
@@ -177,4 +177,10 @@ func newsHead(a Announcement, snaps map[string]*Snapshot) string {
 		return "New since " + nameOf(*a.Predecessor, snaps) + ":"
 	}
 	return "What's new:"
+}
+
+// slackEscape is s as Slack's mrkdwn shows it as written: the three characters it reads as markup
+// (a link, a mention) escaped, as Slack asks.
+func slackEscape(s string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }

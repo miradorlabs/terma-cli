@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // A fake Messages API: it refuses temperature (with a request id in its message), is always
@@ -203,5 +204,13 @@ func TestProbeUnavailableModel(t *testing.T) {
 	p := anthropicProbe(context.Background(), c, "k", &Snapshot{ID: "claude-mythos-5-2", Facts: map[string]any{}})
 	if p.Unavailable != "404 model: claude-mythos-5-2" || len(p.Params) != 0 || p.Tokens != nil || calls != 1 {
 		t.Errorf("probes = %+v after %d requests", p, calls)
+	}
+}
+
+// A long refusal is cut at a character, never inside one.
+func TestAPIErrorCutsAtACharacter(t *testing.T) {
+	msg := apiError([]byte(`{"error":{"message":"` + strings.Repeat("é", 450) + `"}}`))
+	if !utf8.ValidString(msg) || utf8.RuneCountInString(msg) != 401 {
+		t.Errorf("cut to %d runes, valid %v", utf8.RuneCountInString(msg), utf8.ValidString(msg))
 	}
 }
