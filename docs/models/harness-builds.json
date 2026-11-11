@@ -7318,7 +7318,7 @@
           ]
         },
         "2.1.322": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-11T23:00:33.595186074Z",
           "captured": true,
           "uses": [
             {
@@ -10082,7 +10082,7 @@
           ]
         },
         "0.167.0": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-11T23:00:33.595186074Z",
           "captured": true,
           "uses": [
             {
@@ -10114,7 +10114,39 @@
           ]
         },
         "0.167.1": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-11T23:00:33.595186074Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "gpt-6.1-sol",
+              "role": "default",
+              "params": {
+                "include": [
+                  "reasoning.encrypted_content"
+                ],
+                "parallel_tool_calls": false,
+                "reasoning": {
+                  "context": "all_turns",
+                  "effort": "low"
+                },
+                "text": {
+                  "verbosity": "low"
+                },
+                "tool_choice": "auto"
+              }
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "role": "compaction"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "role": "subagents"
+            }
+          ]
+        },
+        "0.167.2": {
+          "captured_at": "2026-11-11T23:00:33.595186074Z",
           "captured": true,
           "uses": [
             {
@@ -13092,11 +13124,11 @@
           "captured": false
         },
         "0.67.0": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-11T23:00:33.595186074Z",
           "captured": true
         },
         "0.68.0": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-11T23:00:33.595186074Z",
           "captured": true
         }
       }
