@@ -33,6 +33,9 @@ const (
 	otlpLogsPath = "/v1/logs"
 	serviceName  = "terma-cli"
 	sendTimeout  = 15 * time.Second
+	// uploadFloor is the slowest uplink a request is given time for, past sendTimeout: a
+	// request of an image's 2.8 MB has about a minute, one of small events 15 s.
+	uploadFloor  = 64 << 10 // bytes a second
 	severityInfo = 9
 	severityText = "INFO"
 )
@@ -118,11 +121,16 @@ func arrayOf[T any](items []T) *otlpValues {
 	return &otlpValues{Values: values}
 }
 
+// timeoutFor is how long a request of n bytes may take.
+func timeoutFor(n int) time.Duration {
+	return sendTimeout + time.Duration(n)*time.Second/uploadFloor
+}
+
 // newHTTPClient refuses redirects: Go keeps the Authorization header on a same-host
 // https→http downgrade, which would send the server key in cleartext.
+// Each request's own deadline, which grows with its body, bounds it.
 func newHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: sendTimeout,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refusing to follow redirect to %s: the OTLP endpoint does not redirect log exports", req.URL.Redacted())
 		},
@@ -185,7 +193,7 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	if client == nil {
 		client = newHTTPClient()
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	ctx, cancel := context.WithTimeout(ctx, timeoutFor(len(body)))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.Endpoint+otlpLogsPath, bytes.NewReader(body))
 	if err != nil {

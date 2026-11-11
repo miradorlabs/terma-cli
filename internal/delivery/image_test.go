@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -237,8 +239,17 @@ func TestAWaitingRecordKeepsItsImage(t *testing.T) {
 // up nothing after it.
 func TestAnImageRefusedOutrightLeavesWithoutItsBytes(t *testing.T) {
 	t.Parallel()
+	for _, status := range []int{http.StatusBadRequest, http.StatusRequestEntityTooLarge} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			t.Parallel()
+			refusedOutright(t, status)
+		})
+	}
+}
+
+func refusedOutright(t *testing.T, status int) {
 	data := base64.StdEncoding.EncodeToString(pixel)
-	rec := &recorder{status: http.StatusBadRequest, refuse: func(body string) bool { return strings.Contains(body, data) }}
+	rec := &recorder{status: status, refuse: func(body string) bool { return strings.Contains(body, data) }}
 	r, s, cfg, stateDir := imageFixture(t, rec, true)
 	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
 	if err := promptimage.Store(stateDir, img); err != nil {
@@ -258,5 +269,84 @@ func TestAnImageRefusedOutrightLeavesWithoutItsBytes(t *testing.T) {
 	}
 	if left, _ := s.Peek(10); len(left) != 0 {
 		t.Fatalf("spool holds %+v", left)
+	}
+}
+
+// An image that does not get through in its time (a slow uplink) is no news about the host:
+// it waits for the next pass without backing off the project, whose other events went.
+func TestAStalledImageDoesNotHoldUpItsProject(t *testing.T) {
+	t.Parallel()
+	cfgDir, stateDir := t.TempDir(), t.TempDir()
+	var bodies []string
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+		if strings.Contains(string(b), semconv.TermaPromptImageEvent) {
+			conn, _, _ := w.(http.Hijacker).Hijack() // the upload never completes
+			_ = conn.Close()
+		}
+	}))
+	t.Cleanup(srv.Close)
+	if err := keystore.Set(cfgDir, "p1", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now(), IncludePrompts: true, IncludeToolContent: true}
+	r := Router{ConfigDir: cfgDir, StateDir: stateDir, OTLPPinned: true,
+		Policy:  func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil },
+		Consent: func(string, hookrun.Consent) bool { return true }}
+	first := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
+	second := promptimage.Image{Data: append(append([]byte{}, pixel...), 0), MIMEType: "image/png", Index: 2}
+	for _, img := range []promptimage.Image{first, second} {
+		if err := promptimage.Store(stateDir, img); err != nil {
+			t.Fatal(err)
+		}
+	}
+	quota := spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}
+	if err := s.Append(imageEvent(first), quota, imageEvent(second)); err != nil {
+		t.Fatal(err)
+	}
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 1 || len(res.Failures) != 0 {
+		t.Fatalf("Flush = %+v", res)
+	}
+	if !s.RetryAt("p1").IsZero() {
+		t.Fatal("a stalled image backed off its project")
+	}
+	if len(bodies) != 2 {
+		t.Fatalf("%d requests; want the events, then one image and no more this pass", len(bodies))
+	}
+	left, err := s.Peek(10)
+	if err != nil || len(left) != 2 || !isImage(left[0]) || !isImage(left[1]) {
+		t.Fatalf("spool holds %+v, %v", left, err)
+	}
+	for _, img := range []promptimage.Image{first, second} {
+		if _, ok := promptimage.Load(stateDir, img.ID()); !ok {
+			t.Fatal("a waiting image's bytes were forgotten")
+		}
+	}
+}
+
+// A flush prunes bytes older than any record the spool still keeps.
+func TestFlushPrunesImagesNoRecordOutlives(t *testing.T) {
+	t.Parallel()
+	r, s, cfg, stateDir := imageFixture(t, &recorder{}, true)
+	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
+	if err := promptimage.Store(stateDir, img); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-spool.MaxAge - time.Hour)
+	if err := os.Chtimes(filepath.Join(promptimage.Dir(stateDir), img.ID()), old, old); err != nil {
+		t.Fatal(err)
+	}
+	r.Flush(t.Context(), s, cfg, true, 0)
+	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
+		t.Fatal("bytes older than the spool keeps records outlived a flush")
 	}
 }

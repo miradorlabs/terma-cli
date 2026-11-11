@@ -163,6 +163,11 @@ func claudePromptFrom(line []byte) (claudePrompt, bool) {
 	if !bytes.Contains(line, []byte(`"image"`)) || !bytes.Contains(line, []byte(`"user"`)) {
 		return claudePrompt{}, false
 	}
+	// A tool's result (a screenshot it read, its base64 twice over) is stepped over undecoded,
+	// unless the record also numbers pastes of its own.
+	if bytes.Contains(line, []byte(`"tool_use_id"`)) && !bytes.Contains(line, []byte(`"imagePasteIds"`)) {
+		return claudePrompt{}, false
+	}
 	var rec claudeUserRecord
 	if json.Unmarshal(line, &rec) != nil || rec.Type != "user" || rec.IsSidechain || rec.Message.Role != "user" {
 		return claudePrompt{}, false

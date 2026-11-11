@@ -209,6 +209,27 @@ func (s *Spool) Writable() error {
 	return f.Sync()
 }
 
+// Mentions reports which of the needles appear in a queued event's line. It reads the file
+// as it stands, without the append lock or decoding a line: an append is whole lines and a
+// rewrite an atomic rename, so a needle unique enough to name one thing (a sha256) is
+// found wherever it is queued, and a false match only says too much.
+func (s *Spool) Mentions(needles []string) (map[string]bool, error) {
+	data, err := os.ReadFile(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	found := map[string]bool{}
+	for _, n := range needles {
+		if n != "" && bytes.Contains(data, []byte(n)) {
+			found[n] = true
+		}
+	}
+	return found, nil
+}
+
 // Peek returns up to n queued events without consuming them.
 func (s *Spool) Peek(n int) ([]Event, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), localLockTimeout)

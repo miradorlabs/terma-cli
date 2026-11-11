@@ -455,3 +455,21 @@ func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 		t.Fatal("a spool whose queue cannot be written must report an error")
 	}
 }
+
+// Mentions finds a needle anywhere in a queued line, without decoding it.
+func TestMentions(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Mentions([]string{"abc"}); err != nil || len(got) != 0 {
+		t.Fatalf("empty spool: %v, %v", got, err)
+	}
+	if err := s.Append(Event{Name: "x", Attrs: map[string]any{"id": "abc123"}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Mentions([]string{"abc123", "def456", ""})
+	if err != nil || !got["abc123"] || got["def456"] || got[""] {
+		t.Fatalf("Mentions = %v, %v", got, err)
+	}
+}
