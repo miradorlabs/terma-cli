@@ -11,13 +11,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"image"
 	_ "image/gif"  // DecodeConfig reads GIF headers
 	_ "image/jpeg" // and JPEG's
 	_ "image/png"  // and PNG's
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -33,7 +33,8 @@ const DirName = "images"
 // 3.5 MB the platform takes in one record. A larger one is sent as what it is, without its bytes.
 const MaxBytes = 2 << 20
 
-// maxStoreBytes bounds the folder: past it an image is not kept, and its record says so.
+// maxStoreBytes bounds the folder: past it the oldest images make room for a new one, and
+// a record whose bytes went that way leaves without them.
 const maxStoreBytes = 256 << 20
 
 // Image is one image a user put in a prompt.
@@ -184,11 +185,21 @@ func ValidID(id string) bool {
 	return true
 }
 
-// ErrStoreFull is Store refusing an image the folder has no room for.
-var ErrStoreFull = errors.New("image store full")
+// Keep is what a terma.prompt.image record says of img, its bytes aside, and keeps those
+// bytes under stateDir for delivery when collect says the team takes them: an image the
+// policy withholds never leaves, so its bytes are not copied. An error is a store that could
+// not keep them; the record still says what the image was.
+func Keep(stateDir string, img Image, collect bool) (map[string]any, error) {
+	attrs := img.Attrs()
+	if !collect {
+		return attrs, nil
+	}
+	return attrs, Store(stateDir, img)
+}
 
-// Store keeps the image's bytes under stateDir until delivery sends them, once per id. An
-// image over MaxBytes is never sent, so it is not kept.
+// Store keeps the image's bytes under stateDir until delivery has sent every record that
+// names them, once per id, the oldest images going first when the folder is full. An image
+// over MaxBytes is never sent, so it is not kept.
 func Store(stateDir string, img Image) error {
 	if len(img.Data) == 0 || len(img.Data) > MaxBytes {
 		return nil
@@ -196,32 +207,49 @@ func Store(stateDir string, img Image) error {
 	dir := Dir(stateDir)
 	path := filepath.Join(dir, img.ID())
 	if _, err := os.Stat(path); err == nil {
-		// Touched, so an image pasted again outlives the prune of the first paste.
+		// Touched, so an image pasted again outlives the prune of the first paste, and a
+		// pass already sending it keeps it for the new record.
 		now := time.Now()
 		return os.Chtimes(path, now, now)
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if used(dir)+int64(len(img.Data)) > maxStoreBytes {
-		return ErrStoreFull
-	}
+	makeRoom(dir, int64(len(img.Data)), maxStoreBytes)
 	return config.WriteFileAtomicNoSync(path, img.Data, 0o600)
 }
 
-// used is the bytes the folder's images take.
-func used(dir string) int64 {
+// makeRoom removes the oldest images until n more bytes fit under limit.
+func makeRoom(dir string, n, limit int64) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return 0
+		return
 	}
-	var n int64
+	type stored struct {
+		name string
+		size int64
+		mod  time.Time
+	}
+	var files []stored
+	var used int64
 	for _, e := range entries {
 		if info, err := e.Info(); err == nil && info.Mode().IsRegular() {
-			n += info.Size()
+			files = append(files, stored{e.Name(), info.Size(), info.ModTime()})
+			used += info.Size()
 		}
 	}
-	return n
+	if used+n <= limit {
+		return
+	}
+	slices.SortFunc(files, func(a, b stored) int { return a.mod.Compare(b.mod) })
+	for _, f := range files {
+		if used+n <= limit {
+			return
+		}
+		if os.Remove(filepath.Join(dir, f.name)) == nil {
+			used -= f.size
+		}
+	}
 }
 
 // Load is the stored image id's bytes in base64, false when the store no longer has it.
@@ -236,10 +264,18 @@ func Load(stateDir, id string) (string, bool) {
 	return base64.StdEncoding.EncodeToString(b), true
 }
 
-// Remove forgets the stored image id, once a record has carried it.
-func Remove(stateDir, id string) {
-	if ValidID(id) {
-		_ = os.Remove(filepath.Join(Dir(stateDir), id))
+// Sweep forgets the stored images ids that no record still waiting names (named false),
+// unless stored or touched since since: a hook keeping one again while delivery ran has a
+// record on its way that needs it.
+func Sweep(stateDir string, ids []string, named func(id string) bool, since time.Time) {
+	for _, id := range ids {
+		if !ValidID(id) || named(id) {
+			continue
+		}
+		path := filepath.Join(Dir(stateDir), id)
+		if info, err := os.Stat(path); err == nil && info.ModTime().Before(since) {
+			_ = os.Remove(path)
+		}
 	}
 }
 

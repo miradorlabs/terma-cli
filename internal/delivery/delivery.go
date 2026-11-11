@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
+	"net/http"
 	"slices"
 	"time"
 
@@ -77,6 +79,8 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	failed := map[string]bool{}
 	waiting := map[string]bool{}
 	accepted := map[string]bool{}
+	// The images this pass sent or let go; their bytes stay until no waiting record names them.
+	var images []string
 	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
 		byProject := map[string][]spool.Event{}
 		var held []spool.Event
@@ -86,6 +90,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			id, _ := e.Attrs[hookrun.AttrProjectID].(string)
 			if id == "" {
 				res.Unroutable++
+				images = appendImage(images, e)
 				continue
 			}
 			pol, checked := policies[id]
@@ -105,6 +110,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			out, ok := r.Outgoing(pol, id, e)
 			if !ok {
 				res.Withheld++
+				images = appendImage(images, e)
 				continue
 			}
 			byProject[id] = append(byProject[id], out)
@@ -144,21 +150,20 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				sender.UserID = r.User(cfg, id, endpoint)
 			}
 			// An image is a request of its own, after the rest: no batch outgrows what the
-			// platform takes in one, and a refused image holds up nothing sent before it.
-			requests, images := [][]spool.Event{}, []spool.Event{}
-			for _, e := range batch {
-				if e.Name == semconv.TermaPromptImageEvent {
-					images = append(images, e)
-				}
-			}
-			if rest := slices.DeleteFunc(slices.Clone(batch), func(e spool.Event) bool { return e.Name == semconv.TermaPromptImageEvent }); len(rest) > 0 {
+			// platform takes in one, and a refused image holds up nothing sent before it. Its
+			// bytes are read only for its own request.
+			var requests [][]spool.Event
+			if rest := slices.DeleteFunc(slices.Clone(batch), isImage); len(rest) > 0 {
 				requests = append(requests, rest)
 			}
-			for _, e := range images {
-				requests = append(requests, []spool.Event{withImageData(r.StateDir, e)})
+			for _, e := range batch {
+				if isImage(e) {
+					requests = append(requests, []spool.Event{e})
+				}
 			}
 			for i, req := range requests {
-				if _, err := sender.Send(ctx, wire(req)); err != nil {
+				err := r.send(ctx, sender, req)
+				if err != nil {
 					failed[id] = true
 					f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
 					// A pass cut short by its own deadline learned nothing about the host.
@@ -168,7 +173,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 					res.Failures = append(res.Failures, f)
 					errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
 					for _, left := range requests[i:] {
-						undelivered = append(undelivered, withoutImageData(left)...)
+						undelivered = append(undelivered, left...)
 					}
 					break
 				}
@@ -176,10 +181,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				accepted[endpoint] = true
 				res.Sent += len(req)
 				for _, e := range req {
-					if e.Name == semconv.TermaPromptImageEvent {
-						imageID, _ := e.Attrs[semconv.TermaImageIDKey].(string)
-						promptimage.Remove(r.StateDir, imageID)
-					}
+					images = appendImage(images, e)
 				}
 			}
 		}
@@ -189,6 +191,9 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 		return held, nil
 	})
 	fr := s.Flush(ctx, router, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
+	if len(images) > 0 {
+		r.forgetImages(s, images, now)
+	}
 	res.Endpoints = slices.Sorted(maps.Keys(accepted))
 	// Loss is the spool's to report; Sent is the router's per-project count.
 	res.Held = fr.Held
@@ -238,8 +243,58 @@ func (r Router) Endpoint(cfg *config.Config, projectID string) string {
 	return cfg.OTLPURL
 }
 
-// withImageData is an image's record as it leaves: with the image's bytes from the store,
-// or saying they are gone. One that never had any to send (too_large) leaves as it is.
+// isImage reports whether e is a terma.prompt.image record.
+func isImage(e spool.Event) bool { return e.Name == semconv.TermaPromptImageEvent }
+
+// appendImage adds e's image id to ids, when e is an image record.
+func appendImage(ids []string, e spool.Event) []string {
+	if id, ok := e.Attrs[semconv.TermaImageIDKey].(string); ok && isImage(e) {
+		return append(ids, id)
+	}
+	return ids
+}
+
+// send sends one request; an image's carries its bytes from the store. An image the platform
+// refuses outright (a 400 or 413: the record, not the host or the key) goes again without
+// them, saying so, rather than holding up every image after it for as long as it waits.
+func (r Router) send(ctx context.Context, sender *otlpSender, req []spool.Event) error {
+	if len(req) != 1 || !isImage(req[0]) {
+		_, err := sender.Send(ctx, wire(req))
+		return err
+	}
+	e := withImageData(r.StateDir, req[0])
+	_, err := sender.Send(ctx, wire([]spool.Event{e}))
+	var ingest *IngestError
+	if _, carried := e.Attrs[semconv.TermaImageDataKey]; !carried || !errors.As(err, &ingest) ||
+		ingest.Status != http.StatusBadRequest && ingest.Status != http.StatusRequestEntityTooLarge {
+		return err
+	}
+	delete(e.Attrs, semconv.TermaImageDataKey)
+	e.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedRefused
+	_, err = sender.Send(ctx, wire([]spool.Event{e}))
+	return err
+}
+
+// forgetImages removes the stored bytes of the images ids this pass sent or let go that no
+// record still in the spool names: a replayed batch, or another prompt with the same image
+// still waiting, keeps them. Prune and the store's bound clear what this misses.
+func (r Router) forgetImages(s *spool.Spool, ids []string, passStart time.Time) {
+	waiting, err := s.Peek(math.MaxInt)
+	if err != nil {
+		return
+	}
+	named := map[string]bool{}
+	for _, e := range waiting {
+		if isImage(e) {
+			if id, ok := e.Attrs[semconv.TermaImageIDKey].(string); ok {
+				named[id] = true
+			}
+		}
+	}
+	promptimage.Sweep(r.StateDir, ids, func(id string) bool { return named[id] }, passStart)
+}
+
+// withImageData is the image record e with its bytes from the store, or saying they are gone.
 func withImageData(stateDir string, e spool.Event) spool.Event {
 	if _, omitted := e.Attrs[semconv.TermaImageOmittedKey]; omitted {
 		return e
@@ -252,17 +307,4 @@ func withImageData(stateDir string, e spool.Event) spool.Event {
 		e.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedUnavailable
 	}
 	return e
-}
-
-// withoutImageData is events as the spool keeps them: an image's bytes stay in the store.
-func withoutImageData(events []spool.Event) []spool.Event {
-	out := make([]spool.Event, len(events))
-	for i, e := range events {
-		if _, ok := e.Attrs[semconv.TermaImageDataKey]; ok {
-			e.Attrs = maps.Clone(e.Attrs)
-			delete(e.Attrs, semconv.TermaImageDataKey)
-		}
-		out[i] = e
-	}
-	return out
 }

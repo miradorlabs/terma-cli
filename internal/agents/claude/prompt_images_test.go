@@ -111,3 +111,31 @@ func mustDecode(t *testing.T, s string) []byte {
 	}
 	return b
 }
+
+// An image that cannot be read keeps its place: the next one is still the prompt's second,
+// under its own placeholder.
+func TestClaudeImagesKeepTheirPlace(t *testing.T) {
+	p, ok := claudePromptFrom([]byte(pastedRecord("u1", "p1", []int{3, 4}, "!!not base64", claudePixel)))
+	if !ok || len(p.Images) != 1 {
+		t.Fatalf("prompt = %+v, %v", p, ok)
+	}
+	if img := p.Images[0]; img.Index != 2 || img.Label != "[Image #4]" {
+		t.Fatalf("image = index %d label %q", img.Index, img.Label)
+	}
+}
+
+// A team that does not collect prompts never gets the image, so its bytes are not copied;
+// the record still says what was pasted, for delivery to withhold.
+func TestClaudeImagesKeepNoBytesWhenPromptsAreOff(t *testing.T) {
+	env := titleEnv(t)
+	env.Policy.IncludePrompts = false
+	path := transcript(t, t.TempDir(), pastedRecord("u1", "p1", []int{1}, claudePixel))
+	stopClaude(t, env, path)
+	if got := spooledImages(t, env.Spool); len(got) != 1 {
+		t.Fatalf("spooled %d images", len(got))
+	}
+	img, _ := promptimage.FromBase64("image/png", claudePixel)
+	if _, ok := promptimage.Load(env.StateDir, img.ID()); ok {
+		t.Fatal("bytes the team does not collect were kept")
+	}
+}

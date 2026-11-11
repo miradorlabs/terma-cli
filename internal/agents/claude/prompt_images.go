@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -75,20 +76,24 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 	if readErr == nil && json.Unmarshal(b, &last) != nil {
 		last = promptImageState{}
 	}
+	collect, _ := e.Policy.Content()
 	offset, err := readPromptImages(transcript, last.Offset, func(p claudePrompt) bool {
+		// A record with no id the platform can take is skipped before its bytes are kept.
+		ids := map[string]any{}
+		hookrun.BoundedAttr(ids, semconv.TermaMessageIDKey, p.UUID)
+		if ids[semconv.TermaMessageIDKey] == nil {
+			return true
+		}
+		hookrun.BoundedAttr(ids, semconv.TermaPromptIDKey, p.PromptID)
 		for _, img := range p.Images {
 			// A store that cannot keep the bytes still lets the record say what the image was.
-			if err := promptimage.Store(e.StateDir, img); err != nil {
+			attrs, err := promptimage.Keep(e.StateDir, img, collect)
+			if err != nil {
 				e.Logf("prompt image: %v", err)
 			}
-			attrs := img.Attrs()
 			attrs[semconv.GenAIMainAgentNameKey] = claudeTool
 			attrs[semconv.TermaEvidenceSourceKey] = sourceClaudeTranscript
-			hookrun.BoundedAttr(attrs, semconv.TermaMessageIDKey, p.UUID)
-			hookrun.BoundedAttr(attrs, semconv.TermaPromptIDKey, p.PromptID)
-			if attrs[semconv.TermaMessageIDKey] == nil {
-				continue
-			}
+			maps.Copy(attrs, ids)
 			// Unsent images stay past the stored offset, for the next stop; the platform folds a re-sent one away.
 			if !e.EmitFor(r, spool.Event{Time: p.Time, Name: semconv.TermaPromptImageEvent, SessionID: sessionID, Attrs: attrs}) {
 				return false
@@ -175,17 +180,24 @@ func claudePromptFrom(line []byte) (claudePrompt, bool) {
 		return claudePrompt{}, false
 	}
 	p := claudePrompt{UUID: rec.UUID, PromptID: rec.PromptID, Time: rec.Timestamp}
+	// n counts the record's image blocks, one that cannot be read included, so each image
+	// keeps its own position and placeholder.
+	n := 0
 	for _, b := range blocks {
-		if b.Type != "image" || b.Source.Type != "base64" {
+		if b.Type != "image" {
+			continue
+		}
+		n++
+		if b.Source.Type != "base64" {
 			continue
 		}
 		img, ok := promptimage.FromBase64(b.Source.MediaType, b.Source.Data)
 		if !ok {
 			continue
 		}
-		img.Index = len(p.Images) + 1
+		img.Index = n
 		// imagePasteIds numbers the record's images as its text's placeholders do.
-		if i := len(p.Images); i < len(rec.ImagePasteIDs) && rec.ImagePasteIDs[i] > 0 {
+		if i := n - 1; i < len(rec.ImagePasteIDs) && rec.ImagePasteIDs[i] > 0 {
 			img.Label = fmt.Sprintf("[Image #%d]", rec.ImagePasteIDs[i])
 		}
 		p.Images = append(p.Images, img)

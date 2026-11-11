@@ -409,6 +409,8 @@ const (
 	TermaImageOmittedTooLarge = "too_large"
 	// TermaImageOmittedUnavailable is terma.image.omitted unavailable: The image was no longer on the machine when the record was sent.
 	TermaImageOmittedUnavailable = "unavailable"
+	// TermaImageOmittedRefused is terma.image.omitted refused: The platform refused the record with its image; it was sent again without it.
+	TermaImageOmittedRefused = "refused"
 	// TermaInstallMethodScript is terma.install.method script: A release binary terma replaces itself, from the install script or a release archive downloaded by hand.
 	TermaInstallMethodScript = "script"
 	// TermaInstallMethodHomebrew is terma.install.method homebrew: Homebrew's, as a cask or a formula.

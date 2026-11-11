@@ -73,13 +73,14 @@ func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in 
 	}
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
+	collect, _ := e.Policy.Content()
 	next, err := readRolloutImages(ctx, rollout, in.TranscriptPath, cursor, turnAdmission(ctx, e), func(p codexPrompt) error {
 		for _, img := range p.Images {
 			// A store that cannot keep the bytes still lets the record say what the image was.
-			if err := promptimage.Store(e.StateDir, img); err != nil {
+			attrs, err := promptimage.Keep(e.StateDir, img, collect)
+			if err != nil {
 				e.Logf("prompt image: %v", err)
 			}
-			attrs := img.Attrs()
 			attrs[semconv.GenAIMainAgentNameKey] = codexTool
 			attrs[semconv.TermaEvidenceSourceKey] = sourceCodexRollout
 			attrs[semconv.TermaMessageIDKey] = p.ID
@@ -165,16 +166,17 @@ func readRolloutImages(ctx context.Context, sessionID, transcript string, cursor
 }
 
 // codexRecordKinds are the records readRolloutImages decodes: those that move the turn, and
-// a message with an image. Every other line, a tool's output among them, is stepped over.
+// a user's message with an image. Every other line, a tool's output among
+// them, is stepped over undecoded, its images too.
 var codexRecordKinds = [][]byte{
-	[]byte(`"input_image"`), []byte(`"turn_context"`), []byte(`"session_meta"`), []byte(`"thread_settings_applied"`),
+	[]byte(`"turn_context"`), []byte(`"session_meta"`), []byte(`"thread_settings_applied"`),
 	[]byte(`"task_started"`), []byte(`"turn_started"`), []byte(`"task_complete"`), []byte(`"turn_complete"`), []byte(`"turn_aborted"`),
 }
 
 // codexPromptFrom keeps the cursor's turn current and returns the images of a user's
 // message; an unparseable record is left alone.
 func codexPromptFrom(line []byte, cursor *imageCursor, sessionID string, admits func(string) bool) (codexPrompt, bool) {
-	relevant := false
+	relevant := bytes.Contains(line, []byte(`"input_image"`)) && bytes.Contains(line, []byte(`"role":"user"`))
 	for _, kind := range codexRecordKinds {
 		if bytes.Contains(line, kind) {
 			relevant = true
@@ -228,7 +230,7 @@ func codexPromptFrom(line []byte, cursor *imageCursor, sessionID string, admits 
 	if !hookrun.EvidenceLabel.MatchString(p.ID) {
 		p.ID = fundingHash(sessionID + cursor.Identity + fmt.Sprint(cursor.Offset))
 	}
-	label := ""
+	label, n := "", 0
 	for _, part := range rec.Payload.Content {
 		switch part.Type {
 		case "input_text":
@@ -237,11 +239,14 @@ func codexPromptFrom(line []byte, cursor *imageCursor, sessionID string, admits 
 				label = m[1]
 			}
 		case "input_image":
+			// n counts every image part, one that cannot be read included, so each keeps its position.
+			n++
 			img, ok := promptimage.FromDataURL(part.ImageURL)
 			if !ok {
+				label = ""
 				continue
 			}
-			img.Index, img.Label = len(p.Images)+1, label
+			img.Index, img.Label = n, label
 			label = ""
 			p.Images = append(p.Images, img)
 		}

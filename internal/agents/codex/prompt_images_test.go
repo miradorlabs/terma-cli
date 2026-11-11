@@ -133,3 +133,18 @@ func TestCodexStopSpoolsPromptImages(t *testing.T) {
 		t.Error("the image's bytes were not kept for delivery")
 	}
 }
+
+// A tool's image is not the user's: its output is stepped over. An image that cannot be read
+// keeps its place, so the next one is still the prompt's second.
+func TestCodexImagesSkipToolOutputAndKeepTheirPlace(t *testing.T) {
+	tool := fmt.Sprintf(`{"timestamp":"2026-09-19T18:18:40.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c1","output":[{"type":"input_image","image_url":%q}]}}`+"\n", codexPixel)
+	broken := strings.Replace(imagePrompt("msg_u2"), codexPixel, "data:image/png;base64,!!", 1)
+	path := sequenceFixture(t, replyTaskStarted(replyTurnA, replyTraceA)+tool+broken+replyTaskComplete(replyTurnA))
+	_, prompts := readImages(t, path, imageCursor{}, admitAll)
+	if len(prompts) != 1 || prompts[0].ID != "msg_u2" || len(prompts[0].Images) != 1 {
+		t.Fatalf("prompts %+v", prompts)
+	}
+	if img := prompts[0].Images[0]; img.Index != 2 || img.Label != "" {
+		t.Fatalf("image = index %d label %q", img.Index, img.Label)
+	}
+}

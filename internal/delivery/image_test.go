@@ -1,8 +1,10 @@
 package delivery
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -34,6 +36,8 @@ type recorder struct {
 	mu     sync.Mutex
 	bodies []string
 	refuse func(body string) bool
+	// status is what a refusal answers; 503 when unset.
+	status int
 }
 
 func (rec *recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +46,7 @@ func (rec *recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer rec.mu.Unlock()
 	rec.bodies = append(rec.bodies, string(b))
 	if rec.refuse != nil && rec.refuse(string(b)) {
-		w.WriteHeader(http.StatusServiceUnavailable)
+		w.WriteHeader(cmp.Or(rec.status, http.StatusServiceUnavailable))
 	}
 }
 
@@ -66,7 +70,7 @@ func imageFixture(t *testing.T, rec *recorder, prompts bool) (Router, *spool.Spo
 }
 
 // Each image leaves in a request of its own, after the project's other events, with its
-// bytes from the store, which forgets them once sent; one whose bytes are gone says so, and
+// bytes from the store, which forgets them once no waiting record names them; one whose bytes are gone says so, and
 // one too large to carry leaves as it was spooled.
 func TestImagesLeaveOneToARequest(t *testing.T) {
 	t.Parallel()
@@ -124,6 +128,9 @@ func TestImagesStayWhenPromptsDo(t *testing.T) {
 	if res.Sent != 0 || res.Withheld != 1 || len(rec.bodies) != 0 {
 		t.Fatalf("Flush = %+v, %d requests", res, len(rec.bodies))
 	}
+	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
+		t.Error("a withheld image's bytes stayed in the store")
+	}
 }
 
 // A refused image goes back to the spool as it came, its bytes left in the store for the
@@ -153,5 +160,103 @@ func TestARefusedImageKeepsItsBytesOutOfTheSpool(t *testing.T) {
 	}
 	if _, ok := promptimage.Load(stateDir, img.ID()); !ok {
 		t.Fatal("a refused image left the store")
+	}
+}
+
+// The same image in two prompts is one stored file: sending the first record, in an earlier
+// batch, leaves the bytes the second still needs.
+func TestAnImageSentOnceStaysForItsNextRecord(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, s, cfg, stateDir := imageFixture(t, rec, true)
+	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
+	if err := promptimage.Store(stateDir, img); err != nil {
+		t.Fatal(err)
+	}
+	first, second := imageEvent(img), imageEvent(img)
+	first.Attrs[semconv.TermaMessageIDKey], second.Attrs[semconv.TermaMessageIDKey] = "m1", "m2"
+	events := []spool.Event{first}
+	for i := range spool.DefaultBatch {
+		events = append(events, spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: fmt.Sprint("s", i), Attrs: map[string]any{hookrun.AttrProjectID: "p1"}})
+	}
+	if err := s.Append(append(events, second)...); err != nil {
+		t.Fatal(err)
+	}
+	if res := r.Flush(t.Context(), s, cfg, true, 0); res.Err != nil {
+		t.Fatalf("Flush = %+v", res)
+	}
+	data := base64.StdEncoding.EncodeToString(pixel)
+	carried := 0
+	for _, body := range rec.bodies {
+		if strings.Contains(body, semconv.TermaPromptImageEvent) {
+			if !strings.Contains(body, data) {
+				t.Errorf("an image left without its bytes: %.300s", body)
+			}
+			carried++
+		}
+	}
+	if carried != 2 {
+		t.Fatalf("%d image requests, want 2", carried)
+	}
+	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
+		t.Error("an image every record has carried stayed in the store")
+	}
+}
+
+// An image a record still waiting names keeps its bytes, though another record carried it.
+func TestAWaitingRecordKeepsItsImage(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, s, cfg, stateDir := imageFixture(t, rec, true)
+	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
+	if err := promptimage.Store(stateDir, img); err != nil {
+		t.Fatal(err)
+	}
+	// p2's policy is out of reach: its record is held for a later pass.
+	policy := r.Policy
+	r.Policy = func(ctx context.Context, cfg *config.Config, id string) (config.Policy, error) {
+		if id == "p2" {
+			return config.Policy{}, context.DeadlineExceeded
+		}
+		return policy(ctx, cfg, id)
+	}
+	held := imageEvent(img)
+	held.Attrs[hookrun.AttrProjectID] = "p2"
+	if err := s.Append(imageEvent(img), held); err != nil {
+		t.Fatal(err)
+	}
+	if res := r.Flush(t.Context(), s, cfg, true, 0); res.Sent != 1 || res.Held != 1 {
+		t.Fatalf("Flush = %+v", res)
+	}
+	if _, ok := promptimage.Load(stateDir, img.ID()); !ok {
+		t.Fatal("the bytes a held record needs were forgotten")
+	}
+}
+
+// An image the platform refuses outright goes again without its bytes, saying so, and holds
+// up nothing after it.
+func TestAnImageRefusedOutrightLeavesWithoutItsBytes(t *testing.T) {
+	t.Parallel()
+	data := base64.StdEncoding.EncodeToString(pixel)
+	rec := &recorder{status: http.StatusBadRequest, refuse: func(body string) bool { return strings.Contains(body, data) }}
+	r, s, cfg, stateDir := imageFixture(t, rec, true)
+	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
+	if err := promptimage.Store(stateDir, img); err != nil {
+		t.Fatal(err)
+	}
+	quota := spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}
+	if err := s.Append(imageEvent(img), quota); err != nil {
+		t.Fatal(err)
+	}
+	res := r.Flush(t.Context(), s, cfg, true, 0)
+	if res.Sent != 2 || res.Err != nil {
+		t.Fatalf("Flush = %+v", res)
+	}
+	last := rec.bodies[len(rec.bodies)-1]
+	if strings.Contains(last, data) || !strings.Contains(last, semconv.TermaImageOmittedRefused) {
+		t.Fatalf("resent image = %.300s", last)
+	}
+	if left, _ := s.Peek(10); len(left) != 0 {
+		t.Fatalf("spool holds %+v", left)
 	}
 }

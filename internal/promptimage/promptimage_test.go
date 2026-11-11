@@ -114,9 +114,10 @@ func TestAttrsAndStore(t *testing.T) {
 	if !ok || got != base64.StdEncoding.EncodeToString(img.Data) {
 		t.Fatalf("Load = %v", ok)
 	}
-	Remove(dir, img.ID())
-	if _, ok := Load(dir, img.ID()); ok {
-		t.Fatal("a removed image loads")
+	if a, err := Keep(dir, Image{Data: pngOf(t, 5, 5), MIMEType: "image/png"}, false); err != nil || a[semconv.TermaImageIDKey] == nil {
+		t.Fatalf("Keep withheld = %v, %v", a, err)
+	} else if _, ok := Load(dir, a[semconv.TermaImageIDKey].(string)); ok {
+		t.Fatal("an image the policy withholds was kept")
 	}
 
 	big := Image{Data: append(pngOf(t, 1, 1), make([]byte, MaxBytes)...), MIMEType: "image/png", Index: 2}
@@ -143,10 +144,10 @@ func TestStoreKeepsToItsFolder(t *testing.T) {
 		if _, ok := Load(dir, id); ok || ValidID(id) {
 			t.Errorf("%q loads", id)
 		}
-		Remove(dir, id)
 	}
+	Sweep(dir, []string{"../secret", "secret"}, func(string) bool { return false }, time.Now().Add(time.Hour))
 	if _, err := os.Stat(secret); err != nil {
-		t.Fatal("Remove reached outside the store")
+		t.Fatal("Sweep reached outside the store")
 	}
 	old, fresh := Image{Data: pngOf(t, 1, 2)}, Image{Data: pngOf(t, 2, 1)}
 	for _, img := range []Image{old, fresh} {
@@ -164,5 +165,68 @@ func TestStoreKeepsToItsFolder(t *testing.T) {
 	}
 	if _, ok := Load(dir, fresh.ID()); !ok {
 		t.Error("a fresh image was pruned")
+	}
+}
+
+// Delivery forgets an image only once no waiting record names it, and never one a hook kept
+// again while it ran.
+func TestSweepKeepsWhatIsStillNeeded(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	sent, waiting, touched := Image{Data: pngOf(t, 1, 3)}, Image{Data: pngOf(t, 3, 1)}, Image{Data: pngOf(t, 2, 2)}
+	for _, img := range []Image{sent, waiting, touched} {
+		if err := Store(dir, img); err != nil {
+			t.Fatal(err)
+		}
+	}
+	passStart := time.Now()
+	past := passStart.Add(-time.Minute)
+	for _, img := range []Image{sent, waiting, touched} {
+		if err := os.Chtimes(filepath.Join(Dir(dir), img.ID()), past, past); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Store(dir, touched); err != nil { // a hook keeps it again mid-pass
+		t.Fatal(err)
+	}
+	if later := passStart.Add(time.Second); os.Chtimes(filepath.Join(Dir(dir), touched.ID()), later, later) != nil {
+		t.Fatal("touch")
+	}
+	Sweep(dir, []string{sent.ID(), waiting.ID(), touched.ID()}, func(id string) bool { return id == waiting.ID() }, passStart)
+	if _, ok := Load(dir, sent.ID()); ok {
+		t.Error("a sent image no record names was kept")
+	}
+	if _, ok := Load(dir, waiting.ID()); !ok {
+		t.Error("an image a waiting record names was forgotten")
+	}
+	if _, ok := Load(dir, touched.ID()); !ok {
+		t.Error("an image kept again during the pass was forgotten")
+	}
+}
+
+// A full store makes room by forgetting its oldest images, not by refusing the new one.
+func TestStoreMakesRoomFromTheOldest(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	images := []Image{{Data: pngOf(t, 1, 1)}, {Data: pngOf(t, 1, 2)}, {Data: pngOf(t, 1, 3)}}
+	for i, img := range images {
+		if err := Store(dir, img); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Now().Add(time.Duration(i-len(images)) * time.Minute)
+		if err := os.Chtimes(filepath.Join(Dir(dir), img.ID()), at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	size := int64(len(images[0].Data))
+	// Room for one more under a limit that holds three: the oldest goes, the rest stay.
+	makeRoom(Dir(dir), size, int64(len(images[0].Data)+len(images[1].Data)+len(images[2].Data)))
+	if _, ok := Load(dir, images[0].ID()); ok {
+		t.Error("the oldest image outlived a full store")
+	}
+	for _, img := range images[1:] {
+		if _, ok := Load(dir, img.ID()); !ok {
+			t.Error("a newer image was forgotten")
+		}
 	}
 }

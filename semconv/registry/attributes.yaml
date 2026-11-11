@@ -269,6 +269,10 @@ attributes:
           value: unavailable
           brief: The image was no longer on the machine when the record was sent.
           stability: development
+        - id: refused
+          value: refused
+          brief: The platform refused the record with its image; it was sent again without it.
+          stability: development
     stability: development
     brief: Why a record carries no terma.image.data although the policy collects prompts.
 
