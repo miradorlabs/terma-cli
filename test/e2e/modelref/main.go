@@ -99,9 +99,7 @@ func main() {
 			if key == "" || (len(wanted) > 0 && !wanted[v.id]) {
 				return nil
 			}
-			// A model whose probes saw something (an answer, or the plain request refused) is not
-			// new; one whose every case went unanswered is probed again.
-			if pr := s.API; *probeMode == "new" && pr != nil && pr.Probes != nil && (len(pr.Probes.Params) > 0 || pr.Probes.Unavailable != "") {
+			if !needsProbe(s, *probeMode) {
 				return nil
 			}
 			return v.probe(ctx, c, key, s)
@@ -177,6 +175,23 @@ func report(r *run, res *result) {
 		fmt.Fprintf(os.Stderr, "modelref: not read %s: %s\n", src, err)
 	}
 	fmt.Fprintf(os.Stderr, "modelref: %d models, %d new\n", len(res.snaps), len(res.new))
+}
+
+// needsProbe says whether a run in mode probes s: every model in "all", none in "none", and in
+// "new" a model whose probes never saw anything (no probes, or every case unanswered); one whose
+// probes saw an answer, or the plain request refused, is not new.
+func needsProbe(s *Snapshot, mode string) bool {
+	switch mode {
+	case "all":
+		return true
+	case "new":
+		p := (*Probes)(nil)
+		if s.API != nil {
+			p = s.API.Probes
+		}
+		return p == nil || len(p.Params) == 0 && p.Unavailable == ""
+	}
+	return false
 }
 
 func reflectEqual(a, b any) bool { return reflect.DeepEqual(roundTrip(a), roundTrip(b)) }

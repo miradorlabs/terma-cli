@@ -230,3 +230,67 @@ func TestRefusedStreamIsObserved(t *testing.T) {
 		t.Errorf("an unanswered stream lost the old events: %v", got.Response.StreamEvents)
 	}
 }
+
+func TestNeedsProbe(t *testing.T) {
+	seen := &Probes{Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}}}
+	for _, tc := range []struct {
+		name   string
+		probes *Probes
+		mode   string
+		want   bool
+	}{
+		{"never probed, new", nil, "new", true},
+		{"every case unanswered, new", &Probes{Params: map[string]ProbeResult{}}, "new", true},
+		{"unavailable to the key, new", &Probes{Params: map[string]ProbeResult{}, Unavailable: "404 model"}, "new", false},
+		{"probed, new", seen, "new", false},
+		{"probed, all", seen, "all", true},
+		{"never probed, none", nil, "none", false},
+	} {
+		s := &Snapshot{ID: "m"}
+		if tc.probes != nil {
+			s.API = &API{Probes: tc.probes}
+		}
+		if got := needsProbe(s, tc.mode); got != tc.want {
+			t.Errorf("%s: needsProbe = %v", tc.name, got)
+		}
+	}
+}
+
+// The stream's answer, as runProbes reads it: events where it streamed; none where the API refused
+// to stream (an answer, so the events are gone); unanswered where it was overloaded (what the
+// stream sent before stands).
+func TestStreamAnswers(t *testing.T) {
+	for _, tc := range []struct {
+		status   int
+		events   []string
+		unanswer bool
+	}{
+		{200, []string{"message_start", "message_stop"}, false},
+		{400, nil, false},
+		{529, nil, true},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var body map[string]any
+			data, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(data, &body)
+			if body["stream"] != true {
+				_ = json.NewEncoder(w).Encode(map[string]any{"model": "m", "usage": map[string]any{"input_tokens": 1}})
+				return
+			}
+			w.WriteHeader(tc.status)
+			_, _ = w.Write([]byte("event: message_start\ndata: {}\n\nevent: message_stop\ndata: {}\n\n"))
+		}))
+		c := newClient()
+		c.wait, c.tries = time.Millisecond, 1
+		target := probeTarget{url: srv.URL, base: map[string]any{"model": "m"}, cases: []probeCase{{name: "baseline"}},
+			shape: shapeOf("model", "usage"),
+			stream: func(base map[string]any) (string, map[string]any) {
+				return srv.URL, merge(base, map[string]any{"stream": true})
+			}}
+		p := runProbes(context.Background(), c, target, "e", testNow)
+		srv.Close()
+		if !slices.Equal(p.Response.StreamEvents, tc.events) || p.streamMissed != tc.unanswer {
+			t.Errorf("stream %d: events %v, unanswered %v", tc.status, p.Response.StreamEvents, p.streamMissed)
+		}
+	}
+}
