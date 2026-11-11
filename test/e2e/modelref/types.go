@@ -169,6 +169,18 @@ type Timeline struct {
 	SchemaVersion int    `json:"schema_version"`
 	ID            string `json:"id"`
 	Steps         []Step `json:"steps"`
+	// Archives are the files the older steps are in (timeline-1.json, the oldest, on), as the
+	// Harness Reference keeps its own.
+	Archives []TimelineArchive `json:"archives,omitempty"`
+}
+
+// TimelineArchive is a file of older timeline steps: its name, the times of its oldest and
+// newest step, and how many it holds.
+type TimelineArchive struct {
+	File  string    `json:"file"`
+	First time.Time `json:"first"`
+	Last  time.Time `json:"last"`
+	Steps int       `json:"steps"`
 }
 
 // Step is one run's changes to a model.

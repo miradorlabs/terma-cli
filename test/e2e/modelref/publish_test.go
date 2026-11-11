@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 // testRun is a run that read every source its observations name.
@@ -251,5 +253,53 @@ func TestDisagreements(t *testing.T) {
 		if got := disagree(tc.vals); got != tc.want {
 			t.Errorf("disagree(%v) = %v", tc.vals, got)
 		}
+	}
+}
+
+// A long timeline keeps its newest steps in timeline.json and the older ones in archives counted
+// from the oldest, which a later step never rewrites; reading them back gives every step.
+func TestTimelineIsPaged(t *testing.T) {
+	dir := t.TempDir()
+	tl := Timeline{SchemaVersion: schemaVersion, ID: "m"}
+	for i := range 60 {
+		tl.Steps = append([]Step{{At: testNow.Add(time.Duration(i) * time.Hour), Event: "changed", Changes: []refdiff.Change{}}}, tl.Steps...)
+	}
+	if err := writeTimelineFiles(dir, tl, 25); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := os.ReadFile(filepath.Join(dir, "timeline-1.json"))
+	var head Timeline
+	_ = readOptional(filepath.Join(dir, "timeline.json"), &head)
+	if len(head.Steps) != 25 || len(head.Archives) != 2 || head.Archives[0].Steps != 25 || head.Archives[1].Steps != 10 {
+		t.Fatalf("head %d steps, archives %+v", len(head.Steps), head.Archives)
+	}
+	tl.Steps = append([]Step{{At: testNow.Add(100 * time.Hour), Event: "changed", Changes: []refdiff.Change{}}}, tl.Steps...)
+	if err := writeTimelineFiles(dir, tl, 25); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := os.ReadFile(filepath.Join(dir, "timeline-1.json")); !bytes.Equal(first, again) {
+		t.Error("a new step rewrote the oldest archive")
+	}
+	all, err := readTimelineFiles(dir)
+	if err != nil || len(all.Steps) != 61 || !all.Steps[0].At.Equal(testNow.Add(100*time.Hour)) || !all.Steps[60].At.Equal(testNow) {
+		t.Errorf("read back %d steps (%v)", len(all.Steps), err)
+	}
+}
+
+// A run that only finds the vendor's page text edited records it on the model's timeline, and
+// keeps it out of the feed.
+func TestPageEditsStayOutOfTheFeed(t *testing.T) {
+	dir := t.TempDir()
+	mustPublish(t, dir, testRun(testNow, docsObs("claude-fable-5-2", fable52)))
+	edited := docsObs("claude-fable-5-2", fable52)
+	edited.docs["overview"] = Page{Title: "Model page", Text: "# claude-fable-5-2\n\nA new footer.\n"}
+	mustPublish(t, dir, testRun(testNow.Add(time.Hour), edited))
+	if tl := readTimeline(t, dir, "claude-fable-5-2"); len(tl.Steps) != 2 || tl.Steps[0].Changes[0].Category != "docs" {
+		t.Fatalf("steps = %+v", tl.Steps)
+	}
+	var recent Recent
+	_ = readOptional(filepath.Join(dir, "recent.json"), &recent)
+	if len(recent.Events) != 1 || recent.Events[0].Event != "listed" {
+		t.Errorf("feed = %+v", recent.Events)
 	}
 }

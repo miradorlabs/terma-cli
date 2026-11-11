@@ -60,11 +60,11 @@ func readPublished(out string) (*published, error) {
 		}
 		p.snaps[s.ID] = &s
 		p.vendors[s.Vendor] = true
-		var t Timeline
-		if err := readOptional(filepath.Join(out, e.ID, "timeline.json"), &t); err != nil {
+		t, err := readTimelineFiles(filepath.Join(out, e.ID))
+		if err != nil {
 			return nil, err
 		}
-		p.timelines[s.ID] = &t
+		p.timelines[s.ID] = t
 	}
 	var r Recent
 	if err := readOptional(filepath.Join(out, "recent.json"), &r); err != nil {
@@ -195,16 +195,23 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		}
 		if step != nil {
 			tl.Steps = append([]Step{*step}, tl.Steps...)
-			recent = append([]RecentEvent{{At: r.now, Model: id, Vendor: s.Vendor, Name: s.Name, Event: step.Event,
-				Changes: len(step.Changes), Highlights: highlights(step.Changes, 3)}}, recent...)
+			// A step that only edits the vendor's pages (a site-wide template change touches every
+			// model of a vendor at once) stays on the model's timeline, out of the feed.
+			if !pagesOnly(step.Changes) {
+				recent = append([]RecentEvent{{At: r.now, Model: id, Vendor: s.Vendor, Name: s.Name, Event: step.Event,
+					Changes: len(step.Changes), Highlights: highlights(step.Changes, 3)}}, recent...)
+			}
 		}
 		n := notes(s, snaps[pred[id]], changelogs[s.Vendor], names)
 		res.notes[id] = n
 		dir := filepath.Join(out, id)
-		for name, v := range map[string]any{"snapshot.json": s, "timeline.json": tl, "notes.json": n} {
+		for name, v := range map[string]any{"snapshot.json": s, "notes.json": n} {
 			if err := writeJSON(filepath.Join(dir, name), v); err != nil {
 				return nil, err
 			}
+		}
+		if err := writeTimelineFiles(dir, *tl, timelineSteps); err != nil {
+			return nil, err
 		}
 		entries = append(entries, entry(s, tl, pred[id], succ[id]))
 	}
@@ -240,6 +247,73 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		return nil, err
 	}
 	return res, nil
+}
+
+// pagesOnly says every change is to the text of the vendor's pages.
+func pagesOnly(changes []refdiff.Change) bool {
+	for _, c := range changes {
+		if c.Category != "docs" {
+			return false
+		}
+	}
+	return len(changes) > 0
+}
+
+// timelineSteps is how many steps timeline.json holds, and each archive at most: the newest
+// steps, which a model's page reads, in one bounded file, and every older one in a file of its own.
+const timelineSteps = 25
+
+// readTimelineFiles is a model's whole timeline: timeline.json's steps, then its archives'.
+func readTimelineFiles(dir string) (*Timeline, error) {
+	var t Timeline
+	if err := readOptional(filepath.Join(dir, "timeline.json"), &t); err != nil {
+		return nil, err
+	}
+	// Archives count from the oldest: the newest archive's steps follow timeline.json's.
+	for i := len(t.Archives) - 1; i >= 0; i-- {
+		var a Timeline
+		if err := readOptional(filepath.Join(dir, t.Archives[i].File), &a); err != nil {
+			return nil, err
+		}
+		t.Steps = append(t.Steps, a.Steps...)
+	}
+	t.Archives = nil
+	return &t, nil
+}
+
+// writeTimelineFiles writes t's newest steps (at most per) to timeline.json, and the older ones
+// to timeline-1.json, timeline-2.json and on, per steps each counted from the oldest, so a full
+// archive's steps never move; an archive no longer needed is removed.
+func writeTimelineFiles(dir string, t Timeline, per int) error {
+	head, older := t, []Step(nil)
+	if len(t.Steps) > per {
+		head.Steps, older = t.Steps[:per], slices.Clone(t.Steps[per:])
+	}
+	head.Archives = nil
+	slices.Reverse(older) // oldest first
+	n := 0
+	for len(older) > 0 {
+		n++
+		chunk := older[:min(per, len(older))]
+		older = older[len(chunk):]
+		steps := slices.Clone(chunk)
+		slices.Reverse(steps) // newest first, as every timeline lists them
+		name := fmt.Sprintf("timeline-%d.json", n)
+		head.Archives = append(head.Archives, TimelineArchive{File: name, First: chunk[0].At, Last: chunk[len(chunk)-1].At, Steps: len(chunk)})
+		if err := writeJSON(filepath.Join(dir, name), Timeline{SchemaVersion: t.SchemaVersion, ID: t.ID, Steps: steps}); err != nil {
+			return err
+		}
+	}
+	stale, _ := filepath.Glob(filepath.Join(dir, "timeline-*.json"))
+	for _, f := range stale {
+		var k int
+		if _, err := fmt.Sscanf(filepath.Base(f), "timeline-%d.json", &k); err == nil && k > n {
+			if err := os.Remove(f); err != nil {
+				return err
+			}
+		}
+	}
+	return writeJSON(filepath.Join(dir, "timeline.json"), head)
 }
 
 // notes are a model's release notes: what its vendor says is new, its changelog's entries that
