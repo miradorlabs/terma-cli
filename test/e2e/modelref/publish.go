@@ -33,12 +33,13 @@ var validID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 type published struct {
 	snaps     map[string]*Snapshot
 	timelines map[string]*Timeline
+	notes     map[string]*Notes
 	recent    []RecentEvent
 	vendors   map[string]bool // vendors with a model published
 }
 
 func readPublished(out string) (*published, error) {
-	p := &published{snaps: map[string]*Snapshot{}, timelines: map[string]*Timeline{}, vendors: map[string]bool{}}
+	p := &published{snaps: map[string]*Snapshot{}, timelines: map[string]*Timeline{}, notes: map[string]*Notes{}, vendors: map[string]bool{}}
 	var idx Index
 	if err := readOptional(filepath.Join(out, "index.json"), &idx); err != nil {
 		return nil, err
@@ -65,6 +66,11 @@ func readPublished(out string) (*published, error) {
 			return nil, err
 		}
 		p.timelines[s.ID] = t
+		var n Notes
+		if err := readOptional(filepath.Join(out, e.ID, "notes.json"), &n); err != nil {
+			return nil, err
+		}
+		p.notes[s.ID] = &n
 	}
 	var r Recent
 	if err := readOptional(filepath.Join(out, "recent.json"), &r); err != nil {
@@ -103,6 +109,8 @@ type result struct {
 	notes    map[string]*Notes
 	new      []string // models first listed this run
 	vendored map[string]bool
+	// fullProbe says the run probed every model it set out to, each one's plain request answered.
+	fullProbe bool
 }
 
 func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, changelogs map[string][]ChangelogEntry,
@@ -128,6 +136,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		s.Harnesses = usesFor(uses, s)
 		snaps[id] = s
 	}
+	fullProbe := false
 	// Probes, where a key is configured and the run asks for them (probe says which), a few
 	// models at a time: each model's cases run one after another.
 	if probe != nil {
@@ -149,7 +158,15 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 			})
 		}
 		wg.Wait()
-		keyWide(todo, probed)
+		dropped := keyWide(todo, probed)
+		// The probes saw every model they set out to, the plain request of each answered: a full
+		// probe done (a daily one's time moves on only then).
+		fullProbe = dropped == 0
+		for _, p := range probed {
+			if p != nil && p.unanswered["baseline"] {
+				fullProbe = false
+			}
+		}
 		for i, s := range todo {
 			p := probed[i]
 			if p == nil {
@@ -172,7 +189,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 	tokenizerLike(snaps)
 	pred, succ := lineage(snaps)
 	names := harnessNames(uses)
-	res := &result{snaps: snaps, notes: map[string]*Notes{}, vendored: prev.vendors}
+	res := &result{snaps: snaps, notes: map[string]*Notes{}, vendored: prev.vendors, fullProbe: fullProbe}
 	recent := prev.recent
 	var entries []Entry
 	for _, id := range sortedIDs(snaps) {
@@ -204,7 +221,17 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 					Changes: len(step.Changes), Highlights: highlights(step.Changes, 3)}}, recent...)
 			}
 		}
-		n := notes(s, snaps[pred[id]], changelogs[s.Vendor], names)
+		// A vendor's changelog not read this run (an outage, or a run of other vendors) keeps the
+		// entries the notes had of it.
+		var named []ChangelogEntry
+		if log, ok := changelogs[s.Vendor]; ok {
+			named = mentions(log, s.ID, s.Name)
+		} else if old := prev.notes[id]; old != nil && old.Changelog != nil {
+			named = old.Changelog
+		} else {
+			named = []ChangelogEntry{}
+		}
+		n := notes(s, snaps[pred[id]], named, names)
 		res.notes[id] = n
 		dir := filepath.Join(out, id)
 		for name, v := range map[string]any{"snapshot.json": s, "notes.json": n} {
@@ -254,7 +281,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 // keyWide drops the probes of a vendor whose every probed model, two or more, was refused as
 // unavailable in one run: that is the key's doing (its access changed, the vendor's error for a
 // key problem), not every model at once, and what the probes saw before stands.
-func keyWide(todo []*Snapshot, probed []*Probes) {
+func keyWide(todo []*Snapshot, probed []*Probes) (dropped int) {
 	type count struct{ probed, unavailable int }
 	by := map[string]*count{}
 	for i, s := range todo {
@@ -275,8 +302,10 @@ func keyWide(todo []*Snapshot, probed []*Probes) {
 		if c := by[s.Vendor]; probed[i] != nil && c.probed >= 2 && c.unavailable == c.probed {
 			fmt.Fprintf(os.Stderr, "modelref: %s: every model refused (%s): the key's doing; probes kept\n", s.Vendor, probed[i].Unavailable)
 			probed[i] = nil
+			dropped++
 		}
 	}
+	return dropped
 }
 
 // incidental says every change is to the text of the vendor's pages, or to which other models
@@ -348,9 +377,9 @@ func writeTimelineFiles(dir string, t Timeline, per int) error {
 }
 
 // notes are a model's release notes: what its vendor says is new, its changelog's entries that
-// name it, and what differs from the model before it.
-func notes(s, before *Snapshot, log []ChangelogEntry, names map[string]string) *Notes {
-	n := &Notes{SchemaVersion: schemaVersion, ID: s.ID, Changelog: mentions(log, s.ID, s.Name),
+// name it (named), and what differs from the model before it.
+func notes(s, before *Snapshot, named []ChangelogEntry, names map[string]string) *Notes {
+	n := &Notes{SchemaVersion: schemaVersion, ID: s.ID, Changelog: named,
 		Changes: []refdiff.Change{}, Highlights: []string{}}
 	if p, ok := s.Docs["whats_new"]; ok {
 		n.WhatsNew = &p

@@ -19,7 +19,11 @@ type observation struct {
 	url    string
 	// listed says the source is the vendor's own list of its models (its docs' index, its API):
 	// a model the vendor lists is one the reference follows.
-	listed  bool
+	listed bool
+	// stale says the list names the model but its page could not be read this run: it stays
+	// listed, and what the source said of it before stands. A model the reference does not
+	// already follow is not taken up from a stale observation (its page decides what it is).
+	stale   bool
 	facts   map[string]any
 	docs    map[string]Page
 	listing map[string]any // the vendor API's own object of the model

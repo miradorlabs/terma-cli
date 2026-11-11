@@ -59,6 +59,8 @@ func googleDocs(ctx context.Context, c *client, now time.Time) ([]observation, e
 		url := googleDocsBase + "/models/" + id
 		text, err := c.text(ctx, url+".md.txt")
 		if errors.Is(err, errNotFound) {
+			// Linked and not there (yet, or for now): listed still, as it was.
+			out = append(out, observation{source: "google-docs", vendor: "google", id: id, url: url, listed: true, stale: true})
 			continue
 		}
 		if err != nil {

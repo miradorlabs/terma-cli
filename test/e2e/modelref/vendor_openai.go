@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -64,6 +65,8 @@ func openAIDocs(ctx context.Context, c *client, now time.Time) ([]observation, e
 		url := openAIDocsBase + p
 		text, err := c.text(ctx, url+".md")
 		if errors.Is(err, errNotFound) {
+			// Linked and not there (yet, or for now): listed still, as it was.
+			out = append(out, observation{source: "openai-docs", vendor: "openai", id: path.Base(p), url: url, listed: true, stale: true})
 			continue
 		}
 		if err != nil {

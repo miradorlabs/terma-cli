@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/fs"
 	"maps"
@@ -333,5 +334,101 @@ func TestAKeyRemovedIsNoOutage(t *testing.T) {
 	r.keyed["anthropic"] = false
 	if res := mustPublish(t, dir, r); res.snaps["claude-fable-5-1"].Listed {
 		t.Error("still listed by an API whose key was taken away")
+	}
+}
+
+// A vendor's changelog not read this run keeps the entries the notes had of it: the notes are
+// written the same.
+func TestNotesKeepAChangelogNotRead(t *testing.T) {
+	dir := t.TempDir()
+	log := map[string][]ChangelogEntry{"anthropic": {{Date: "2026-11-09", URL: "u", Text: "* We launched Claude Fable 5.2."}}}
+	run := func(at time.Time, logs map[string][]ChangelogEntry) []byte {
+		t.Helper()
+		prev, err := readPublished(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := publish(dir, testRun(at, docsObs("claude-fable-5-2", fable52)), prev, nil, logs, nil); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := os.ReadFile(filepath.Join(dir, "claude-fable-5-2", "notes.json"))
+		return data
+	}
+	first := run(testNow, log)
+	if !strings.Contains(string(first), "We launched Claude Fable 5.2") {
+		t.Fatalf("notes = %s", first)
+	}
+	if later := run(testNow.Add(time.Hour), map[string][]ChangelogEntry{}); !bytes.Equal(first, later) {
+		t.Errorf("a changelog not read changed the notes:\n%s", later)
+	}
+}
+
+// A model its vendor's index still links, whose page could not be read this run, stays listed
+// with what its page said before; a model the reference does not follow yet is not taken up from
+// a link alone.
+func TestALinkedPageNotReadIsNoChange(t *testing.T) {
+	const base = "https://developers.openai.com/api/docs"
+	index := "# Models\n\n- [GPT-6.1 Sol](/api/docs/models/gpt-6.1-sol.md): x\n- [GPT-7](/api/docs/models/gpt-7.md): y\n"
+	pages := map[string]string{base + "/models.md": index, base + "/models/gpt-6.1-sol.md": testdata(t, "openai/gpt-6.1-sol.md")}
+	c, web := newFakeWeb(t, pages)
+	dir := t.TempDir()
+	run := func(at time.Time) *result {
+		t.Helper()
+		obs, err := openAIDocs(context.Background(), c, at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prev, err := readPublished(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := testRun(at, obs...)
+		r.read["openai-docs"] = true // read whole: its index answered
+		res, err := publish(dir, r, prev, nil, map[string][]ChangelogEntry{}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	first := run(testNow)
+	if first.snaps["gpt-6.1-sol"] == nil || first.snaps["gpt-7"] != nil {
+		t.Fatalf("followed %v", sortedIDs(first.snaps))
+	}
+	before, _ := os.ReadFile(filepath.Join(dir, "gpt-6.1-sol", "snapshot.json"))
+	web.mu.Lock()
+	delete(web.pages, base+"/models/gpt-6.1-sol.md")
+	web.mu.Unlock()
+	second := run(testNow.Add(time.Hour))
+	if s := second.snaps["gpt-6.1-sol"]; s == nil || !s.Listed {
+		t.Fatal("a linked model whose page was not read was unlisted")
+	}
+	if after, _ := os.ReadFile(filepath.Join(dir, "gpt-6.1-sol", "snapshot.json")); !bytes.Equal(before, after) {
+		t.Errorf("a page not read changed the snapshot:\n%s", after)
+	}
+	if tl := readTimeline(t, dir, "gpt-6.1-sol"); len(tl.Steps) != 1 {
+		t.Errorf("a page not read made a step: %+v", tl.Steps[0])
+	}
+}
+
+// A full probe is done only when every model it set out to probe answered its plain request.
+func TestFullProbeOnlyWhenEveryModelAnswered(t *testing.T) {
+	answered := func(*Snapshot) *Probes {
+		return &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}}}
+	}
+	overloaded := func(*Snapshot) *Probes {
+		return &Probes{Endpoint: "e", Params: map[string]ProbeResult{}, unanswered: map[string]bool{"baseline": true}}
+	}
+	for name, tc := range map[string]struct {
+		probe func(*Snapshot) *Probes
+		want  bool
+	}{"answered": {answered, true}, "overloaded": {overloaded, false}} {
+		prev, _ := readPublished(t.TempDir())
+		res, err := publish(t.TempDir(), testRun(testNow, docsObs("claude-fable-5-2", fable52)), prev, nil, nil, tc.probe)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.fullProbe != tc.want {
+			t.Errorf("%s: fullProbe = %v", name, res.fullProbe)
+		}
 	}
 }

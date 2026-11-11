@@ -38,7 +38,7 @@ func (r *run) covers(vendor string) bool { return len(r.wanted) == 0 || r.wanted
 func followed(r *run, prev map[string]*Snapshot) map[string]bool {
 	listed := map[string]bool{}
 	for _, o := range r.obs {
-		if o.listed {
+		if o.listed && (!o.stale || prev[o.id] != nil) {
 			listed[o.id] = true
 		}
 	}
@@ -94,7 +94,16 @@ func assemble(id, vendorID string, r *run, prev *Snapshot, listed bool) *Snapsho
 			exact[o.source] = true
 		}
 	}
+	staleFor := map[string]bool{}
 	for _, o := range r.obs {
+		if o.stale && o.vendor == vendorID && norm(o.id) == key {
+			staleFor[o.source] = true
+		}
+	}
+	for _, o := range r.obs {
+		if o.stale || staleFor[o.source] {
+			continue
+		}
 		// A catalog that names a dated model by its undated name (OpenRouter's claude-opus-4.5
 		// for claude-opus-4-5-20251101) says it of the dated one, where it names no other.
 		match := norm(o.id) == key || !o.listed && !exact[o.source] && undated != key && norm(o.id) == undated
@@ -127,7 +136,7 @@ func assemble(id, vendorID string, r *run, prev *Snapshot, listed bool) *Snapsho
 	}
 	if prev != nil {
 		for src, url := range prev.Sources {
-			if r.read[src] && r.covers(vendorID) {
+			if r.read[src] && r.covers(vendorID) && !staleFor[src] {
 				continue
 			}
 			s.Sources[src] = url

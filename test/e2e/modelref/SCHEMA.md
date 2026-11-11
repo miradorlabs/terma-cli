@@ -30,8 +30,10 @@ writes text (not an embedding, image, voice, live or moderation model).
 
 A fact takes the value of the first source in that order that states it. A source not read on a
 run (an outage, no key) keeps what it said before: a vendor's outage never reads as its models
-going away, and a model is "unlisted" only when a vendor source that lists models was read and did
-not list it.
+going away. A model is "unlisted" only when every vendor list that named it (its docs, and its API
+where the API lists the models it serves) was read without it; a list whose model page could not be
+read that run still lists it, with what the page said before. A changelog not read keeps the
+entries the notes had of it.
 
 ## Layout
 

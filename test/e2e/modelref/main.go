@@ -114,8 +114,9 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if mode == "all" && *probeMode != "all" {
-		// The daily full probe, done: the next is due a day from now.
+	if mode == "all" && *probeMode == "daily" && len(wanted) == 0 && res.fullProbe {
+		// The daily full probe, done for every vendor and every model: the next is due a day from
+		// now. One that was not (a run of some vendors, an outage) is due again next run.
 		if err := writeJSON(filepath.Join(*out, probeStateFile), probeState{SchemaVersion: schemaVersion, AllAt: now}); err != nil {
 			fail(err)
 		}
