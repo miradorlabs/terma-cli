@@ -1,7 +1,30 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T01:31:58.028457459Z",
+  "generated_at": "2026-11-11T02:46:27.785020661Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1106.51428",
+      "released_at": "2026-11-11T02:34:53Z",
+      "captured_at": "2026-11-11T02:46:27.785020661Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1103.60933",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
     {
       "harness": "claude-desktop",
       "name": "Claude Desktop (Code)",
@@ -6213,42 +6236,6 @@
         "System prompt changed (+81 −73 chars)",
         "New beta: terminal_resize_reflow",
         "Flag removed: `codex --full-auto`"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.125.0",
-      "released_at": "2026-04-24T18:01:41.002Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.124.0",
-      "changes": 17,
-      "categories": {
-        "behavior": 2,
-        "cli": 7,
-        "config": 3,
-        "filesystem": 2,
-        "model": 1,
-        "prompt": 1,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 11,
-        "notable": 6
-      },
-      "undocumented": 7,
-      "highlights": [
-        "Default model: gpt-5.4 → gpt-5.5",
-        "System prompt changed (+17945 −11407 chars)",
-        "spawn_agent tool description changed (+689 −324 chars)"
       ],
       "signing": "revoked"
     }
