@@ -3,15 +3,19 @@ package delivery
 import (
 	"cmp"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -319,6 +323,9 @@ func TestAStalledImageDoesNotHoldUpItsProject(t *testing.T) {
 	if !s.RetryAt("p1").IsZero() {
 		t.Fatal("a stalled image backed off its project")
 	}
+	if s.RetryAt(imageDestination("p1")).IsZero() {
+		t.Fatal("a stalled image opened no window of its own")
+	}
 	if len(bodies) != 2 {
 		t.Fatalf("%d requests; want the events, then one image and no more this pass", len(bodies))
 	}
@@ -348,5 +355,68 @@ func TestFlushPrunesImagesNoRecordOutlives(t *testing.T) {
 	r.Flush(t.Context(), s, cfg, true, 0)
 	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
 		t.Fatal("bytes older than the spool keeps records outlived a flush")
+	}
+}
+
+// Which failures are an image stalling on the uplink, backing off only the project's images,
+// and which are news about the host.
+func TestImageStalled(t *testing.T) {
+	t.Parallel()
+	img := []spool.Event{{Name: semconv.TermaPromptImageEvent}}
+	other := []spool.Event{{Name: semconv.TermaSessionQuotaEvent}}
+	live := t.Context()
+	over, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, c := range []struct {
+		name     string
+		ctx      context.Context
+		req      []spool.Event
+		err      error
+		answered bool
+		want     bool
+	}{
+		{"own deadline", live, img, context.DeadlineExceeded, true, true},
+		{"reset mid-upload", live, img, &url.Error{Op: "Post", Err: syscall.ECONNRESET}, true, true},
+		{"cut off", live, img, &url.Error{Op: "Post", Err: io.EOF}, true, true},
+		{"pass ran out", over, img, context.Canceled, true, true},
+		{"host has not answered", live, img, context.DeadlineExceeded, false, false},
+		{"host refused", live, img, &IngestError{Status: http.StatusServiceUnavailable}, true, false},
+		{"dial", live, img, &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}, true, false},
+		{"dns", live, img, &net.DNSError{Err: "no such host", Name: "x"}, true, false},
+		{"tls", live, img, &tls.CertificateVerificationError{}, true, false},
+		{"not an image", live, other, context.DeadlineExceeded, true, false},
+	} {
+		if got := imageStalled(c.ctx, c.req, c.err, c.answered); got != c.want {
+			t.Errorf("%s: imageStalled = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// With too little of the pass left, an image waits for the next pass untried, and what was
+// sent before it is acknowledged.
+func TestAnImageWaitsWhenThePassIsNearlyOver(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, s, cfg, stateDir := imageFixture(t, rec, true)
+	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
+	if err := promptimage.Store(stateDir, img); err != nil {
+		t.Fatal(err)
+	}
+	quota := spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}
+	if err := s.Append(quota, imageEvent(img)); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), minImageTime/2)
+	defer cancel()
+	r.Flush(ctx, s, cfg, true, 0)
+	if len(rec.bodies) != 1 || strings.Contains(rec.bodies[0], semconv.TermaPromptImageEvent) {
+		t.Fatalf("%d requests; want the events alone", len(rec.bodies))
+	}
+	left, err := s.Peek(10)
+	if err != nil || len(left) != 1 || !isImage(left[0]) {
+		t.Fatalf("spool holds %+v, %v", left, err)
+	}
+	if !s.RetryAt("p1").IsZero() || !s.RetryAt(imageDestination("p1")).IsZero() {
+		t.Fatal("an image never tried opened a window")
 	}
 }

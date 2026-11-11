@@ -100,10 +100,12 @@ const (
 	DefaultFlushTimeout = 30 * time.Second
 	// Local operations must not wait indefinitely for another process.
 	localLockTimeout = 250 * time.Millisecond
-	minBackoff       = 30 * time.Second
-	maxBackoff       = time.Hour
-	dirMode          = 0o700
-	fileMode         = 0o600
+	// ackTimeout bounds acknowledging a delivered batch, which outlives the pass's deadline.
+	ackTimeout = 2 * time.Second
+	minBackoff = 30 * time.Second
+	maxBackoff = time.Hour
+	dirMode    = 0o700
+	fileMode   = 0o600
 )
 
 // Spool is one queue directory.

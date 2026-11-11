@@ -473,3 +473,26 @@ func TestMentions(t *testing.T) {
 		t.Fatalf("Mentions = %v, %v", got, err)
 	}
 }
+
+// What a sender delivered is acknowledged though the pass ran out of time sending it: the
+// batch does not replay, resending what went and holding up what waits behind it.
+func TestDeliveredBatchIsAcknowledgedPastTheDeadline(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "sent"}, Event{Name: "cut"}); err != nil {
+		t.Fatal(err)
+	}
+	res := s.Flush(context.Background(), SenderFunc(func(ctx context.Context, events []Event) ([]Event, error) {
+		<-ctx.Done() // the pass's deadline passes mid-send
+		return nil, &PartialDelivery{Undelivered: events[1:], Err: ctx.Err()}
+	}), FlushOptions{Force: true, Timeout: 20 * time.Millisecond})
+	if res.Err == nil {
+		t.Fatal("a pass cut short reported no error")
+	}
+	left, err := s.Peek(10)
+	if err != nil || len(left) != 1 || left[0].Name != "cut" {
+		t.Fatalf("spool holds %+v, %v; want only the undelivered event", left, err)
+	}
+}

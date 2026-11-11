@@ -148,21 +148,30 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			if r.User != nil {
 				sender.UserID = r.User(cfg, id, endpoint)
 			}
-			requests, later := imageRequests(batch, stalled[id])
+			// Images whose own window is open, or that stalled earlier in the pass, wait.
+			imagesWait := stalled[id] || !force && now.Before(s.RetryAt(imageDestination(id)))
+			requests, later := imageRequests(batch, imagesWait)
 			undelivered = append(undelivered, later...)
 			for i, req := range requests {
 				err := r.send(ctx, sender, req)
-				if err != nil && imageStalled(ctx, req, err) {
-					// No news about the host, which took the rest: the project's other events
-					// keep their pace, and its images wait for the next pass.
+				switch {
+				case err == nil:
+				case errors.Is(err, errNoTimeLeft):
+					// Too little of the pass is left to give an image: the next pass sends it.
+					for _, left := range requests[i:] {
+						undelivered = append(undelivered, left...)
+					}
+				case imageStalled(ctx, req, err, accepted[endpoint]):
+					// The host took the rest; an image that did not get through in its time is
+					// news about the uplink. The project's other events keep their pace, and its
+					// images wait for their own window.
 					stalled[id] = true
+					s.DestinationFailed(imageDestination(id), time.Now())
 					errs = append(errs, fmt.Errorf("%s (%s): image: %w", id, endpoint, err))
 					for _, left := range requests[i:] {
 						undelivered = append(undelivered, left...)
 					}
-					break
-				}
-				if err != nil {
+				default:
 					failed[id] = true
 					f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
 					// A pass cut short by its own deadline learned nothing about the host.
@@ -174,9 +183,14 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 					for _, left := range requests[i:] {
 						undelivered = append(undelivered, left...)
 					}
+				}
+				if err != nil {
 					break
 				}
 				s.DestinationDelivered(id, time.Now())
+				if len(req) == 1 && isImage(req[0]) {
+					s.DestinationDelivered(imageDestination(id), time.Now())
+				}
 				accepted[endpoint] = true
 				res.Sent += len(req)
 				for _, e := range req {

@@ -2,9 +2,13 @@ package delivery
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"io"
 	"maps"
+	"net"
 	"net/http"
+	"syscall"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/promptimage"
@@ -54,12 +58,40 @@ func imageRequests(batch []spool.Event, stalled bool) (requests [][]spool.Event,
 	return requests, later
 }
 
-// imageStalled reports whether an image's request failed for want of time or a connection
-// rather than by the host's answer: a slow uplink, not news about the host, so it backs off
-// neither the project nor its other events.
-func imageStalled(ctx context.Context, req []spool.Event, err error) bool {
+// imageDestination is the retry window of project id's images, apart from its other events.
+func imageDestination(id string) string { return id + "/images" }
+
+// minImageTime is the least of a pass an image is sent with; with less left it waits.
+const minImageTime = 5 * time.Second
+
+// errNoTimeLeft is an image not sent because too little of the pass was left for it.
+var errNoTimeLeft = errors.New("too little of the pass left for an image")
+
+// imageStalled reports whether an image's request failed for want of time on the uplink: it
+// ran out of time or its connection broke mid-upload, to a host that already answered this
+// pass (answered). That is no news about the host, so it backs off only the project's images.
+// The host's own answer, a failure to reach it (dial, DNS, TLS) or a host that has not
+// answered this pass is a failure like any other.
+func imageStalled(ctx context.Context, req []spool.Event, err error, answered bool) bool {
+	if len(req) != 1 || !isImage(req[0]) || !answered {
+		return false
+	}
 	var ingest *IngestError
-	return len(req) == 1 && isImage(req[0]) && ctx.Err() == nil && !errors.As(err, &ingest)
+	var dns *net.DNSError
+	var op *net.OpError
+	var cert *tls.CertificateVerificationError
+	switch {
+	case errors.As(err, &ingest), errors.As(err, &dns), errors.As(err, &cert),
+		errors.As(err, &op) && op.Op == "dial":
+		return false
+	case ctx.Err() != nil:
+		// The pass ran out mid-upload.
+		return true
+	}
+	var ne net.Error
+	return errors.Is(err, context.DeadlineExceeded) || errors.As(err, &ne) && ne.Timeout() ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 // send sends one request; an image's carries its bytes from the store. An image the platform
@@ -69,6 +101,9 @@ func (r Router) send(ctx context.Context, sender *otlpSender, req []spool.Event)
 	if len(req) != 1 || !isImage(req[0]) {
 		_, err := sender.Send(ctx, wire(req))
 		return err
+	}
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < minImageTime {
+		return errNoTimeLeft
 	}
 	e := withImageData(r.StateDir, req[0])
 	_, err := sender.Send(ctx, wire([]spool.Event{e}))
