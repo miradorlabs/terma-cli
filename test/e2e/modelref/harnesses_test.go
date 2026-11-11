@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -68,6 +69,7 @@ func TestHarnessUses(t *testing.T) {
 // A run reads only the builds it has not read before; a build a harness's index no longer lists
 // goes; a harness whose index cannot be read keeps what was read of it.
 func TestHarnessBuildsAreIncremental(t *testing.T) {
+	var mu sync.Mutex // the join reads builds at once
 	read := map[string]int{}
 	files := map[string]string{
 		"index.json":                  `{"harnesses":[{"id":"claude","name":"Claude Code"},{"id":"codex","name":"Codex CLI"}]}`,
@@ -78,6 +80,8 @@ func TestHarnessBuildsAreIncremental(t *testing.T) {
 		"codex/versions/0.1.0.json":   `{"model":{"default":"gpt-6.1-sol"}}`,
 	}
 	src := func(_ context.Context, path string) ([]byte, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		read[path]++
 		if f, ok := files[path]; ok {
 			return []byte(f), nil
