@@ -11,25 +11,41 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/earendil-works/pi/releases",
-    "latest": "1.5.1",
+    "latest": "1.5.2",
     "support": "supported",
-    "versions_tracked": 5,
+    "versions_tracked": 6,
     "first_tracked": "2026-10-12",
     "last_change": {
-      "from": "1.5.0",
-      "to": "1.5.1",
-      "at": "2026-11-10T05:19:19.197557181Z",
-      "released_at": "2026-11-09T23:45:13.428Z",
-      "changes": 18,
-      "categories": {
-        "caching": 1,
-        "cli": 10,
-        "config": 6,
-        "request": 1
-      }
+      "from": "1.5.1",
+      "to": "1.5.2",
+      "at": "2026-11-11T05:17:29.64320186Z",
+      "released_at": "2026-11-10T12:24:55.226Z",
+      "changes": 0,
+      "categories": {}
     }
   },
   "versions": [
+    {
+      "version": "1.5.2",
+      "released_at": "2026-11-10T12:24:55.226Z",
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.5.1",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null
+    },
     {
       "version": "1.5.1",
       "released_at": "2026-11-09T23:45:13.428Z",

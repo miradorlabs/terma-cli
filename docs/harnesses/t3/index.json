@@ -12,7 +12,7 @@
     },
     "changelog": "https://github.com/pingdotgg/t3code/releases",
     "latest": "0.1.8",
-    "support": "unsupported",
+    "support": "untested",
     "versions_tracked": 2,
     "first_tracked": "2026-10-02",
     "last_change": {
@@ -20,9 +20,9 @@
       "to": "0.1.8",
       "at": "2026-11-10T05:19:19.197557181Z",
       "released_at": "2026-11-09T22:48:39.205Z",
-      "changes": 2,
+      "changes": 3,
       "categories": {
-        "support": 2
+        "support": 3
       }
     }
   },
@@ -34,22 +34,23 @@
       "platforms": [
         "darwin/arm64"
       ],
-      "support": "unsupported",
+      "support": "untested",
       "previous": "0.0.45",
-      "changes": 2,
+      "changes": 3,
       "categories": {
-        "support": 2
+        "support": 3
       },
       "impact": {
-        "breaking": 2,
+        "breaking": 0,
         "degrading": 0,
-        "informational": 0,
-        "notable": 0
+        "informational": 1,
+        "notable": 2
       },
       "undocumented": 0,
       "highlights": [
-        "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64",
-        "Terma support: supported → unsupported"
+        "Terma: Telemetry reaches the project through the local relay now not run on darwin/arm64",
+        "Terma support: supported → untested",
+        "support.capabilities.relay.telemetry@darwin/arm64.why added"
       ],
       "signing": null
     },

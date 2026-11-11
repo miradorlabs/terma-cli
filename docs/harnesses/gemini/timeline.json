@@ -7,14 +7,6 @@
       "previous": "0.67.0",
       "changes": [
         {
-          "id": "prompt.system.0.text",
-          "category": "prompt",
-          "op": "changed",
-          "title": "System prompt changed (+382 −382 chars)",
-          "impact": "notable",
-          "documented": false
-        },
-        {
           "id": "request.endpoint",
           "category": "request",
           "op": "changed",
@@ -23,514 +15,34 @@
           "documented": false
         },
         {
-          "id": "telemetry.export",
+          "id": "telemetry.export.interval_batches.logs",
           "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry export added",
+          "op": "changed",
+          "title": "Telemetry export.interval_batches.logs changed: 2 → 1",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.logs/gemini_cli.api_request",
+          "id": "telemetry.export.interval_batches.traces",
           "category": "telemetry",
           "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.api_request",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.api_response",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.api_response",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.config",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.config",
-          "impact": "degrading",
-          "documented": true
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.file_operation",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.file_operation",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.hook_call",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.hook_call",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.model_routing",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.model_routing",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.plan.approval_mode_duration",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.plan.approval_mode_duration",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.ripgrep_fallback",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.ripgrep_fallback",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.startup_stats",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.startup_stats",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.tool_call",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.tool_call",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gemini_cli.user_prompt",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gemini_cli.user_prompt",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.logs/gen_ai.client.inference.operation.details",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/gen_ai.client.inference.operation.details",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.keys removed",
+          "title": "Telemetry export.interval_batches.traces removed",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.keys",
+          "id": "telemetry.export.interval_ms.traces",
           "category": "telemetry",
           "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.keys removed",
+          "title": "Telemetry export.interval_ms.traces removed",
           "impact": "notable",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.unit added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.file.operation.count",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/gemini_cli.file.operation.count",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.monotonic added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.unit added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.lines.changed",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/gemini_cli.lines.changed",
-          "impact": "degrading",
-          "documented": true
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.unit added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.network_retry.count",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/gemini_cli.network_retry.count",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.monotonic added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.unit added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.monotonic added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.tool.call.count",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/gemini_cli.tool.call.count",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gemini_cli.tool.call.latency",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/gemini_cli.tool.call.latency",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.unit added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.temporality added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.type added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.unit added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.resource",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: resource",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.traces/llm_call.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/llm_call.keys removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.traces/llm_call.root",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.traces/llm_call.root added",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "telemetry.surfaces.traces/schedule_tool_calls",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/schedule_tool_calls",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.traces/tool_call",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/tool_call",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "hooks.events.BeforeModel.matcher",
+          "id": "hooks.events.BeforeToolSelection.matcher",
           "category": "hooks",
           "op": "changed",
-          "title": "BeforeModel hook takes a matcher: true → false",
+          "title": "BeforeToolSelection hook takes a matcher: true → false",
           "impact": "informational",
           "documented": false
         },
@@ -561,65 +73,330 @@
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.api_request",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: api_request",
+          "op": "added",
+          "title": "New vendor telemetry event: api_request",
           "impact": "notable",
           "documented": false
         },
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.api_response",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: api_response",
+          "op": "added",
+          "title": "New vendor telemetry event: api_response",
           "impact": "notable",
           "documented": false
         },
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.hook_call",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: hook_call",
+          "op": "added",
+          "title": "New vendor telemetry event: hook_call",
           "impact": "notable",
           "documented": false
         },
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.model_routing",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: model_routing",
+          "op": "added",
+          "title": "New vendor telemetry event: model_routing",
           "impact": "notable",
           "documented": false
         },
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.new_prompt",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: new_prompt",
+          "op": "added",
+          "title": "New vendor telemetry event: new_prompt",
           "impact": "notable",
           "documented": false
         },
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.start_session",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: start_session",
+          "op": "added",
+          "title": "New vendor telemetry event: start_session",
           "impact": "notable",
           "documented": false
         },
         {
           "id": "network.telemetry.POST play.googleapis.com/log.events.startup_stats",
           "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: startup_stats",
+          "op": "added",
+          "title": "New vendor telemetry event: startup_stats",
           "impact": "notable",
           "documented": false
+        },
+        {
+          "id": "storage.transcript.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk transcript path changed",
+          "impact": "informational",
+          "documented": true
         }
       ]
     },
     {
       "version": "0.67.0",
       "previous": "0.66.0",
-      "changes": []
+      "changes": [
+        {
+          "id": "telemetry.export",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry export added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.session.count.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.session.count.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.unit added",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/llm_call.root",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.traces/llm_call.root added",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
     },
     {
       "version": "0.66.0",

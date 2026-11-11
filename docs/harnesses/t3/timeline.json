@@ -10,16 +10,24 @@
           "id": "support.capabilities.relay.telemetry@darwin/arm64.result",
           "category": "support",
           "op": "changed",
-          "title": "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64",
-          "impact": "breaking",
+          "title": "Terma: Telemetry reaches the project through the local relay now not run on darwin/arm64",
+          "impact": "notable",
           "documented": true
+        },
+        {
+          "id": "support.capabilities.relay.telemetry@darwin/arm64.why",
+          "category": "support",
+          "op": "added",
+          "title": "support.capabilities.relay.telemetry@darwin/arm64.why added",
+          "impact": "informational",
+          "documented": false
         },
         {
           "id": "support.status",
           "category": "support",
           "op": "changed",
-          "title": "Terma support: supported → unsupported",
-          "impact": "breaking",
+          "title": "Terma support: supported → untested",
+          "impact": "notable",
           "documented": false
         }
       ]

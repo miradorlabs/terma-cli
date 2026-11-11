@@ -12783,7 +12783,8 @@
           }
         },
         "unobserved": [
-          "tengu_cache_eviction_hint"
+          "tengu_cache_eviction_hint",
+          "tengu_headless_latency"
         ]
       }
     }

@@ -7,7 +7,7 @@
   "capture": {
     "partial": false,
     "sections": {
-      "support": "2026-11-10T05:19:19.197557181Z"
+      "support": "2026-11-11T05:17:29.64320186Z"
     }
   },
   "side_requests": null,
@@ -17,9 +17,10 @@
         "id": "relay.telemetry",
         "label": "Telemetry reaches the project through the local relay",
         "platform": "darwin/arm64",
-        "result": "fail"
+        "result": "not run",
+        "why": "the test driver can't drive this version yet (it no longer serves /api/orchestration)"
       }
     ],
-    "status": "unsupported"
+    "status": "untested"
   }
 }

@@ -14,13 +14,12 @@
     "last_change": {
       "from": "1.0.108",
       "to": "1.0.109",
-      "at": "2026-11-10T17:17:30.953104486Z",
+      "at": "2026-11-11T05:17:29.64320186Z",
       "released_at": "2026-11-10T17:01:16.753Z",
-      "changes": 56,
+      "changes": 55,
       "categories": {
         "cli": 13,
-        "config": 42,
-        "storage": 1
+        "config": 42
       }
     }
   },
@@ -28,22 +27,21 @@
     {
       "version": "1.0.109",
       "released_at": "2026-11-10T17:01:16.753Z",
-      "captured_at": "2026-11-10T17:17:30.953104486Z",
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "1.0.108",
-      "changes": 56,
+      "changes": 55,
       "categories": {
         "cli": 13,
-        "config": 42,
-        "storage": 1
+        "config": 42
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 56,
+        "informational": 55,
         "notable": 0
       },
       "undocumented": 6,

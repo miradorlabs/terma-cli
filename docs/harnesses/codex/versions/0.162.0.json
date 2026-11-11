@@ -3,7 +3,7 @@
   "harness": "codex",
   "version": "0.162.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-05T09:54:28.532441Z",
+  "captured_at": "2026-11-11T05:17:29.64320186Z",
   "capture": {
     "command": [
       "codex",
@@ -48,7 +48,7 @@
       "side_requests": "2026-11-05T02:11:01.502194Z",
       "storage": "2026-11-05T02:11:01.502194Z",
       "support": "2026-11-05T02:11:01.502194Z",
-      "telemetry": "2026-11-05T02:11:01.502194Z",
+      "telemetry": "2026-11-11T05:17:29.64320186Z",
       "tools": "2026-11-05T02:11:01.502194Z"
     }
   },
@@ -749,64 +749,6 @@
             ]
           },
           "turn_id": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          }
-        }
-      },
-      "traces/list_skills": {
-        "keys": {
-          "busy_ns": {
-            "class": "safe",
-            "kinds": [
-              "number"
-            ]
-          },
-          "code.file.path": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "code.line.number": {
-            "class": "safe",
-            "kinds": [
-              "number"
-            ]
-          },
-          "code.module.name": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "idle_ns": {
-            "class": "safe",
-            "kinds": [
-              "number"
-            ]
-          },
-          "mirador.project.id": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "target": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "thread.id": {
-            "class": "safe",
-            "kinds": [
-              "number"
-            ]
-          },
-          "thread.name": {
             "class": "safe",
             "kinds": [
               "text"

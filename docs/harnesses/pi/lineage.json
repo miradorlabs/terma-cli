@@ -3,8 +3,8 @@
   "harness": "pi",
   "window": {
     "oldest": "1.2.0",
-    "newest": "1.5.1",
-    "builds": 5
+    "newest": "1.5.2",
+    "builds": 6
   },
   "items": {
     "cli.commands.pi auth": {

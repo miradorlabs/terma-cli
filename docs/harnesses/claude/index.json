@@ -7,45 +7,96 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.322",
-    "support": "supported",
-    "versions_tracked": 103,
+    "latest": "9.9.9",
+    "support": "untested",
+    "versions_tracked": 105,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.321",
-      "to": "2.1.322",
-      "at": "2026-11-10T05:27:59.913036763Z",
-      "released_at": "2026-11-10T01:58:41.811Z",
-      "changes": 1,
-      "categories": {
-        "config": 1
-      }
+      "from": "9.9.8",
+      "to": "9.9.9",
+      "at": "2026-11-11T05:17:29.64320186Z",
+      "released_at": null,
+      "changes": 0,
+      "categories": {}
     }
   },
   "versions": [
     {
+      "version": "9.9.9",
+      "released_at": null,
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "9.9.8",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
+    {
+      "version": "9.9.8",
+      "released_at": null,
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "2.1.322",
+      "changes": 7,
+      "categories": {
+        "network": 7
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 7
+      },
+      "undocumented": null,
+      "highlights": [
+        "Network request no longer made: POST api.anthropic.com/api/eval/sdk-zAZezfDKGoZuXXKe",
+        "Network request no longer made: POST api.anthropic.com/api/event_logging/v2/batch",
+        "Network request no longer made: GET api.anthropic.com/mcp-registry/v0/servers"
+      ],
+      "signing": null
+    },
+    {
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-10T05:27:59.913036763Z",
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 1,
+      "changes": 21,
       "categories": {
-        "config": 1
+        "config": 1,
+        "hooks": 1,
+        "network": 1,
+        "telemetry": 18
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
-        "notable": 0
+        "informational": 20,
+        "notable": 1
       },
-      "undocumented": 1,
+      "undocumented": 21,
       "highlights": [
-        "fastMode description changed (+132 −72 chars)"
+        "New vendor telemetry event: tengu_startup_timing",
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added"
       ],
       "signing": "valid"
     },
@@ -501,14 +552,14 @@
       ],
       "support": "supported",
       "previous": "2.1.303",
-      "changes": 84,
+      "changes": 83,
       "categories": {
         "behavior": 12,
         "cli": 9,
         "config": 17,
         "filesystem": 2,
         "hooks": 11,
-        "network": 2,
+        "network": 1,
         "prompt": 17,
         "request": 1,
         "tools": 13
@@ -517,7 +568,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 38,
-        "notable": 46
+        "notable": 45
       },
       "undocumented": 39,
       "highlights": [

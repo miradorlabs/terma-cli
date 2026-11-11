@@ -12,22 +12,22 @@
     },
     "changelog": "https://github.com/google-gemini/gemini-cli/releases",
     "latest": "0.68.0",
-    "support": "untested",
+    "support": "supported",
     "versions_tracked": 8,
     "first_tracked": "2026-09-24",
     "last_change": {
       "from": "0.67.0",
       "to": "0.68.0",
-      "at": "2026-11-10T21:30:49.077773519Z",
+      "at": "2026-11-11T05:17:29.64320186Z",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "changes": 76,
+      "changes": 16,
       "categories": {
         "config": 3,
         "hooks": 1,
         "network": 7,
-        "prompt": 1,
         "request": 1,
-        "telemetry": 63
+        "storage": 1,
+        "telemetry": 3
       }
     }
   },
@@ -35,54 +35,60 @@
     {
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-10T21:30:49.077773519Z",
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
       "platforms": [
         "darwin/arm64"
       ],
-      "support": "untested",
+      "support": "supported",
       "previous": "0.67.0",
-      "changes": 76,
+      "changes": 16,
       "categories": {
         "config": 3,
         "hooks": 1,
         "network": 7,
-        "prompt": 1,
         "request": 1,
-        "telemetry": 63
+        "storage": 1,
+        "telemetry": 3
       },
       "impact": {
         "breaking": 0,
-        "degrading": 19,
-        "informational": 34,
-        "notable": 23
+        "degrading": 0,
+        "informational": 3,
+        "notable": 13
       },
-      "undocumented": 73,
+      "undocumented": 15,
       "highlights": [
-        "Telemetry surface no longer sent: logs/gemini_cli.api_request",
-        "Telemetry surface no longer sent: logs/gemini_cli.api_response",
-        "Telemetry surface no longer sent: logs/gemini_cli.config"
+        "Request endpoint changed",
+        "Telemetry export.interval_batches.traces removed",
+        "Telemetry export.interval_ms.traces removed"
       ],
       "signing": null
     },
     {
       "version": "0.67.0",
       "released_at": "2026-11-04T20:32:45.08Z",
-      "captured_at": "2026-11-10T05:27:59.913036763Z",
+      "captured_at": "2026-11-11T05:17:29.64320186Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.66.0",
-      "changes": 0,
-      "categories": {},
+      "changes": 32,
+      "categories": {
+        "telemetry": 32
+      },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 0,
+        "informational": 32,
         "notable": 0
       },
-      "undocumented": 0,
-      "highlights": [],
+      "undocumented": 30,
+      "highlights": [
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
+        "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added"
+      ],
       "signing": null
     },
     {
