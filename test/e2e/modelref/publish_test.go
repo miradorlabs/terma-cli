@@ -303,3 +303,22 @@ func TestPageEditsStayOutOfTheFeed(t *testing.T) {
 		t.Errorf("feed = %+v", recent.Events)
 	}
 }
+
+// A model two of its vendor's lists name stays listed while one of them could not be read, even
+// where the other, read, no longer names it; it is unlisted once both were read without it.
+func TestUnlistedOnlyWhenEveryListSaysSo(t *testing.T) {
+	dir := t.TempDir()
+	api := observation{source: "anthropic-api", vendor: "anthropic", id: "claude-fable-5-1", listed: true, facts: map[string]any{}}
+	mustPublish(t, dir, testRun(testNow, docsObs("claude-fable-5-1", fable51), api, docsObs("claude-fable-5-2", fable52)))
+	// The docs no longer list it; the API was not read (it timed out).
+	r := testRun(testNow.Add(time.Hour), docsObs("claude-fable-5-2", fable52))
+	r.failed["anthropic-api"] = "timeout"
+	if res := mustPublish(t, dir, r); !res.snaps["claude-fable-5-1"].Listed {
+		t.Fatal("unlisted while the API, which listed it, was not read")
+	}
+	// Both read, neither lists it.
+	r = testRun(testNow.Add(2*time.Hour), docsObs("claude-fable-5-2", fable52), observation{source: "anthropic-api", vendor: "anthropic", id: "claude-fable-5-2", listed: true, facts: map[string]any{}})
+	if res := mustPublish(t, dir, r); res.snaps["claude-fable-5-1"].Listed {
+		t.Error("still listed once every list was read without it")
+	}
+}

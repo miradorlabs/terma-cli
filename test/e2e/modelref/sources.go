@@ -54,9 +54,12 @@ type vendor struct {
 	openrouter, modelsdev string
 	// keyEnv is the variable its API key is read from.
 	keyEnv string
-	docs   func(ctx context.Context, c *client, now time.Time) ([]observation, error)
-	api    func(ctx context.Context, c *client, key string) ([]observation, error)
-	probe  func(ctx context.Context, c *client, key string, m *Snapshot) *Probes
+	// apiLists says the API's model list is a list of the models the vendor offers (and so
+	// decides, with its docs, which models the reference follows).
+	apiLists bool
+	docs     func(ctx context.Context, c *client, now time.Time) ([]observation, error)
+	api      func(ctx context.Context, c *client, key string) ([]observation, error)
+	probe    func(ctx context.Context, c *client, key string, m *Snapshot) *Probes
 }
 
 // vendors are every vendor the reference follows, in the order it lists them.

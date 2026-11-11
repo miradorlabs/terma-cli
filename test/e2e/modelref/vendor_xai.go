@@ -46,10 +46,10 @@ var xAI = &vendor{
 		return fmt.Sprintf("%04d-%02d", st.year, int(mo))
 	},
 	openrouter: "x-ai", modelsdev: "xai",
-	keyEnv: "XAI_API_KEY",
-	docs:   xaiDocs,
-	api:    xaiAPI,
-	probe:  xaiProbe,
+	keyEnv: "XAI_API_KEY", apiLists: true,
+	docs:  xaiDocs,
+	api:   xaiAPI,
+	probe: xaiProbe,
 }
 
 const xaiDocsBase = "https://docs.x.ai/developers"

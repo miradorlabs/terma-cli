@@ -25,10 +25,10 @@ var anthropic = &vendor{
 		return ""
 	},
 	openrouter: "anthropic", modelsdev: "anthropic",
-	keyEnv: "ANTHROPIC_API_KEY",
-	docs:   anthropicDocs,
-	api:    anthropicAPI,
-	probe:  anthropicProbe,
+	keyEnv: "ANTHROPIC_API_KEY", apiLists: true,
+	docs:  anthropicDocs,
+	api:   anthropicAPI,
+	probe: anthropicProbe,
 }
 
 const (

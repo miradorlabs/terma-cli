@@ -47,17 +47,29 @@ func followed(r *run, prev map[string]*Snapshot) map[string]bool {
 		if out[id] {
 			continue
 		}
-		// Still listed unless a vendor source that lists models was read this time and did not
-		// list it.
-		readSome := false
+		// Still listed unless every vendor source that listed it was read this time and none
+		// lists it: a list that could not be read (an outage) may list it still.
+		listers, unread := 0, 0
 		for src := range s.Sources {
-			if strings.HasPrefix(src, s.Vendor+"-") && r.read[src] && r.covers(s.Vendor) {
-				readSome = true
+			if !listsModels(src, s.Vendor) {
+				continue
+			}
+			listers++
+			if !r.read[src] || !r.covers(s.Vendor) {
+				unread++
 			}
 		}
-		out[id] = s.Listed && !readSome
+		out[id] = s.Listed && (listers == 0 || unread > 0)
 	}
 	return out
+}
+
+// listsModels says src is one of vendor's own lists of its models: its docs, or its API where
+// the API's list is the models it serves (not every model a key may use, embeddings and images
+// among them).
+func listsModels(src, vendorID string) bool {
+	v := vendorByID(vendorID)
+	return v != nil && (src == v.id+"-docs" || src == v.id+"-api" && v.apiLists)
 }
 
 // assemble builds a model's snapshot from this run's observations and its previous snapshot.
