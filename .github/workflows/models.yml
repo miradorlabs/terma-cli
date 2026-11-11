@@ -31,27 +31,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # Reading and probing take minutes and hold nothing: only this workflow writes docs/models, and
+  # its own group runs it one at a time.
+  render:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # For the Slack webhook the announcements are posted with.
-    environment: live-harnesses
-    permissions:
-      contents: write
-    # The compat-matrix branch is published by three jobs (this one, reference.yml's and the
-    # nightly live.yml's): never two at once. The restore, the render and the push run while
-    # holding it, so the push starts from what the restore read.
-    concurrency:
-      group: compat-matrix
-      cancel-in-progress: false
+    outputs:
+      changed: ${{ steps.render.outputs.changed }}
     steps:
-      # Keeps its token: this job pushes to compat-matrix (publish.sh).
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
           cache-dependency-path: test/e2e/go.sum
       - name: Read, probe and render
+        id: render
         working-directory: test/e2e
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -60,17 +56,57 @@ jobs:
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           PROBE: ${{ inputs.probe || (github.event.schedule == '17 6 * * *' && 'all') || 'new' }}
           SINCE: ${{ inputs.announce_since }}
+          HARNESSES: https://raw.githubusercontent.com/${{ github.repository }}/compat-matrix/docs/harnesses
         run: |
           (cd ../.. && test/e2e/compatgen/publish.sh restore-models)
+          mkdir -p ../../docs/models && cp -R ../../docs/models "$RUNNER_TEMP/before"
           status=0
-          go run ./modelref -out ../../docs/models -harnesses ../../docs/harnesses -probe "$PROBE" \
-            -announce-since "$SINCE" -announce "$RUNNER_TEMP/announcements.json" 2>"$RUNNER_TEMP/modelref.log" || status=$?
+          go run ./modelref -out ../../docs/models -harnesses "$HARNESSES" -probe "$PROBE" \
+            -announce-since "$SINCE" -announce ../../docs/announcements.json 2>"$RUNNER_TEMP/modelref.log" || status=$?
           cat "$RUNNER_TEMP/modelref.log" >&2
           { echo '```'; cat "$RUNNER_TEMP/modelref.log"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
+          [ "$status" -eq 0 ] || exit "$status"
+          # A run that found nothing new wrote the same bytes: nothing to publish or announce.
+          if diff -rq "$RUNNER_TEMP/before" ../../docs/models >/dev/null; then
+            echo changed=false >> "$GITHUB_OUTPUT"
+          else
+            echo changed=true >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: steps.render.outputs.changed == 'true'
+        with:
+          name: models
+          path: |
+            docs/models
+            docs/announcements.json
+          retention-days: 3
+
+  publish:
+    needs: render
+    if: needs.render.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # For the Slack webhook the announcements are posted with.
+    environment: live-harnesses
+    permissions:
+      contents: write
+    # The compat-matrix branch is published by three jobs (this one, reference.yml's and the
+    # nightly live.yml's): never two at once. This one holds it only to publish, starting from
+    # the branch as it is then (publish.sh publish-models).
+    concurrency:
+      group: compat-matrix
+      cancel-in-progress: false
+    steps:
+      # Keeps its token: this job pushes to compat-matrix (publish.sh).
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: models
+          path: docs
       - name: Publish the reference
         run: |
-          news=$(jq -r '[.[].model] | join(" ")' "$RUNNER_TEMP/announcements.json")
+          news=$(jq -r '[.[].model] | join(" ")' docs/announcements.json)
+          mv docs/announcements.json "$RUNNER_TEMP/announcements.json"
           TERMA_MODELS_SUMMARY="${news:+new $news}" test/e2e/compatgen/publish.sh publish-models
       # Each model once, the run it is first listed, after it is published. The X post's text is
       # in the run's summary, to post by hand until the reference has an account to post with.

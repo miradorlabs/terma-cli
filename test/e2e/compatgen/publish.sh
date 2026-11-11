@@ -9,8 +9,7 @@
 #            commits the reference alone (the frequent check's new builds, reference.yml),
 #            leaving the night's matrix and catalog as they are
 #   restore-models
-#            puts back the Model Reference (docs/models) as last published, and the Harness
-#            Reference it reads
+#            puts back the Model Reference (docs/models) as last published
 #   publish-models
 #            commits the Model Reference alone (models.yml), leaving the rest as it is
 #
@@ -89,25 +88,27 @@ publish-reference)
 	git push -q origin "$branch"
 	;;
 restore-models)
-	# The Model Reference merges into what it last published, and reads the Harness Reference
-	# for the harnesses that use each model.
-	git fetch -q origin "$branch" 2>/dev/null || exit 0
-	rm -rf docs/models docs/harnesses
-	for d in docs/models docs/harnesses; do
-		if git cat-file -e "origin/$branch:$d" 2>/dev/null; then
-			git archive "origin/$branch" "$d" | tar -x
-		fi
-	done
+	# The Model Reference merges into what it last published: that alone, from the branch's
+	# newest commit (it reads the Harness Reference from where it is published).
+	git fetch -q --depth=1 origin "$branch" 2>/dev/null || exit 0
+	rm -rf docs/models
+	if git cat-file -e "origin/$branch:docs/models" 2>/dev/null; then
+		git archive "origin/$branch" docs/models | tar -x
+	fi
 	;;
 publish-models)
 	[ -d docs/models ] || exit 0
 	tmp=$(mktemp -d)
 	trap 'rm -rf "$tmp"' EXIT
 	cp -R docs/models "$tmp/"
-	rm -rf docs/models docs/harnesses
+	rm -rf docs/models
 	git config user.name "terma-compat"
 	git config user.email "terma-compat@users.noreply.github.com"
-	if git rev-parse -q --verify "origin/$branch" >/dev/null; then
+	# The branch as it is now (another job may have published since the restore), its newest
+	# commit, with only docs/models in the working tree: the rest of the branch is committed
+	# as it stands, never checked out.
+	if git fetch -q --depth=1 origin "$branch" 2>/dev/null && git rev-parse -q --verify "origin/$branch" >/dev/null; then
+		git sparse-checkout set --no-cone /docs/models/
 		git checkout -q -B "$branch" "origin/$branch"
 	else
 		git checkout -q --orphan "$branch"
@@ -116,7 +117,7 @@ publish-models)
 	mkdir -p docs
 	rm -rf docs/models
 	cp -R "$tmp/models" docs/models
-	git add -A -f docs/models
+	git add -A -f --sparse docs/models
 	if git diff --cached --quiet; then exit 0; fi
 	git commit -q -m "models: ${TERMA_MODELS_SUMMARY:-changes}, $(date -u +%FT%RZ)"
 	git push -q origin "$branch"

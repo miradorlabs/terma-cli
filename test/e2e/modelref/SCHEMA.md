@@ -40,7 +40,9 @@ docs/models/index.json                 every vendor, every model, newest release
 docs/models/recent.json                the newest events across every model, for a feed
 docs/models/<model>/snapshot.json      everything the reference holds of a model, as last observed
 docs/models/<model>/notes.json         its release notes: what's new, against the model before
-docs/models/<model>/timeline.json      what changed in what the reference observes, newest first
+docs/models/<model>/timeline.json      the newest 25 steps of what changed in what it observes
+docs/models/<model>/timeline-<n>.json  older steps, 25 a file from the oldest
+docs/models/harness-builds.json        what each Harness Reference build uses, as the join last read it
 ```
 
 `<model>` is the vendor's API id (`claude-fable-5-2`, `gpt-6.1-sol`, `gemini-4-argon`, `grok-4.7`):
@@ -149,7 +151,7 @@ what the API did with each:
   },
   "tokens": { "prose": 72, "code": 101, "json": 98, "cjk": 61, "symbols": 70, "indented": 52 },
   "tokenizer_like": ["claude-opus-5-5", "claude-sonnet-5-5"],
-  "response": { "model": "claude-fable-5-2", "stop_reason": "max_tokens", "usage_keys": ["input_tokens", "output_tokens"],
+  "response": { "model": "claude-fable-5-2", "usage_keys": ["input_tokens", "output_tokens"],
                 "headers": ["anthropic-ratelimit-requests-limit", "request-id"], "stream_events": ["message_start", "…"] }
 }
 ```
@@ -160,11 +162,14 @@ why (`"404 model: claude-mythos-5-2"`) and no case was sent: `params` is empty. 
 the cases by name (`modelref/probe_vendors.go`: sampling, stop sequences, thinking and effort,
 forced tool use, prefill, structured output, the output limit plus one, service tiers), each
 `accepted` or not with the API's status and its error message (request ids taken out). A case the
-API never answered meaningfully (the network, a 429, a 5xx) is left out, not counted as a refusal.
+API never answered meaningfully (the network, a 429, a 5xx) is not observed: it keeps the result the
+probes saw before, and is never counted as a refusal; so does the plain answer, its stream and the
+corpus, where those were not read.
 `tokens` are the token counts of a fixed corpus (`modelref/probecorpus.go`); `tokenizer_like` the
 same vendor's models that count every text the same. `response` is a plain answer's shape: the
-model the API says answered, why it stopped, its usage keys, the response headers a caller reads
-(names only), the event kinds its stream sent; `fingerprint` where the vendor sends one (xAI).
+model the API says answered, its usage keys, the response headers a caller reads (names only), the
+event kinds its stream sent. Why one short answer stopped, and a backend's fingerprint, vary from run
+to run and are not kept.
 
 ## <model>/notes.json
 
@@ -214,6 +219,17 @@ each still does), and its pages' text (a unified diff in `text_diff`). `category
 limit went down), `notable` (any other fact, probe or harness change), `informational` (a page's text,
 the API listing's details).
 
+`timeline.json` holds the newest 25 steps, and `archives` lists the files holding the older ones:
+`timeline-1.json` the oldest 25, `timeline-2.json` the next, and on, so a full archive never changes.
+Each archive lists `file`, the times of its `first` and `last` step, and how many `steps` it holds.
+
+## harness-builds.json
+
+What each build the Harness Reference tracks uses, by harness id and version: `captured` false for a
+build whose models were not captured, else its `uses` (`model` as the harness writes it, `role`,
+`label`, the `params` a default model is sent with). It lets a run read only the builds it has not
+read before; a model's `harnesses` are derived from it.
+
 ## recent.json
 
 ```json
@@ -225,7 +241,9 @@ the API listing's details).
 }
 ```
 
-The newest 200 timeline steps across every model, newest first.
+The newest 200 timeline steps across every model, newest first. A step that only edits the text of
+the vendor's pages is on its model's timeline and not here: a site-wide template change touches every
+model of a vendor at once.
 
 ## Announcements
 

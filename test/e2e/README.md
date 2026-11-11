@@ -439,8 +439,9 @@ before. Each model listed for the first time is announced in Slack, its X post's
 run's summary.
 
 ```bash
-git archive origin/compat-matrix docs/models docs/harnesses | tar -x -C /tmp/ref
-go run ./modelref -out /tmp/ref/docs/models -harnesses /tmp/ref/docs/harnesses -probe none
+git archive origin/compat-matrix docs/models | tar -x -C /tmp/ref
+go run ./modelref -out /tmp/ref/docs/models -probe none \
+  -harnesses https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses
 ```
 
 ## Relay restarts

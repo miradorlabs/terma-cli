@@ -105,8 +105,8 @@ func TestPublishTwoNights(t *testing.T) {
 		models := filepath.Join(tmp, "models"+string(rune('1'+i)))
 		run(tmp, "git", "clone", "-q", "-b", "main", origin, models)
 		run(models, "bash", script, "restore-models")
-		if b, err := os.ReadFile(filepath.Join(models, "docs/harnesses/claude/versions/1.0.1.json")); err != nil || string(b) != "between\n" {
-			t.Fatalf("restore-models did not put back the Harness Reference: %q (%v)", b, err)
+		if _, err := os.Stat(filepath.Join(models, "docs/harnesses")); err == nil {
+			t.Fatal("restore-models put back the Harness Reference, which it reads from where it is published")
 		}
 		if i == 1 {
 			if b, err := os.ReadFile(filepath.Join(models, "docs/models/index.json")); err != nil || string(b) != "models 1\n" {
@@ -117,6 +117,15 @@ func TestPublishTwoNights(t *testing.T) {
 		write(models, "docs/harnesses/index.json", "not to be published\n")
 		if s := run(models, "git", "status", "--porcelain"); s != "" {
 			t.Fatalf("the Model Reference is not ignored on main:\n%s", s)
+		}
+		if i == 1 {
+			// Another job publishes while this one renders: its publish starts from the branch as
+			// it is then, and keeps what the other published.
+			other := filepath.Join(tmp, "other")
+			run(tmp, "git", "clone", "-q", "-b", "main", origin, other)
+			run(other, "bash", script, "restore")
+			write(other, "docs/harnesses/claude/versions/1.0.3.json", "meanwhile\n")
+			run(other, "bash", script, "publish-reference")
 		}
 		run(models, "bash", script, "publish-models")
 	}
@@ -135,8 +144,11 @@ func TestPublishTwoNights(t *testing.T) {
 
 	check := filepath.Join(tmp, "check")
 	run(tmp, "git", "clone", "-q", "-b", "compat-matrix", origin, check)
-	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "6" {
+	if n := run(check, "git", "rev-list", "--count", "HEAD"); n != "7" {
 		t.Errorf("compat-matrix has %s commits, want one a night, the checks' and two of the Model Reference's", n)
+	}
+	if b, err := os.ReadFile(filepath.Join(check, "docs/harnesses/claude/versions/1.0.3.json")); err != nil || string(b) != "meanwhile\n" {
+		t.Errorf("the Model Reference's publish lost what another job published meanwhile: %q (%v)", b, err)
 	}
 	if b, err := os.ReadFile(filepath.Join(check, "docs/models/index.json")); err != nil || string(b) != "models 2\n" {
 		t.Errorf("compat-matrix has the Model Reference as %q (%v)", b, err)
