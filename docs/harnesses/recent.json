@@ -1,7 +1,37 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T21:46:13.106302964Z",
+  "generated_at": "2026-11-11T01:31:58.028457459Z",
   "versions": [
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "5.1231.2",
+      "released_at": "2026-11-11T00:05:48.791Z",
+      "captured_at": "2026-11-11T01:31:58.028457459Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "5.1231.0",
+      "changes": 12,
+      "categories": {
+        "cli": 2,
+        "network": 10
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 12
+      },
+      "undocumented": null,
+      "highlights": [
+        "The app's agent's BAGGAGE: none → none",
+        "The app's agent's SENTRY-TRACE: <hex>-9639c2a7d6ff93ba → <hex>-a008d91b966eb681",
+        "New vendor telemetry event: tengu_headless_latency"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
@@ -6219,40 +6249,6 @@
         "Default model: gpt-5.4 → gpt-5.5",
         "System prompt changed (+17945 −11407 chars)",
         "spawn_agent tool description changed (+689 −324 chars)"
-      ],
-      "signing": "revoked"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.124.0",
-      "released_at": "2026-04-23T18:30:45.892Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.123.0",
-      "changes": 76,
-      "categories": {
-        "behavior": 1,
-        "cli": 1,
-        "config": 63,
-        "filesystem": 10,
-        "prompt": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 71,
-        "notable": 5
-      },
-      "undocumented": 54,
-      "highlights": [
-        "System prompt changed (+376 −387 chars)",
-        "Behaviour: sandbox removed",
-        "New setting: auto_review.policy"
       ],
       "signing": "revoked"
     }

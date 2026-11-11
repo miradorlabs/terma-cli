@@ -3,6 +3,108 @@
   "harness": "claude-desktop",
   "steps": [
     {
+      "version": "5.1231.2",
+      "previous": "5.1231.0",
+      "changes": [
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-9639c2a7d6ff93ba → <hex>-a008d91b966eb681",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_headless_latency",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_schema_violation",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_sdk_schema_violation",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.chorus.ideas.suggestions_shown",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: chorus.ideas.suggestions_shown",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_keep_awake_held",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_ccd_keep_awake_held",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_message_cycle_start",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_ccd_message_cycle_start",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_remote_control_auto_enable",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_ccd_remote_control_auto_enable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_initialized",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_ccd_session_initialized",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_visibility_changed",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: desktop_ccd_session_visibility_changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.lam_internal_mcp_server_created",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: lam_internal_mcp_server_created",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.lam_mcp_servers_setup_summary",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: lam_mcp_servers_setup_summary",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "5.1231.0",
       "previous": "4.16336.0",
       "changes": [

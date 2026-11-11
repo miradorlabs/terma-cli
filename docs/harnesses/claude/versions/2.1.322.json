@@ -24209,7 +24209,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-10T21:46:13.106302964Z",
+    "fetched_at": "2026-11-11T01:31:58.028457459Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24661,7 +24661,7 @@
       },
       "desktopSessionCleanupPeriodDays": {
         "default": "`0`, which sets no age limit",
-        "description": "Set an age limit in days for the transcripts of sessions you started or most recently continued in Claude Desktop or Cowork. Without this key, Claude Code keeps those transcripts at any age. Claude Code deletes each one once it's older than both this limit and `cleanupPeriodDays`, so with `cleanupPeriodDays` at its default of 30, a value of `7` still keeps them 30 days. Cleaned up automatically lists the cases where `cleanupPeriodDays` applies instead and Claude Code ignores this key. Requires Claude Code v2.1.248 or later.",
+        "description": "Set an age limit in days for the transcripts of sessions you started or most recently continued in Claude Desktop or Cowork. Without this key, Claude Code keeps those transcripts at any age, except in cases such as a session you deleted in Claude Desktop. Requires Claude Code v2.1.248 or later.",
         "read": true,
         "scope": "User or managed",
         "scope_note": "Claude Code also reads the key from a file you pass with `--settings`, and ignores it in project and local settings.",

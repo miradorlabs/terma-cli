@@ -6,29 +6,51 @@
     "vendor": "Anthropic",
     "homepage": "https://claude.ai/download",
     "source": null,
-    "latest": "5.1231.0",
+    "latest": "5.1231.2",
     "support": "untested",
-    "versions_tracked": 2,
+    "versions_tracked": 3,
     "first_tracked": "2026-11-03",
     "last_change": {
-      "from": "4.16336.0",
-      "to": "5.1231.0",
-      "at": "2026-11-10T16:47:46.966590707Z",
-      "released_at": "2026-11-10T07:14:38.847Z",
-      "changes": 136,
+      "from": "5.1231.0",
+      "to": "5.1231.2",
+      "at": "2026-11-11T01:31:58.028457459Z",
+      "released_at": "2026-11-11T00:05:48.791Z",
+      "changes": 12,
       "categories": {
-        "binary": 4,
-        "cli": 7,
-        "config": 10,
-        "network": 84,
-        "prompt": 3,
-        "request": 1,
-        "side_requests": 5,
-        "tools": 22
+        "cli": 2,
+        "network": 10
       }
     }
   },
   "versions": [
+    {
+      "version": "5.1231.2",
+      "released_at": "2026-11-11T00:05:48.791Z",
+      "captured_at": "2026-11-11T01:31:58.028457459Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "5.1231.0",
+      "changes": 12,
+      "categories": {
+        "cli": 2,
+        "network": 10
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 12
+      },
+      "undocumented": null,
+      "highlights": [
+        "The app's agent's BAGGAGE: none → none",
+        "The app's agent's SENTRY-TRACE: <hex>-9639c2a7d6ff93ba → <hex>-a008d91b966eb681",
+        "New vendor telemetry event: tengu_headless_latency"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "5.1231.0",
       "released_at": "2026-11-10T07:14:38.847Z",
