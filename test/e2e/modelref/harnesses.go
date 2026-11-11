@@ -1,22 +1,27 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/miradorlabs/terma-cli/e2e/refdiff"
 )
 
 // The join with the Harness Reference (docs/harnesses): which coding-agent harness builds use a
 // model, and how. Each build's snapshot says the model a session starts on, the aliases it
-// offers, and the models its compaction, subagents, fallback and side requests ask for; the
-// reference reads every tracked build, oldest first, and keeps for each model and each way a
-// harness uses it the builds that do.
+// offers, and the models its compaction, subagents, fallback and side requests ask for. The
+// reference reads the Harness Reference as its readers do, from where it is published, and
+// keeps what each build uses in harness-builds.json beside the models: a run reads each
+// harness's index and only the builds it has not read before, never the whole tree.
 
 // harnessSnapshot is what the join reads of a build's snapshot.
 type harnessSnapshot struct {
@@ -41,73 +46,198 @@ type harnessSnapshot struct {
 	} `json:"side_requests"`
 }
 
-// harnessUses reads the Harness Reference at dir and says, by model id as each harness names
-// it (normalized, norm), every way a harness's builds use it.
-func harnessUses(dir string) (map[string][]HarnessUse, error) {
+// harnessBuildsFile is the file, beside the models, that keeps what each build uses.
+const harnessBuildsFile = "harness-builds.json"
+
+// harnessBuilds is harness-builds.json: what each tracked harness build uses, by harness id and
+// version, as the join last read it.
+type harnessBuilds struct {
+	SchemaVersion int                         `json:"schema_version"`
+	Harnesses     map[string]*harnessOfBuilds `json:"harnesses"`
+}
+
+type harnessOfBuilds struct {
+	Name   string                  `json:"name"`
+	Builds map[string]*buildModels `json:"builds"`
+}
+
+// buildModels is what one build uses. A build whose models were not captured (a capture that
+// failed, a build only listed) says nothing of them: Captured false.
+type buildModels struct {
+	Captured bool       `json:"captured"`
+	Uses     []buildUse `json:"uses,omitempty"`
+}
+
+// harnessSource reads a file of the Harness Reference by its path below docs/harnesses: from a
+// folder, or over HTTP from where it is published. A file that is not there is errNotFound.
+type harnessSource func(ctx context.Context, path string) ([]byte, error)
+
+// harnessesAt is the source at loc: a URL (https://…/docs/harnesses) or a folder.
+func harnessesAt(c *client, loc string) harnessSource {
+	if strings.HasPrefix(loc, "https://") || strings.HasPrefix(loc, "http://") {
+		base := strings.TrimSuffix(loc, "/")
+		return func(ctx context.Context, path string) ([]byte, error) {
+			text, err := c.text(ctx, base+"/"+path)
+			return []byte(text), err
+		}
+	}
+	return func(_ context.Context, path string) ([]byte, error) {
+		data, err := os.ReadFile(filepath.Join(loc, filepath.FromSlash(path)))
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("%s: %w", path, errNotFound)
+		}
+		return data, err
+	}
+}
+
+// readHarnessBuilds brings cache up to date with the Harness Reference: each harness's builds as
+// its index lists them now, reading only those cache does not hold. What cannot be read this time
+// (the index, a harness's index, a build) keeps what cache said: an outage is no change.
+func readHarnessBuilds(ctx context.Context, src harnessSource, cache *harnessBuilds) (*harnessBuilds, []error) {
+	out := &harnessBuilds{SchemaVersion: schemaVersion, Harnesses: map[string]*harnessOfBuilds{}}
+	if cache == nil || cache.Harnesses == nil {
+		cache = &harnessBuilds{Harnesses: map[string]*harnessOfBuilds{}}
+	}
 	var index struct {
 		Harnesses []struct {
-			ID     string `json:"id"`
-			Name   string `json:"name"`
-			Latest string `json:"latest"`
+			ID   string `json:"id"`
+			Name string `json:"name"`
 		} `json:"harnesses"`
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "index.json"))
-	if os.IsNotExist(err) {
-		return map[string][]HarnessUse{}, nil
+	data, err := src(ctx, "index.json")
+	if err == nil {
+		err = json.Unmarshal(data, &index)
+	}
+	if errors.Is(err, errNotFound) {
+		return out, nil
 	}
 	if err != nil {
-		return nil, err
+		cache.SchemaVersion = schemaVersion
+		return cache, []error{err}
 	}
-	if err := json.Unmarshal(data, &index); err != nil {
-		return nil, err
-	}
-	out := map[string][]HarnessUse{}
+	var errs []error
 	for _, h := range index.Harnesses {
+		if !validID.MatchString(h.ID) {
+			continue
+		}
+		before := cache.Harnesses[h.ID]
 		var hi struct {
 			Versions []struct {
 				Version string `json:"version"`
 			} `json:"versions"`
 		}
-		data, err := os.ReadFile(filepath.Join(dir, h.ID, "index.json"))
+		data, err := src(ctx, h.ID+"/index.json")
+		if err == nil {
+			err = json.Unmarshal(data, &hi)
+		}
 		if err != nil {
+			if before != nil {
+				out.Harnesses[h.ID] = before
+			}
+			if !errors.Is(err, errNotFound) {
+				errs = append(errs, err)
+			}
 			continue
 		}
-		if err := json.Unmarshal(data, &hi); err != nil {
-			return nil, err
-		}
-		versions := make([]string, 0, len(hi.Versions))
+		now := &harnessOfBuilds{Name: h.Name, Builds: map[string]*buildModels{}}
+		var todo []string
 		for _, v := range hi.Versions {
-			versions = append(versions, v.Version)
+			if !validID.MatchString(v.Version) {
+				continue
+			}
+			if before != nil && before.Builds[v.Version] != nil {
+				now.Builds[v.Version] = before.Builds[v.Version]
+			} else {
+				todo = append(todo, v.Version)
+			}
+		}
+		read := make([]*buildModels, len(todo))
+		readErrs := make([]error, len(todo))
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 8)
+		for i, v := range todo {
+			wg.Go(func() {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				read[i], readErrs[i] = readBuild(ctx, src, h.ID, v)
+			})
+		}
+		wg.Wait()
+		for i, v := range todo {
+			switch {
+			case readErrs[i] != nil:
+				// Read again next time.
+				errs = append(errs, readErrs[i])
+			case read[i] != nil:
+				now.Builds[v] = read[i]
+			}
+		}
+		out.Harnesses[h.ID] = now
+	}
+	return out, errs
+}
+
+// readBuild is what one build's snapshot says it uses; nil for a build listed without one.
+func readBuild(ctx context.Context, src harnessSource, harness, version string) (*buildModels, error) {
+	data, err := src(ctx, harness+"/versions/"+version+".json")
+	if errors.Is(err, errNotFound) {
+		return &buildModels{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var s harnessSnapshot
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, fmt.Errorf("%s %s: %w", harness, version, err)
+	}
+	if s.Model == nil {
+		return &buildModels{}, nil
+	}
+	return &buildModels{Captured: true, Uses: buildUses(&s)}, nil
+}
+
+// harnessUses says, by model id as each harness names it (normalized, norm), every way a
+// harness's builds use it: oldest build first, and current where the harness's newest build whose
+// models were captured still does.
+func harnessUses(hb *harnessBuilds) map[string][]HarnessUse {
+	out := map[string][]HarnessUse{}
+	ids := make([]string, 0, len(hb.Harnesses))
+	for id := range hb.Harnesses {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		h := hb.Harnesses[id]
+		versions := make([]string, 0, len(h.Builds))
+		for v := range h.Builds {
+			versions = append(versions, v)
 		}
 		sort.Slice(versions, func(i, j int) bool { return refdiff.VersionCompare(versions[i], versions[j]) < 0 })
 		type key struct{ model, role, label string }
 		uses := map[key]*HarnessUse{}
 		var order []key
-		// newest is the newest build whose models were captured: a build tracked without its
-		// model section (a capture that failed, a build only listed) says nothing of them.
 		newest := ""
 		for _, v := range versions {
-			var s harnessSnapshot
-			data, err := os.ReadFile(filepath.Join(dir, h.ID, "versions", v+".json"))
-			if err != nil || json.Unmarshal(data, &s) != nil || s.Model == nil {
+			b := h.Builds[v]
+			if !b.Captured {
 				continue
 			}
 			newest = v
-			for _, u := range buildUses(&s) {
-				k := key{norm(harnessModel(u.model)), u.role, u.label}
+			for _, u := range b.Uses {
+				k := key{norm(harnessModel(u.Model)), u.Role, u.Label}
 				if k.model == "" {
 					continue
 				}
 				hu := uses[k]
 				if hu == nil {
-					hu = &HarnessUse{Harness: h.ID, Name: h.Name, Role: u.role, Label: u.label, First: v}
+					hu = &HarnessUse{Harness: id, Name: h.Name, Role: u.Role, Label: u.Label, First: v}
 					uses[k] = hu
 					order = append(order, k)
 				}
 				hu.Last = v
 				hu.Builds++
-				if u.params != nil {
-					hu.Params = u.params
+				if u.Params != nil {
+					hu.Params = u.Params
 				}
 			}
 		}
@@ -117,12 +247,15 @@ func harnessUses(dir string) (map[string][]HarnessUse, error) {
 			out[k.model] = append(out[k.model], *u)
 		}
 	}
-	return out, nil
+	return out
 }
 
+// buildUse is one way a build uses a model.
 type buildUse struct {
-	model, role, label string
-	params             map[string]any
+	Model  string         `json:"model"`
+	Role   string         `json:"role"`
+	Label  string         `json:"label,omitempty"`
+	Params map[string]any `json:"params,omitempty"`
 }
 
 // buildUses are the ways one build uses models.
@@ -130,7 +263,7 @@ func buildUses(s *harnessSnapshot) []buildUse {
 	var out []buildUse
 	add := func(m *string, role, label string, params map[string]any) {
 		if m != nil && *m != "" {
-			out = append(out, buildUse{*m, role, label, params})
+			out = append(out, buildUse{Model: *m, Role: role, Label: label, Params: params})
 		}
 	}
 	if s.Model != nil {

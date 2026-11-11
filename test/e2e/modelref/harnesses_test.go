@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,10 +30,11 @@ func TestHarnessUses(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "claude/versions/2.1.10.json"),
 		`{"model":{"default":"claude-fable-5-2","aliases":{"opus":"claude-opus-5-5[1m]"},"params":{"output_config":{"effort":"high"}}},"side_requests":[{"model":"claude-haiku-5-5"},{"model":"claude-haiku-5-5"}]}`)
 	writeFile(t, filepath.Join(dir, "claude/versions/9.9.9.json"), `{"network":{}}`)
-	uses, err := harnessUses(dir)
-	if err != nil {
-		t.Fatal(err)
+	builds, errs := readHarnessBuilds(context.Background(), harnessesAt(newClient(), dir), nil)
+	if len(errs) > 0 {
+		t.Fatal(errs)
 	}
+	uses := harnessUses(builds)
 	find := func(model, role string) *HarnessUse {
 		for _, u := range uses[norm(model)] {
 			if u.Role == role {
@@ -58,5 +62,50 @@ func TestHarnessUses(t *testing.T) {
 	s := &Snapshot{ID: "claude-opus-5-5", Facts: map[string]any{}}
 	if got := usesFor(uses, s); len(got) != 3 || got[0].Role != "default" {
 		t.Errorf("usesFor = %+v", got)
+	}
+}
+
+// A run reads only the builds it has not read before; a build a harness's index no longer lists
+// goes; a harness whose index cannot be read keeps what was read of it.
+func TestHarnessBuildsAreIncremental(t *testing.T) {
+	read := map[string]int{}
+	files := map[string]string{
+		"index.json":                  `{"harnesses":[{"id":"claude","name":"Claude Code"},{"id":"codex","name":"Codex CLI"}]}`,
+		"claude/index.json":           `{"versions":[{"version":"2.1.9"},{"version":"2.1.10"}]}`,
+		"claude/versions/2.1.9.json":  `{"model":{"default":"claude-opus-5-5"}}`,
+		"claude/versions/2.1.10.json": `{"model":{"default":"claude-fable-5-2"}}`,
+		"codex/index.json":            `{"versions":[{"version":"0.1.0"}]}`,
+		"codex/versions/0.1.0.json":   `{"model":{"default":"gpt-6.1-sol"}}`,
+	}
+	src := func(_ context.Context, path string) ([]byte, error) {
+		read[path]++
+		if f, ok := files[path]; ok {
+			return []byte(f), nil
+		}
+		if path == "codex/index.json" {
+			return nil, errors.New("503")
+		}
+		return nil, fmt.Errorf("%s: %w", path, errNotFound)
+	}
+	first, errs := readHarnessBuilds(context.Background(), src, nil)
+	if len(errs) > 0 || len(first.Harnesses["claude"].Builds) != 2 {
+		t.Fatalf("first read: %+v %v", first, errs)
+	}
+	files["claude/index.json"] = `{"versions":[{"version":"2.1.10"},{"version":"2.1.11"}]}`
+	files["claude/versions/2.1.11.json"] = `{"network":{}}`
+	delete(files, "codex/index.json")
+	second, errs := readHarnessBuilds(context.Background(), src, first)
+	if len(errs) != 1 {
+		t.Errorf("errors = %v, want the codex index's", errs)
+	}
+	if read["claude/versions/2.1.10.json"] != 1 || read["claude/versions/2.1.11.json"] != 1 {
+		t.Errorf("builds read again: %v", read)
+	}
+	c := second.Harnesses["claude"].Builds
+	if _, ok := c["2.1.9"]; ok || c["2.1.11"].Captured || !c["2.1.10"].Captured {
+		t.Errorf("claude builds = %+v", c)
+	}
+	if second.Harnesses["codex"] == nil || len(second.Harnesses["codex"].Builds) != 1 {
+		t.Errorf("an unreadable index lost codex's builds: %+v", second.Harnesses["codex"])
 	}
 }

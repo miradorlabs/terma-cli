@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -25,7 +26,7 @@ import (
 
 func main() {
 	out := flag.String("out", "docs/models", "the published tree to merge into")
-	harnesses := flag.String("harnesses", "", "the Harness Reference's published tree (docs/harnesses), for which harnesses use each model")
+	harnesses := flag.String("harnesses", "", "where the Harness Reference is published (a URL, …/docs/harnesses, or a folder), for which harnesses use each model; only builds not yet read are fetched")
 	probeMode := flag.String("probe", "new", "which models to probe where a vendor's key is set: new (never probed), all, or none")
 	only := flag.String("vendors", "", "read only these vendors (comma-separated ids); the others keep what was published")
 	site := flag.String("site", "https://terma.ai", "the reference's public site, for the links announcements carry")
@@ -63,12 +64,21 @@ func main() {
 		}
 	}
 	r := read(ctx, c, wanted, now)
-	uses := map[string][]HarnessUse{}
+	var builds harnessBuilds
+	if err := readOptional(filepath.Join(*out, harnessBuildsFile), &builds); err != nil {
+		fail(err)
+	}
 	if *harnesses != "" {
-		if uses, err = harnessUses(*harnesses); err != nil {
-			fail(fmt.Errorf("-harnesses: %w", err))
+		updated, errs := readHarnessBuilds(ctx, harnessesAt(c, *harnesses), &builds)
+		for _, err := range errs {
+			r.failed["harnesses"] = err.Error()
+		}
+		builds = *updated
+		if err := writeJSON(filepath.Join(*out, harnessBuildsFile), builds); err != nil {
+			fail(err)
 		}
 	}
+	uses := harnessUses(&builds)
 	changelogs := map[string][]ChangelogEntry{}
 	for _, v := range vendors {
 		if len(wanted) > 0 && !wanted[v.id] {
