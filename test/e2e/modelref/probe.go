@@ -75,10 +75,20 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 			r.Error = apiError(resp.Body)
 		}
 		if pc.name == "baseline" && !r.Accepted {
-			// The plain request refused (a model the key may not use, one taken down): no case
-			// would say anything of the model's API.
-			p.Unavailable = fmt.Sprintf("%d %s", r.Status, r.Error)
 			p.Params = map[string]ProbeResult{}
+			if modelRefused(r.Status) {
+				// The plain request refused for the model (one the key may not use, one taken
+				// down): no case would say anything of its API.
+				p.Unavailable = fmt.Sprintf("%d %s", r.Status, r.Error)
+				return p
+			}
+			// Refused for the key's own reasons (revoked, out of credit, over its budget): nothing
+			// of the model was observed, and what the probes saw before stands.
+			p.Errors = append(p.Errors, fmt.Sprintf("baseline: %d %s", r.Status, r.Error))
+			for _, c := range t.cases {
+				p.unanswered[c.name] = true
+			}
+			p.streamMissed = true
 			return p
 		}
 		p.Params[pc.name] = r
@@ -114,6 +124,13 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 		}
 	}
 	return p
+}
+
+// modelRefused says a refusal of the plain request is the model's: not there for this key (404) or
+// not permitted to it (403). Any other refusal (401 a bad key, 400 out of credit, 402, 429) is the
+// key's, and says nothing of the model.
+func modelRefused(status int) bool {
+	return status == http.StatusNotFound || status == http.StatusForbidden
 }
 
 // keepUnobserved is p with what this run did not observe taken from old, the model's probes
@@ -288,6 +305,12 @@ func tokenizerLike(snaps map[string]*Snapshot) {
 	for id, s := range snaps {
 		if s.API != nil && s.API.Probes != nil && len(s.API.Probes.Tokens) == len(corpus) {
 			all = append(all, counted{id, s.API.Probes.Tokens})
+		}
+	}
+	for _, s := range snaps {
+		// A model whose corpus was not counted whole says nothing of its tokenizer.
+		if s.API != nil && s.API.Probes != nil && len(s.API.Probes.Tokens) != len(corpus) {
+			s.API.Probes.TokenizerLike = nil
 		}
 	}
 	for _, a := range all {

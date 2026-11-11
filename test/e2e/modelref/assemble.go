@@ -141,7 +141,11 @@ func assemble(id, vendorID string, r *run, prev *Snapshot, listed bool) *Snapsho
 			if s.API == nil {
 				s.API = &API{}
 			}
-			s.API.Probes = prev.API.Probes
+			// A copy: the run derives what it shares with other models (TokenizerLike) on it, and
+			// the snapshot before must stay as it was, to compare with.
+			kept := *prev.API.Probes
+			kept.TokenizerLike = slices.Clone(kept.TokenizerLike)
+			s.API.Probes = &kept
 		}
 	}
 	sources := make([]string, 0, len(bySource))

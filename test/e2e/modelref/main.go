@@ -27,7 +27,7 @@ import (
 func main() {
 	out := flag.String("out", "docs/models", "the published tree to merge into")
 	harnesses := flag.String("harnesses", "", "where the Harness Reference is published (a URL, …/docs/harnesses, or a folder), for which harnesses use each model; only builds not yet read are fetched")
-	probeMode := flag.String("probe", "new", "which models to probe where a vendor's key is set: new (never probed), all, or none")
+	probeMode := flag.String("probe", "new", "which models to probe where a vendor's key is set: new (never probed), all, none, or daily (all once a day, by the time the last full probe was published, and new otherwise)")
 	only := flag.String("vendors", "", "read only these vendors (comma-separated ids); the others keep what was published")
 	site := flag.String("site", "https://terma.ai", "the reference's public site, for the links announcements carry")
 	announcePath := flag.String("announce", "", "write the models to announce (new this run) to this JSON file")
@@ -44,9 +44,9 @@ func main() {
 		now = at.UTC()
 	}
 	switch *probeMode {
-	case "new", "all", "none":
+	case "new", "all", "none", "daily":
 	default:
-		fail(fmt.Errorf("-probe %q: want new, all or none", *probeMode))
+		fail(fmt.Errorf("-probe %q: want new, all, none or daily", *probeMode))
 	}
 	ctx := context.Background()
 	c := newClient()
@@ -91,15 +91,20 @@ func main() {
 		}
 		changelogs[v.id] = entries
 	}
+	var state probeState
+	if err := readOptional(filepath.Join(*out, probeStateFile), &state); err != nil {
+		fail(err)
+	}
+	mode := effectiveMode(*probeMode, state, now)
 	var probe func(*Snapshot) *Probes
-	if *probeMode != "none" {
+	if mode != "none" {
 		probe = func(s *Snapshot) *Probes {
 			v := vendorByID(s.Vendor)
 			key := os.Getenv(v.keyEnv)
 			if key == "" || (len(wanted) > 0 && !wanted[v.id]) {
 				return nil
 			}
-			if !needsProbe(s, *probeMode) {
+			if !needsProbe(s, mode) {
 				return nil
 			}
 			return v.probe(ctx, c, key, s)
@@ -108,6 +113,12 @@ func main() {
 	res, err := publish(*out, r, prev, uses, changelogs, probe)
 	if err != nil {
 		fail(err)
+	}
+	if mode == "all" && *probeMode != "all" {
+		// The daily full probe, done: the next is due a day from now.
+		if err := writeJSON(filepath.Join(*out, probeStateFile), probeState{SchemaVersion: schemaVersion, AllAt: now}); err != nil {
+			fail(err)
+		}
 	}
 	report(r, res)
 	if *announcePath != "" {
@@ -175,6 +186,28 @@ func report(r *run, res *result) {
 		fmt.Fprintf(os.Stderr, "modelref: not read %s: %s\n", src, err)
 	}
 	fmt.Fprintf(os.Stderr, "modelref: %d models, %d new\n", len(res.snaps), len(res.new))
+}
+
+// probeStateFile keeps when every model was last probed, beside the models.
+const probeStateFile = "probes.json"
+
+// probeState is probes.json.
+type probeState struct {
+	SchemaVersion int       `json:"schema_version"`
+	AllAt         time.Time `json:"all_at"`
+}
+
+// effectiveMode is the probe mode a run takes: daily is all where the last full probe is a day
+// old or more (or never was), and new otherwise. A full probe due is never lost to a run that
+// did not start: the next one takes it.
+func effectiveMode(mode string, st probeState, now time.Time) string {
+	if mode != "daily" {
+		return mode
+	}
+	if st.AllAt.IsZero() || now.Sub(st.AllAt) >= 24*time.Hour {
+		return "all"
+	}
+	return "new"
 }
 
 // needsProbe says whether a run in mode probes s: every model in "all", none in "none", and in

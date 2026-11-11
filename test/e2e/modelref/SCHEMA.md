@@ -43,6 +43,7 @@ docs/models/<model>/notes.json         its release notes: what's new, against th
 docs/models/<model>/timeline.json      the newest 25 steps of what changed in what it observes
 docs/models/<model>/timeline-<n>.json  older steps, 25 a file from the oldest
 docs/models/harness-builds.json        what each Harness Reference build uses, as the join last read it
+docs/models/probes.json                when every model was last probed (all_at), for the daily full probe
 ```
 
 `<model>` is the vendor's API id (`claude-fable-5-2`, `gpt-6.1-sol`, `gemini-4-argon`, `grok-4.7`):
@@ -157,8 +158,10 @@ what the API did with each:
 ```
 
 `at` is when the probes first saw what they show: a run that sees the same keeps it. Where the API refused
-the plain request (a model the reference's key may not use, Mythos models), `unavailable` says
-why (`"404 model: claude-mythos-5-2"`) and no case was sent: `params` is empty. `params` are
+the plain request for the model (404 or 403: a model the reference's key may not use, Mythos models),
+`unavailable` says why (`"404 model: claude-mythos-5-2"`) and no case was sent: `params` is empty. A
+refusal for the key's own reasons (401, out of credit, any other status), or every model of a vendor
+refused at once, observes nothing: the probes before stand. `params` are
 the cases by name (`modelref/probe_vendors.go`: sampling, stop sequences, thinking and effort,
 forced tool use, prefill, structured output, the output limit plus one, service tiers), each
 `accepted` or not with the API's status and its error message (request ids taken out). A case the

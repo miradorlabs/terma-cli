@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -292,5 +293,90 @@ func TestStreamAnswers(t *testing.T) {
 		if !slices.Equal(p.Response.StreamEvents, tc.events) || p.streamMissed != tc.unanswer {
 			t.Errorf("stream %d: events %v, unanswered %v", tc.status, p.Response.StreamEvents, p.streamMissed)
 		}
+	}
+}
+
+func TestEffectiveMode(t *testing.T) {
+	day := probeState{AllAt: testNow}
+	for _, tc := range []struct {
+		mode string
+		st   probeState
+		now  time.Time
+		want string
+	}{
+		{"daily", probeState{}, testNow, "all"},
+		{"daily", day, testNow.Add(23 * time.Hour), "new"},
+		{"daily", day, testNow.Add(24 * time.Hour), "all"},
+		{"new", probeState{}, testNow, "new"},
+		{"all", day, testNow, "all"},
+	} {
+		if got := effectiveMode(tc.mode, tc.st, tc.now); got != tc.want {
+			t.Errorf("%s at +%v: %s, want %s", tc.mode, tc.now.Sub(testNow), got, tc.want)
+		}
+	}
+}
+
+// A key the vendor refuses for its own reasons (401, out of credit) observes nothing: the probes
+// before stand, every case of them. Every model of a vendor refused at once is the key's doing too.
+func TestKeyRefusalsAreNoChange(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		body   string
+	}{
+		{401, `{"error":{"message":"invalid x-api-key"}}`},
+		{400, `{"error":{"message":"Your credit balance is too low to access the Anthropic API."}}`},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(tc.status)
+			_, _ = w.Write([]byte(tc.body))
+		}))
+		c := newClient()
+		c.wait, c.tries = time.Millisecond, 1
+		c.rewrite = func(u string) string { return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+		p := anthropicProbe(context.Background(), c, "k", &Snapshot{ID: "m", Facts: map[string]any{}})
+		srv.Close()
+		old := &Probes{Endpoint: p.Endpoint, Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}, "effort.max": {Accepted: true, Status: 200}},
+			Tokens: map[string]int{"prose": 1}, Response: &ResponseShape{Model: "m", StreamEvents: []string{"message_start"}}}
+		if p.Unavailable != "" {
+			t.Errorf("%d: the key's refusal read as the model's: %s", tc.status, p.Unavailable)
+		}
+		if got := keepUnobserved(old, p); !reflectEqual(probeView(got), probeView(old)) {
+			t.Errorf("%d: the key's refusal changed the probes: %+v", tc.status, got)
+		}
+	}
+	todo := []*Snapshot{{ID: "a", Vendor: "anthropic"}, {ID: "b", Vendor: "anthropic"}, {ID: "g", Vendor: "google"}}
+	probed := []*Probes{{Unavailable: "404 x"}, {Unavailable: "404 y"}, {Unavailable: "404 z"}}
+	keyWide(todo, probed)
+	if probed[0] != nil || probed[1] != nil || probed[2] == nil {
+		t.Errorf("after keyWide: %v %v %v (a lone unavailable model is the model's)", probed[0], probed[1], probed[2])
+	}
+}
+
+// A model that comes to count tokens the same as another (a new model of its tokenizer) records
+// that on its timeline; the snapshot before is not changed in the run that compares it.
+func TestTokenizerLikeIsAChange(t *testing.T) {
+	tokens := map[string]int{}
+	for _, c := range corpus {
+		tokens[c.name] = 10
+	}
+	probe := func(*Snapshot) *Probes {
+		return &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}}, Tokens: maps.Clone(tokens)}
+	}
+	dir := t.TempDir()
+	for i, obs := range [][]observation{
+		{docsObs("claude-fable-5-1", fable51)},
+		{docsObs("claude-fable-5-1", fable51), docsObs("claude-fable-5-2", fable52)},
+	} {
+		prev, err := readPublished(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := publish(dir, testRun(testNow.Add(time.Duration(i)*time.Hour), obs...), prev, nil, nil, probe); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tl := readTimeline(t, dir, "claude-fable-5-1")
+	if len(tl.Steps) != 2 || tl.Steps[0].Changes[0].Title != "Counts tokens the same as claude-fable-5-2" {
+		t.Errorf("fable 5.1 timeline = %+v", tl.Steps)
 	}
 }

@@ -29,6 +29,9 @@ func view(s *Snapshot) map[string]any {
 		}
 		if p := s.API.Probes; p != nil {
 			api["probes"] = probeView(p)
+			// Which other models count tokens the same is derived from them all, after probing:
+			// compared run to run, kept out of what the probes themselves saw.
+			api["tokenizer_like"] = append([]string{}, p.TokenizerLike...)
 		}
 		v["api"] = api
 	}
@@ -123,7 +126,7 @@ func impact(c refdiff.Change) string {
 			}
 			return "notable"
 		}
-		if len(c.Path) >= 3 && c.Path[2] == "tokens" {
+		if len(c.Path) >= 3 && c.Path[2] == "tokens" || len(c.Path) >= 2 && c.Path[1] == "tokenizer_like" {
 			return "notable"
 		}
 		return "informational"
@@ -189,6 +192,14 @@ func title(c refdiff.Change, names map[string]string) string {
 				return "API now rejects " + name
 			case len(p) == 5 && p[4] == "error":
 				return "API's error for " + name + " changed"
+			}
+		}
+		if len(p) == 3 && p[1] == "tokenizer_like" {
+			if c.Op == "added" {
+				return "Counts tokens the same as " + p[2]
+			}
+			if c.Op == "removed" {
+				return "No longer counts tokens the same as " + p[2]
 			}
 		}
 		if len(p) >= 3 && p[1] == "probes" && p[2] == "tokens" {

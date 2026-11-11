@@ -149,6 +149,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 			})
 		}
 		wg.Wait()
+		keyWide(todo, probed)
 		for i, s := range todo {
 			p := probed[i]
 			if p == nil {
@@ -247,6 +248,34 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		return nil, err
 	}
 	return res, nil
+}
+
+// keyWide drops the probes of a vendor whose every probed model, two or more, was refused as
+// unavailable in one run: that is the key's doing (its access changed, the vendor's error for a
+// key problem), not every model at once, and what the probes saw before stands.
+func keyWide(todo []*Snapshot, probed []*Probes) {
+	type count struct{ probed, unavailable int }
+	by := map[string]*count{}
+	for i, s := range todo {
+		if probed[i] == nil {
+			continue
+		}
+		c := by[s.Vendor]
+		if c == nil {
+			c = &count{}
+			by[s.Vendor] = c
+		}
+		c.probed++
+		if probed[i].Unavailable != "" {
+			c.unavailable++
+		}
+	}
+	for i, s := range todo {
+		if c := by[s.Vendor]; probed[i] != nil && c.probed >= 2 && c.unavailable == c.probed {
+			fmt.Fprintf(os.Stderr, "modelref: %s: every model refused (%s): the key's doing; probes kept\n", s.Vendor, probed[i].Unavailable)
+			probed[i] = nil
+		}
+	}
 }
 
 // pagesOnly says every change is to the text of the vendor's pages.
