@@ -160,6 +160,7 @@ func (sb *Sandbox) UseMuseSetup(b Binary, url string) {
 	}
 	sb.UseMuse(url)
 	sb.SetupAgents = append(sb.SetupAgents, "muse")
+	sb.RelayAgents = append(sb.RelayAgents, "muse")
 	sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
 	sb.Receiver.Reset()
 }

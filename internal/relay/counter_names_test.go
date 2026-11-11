@@ -27,7 +27,7 @@ var pinnedCounterNames = []string{
 	"dropped.unclaimed_expired.", "dropped.unclaimed_expired_at_exit.",
 	"dropped.unclaimed_overflow.", "dropped.uncovered_process.",
 	"dropped.uncovered_process_at_exit.", "dropped.upstream_", "forwarded.", "heartbeats_failed",
-	"heartbeats_sent", "held_parts", "process_index_full", "queued_at_exit.", "received.",
+	"heartbeats_sent", "held_parts", "mirrored.dropped_busy", "mirrored.failed", "mirrored.refused", "mirrored.sent", "process_index_full", "queued_at_exit.", "received.",
 	"recovered_from_outbox", "refused_restarting", "refused_unauthorized", "refused_undecodable",
 	"refused_unreadable", "released_after_hold", "sender_unresolved", "trace_index_full",
 	"unclassified", "upstream_rejected.", "upstream_retries", "withheld_at_send_records",

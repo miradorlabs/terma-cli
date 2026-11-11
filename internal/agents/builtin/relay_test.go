@@ -48,7 +48,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 				"opencode": "xdg/opencode/plugins/terma.js", "omp": "omp/agent/extensions/terma-relay.ts",
 				"pi": "pi/extensions/terma.ts", "hermes": "hermes/plugins/terma/__init__.py",
 				"gemini": "gemini/.gemini/settings.json", "dsh": "dsh/plugins/terma-relay.mjs",
-				"copilot": vscodeSettings(t, home),
+				"copilot": vscodeSettings(t, home), "muse": "xdg/muse/settings.json",
 			}
 			if _, ok := paths[e.Name()]; !ok {
 				t.Fatalf("this test knows no configuration file for %s", e.Name())

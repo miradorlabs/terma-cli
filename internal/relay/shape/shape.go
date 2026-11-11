@@ -82,3 +82,20 @@ func SeatID(scope, email string) string {
 type Capturer interface {
 	CaptureRules() CaptureRules
 }
+
+// Mirror is where an agent sends its vendor's own telemetry, which pointing it at the relay
+// moves there too: what arrives on Prefix + "logs" or "traces" is the agent's own OTLP record of
+// its sessions, which the relay routes as any export, and an exact copy of which, the agent's
+// own credential with it, still goes to Upstream + the same path. So the relay never takes the
+// vendor's copy away, and never reads, keeps or forwards the credential anywhere else.
+type Mirror struct {
+	// Prefix is the path the agent puts before the signal, from "/" to "/".
+	Prefix string
+	// Upstream is the base URL the agent sends to by default.
+	Upstream string
+}
+
+// Mirrored is an agent whose vendor telemetry the relay takes and passes on (Mirror).
+type Mirrored interface {
+	Mirrors() []Mirror
+}

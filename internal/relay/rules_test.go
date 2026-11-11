@@ -38,7 +38,7 @@ var (
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
 		"file_path", "result", "cwd"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
-	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
+	pinnedSessionKeys       = []string{"session.id", "conversation.id", "session_root_id", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )
 
 func TestComposedRulesArePinned(t *testing.T) {

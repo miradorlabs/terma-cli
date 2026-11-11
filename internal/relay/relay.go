@@ -62,6 +62,8 @@ type Options struct {
 	// Correlators and Capturers say how each agent's records name their session and carry content.
 	Correlators []shape.Correlator
 	Capturers   []shape.Capturer
+	// Mirrors are the agents' vendor telemetry paths, each copied on to its vendor (shape.Mirror).
+	Mirrors []shape.Mirror
 	// Token is what the agents' exporters present as `Authorization: Bearer <token>`.
 	Token string
 	// Hold and TraceHold: DefaultHold and DefaultTraceHold (at least Hold) when zero.
@@ -139,6 +141,8 @@ type Relay struct {
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
 	stopping   chan struct{}
+	// mirrorSlots bounds the vendor's copies in flight (mirror.go).
+	mirrorSlots chan struct{}
 }
 
 // New returns a relay. Run must be started for anything to leave.
@@ -180,6 +184,7 @@ func New(opts Options) *Relay {
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		mirrorSlots: make(chan struct{}, mirrorInFlight),
 	}
 }
 
@@ -199,11 +204,13 @@ func (r *Relay) warnf(format string, args ...any) {
 //
 // The token may also lead the path (/<token>/v1/logs) for an exporter whose config file has
 // no headers setting: an environment header would hand the token to every tool the agent runs.
+// The Authorization such an export arrived with is the agent's own, for its vendor: only the
+// vendor's copy of a mirrored export carries it (mirror.go).
 func (r *Relay) Handler() http.Handler {
 	mux := r.routes()
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if rest, ok := r.pathToken(req.URL.Path); ok {
-			req = req.Clone(req.Context())
+			req = req.Clone(context.WithValue(req.Context(), vendorAuth{}, req.Header.Get("Authorization")))
 			req.URL.Path = rest
 			req.URL.RawPath = ""
 			req.Header.Set("Authorization", "Bearer "+r.opts.Token)
@@ -227,6 +234,11 @@ func (r *Relay) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	for _, s := range []Signal{Logs, Metrics, Traces} {
 		mux.HandleFunc("/v1/"+string(s), func(w http.ResponseWriter, req *http.Request) { r.export(w, req, s) })
+	}
+	for _, m := range r.opts.Mirrors {
+		for _, s := range []Signal{Logs, Traces} {
+			mux.HandleFunc(m.Prefix+string(s), r.mirrored(m, s))
+		}
 	}
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, req *http.Request) {
 		if !r.authorized(req) {
