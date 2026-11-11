@@ -18,7 +18,7 @@ import (
 
 // testRun is a run that read every source its observations name.
 func testRun(now time.Time, obs ...observation) *run {
-	r := &run{now: now, read: map[string]bool{}, failed: map[string]string{}}
+	r := &run{now: now, read: map[string]bool{}, failed: map[string]string{}, keyed: map[string]bool{"anthropic": true}}
 	for _, o := range obs {
 		r.read[o.source] = true
 		r.obs = append(r.obs, o)
@@ -320,5 +320,18 @@ func TestUnlistedOnlyWhenEveryListSaysSo(t *testing.T) {
 	r = testRun(testNow.Add(2*time.Hour), docsObs("claude-fable-5-2", fable52), observation{source: "anthropic-api", vendor: "anthropic", id: "claude-fable-5-2", listed: true, facts: map[string]any{}})
 	if res := mustPublish(t, dir, r); res.snaps["claude-fable-5-1"].Listed {
 		t.Error("still listed once every list was read without it")
+	}
+}
+
+// An API whose key was taken away is no list: a model its docs drop is unlisted, though the API,
+// read before, named it.
+func TestAKeyRemovedIsNoOutage(t *testing.T) {
+	dir := t.TempDir()
+	api := observation{source: "anthropic-api", vendor: "anthropic", id: "claude-fable-5-1", listed: true, facts: map[string]any{}}
+	mustPublish(t, dir, testRun(testNow, docsObs("claude-fable-5-1", fable51), api, docsObs("claude-fable-5-2", fable52)))
+	r := testRun(testNow.Add(time.Hour), docsObs("claude-fable-5-2", fable52))
+	r.keyed["anthropic"] = false
+	if res := mustPublish(t, dir, r); res.snaps["claude-fable-5-1"].Listed {
+		t.Error("still listed by an API whose key was taken away")
 	}
 }

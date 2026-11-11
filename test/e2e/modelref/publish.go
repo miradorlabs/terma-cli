@@ -196,9 +196,10 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		}
 		if step != nil {
 			tl.Steps = append([]Step{*step}, tl.Steps...)
-			// A step that only edits the vendor's pages (a site-wide template change touches every
-			// model of a vendor at once) stays on the model's timeline, out of the feed.
-			if !pagesOnly(step.Changes) {
+			// A step that only follows from changes elsewhere (a site-wide edit of the vendor's
+			// pages, a new model that counts tokens the same) touches many models at once: it stays
+			// on each model's timeline, out of the feed.
+			if !incidental(step.Changes) {
 				recent = append([]RecentEvent{{At: r.now, Model: id, Vendor: s.Vendor, Name: s.Name, Event: step.Event,
 					Changes: len(step.Changes), Highlights: highlights(step.Changes, 3)}}, recent...)
 			}
@@ -278,10 +279,11 @@ func keyWide(todo []*Snapshot, probed []*Probes) {
 	}
 }
 
-// pagesOnly says every change is to the text of the vendor's pages.
-func pagesOnly(changes []refdiff.Change) bool {
+// incidental says every change is to the text of the vendor's pages, or to which other models
+// count tokens the same.
+func incidental(changes []refdiff.Change) bool {
 	for _, c := range changes {
-		if c.Category != "docs" {
+		if c.Category != "docs" && !(len(c.Path) >= 2 && c.Path[0] == "api" && c.Path[1] == "tokenizer_like") {
 			return false
 		}
 	}

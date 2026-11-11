@@ -131,7 +131,10 @@ func main() {
 // read reads every source of every vendor wanted (all, where none is named), and the public
 // catalogs, at once.
 func read(ctx context.Context, c *client, wanted map[string]bool, now time.Time) *run {
-	r := &run{now: now, read: map[string]bool{}, failed: map[string]string{}, wanted: wanted}
+	r := &run{now: now, read: map[string]bool{}, failed: map[string]string{}, wanted: wanted, keyed: map[string]bool{}}
+	for _, v := range vendors {
+		r.keyed[v.id] = os.Getenv(v.keyEnv) != ""
+	}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	got := func(source string, obs []observation, err error) {

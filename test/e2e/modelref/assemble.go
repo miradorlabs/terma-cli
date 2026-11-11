@@ -23,6 +23,9 @@ type run struct {
 	read map[string]bool // source → read whole this run
 	// wanted are the vendors read this run; none named is every one.
 	wanted map[string]bool
+	// keyed are the vendors whose API key is set this run: an API without one is no list the run
+	// expects to read.
+	keyed map[string]bool
 	// failed are the sources tried and not read.
 	failed map[string]string
 }
@@ -51,7 +54,8 @@ func followed(r *run, prev map[string]*Snapshot) map[string]bool {
 		// lists it: a list that could not be read (an outage) may list it still.
 		listers, unread := 0, 0
 		for src := range s.Sources {
-			if !listsModels(src, s.Vendor) {
+			if !listsModels(src, s.Vendor) || src == s.Vendor+"-api" && !r.keyed[s.Vendor] {
+				// An API whose key was taken away is a choice, not an outage: it lists nothing now.
 				continue
 			}
 			listers++

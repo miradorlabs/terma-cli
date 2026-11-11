@@ -245,9 +245,10 @@ read before; a model's `harnesses` are derived from it.
 }
 ```
 
-The newest 200 timeline steps across every model, newest first. A step that only edits the text of
-the vendor's pages is on its model's timeline and not here: a site-wide template change touches every
-model of a vendor at once.
+The newest 200 timeline steps across every model, newest first. A step that only follows from changes
+elsewhere is on its model's timeline and not here: an edit of the text of the vendor's pages (a
+site-wide template change touches every model of a vendor at once), or another model now counting
+tokens the same (a new model of a tokenizer touches all its siblings).
 
 ## Announcements
 

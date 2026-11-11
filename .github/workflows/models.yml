@@ -111,7 +111,8 @@ jobs:
       # Each model once, the run it is first listed, after it is published. The X post's text is
       # in the run's summary, to post by hand until the reference has an account to post with.
       # A post that fails fails the run, so someone sees it and posts it from the summary: a model is
-      # announced the run it is first published, never again.
+      # announced the run it is first published, never again. Re-running this job posts every
+      # message again, those that got through included.
       - name: Announce new models
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_MODELS_WEBHOOK_URL || secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
