@@ -282,7 +282,6 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 	if len(recent) > maxRecent {
 		recent = recent[:maxRecent]
 	}
-	// As of the newest change: a run that changed nothing writes the same bytes.
 	// As of the newest change on any timeline (the feed leaves some out): a run that changed
 	// nothing writes the same bytes.
 	asOf := time.Time{}

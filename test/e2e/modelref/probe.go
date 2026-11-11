@@ -145,8 +145,8 @@ func unanswered(p *Probes, t probeTarget) *Probes {
 }
 
 // keyRefusal says a refusal of the plain request is the key's, not the model's: 401 (a key the
-// vendor does not take), 402, or a refusal that speaks of the account's credit, billing or quota
-// (Anthropic's low-credit 400). Any other refusal (404 not served to this key, 403, a 400 about
+// vendor does not take), 402, or a refusal that speaks of the key itself or of the account's
+// credit, billing or quota (Anthropic's low-credit 400, Google's and xAI's 400 for a bad key). Any other refusal (404 not served to this key, 403, a 400 about
 // the model) is the model's: it is unavailable.
 func keyRefusal(status int, msg string) bool {
 	switch status {
@@ -154,7 +154,9 @@ func keyRefusal(status int, msg string) bool {
 		return true
 	}
 	m := strings.ToLower(msg)
-	for _, w := range []string{"credit", "billing", "quota"} {
+	// Google and xAI refuse a key they do not take with a 400 ("API key not valid",
+	// "Incorrect API key provided").
+	for _, w := range []string{"credit", "billing", "quota", "api key", "api_key", "x-api-key"} {
 		if strings.Contains(m, w) {
 			return true
 		}

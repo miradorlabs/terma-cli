@@ -412,6 +412,8 @@ func TestKeyRefusal(t *testing.T) {
 		{402, "", true},
 		{400, "Your credit balance is too low to access the Anthropic API.", true},
 		{400, "You exceeded your current quota, please check your plan and billing details.", true},
+		{400, "Incorrect API key provided. You can obtain an API key from https://console.x.ai.", true},
+		{400, "API key not valid. Please pass a valid API key.", true},
 		{400, "This model is not supported on the Messages API.", false},
 		{404, "model: claude-mythos-5-2", false},
 		{403, "permission denied for this model", false},
