@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"io/fs"
 	"maps"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -410,25 +414,48 @@ func TestALinkedPageNotReadIsNoChange(t *testing.T) {
 	}
 }
 
-// A full probe is done only when every model it set out to probe answered its plain request.
-func TestFullProbeOnlyWhenEveryModelAnswered(t *testing.T) {
-	answered := func(*Snapshot) *Probes {
-		return &Probes{Endpoint: "e", Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}}}
-	}
-	overloaded := func(*Snapshot) *Probes {
-		return &Probes{Endpoint: "e", Params: map[string]ProbeResult{}, unanswered: map[string]bool{"baseline": true}}
-	}
-	for name, tc := range map[string]struct {
-		probe func(*Snapshot) *Probes
-		want  bool
-	}{"answered": {answered, true}, "overloaded": {overloaded, false}} {
-		prev, _ := readPublished(t.TempDir())
-		res, err := publish(t.TempDir(), testRun(testNow, docsObs("claude-fable-5-2", fable52)), prev, nil, nil, tc.probe)
-		if err != nil {
-			t.Fatal(err)
+// The models a run's probes observed are those whose plain request was answered: a model the API
+// keeps failing is not, so the daily probe is due again for it alone, and only its plain request
+// is sent.
+func TestOnlyAnsweredProbesAreObserved(t *testing.T) {
+	calls := map[string]int{}
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		data, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(data, &body)
+		model, _ := body["model"].(string)
+		mu.Lock()
+		calls[model]++
+		mu.Unlock()
+		switch {
+		case model == "claude-fable-5-1":
+			w.WriteHeader(529)
+		case strings.HasSuffix(r.URL.Path, "/count_tokens"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"input_tokens": 3})
+		default:
+			_ = json.NewEncoder(w).Encode(map[string]any{"model": model, "usage": map[string]any{"input_tokens": 1}})
 		}
-		if res.fullProbe != tc.want {
-			t.Errorf("%s: fullProbe = %v", name, res.fullProbe)
-		}
+	}))
+	t.Cleanup(srv.Close)
+	c := newClient()
+	c.wait, c.tries = time.Millisecond, 1
+	c.rewrite = func(u string) string { return srv.URL + strings.TrimPrefix(u, "https://api.anthropic.com") }
+	probe := func(s *Snapshot) *Probes { return anthropicProbe(context.Background(), c, "k", s) }
+	prev, _ := readPublished(t.TempDir())
+	res, err := publish(t.TempDir(), testRun(testNow, docsObs("claude-fable-5-1", fable51), docsObs("claude-fable-5-2", fable52)), prev, nil, nil, probe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(res.observed, []string{"claude-fable-5-2"}) {
+		t.Errorf("observed = %v", res.observed)
+	}
+	if calls["claude-fable-5-1"] != 1 {
+		t.Errorf("a model whose plain request went unanswered was sent %d requests, want 1", calls["claude-fable-5-1"])
+	}
+	// Next run, daily: only the failing model is due.
+	failing, answered := res.snaps["claude-fable-5-1"], res.snaps["claude-fable-5-2"]
+	if !needsProbe(failing, "daily", time.Time{}, testNow.Add(15*time.Minute)) || needsProbe(answered, "daily", testNow, testNow.Add(15*time.Minute)) {
+		t.Error("daily: want only the failing model due")
 	}
 }

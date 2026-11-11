@@ -27,7 +27,7 @@ import (
 func main() {
 	out := flag.String("out", "docs/models", "the published tree to merge into")
 	harnesses := flag.String("harnesses", "", "where the Harness Reference is published (a URL, …/docs/harnesses, or a folder), for which harnesses use each model; only builds not yet read are fetched")
-	probeMode := flag.String("probe", "new", "which models to probe where a vendor's key is set: new (never probed), all, none, or daily (all once a day, by the time the last full probe was published, and new otherwise)")
+	probeMode := flag.String("probe", "new", "which models to probe where a vendor's key is set: new (never probed), all, none, or daily (new, and each model a day after its probes last answered, kept in probes.json)")
 	only := flag.String("vendors", "", "read only these vendors (comma-separated ids); the others keep what was published")
 	site := flag.String("site", "https://terma.ai", "the reference's public site, for the links announcements carry")
 	announcePath := flag.String("announce", "", "write the models to announce (new this run) to this JSON file")
@@ -95,7 +95,7 @@ func main() {
 	if err := readOptional(filepath.Join(*out, probeStateFile), &state); err != nil {
 		fail(err)
 	}
-	mode := effectiveMode(*probeMode, state, now)
+	mode := *probeMode
 	var probe func(*Snapshot) *Probes
 	if mode != "none" {
 		probe = func(s *Snapshot) *Probes {
@@ -104,7 +104,7 @@ func main() {
 			if key == "" || (len(wanted) > 0 && !wanted[v.id]) {
 				return nil
 			}
-			if !needsProbe(s, mode) {
+			if !needsProbe(s, mode, state.Models[s.ID], now) {
 				return nil
 			}
 			return v.probe(ctx, c, key, s)
@@ -114,12 +114,19 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if mode == "all" && *probeMode == "daily" && len(wanted) == 0 && res.fullProbe {
-		// The daily full probe, done for every vendor and every model: the next is due a day from
-		// now. One that was not (a run of some vendors, an outage) is due again next run.
-		if err := writeJSON(filepath.Join(*out, probeStateFile), probeState{SchemaVersion: schemaVersion, AllAt: now}); err != nil {
-			fail(err)
+	// Each model probed and answered this run (its plain request answered, or refused as the
+	// model's) is not due again for a day; a model that was not stays due, alone.
+	next := probeState{SchemaVersion: schemaVersion, Models: map[string]time.Time{}}
+	for id, at := range state.Models {
+		if res.snaps[id] != nil {
+			next.Models[id] = at
 		}
+	}
+	for _, id := range res.observed {
+		next.Models[id] = now
+	}
+	if err := writeJSON(filepath.Join(*out, probeStateFile), next); err != nil {
+		fail(err)
 	}
 	report(r, res)
 	if *announcePath != "" {
@@ -192,41 +199,33 @@ func report(r *run, res *result) {
 	fmt.Fprintf(os.Stderr, "modelref: %d models, %d new\n", len(res.snaps), len(res.new))
 }
 
-// probeStateFile keeps when every model was last probed, beside the models.
+// probeStateFile keeps when each model was last probed and answered, beside the models.
 const probeStateFile = "probes.json"
 
-// probeState is probes.json.
+// probeState is probes.json: by model, when its probes last observed it.
 type probeState struct {
-	SchemaVersion int       `json:"schema_version"`
-	AllAt         time.Time `json:"all_at"`
+	SchemaVersion int                  `json:"schema_version"`
+	Models        map[string]time.Time `json:"models"`
 }
 
-// effectiveMode is the probe mode a run takes: daily is all where the last full probe is a day
-// old or more (or never was), and new otherwise. A full probe due is never lost to a run that
-// did not start: the next one takes it.
-func effectiveMode(mode string, st probeState, now time.Time) string {
-	if mode != "daily" {
-		return mode
-	}
-	if st.AllAt.IsZero() || now.Sub(st.AllAt) >= 24*time.Hour {
-		return "all"
-	}
-	return "new"
-}
-
-// needsProbe says whether a run in mode probes s: every model in "all", none in "none", and in
-// "new" a model whose probes never saw anything (no probes, or every case unanswered); one whose
-// probes saw an answer, or the plain request refused, is not new.
-func needsProbe(s *Snapshot, mode string) bool {
+// needsProbe says whether a run in mode probes s, last probed and answered at last (zero for
+// never): every model in "all", none in "none"; in "new" a model whose probes never saw anything
+// (no probes, or every case unanswered); in "daily" those, and a model last answered a day ago or
+// more. A model the API keeps failing is due again next run, alone: it costs one request a run,
+// and every other model stays at once a day.
+func needsProbe(s *Snapshot, mode string, last, now time.Time) bool {
 	switch mode {
 	case "all":
 		return true
-	case "new":
+	case "new", "daily":
 		p := (*Probes)(nil)
 		if s.API != nil {
 			p = s.API.Probes
 		}
-		return p == nil || len(p.Params) == 0 && p.Unavailable == ""
+		if p == nil || len(p.Params) == 0 && p.Unavailable == "" {
+			return true
+		}
+		return mode == "daily" && (last.IsZero() || now.Sub(last) >= 24*time.Hour)
 	}
 	return false
 }

@@ -45,7 +45,7 @@ docs/models/<model>/notes.json         its release notes: what's new, against th
 docs/models/<model>/timeline.json      the newest 25 steps of what changed in what it observes
 docs/models/<model>/timeline-<n>.json  older steps, 25 a file from the oldest
 docs/models/harness-builds.json        what each Harness Reference build uses, as the join last read it
-docs/models/probes.json                when every model was last probed (all_at), for the daily full probe
+docs/models/probes.json                when each model's probes last observed it, for the daily probe
 ```
 
 `<model>` is the vendor's API id (`claude-fable-5-2`, `gpt-6.1-sol`, `gemini-4-argon`, `grok-4.7`):

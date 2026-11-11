@@ -109,8 +109,9 @@ type result struct {
 	notes    map[string]*Notes
 	new      []string // models first listed this run
 	vendored map[string]bool
-	// fullProbe says the run probed every model it set out to, each one's plain request answered.
-	fullProbe bool
+	// observed are the models this run's probes observed: the plain request answered, or refused
+	// as the model's.
+	observed []string
 }
 
 func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, changelogs map[string][]ChangelogEntry,
@@ -136,7 +137,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		s.Harnesses = usesFor(uses, s)
 		snaps[id] = s
 	}
-	fullProbe := false
+	var observed []string
 	// Probes, where a key is configured and the run asks for them (probe says which), a few
 	// models at a time: each model's cases run one after another.
 	if probe != nil {
@@ -158,13 +159,10 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 			})
 		}
 		wg.Wait()
-		dropped := keyWide(todo, probed)
-		// The probes saw every model they set out to, the plain request of each answered: a full
-		// probe done (a daily one's time moves on only then).
-		fullProbe = dropped == 0
-		for _, p := range probed {
-			if p != nil && p.unanswered["baseline"] {
-				fullProbe = false
+		keyWide(todo, probed)
+		for i, p := range probed {
+			if p != nil && !p.unanswered["baseline"] {
+				observed = append(observed, todo[i].ID)
 			}
 		}
 		for i, s := range todo {
@@ -189,7 +187,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 	tokenizerLike(snaps)
 	pred, succ := lineage(snaps)
 	names := harnessNames(uses)
-	res := &result{snaps: snaps, notes: map[string]*Notes{}, vendored: prev.vendors, fullProbe: fullProbe}
+	res := &result{snaps: snaps, notes: map[string]*Notes{}, vendored: prev.vendors, observed: observed}
 	recent := prev.recent
 	var entries []Entry
 	for _, id := range sortedIDs(snaps) {

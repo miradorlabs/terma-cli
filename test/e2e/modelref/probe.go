@@ -63,11 +63,17 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 		if err != nil {
 			p.unanswered[pc.name] = true
 			p.Errors = append(p.Errors, pc.name+": not answered")
+			if pc.name == "baseline" {
+				return unanswered(p, t)
+			}
 			continue
 		}
 		if retryable(resp.Status) {
 			p.unanswered[pc.name] = true
 			p.Errors = append(p.Errors, pc.name+": "+http.StatusText(resp.Status))
+			if pc.name == "baseline" {
+				return unanswered(p, t)
+			}
 			continue
 		}
 		r := ProbeResult{Accepted: resp.Status/100 == 2, Status: resp.Status}
@@ -85,11 +91,7 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 			// Refused for the key's own reasons (revoked, out of credit, over its budget): nothing
 			// of the model was observed, and what the probes saw before stands.
 			p.Errors = append(p.Errors, fmt.Sprintf("baseline: %d %s", r.Status, r.Error))
-			for _, c := range t.cases {
-				p.unanswered[c.name] = true
-			}
-			p.streamMissed = true
-			return p
+			return unanswered(p, t)
 		}
 		p.Params[pc.name] = r
 		if pc.name == "baseline" && r.Accepted && t.shape != nil {
@@ -123,6 +125,18 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 			p.Tokens[text.name] = n
 		}
 	}
+	return p
+}
+
+// unanswered is p with every case, the stream and the corpus not observed: the plain request
+// was not answered (or refused for the key's reasons), so no other request is sent this run, and
+// what the probes saw before stands.
+func unanswered(p *Probes, t probeTarget) *Probes {
+	p.Params = map[string]ProbeResult{}
+	for _, c := range t.cases {
+		p.unanswered[c.name] = true
+	}
+	p.streamMissed = true
 	return p
 }
 

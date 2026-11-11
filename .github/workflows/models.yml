@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       probe:
-        description: "Which models to probe: daily (all once a day, new otherwise), new (never probed), all, or none"
+        description: "Which models to probe: daily (new, and each model a day after its last answer), new (never probed), all, or none"
         default: daily
       announce_since:
         description: "Also announce models released on or after this date (YYYY-MM-DD), for a vendor's first publish"
@@ -52,8 +52,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-          # Every model once a day, by when the last full probe was published (docs/models/probes.json):
-          # a run that did not start never skips it.
+          # Each model once a day, by when its probes last observed it (docs/models/probes.json): a
+          # model the API keeps failing is due again next run, alone, at one request a run.
           PROBE: ${{ inputs.probe || 'daily' }}
           SINCE: ${{ inputs.announce_since }}
           HARNESSES: https://raw.githubusercontent.com/${{ github.repository }}/compat-matrix/docs/harnesses

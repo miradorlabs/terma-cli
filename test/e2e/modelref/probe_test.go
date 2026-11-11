@@ -234,24 +234,30 @@ func TestRefusedStreamIsObserved(t *testing.T) {
 
 func TestNeedsProbe(t *testing.T) {
 	seen := &Probes{Params: map[string]ProbeResult{"baseline": {Accepted: true, Status: 200}}}
+	day := testNow.Add(-24 * time.Hour)
 	for _, tc := range []struct {
 		name   string
 		probes *Probes
 		mode   string
+		last   time.Time
 		want   bool
 	}{
-		{"never probed, new", nil, "new", true},
-		{"every case unanswered, new", &Probes{Params: map[string]ProbeResult{}}, "new", true},
-		{"unavailable to the key, new", &Probes{Params: map[string]ProbeResult{}, Unavailable: "404 model"}, "new", false},
-		{"probed, new", seen, "new", false},
-		{"probed, all", seen, "all", true},
-		{"never probed, none", nil, "none", false},
+		{"never probed, new", nil, "new", time.Time{}, true},
+		{"every case unanswered, new", &Probes{Params: map[string]ProbeResult{}}, "new", time.Time{}, true},
+		{"unavailable to the key, new", &Probes{Params: map[string]ProbeResult{}, Unavailable: "404 model"}, "new", time.Time{}, false},
+		{"probed, new", seen, "new", time.Time{}, false},
+		{"probed, all", seen, "all", testNow, true},
+		{"never probed, none", nil, "none", time.Time{}, false},
+		{"probed an hour ago, daily", seen, "daily", testNow.Add(-time.Hour), false},
+		{"probed a day ago, daily", seen, "daily", day, true},
+		{"probed, time unknown, daily", seen, "daily", time.Time{}, true},
+		{"never probed, daily", nil, "daily", time.Time{}, true},
 	} {
 		s := &Snapshot{ID: "m"}
 		if tc.probes != nil {
 			s.API = &API{Probes: tc.probes}
 		}
-		if got := needsProbe(s, tc.mode); got != tc.want {
+		if got := needsProbe(s, tc.mode, tc.last, testNow); got != tc.want {
 			t.Errorf("%s: needsProbe = %v", tc.name, got)
 		}
 	}
@@ -292,26 +298,6 @@ func TestStreamAnswers(t *testing.T) {
 		srv.Close()
 		if !slices.Equal(p.Response.StreamEvents, tc.events) || p.streamMissed != tc.unanswer {
 			t.Errorf("stream %d: events %v, unanswered %v", tc.status, p.Response.StreamEvents, p.streamMissed)
-		}
-	}
-}
-
-func TestEffectiveMode(t *testing.T) {
-	day := probeState{AllAt: testNow}
-	for _, tc := range []struct {
-		mode string
-		st   probeState
-		now  time.Time
-		want string
-	}{
-		{"daily", probeState{}, testNow, "all"},
-		{"daily", day, testNow.Add(23 * time.Hour), "new"},
-		{"daily", day, testNow.Add(24 * time.Hour), "all"},
-		{"new", probeState{}, testNow, "new"},
-		{"all", day, testNow, "all"},
-	} {
-		if got := effectiveMode(tc.mode, tc.st, tc.now); got != tc.want {
-			t.Errorf("%s at +%v: %s, want %s", tc.mode, tc.now.Sub(testNow), got, tc.want)
 		}
 	}
 }
