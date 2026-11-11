@@ -82,15 +82,18 @@ func runProbes(ctx context.Context, c *client, t probeTarget, endpoint string, n
 		}
 		if pc.name == "baseline" && !r.Accepted {
 			p.Params = map[string]ProbeResult{}
-			if modelRefused(r.Status) {
+			if !keyRefusal(r.Status, r.Error) {
 				// The plain request refused for the model (one the key may not use, one taken
-				// down): no case would say anything of its API.
+				// down, one the API does not serve this way): no case would say anything of its
+				// API.
 				p.Unavailable = fmt.Sprintf("%d %s", r.Status, r.Error)
 				return p
 			}
 			// Refused for the key's own reasons (revoked, out of credit, over its budget): nothing
 			// of the model was observed, and what the probes saw before stands.
-			p.Errors = append(p.Errors, fmt.Sprintf("baseline: %d %s", r.Status, r.Error))
+			// The status alone: a vendor's message about a key may quote part of it, and the run's
+			// log is public.
+			p.Errors = append(p.Errors, fmt.Sprintf("baseline: %d %s", r.Status, http.StatusText(r.Status)))
 			p.keyRefused = true
 			return unanswered(p, t)
 		}
@@ -141,11 +144,22 @@ func unanswered(p *Probes, t probeTarget) *Probes {
 	return p
 }
 
-// modelRefused says a refusal of the plain request is the model's: not there for this key (404) or
-// not permitted to it (403). Any other refusal (401 a bad key, 400 out of credit, 402, 429) is the
-// key's, and says nothing of the model.
-func modelRefused(status int) bool {
-	return status == http.StatusNotFound || status == http.StatusForbidden
+// keyRefusal says a refusal of the plain request is the key's, not the model's: 401 (a key the
+// vendor does not take), 402, or a refusal that speaks of the account's credit, billing or quota
+// (Anthropic's low-credit 400). Any other refusal (404 not served to this key, 403, a 400 about
+// the model) is the model's: it is unavailable.
+func keyRefusal(status int, msg string) bool {
+	switch status {
+	case http.StatusUnauthorized, http.StatusPaymentRequired:
+		return true
+	}
+	m := strings.ToLower(msg)
+	for _, w := range []string{"credit", "billing", "quota"} {
+		if strings.Contains(m, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // keepUnobserved is p with what this run did not observe taken from old, the model's probes

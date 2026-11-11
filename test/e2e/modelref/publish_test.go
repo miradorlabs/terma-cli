@@ -396,7 +396,7 @@ func TestALinkedPageNotReadIsNoChange(t *testing.T) {
 	}
 	first := run(testNow)
 	if first.snaps["gpt-6.1-sol"] == nil || first.snaps["gpt-7"] != nil {
-		t.Fatalf("followed %v", sortedIDs(first.snaps))
+		t.Fatalf("followed %v", sortedKeys(first.snaps))
 	}
 	before, _ := os.ReadFile(filepath.Join(dir, "gpt-6.1-sol", "snapshot.json"))
 	web.mu.Lock()
@@ -457,5 +457,58 @@ func TestOnlyAnsweredProbesAreObserved(t *testing.T) {
 	failing, answered := res.snaps["claude-fable-5-1"], res.snaps["claude-fable-5-2"]
 	if !needsProbe(failing, "daily", time.Time{}, testNow.Add(15*time.Minute)) || needsProbe(answered, "daily", testNow, testNow.Add(15*time.Minute)) {
 		t.Error("daily: want only the failing model due")
+	}
+}
+
+// A Google page that lists several models, not read this run, keeps every one of them listed with
+// what it said before, not only the one its link names.
+func TestEveryModelOfAPageNotReadStays(t *testing.T) {
+	dir := t.TempDir()
+	page := "https://ai.google.dev/gemini-api/docs/models/gemini-9-flash"
+	model := func(id string) observation {
+		return observation{source: "google-docs", vendor: "google", id: id, url: page, listed: true,
+			facts: map[string]any{factName: id, factContextWindow: int64(1_000_000)}, docs: map[string]Page{"overview": {Text: "# page\n"}}}
+	}
+	r := testRun(testNow, model("gemini-9-flash"), model("gemini-9-flash-preview"))
+	mustPublish(t, dir, r)
+	// The page 404s: its link yields one stale observation, named for the link.
+	r = testRun(testNow.Add(time.Hour))
+	r.read["google-docs"] = true
+	r.obs = []observation{{source: "google-docs", vendor: "google", id: "gemini-9-flash", url: page, listed: true, stale: true}}
+	res := mustPublish(t, dir, r)
+	for _, id := range []string{"gemini-9-flash", "gemini-9-flash-preview"} {
+		s := res.snaps[id]
+		if s == nil || !s.Listed || s.Facts[factContextWindow] != int64(1_000_000) {
+			t.Errorf("%s after its page was not read: %+v", id, s)
+		}
+		if tl := readTimeline(t, dir, id); len(tl.Steps) != 1 {
+			t.Errorf("%s: a page not read made a step: %+v", id, tl.Steps[0])
+		}
+	}
+}
+
+// A model only a vendor's API listed is listed by nothing once its key is taken away.
+func TestAModelOnlyAKeylessAPIListedIsUnlisted(t *testing.T) {
+	dir := t.TempDir()
+	api := observation{source: "anthropic-api", vendor: "anthropic", id: "claude-x-1", listed: true, facts: map[string]any{}}
+	mustPublish(t, dir, testRun(testNow, api, docsObs("claude-fable-5-2", fable52)))
+	r := testRun(testNow.Add(time.Hour), docsObs("claude-fable-5-2", fable52))
+	r.keyed["anthropic"] = false
+	if res := mustPublish(t, dir, r); res.snaps["claude-x-1"].Listed {
+		t.Error("still listed by an API whose key was taken away, and by nothing else")
+	}
+}
+
+// generated_at is the newest change any timeline holds, the ones the feed leaves out included.
+func TestGeneratedAtFollowsEveryTimeline(t *testing.T) {
+	dir := t.TempDir()
+	mustPublish(t, dir, testRun(testNow, docsObs("claude-fable-5-2", fable52)))
+	edited := docsObs("claude-fable-5-2", fable52)
+	edited.docs["overview"] = Page{Title: "Model page", Text: "# claude-fable-5-2\n\nA new footer.\n"}
+	mustPublish(t, dir, testRun(testNow.Add(time.Hour), edited))
+	var idx Index
+	_ = readOptional(filepath.Join(dir, "index.json"), &idx)
+	if !idx.GeneratedAt.Equal(testNow.Add(time.Hour)) {
+		t.Errorf("generated_at = %v, want the page edit's time", idx.GeneratedAt)
 	}
 }

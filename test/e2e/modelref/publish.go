@@ -142,7 +142,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 	// models at a time: each model's cases run one after another.
 	if probe != nil {
 		var todo []*Snapshot
-		for _, id := range sortedIDs(snaps) {
+		for _, id := range sortedKeys(snaps) {
 			s := snaps[id]
 			if st, _ := s.Facts[factStatus].(string); s.Listed && st != "retired" {
 				todo = append(todo, s)
@@ -210,7 +210,7 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 	res := &result{snaps: snaps, notes: map[string]*Notes{}, vendored: prev.vendors, observed: observed}
 	recent := prev.recent
 	var entries []Entry
-	for _, id := range sortedIDs(snaps) {
+	for _, id := range sortedKeys(snaps) {
 		s := snaps[id]
 		tl := prev.timelines[id]
 		if tl == nil {
@@ -283,8 +283,15 @@ func publish(out string, r *run, prev *published, uses map[string][]HarnessUse, 
 		recent = recent[:maxRecent]
 	}
 	// As of the newest change: a run that changed nothing writes the same bytes.
+	// As of the newest change on any timeline (the feed leaves some out): a run that changed
+	// nothing writes the same bytes.
 	asOf := time.Time{}
-	if len(recent) > 0 {
+	for _, e := range entries {
+		if e.LastChange != nil && e.LastChange.At.After(asOf) {
+			asOf = e.LastChange.At
+		}
+	}
+	if len(recent) > 0 && recent[0].At.After(asOf) {
 		asOf = recent[0].At
 	}
 	if err := writeJSON(filepath.Join(out, "index.json"), Index{SchemaVersion: schemaVersion, GeneratedAt: asOf, Vendors: vs, Models: entries}); err != nil {
@@ -545,15 +552,6 @@ func harnessNames(uses map[string][]HarnessUse) map[string]string {
 		}
 	}
 	return names
-}
-
-func sortedIDs(m map[string]*Snapshot) []string {
-	ids := make([]string, 0, len(m))
-	for id := range m {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
 }
 
 func deref(s *string) string {

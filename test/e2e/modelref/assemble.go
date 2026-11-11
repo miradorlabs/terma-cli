@@ -38,7 +38,7 @@ func (r *run) covers(vendor string) bool { return len(r.wanted) == 0 || r.wanted
 func followed(r *run, prev map[string]*Snapshot) map[string]bool {
 	listed := map[string]bool{}
 	for _, o := range r.obs {
-		if o.listed && (!o.stale || prev[o.id] != nil) {
+		if o.listed && !o.stale {
 			listed[o.id] = true
 		}
 	}
@@ -50,12 +50,22 @@ func followed(r *run, prev map[string]*Snapshot) map[string]bool {
 		if out[id] {
 			continue
 		}
+		// A model whose page its list links but could not be read this run (stalePage) was
+		// listed, and is listed still.
+		if s.Listed && stalePage(r, s) != "" {
+			out[id] = true
+			continue
+		}
 		// Still listed unless every vendor source that listed it was read this time and none
 		// lists it: a list that could not be read (an outage) may list it still.
-		listers, unread := 0, 0
+		listers, unread, keyless := 0, 0, 0
 		for src := range s.Sources {
-			if !listsModels(src, s.Vendor) || src == s.Vendor+"-api" && !r.keyed[s.Vendor] {
+			if !listsModels(src, s.Vendor) {
+				continue
+			}
+			if src == s.Vendor+"-api" && !r.keyed[s.Vendor] {
 				// An API whose key was taken away is a choice, not an outage: it lists nothing now.
+				keyless++
 				continue
 			}
 			listers++
@@ -63,9 +73,23 @@ func followed(r *run, prev map[string]*Snapshot) map[string]bool {
 				unread++
 			}
 		}
-		out[id] = s.Listed && (listers == 0 || unread > 0)
+		// A model no list was ever known to name stays as it was; one only a keyless API named
+		// is listed by nothing now.
+		out[id] = s.Listed && (listers == 0 && keyless == 0 || unread > 0)
 	}
 	return out
+}
+
+// stalePage is the source whose list links s's page, that page not read this run (a stale
+// observation of the same page), or "". A page is known by its URL, so every model it lists
+// (a Google page's variants; an OpenAI page whose slug is not its model's id) is matched.
+func stalePage(r *run, s *Snapshot) string {
+	for _, o := range r.obs {
+		if o.stale && o.vendor == s.Vendor && s.Sources[o.source] == o.url {
+			return o.source
+		}
+	}
+	return ""
 }
 
 // listsModels says src is one of vendor's own lists of its models: its docs, or its API where
@@ -95,9 +119,9 @@ func assemble(id, vendorID string, r *run, prev *Snapshot, listed bool) *Snapsho
 		}
 	}
 	staleFor := map[string]bool{}
-	for _, o := range r.obs {
-		if o.stale && o.vendor == vendorID && norm(o.id) == key {
-			staleFor[o.source] = true
+	if prev != nil {
+		if src := stalePage(r, prev); src != "" {
+			staleFor[src] = true
 		}
 	}
 	for _, o := range r.obs {

@@ -401,3 +401,23 @@ func TestAKeyRefusedStopsTheVendor(t *testing.T) {
 		t.Errorf("%d requests for a refused key, want at most %d", calls, probeParallel)
 	}
 }
+
+func TestKeyRefusal(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		msg    string
+		want   bool
+	}{
+		{401, "Incorrect API key provided: sk-proj-...abcd", true},
+		{402, "", true},
+		{400, "Your credit balance is too low to access the Anthropic API.", true},
+		{400, "You exceeded your current quota, please check your plan and billing details.", true},
+		{400, "This model is not supported on the Messages API.", false},
+		{404, "model: claude-mythos-5-2", false},
+		{403, "permission denied for this model", false},
+	} {
+		if got := keyRefusal(tc.status, tc.msg); got != tc.want {
+			t.Errorf("%d %q: keyRefusal = %v", tc.status, tc.msg, got)
+		}
+	}
+}
