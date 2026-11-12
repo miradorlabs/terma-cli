@@ -144,7 +144,7 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 		if c.repo == r {
 			e.EmitFor(r, ev)
 		} else {
-			e.emit(e.stamp(c.repo, ev))
+			e.emit(e.Stamp(c.repo, ev))
 		}
 	}
 }

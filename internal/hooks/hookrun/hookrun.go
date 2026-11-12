@@ -292,7 +292,7 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 // EmitFor spools an event stamped with the repository's project, parking it in the
 // repository's store when the spool cannot be written, and reports whether it was kept.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
-	ev = e.stamp(r, ev)
+	ev = e.Stamp(r, ev)
 	e.claimForRelay(r, ev)
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
@@ -300,8 +300,10 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
-// stamp names the event's repository, for delivery's admission, and its project.
-func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
+// Stamp names the event's repository, for delivery's admission, whether a global policy
+// collected it, which delivery checks again as it leaves, and its project. Every event a
+// hook spools goes through it, appended directly or emitted.
+func (e Env) Stamp(r *Repo, ev spool.Event) spool.Event {
 	ev.Global = e.Policy.Global()
 	if r != nil {
 		ev.Repository = r.Repository

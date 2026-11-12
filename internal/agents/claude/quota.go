@@ -119,10 +119,7 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 			attrs[w.resets] = at
 		}
 	}
-	ev := spool.Event{Name: semconv.TermaSessionQuotaEvent, SessionID: p.SessionID, Repository: r.Repository, Attrs: attrs}
-	if projectID != "" {
-		attrs[hookrun.AttrProjectID] = projectID
-	}
+	ev := e.Stamp(r, spool.Event{Name: semconv.TermaSessionQuotaEvent, SessionID: p.SessionID, Attrs: attrs})
 	ev.Time = now
 	if err := e.Spool.Append(ev); err != nil {
 		e.Logf("quota append: %v", err)

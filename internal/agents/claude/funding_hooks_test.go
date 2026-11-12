@@ -371,6 +371,25 @@ func limitRun(t *testing.T, env hookrun.Env, transcript, kind string, hooks ...f
 	return limits
 }
 
+// The session's end reports its last unreported API error made where the team collects: one
+// after it, made elsewhere, stays on the machine and does not hide it.
+func TestSessionEndReportsTheLastErrorMadeWhereTheTeamCollects(t *testing.T) {
+	env := newFundingEnv(t)
+	apiErrorIn := func(cwd string, at time.Time, kind string) string {
+		b, _ := json.Marshal(map[string]any{"type": "assistant", "sessionId": "funding-session", "cwd": cwd, "timestamp": at,
+			"isApiErrorMessage": true, "error": kind})
+		return string(b)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "funding-session.jsonl")
+	hookruntest.WriteFile(t, dir, "funding-session.jsonl", apiErrorIn(env.Cwd, env.Now.Add(-2*time.Second), "rate_limit")+"\n"+
+		apiErrorIn(t.TempDir(), env.Now.Add(-time.Second), "overloaded")+"\n")
+	got := limitRun(t, env, path, "", sessionEnd)
+	if len(got) != 1 || got[0].Attrs[semconv.ErrorTypeKey] != "rate_limit" {
+		t.Fatalf("reported %+v, want the listed repository's rate_limit", got)
+	}
+}
+
 // A headless run's StopFailure can die before it reports; the session's end reports the
 // transcript's API error once, and never one StopFailure already reported.
 func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {

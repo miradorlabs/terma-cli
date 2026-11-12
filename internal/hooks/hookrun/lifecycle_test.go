@@ -189,3 +189,27 @@ func manifestFiles(t *testing.T, root, sid string) string {
 	slices.Sort(files)
 	return strings.Join(files, ",")
 }
+
+// Under a global policy, what a hook appends to the spool itself says so, as an emitted
+// event does: delivery drops it if the policy has left global mode when it leaves.
+func TestDirectAppendsAreMarkedGlobal(t *testing.T) {
+	t.Parallel()
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: dir, Spool: sp, Policy: config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}}
+	r, err := env.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.CaptureFunding(r, "sess-global-1", "claude-code", "account", FundingEvidence{Source: "test", Status: "observed"})
+	env.CaptureObservation(context.Background(), r, Observation{Tool: "claude-code", StateDir: "observations", SessionID: "sess-global-1", Hook: "Stop", Attrs: map[string]any{"k": "v"}})
+	events := hookruntest.Spooled(t, sp)
+	if len(events) != 2 {
+		t.Fatalf("spooled %d events, want the funding and the observation", len(events))
+	}
+	for _, e := range events {
+		if !e.Global || e.Attrs[AttrProjectID] != "p-default" {
+			t.Errorf("%s: global %v, project %v", e.Name, e.Global, e.Attrs[AttrProjectID])
+		}
+	}
+}

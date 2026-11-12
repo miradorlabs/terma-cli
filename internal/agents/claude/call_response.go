@@ -100,7 +100,8 @@ func captureClaudeCallResponses(ctx context.Context, e hookrun.Env, r *hookrun.R
 	admits := e.Admission(ctx)
 	for _, c := range calls {
 		// A session moved into a listed repository, or resumed there, still holds calls made
-		// before elsewhere: those stay on the machine, and the read moves past them.
+		// before elsewhere: those stay on the machine, and the read moves past them. So does
+		// a call whose directory cannot be judged (gone, unreadable): it is not retried.
 		if !admits(c.Cwd) {
 			continue
 		}

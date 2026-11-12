@@ -168,7 +168,7 @@ func PrePush(ctx context.Context, env Env) error {
 	}
 	vcsAttrs(attrs, r)
 	// No relay claim: the sessions stamped into pushed commits did not make the push.
-	rec.Event = env.stamp(r, spool.Event{Name: semconv.TermaPushEvent, Time: rec.Time, Attrs: attrs})
+	rec.Event = env.Stamp(r, spool.Event{Name: semconv.TermaPushEvent, Time: rec.Time, Attrs: attrs})
 	path := filepath.Join(env.StateDir, PushesDir, rec.ID+".json")
 	if err := config.WriteJSON(path, rec, 0o600); err != nil {
 		env.Logf("record push: %v", err)
