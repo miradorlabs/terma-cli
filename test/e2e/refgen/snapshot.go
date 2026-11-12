@@ -482,22 +482,23 @@ func mergeTelemetry(old, tonight any) any {
 	for name, raw := range oldSurfaces {
 		was, _ := raw.(map[string]any)
 		s, ok := surfaces[name].(map[string]any)
-		if !ok {
-			if !keepKeys {
-				continue // a surface the census did not see tonight is gone; the probe's alone is not
-			}
-			s = map[string]any{}
-			surfaces[name] = s
+		switch {
+		case !ok && !keepKeys:
+			continue // a surface the census did not see tonight is gone
+		case !ok:
+			// Only the probe ran tonight, and it sees fewer surfaces than the census: one it did
+			// not see keeps all it had, its probe findings as well as its keys.
+			surfaces[name] = maps.Clone(was)
+			continue
 		}
 		if keys, ok := was["keys"]; ok && keepKeys {
 			s["keys"] = keys
 		}
 		if keepProbe {
+			// Tonight measured no probe findings at all (TelemetryMeasured), so none is replaced.
 			for _, f := range refdiff.ProbeFields {
 				if v, ok := was[f]; ok {
-					if _, has := s[f]; !has {
-						s[f] = v
-					}
+					s[f] = v
 				}
 			}
 		}

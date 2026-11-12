@@ -70,6 +70,7 @@ func TestTelemetryComparesWhatBothMeasured(t *testing.T) {
 // An export interval rests on the batches the run saw: from one, it is the run's jitter, and how
 // many there were is the run's; from several on both sides, a new interval is a change.
 func TestExportIntervalNeedsSeveralBatches(t *testing.T) {
+	const noInterval = `{"export":{"protocol":"http/protobuf"},"surfaces":{"metrics/m":{"type":"sum"}}}`
 	export := func(ms, batches int) string {
 		b, _ := json.Marshal(map[string]any{"export": map[string]any{"protocol": "http/protobuf",
 			"interval_ms": map[string]int{"logs": ms}, "interval_batches": map[string]int{"logs": batches}},
@@ -84,9 +85,30 @@ func TestExportIntervalNeedsSeveralBatches(t *testing.T) {
 		{export(1000, 3), export(500, 1), 0},
 		{export(1000, 3), export(1000, 5), 0},
 		{export(1000, 3), export(500, 4), 1},
+		// A run that caught no batch before the cutoff measured no interval at all.
+		{export(1000, 1), noInterval, 0},
+		{noInterval, export(1000, 1), 0},
+		{export(1000, 3), noInterval, 0},
 	} {
 		if got := telemetryTitles(telemetrySnapshot(t, "1", tc.a), telemetrySnapshot(t, "2", tc.b)); len(got) != tc.want {
 			t.Errorf("%s → %s: %q, want %d changes", tc.a, tc.b, got, tc.want)
 		}
+	}
+}
+
+// A probe that saw logs alone measured the export, though no surface has a probe field: its
+// findings are compared with another probe's, and a census beside it measured none of them.
+func TestLogsOnlyProbeMeasuredTheExport(t *testing.T) {
+	logsProbe := `{"export":{"protocol":"http/protobuf"},"surfaces":{"logs/codex.api_request":{}}}`
+	var tel map[string]any
+	if err := json.Unmarshal([]byte(logsProbe), &tel); err != nil {
+		t.Fatal(err)
+	}
+	if census, probe := TelemetryMeasured(tel); census || !probe {
+		t.Errorf("TelemetryMeasured = census %v, probe %v; want the probe alone", census, probe)
+	}
+	asJSON := strings.Replace(logsProbe, "http/protobuf", "http/json", 1)
+	if got := telemetryTitles(telemetrySnapshot(t, "1", logsProbe), telemetrySnapshot(t, "2", asJSON)); len(got) != 1 {
+		t.Errorf("an export both probes measured, changed: %q", got)
 	}
 }
