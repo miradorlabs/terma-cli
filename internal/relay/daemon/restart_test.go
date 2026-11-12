@@ -399,14 +399,27 @@ func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
 	c := runConfig(stateDir, 0, nil)
 	var uploading atomic.Bool
 	uploading.Store(true)
-	c.Engine.Halt = func(bool) bool { return !uploading.Load() }
+	asked := make(chan struct{}, 1)
+	c.Engine.Halt = func(bool) bool {
+		select {
+		case asked <- struct{}{}:
+		default:
+		}
+		return !uploading.Load()
+	}
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
 	askToMakeWay(t, dir)
+	// Once the relay has asked the work beside it to halt and been told no, it must not go.
+	select {
+	case <-asked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay never asked the work beside it to halt")
+	}
 	select {
 	case <-r.done:
 		t.Fatalf("the relay stepped aside mid-upload: %+v", r.res)
-	case <-time.After(2 * time.Second):
+	default:
 	}
 	uploading.Store(false)
 	select {
@@ -444,13 +457,26 @@ func TestAnIdleRelayWaitsForAnUpload(t *testing.T) {
 	c := runConfig(stateDir, time.Millisecond, nil)
 	var uploading atomic.Bool
 	uploading.Store(true)
-	c.Engine.Halt = func(bool) bool { return !uploading.Load() }
+	asked := make(chan struct{}, 1)
+	c.Engine.Halt = func(bool) bool {
+		select {
+		case asked <- struct{}{}:
+		default:
+		}
+		return !uploading.Load()
+	}
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
+	// Once the relay has asked the work beside it to halt and been told no, it must not go.
+	select {
+	case <-asked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay never asked the work beside it to halt")
+	}
 	select {
 	case <-r.done:
 		t.Fatalf("the relay idled out mid-upload: %+v", r.res)
-	case <-time.After(2 * time.Second):
+	default:
 	}
 	uploading.Store(false)
 	select {

@@ -278,8 +278,8 @@ func TestTiming(t *testing.T) {
 	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
 	past, ahead := now.Add(-time.Second), now.Add(time.Minute)
 	type woke struct {
-		cause   wakeCause
-		changed bool
+		cause            wakeCause
+		changed, resumed bool
 	}
 	for _, c := range []struct {
 		name             string
@@ -287,15 +287,17 @@ func TestTiming(t *testing.T) {
 		woke             woke
 		run, forDeadline bool
 	}{
-		{"the timer", timing{}, woke{wokeByTimer, false}, true, true},
-		{"a nudge, the queue changed", timing{}, woke{wokeByNudge, true}, true, false},
-		{"a nudge, the queue changed, under the guard", timing{notBefore: ahead}, woke{wokeByNudge, true}, true, false},
-		{"a nudge, nothing new", timing{}, woke{wokeByNudge, false}, false, false},
-		{"a nudge, nothing new, a deadline come", timing{due: deadlines{windowEnds: past}}, woke{wokeByNudge, false}, true, true},
-		{"a nudge, nothing new, a deadline come, under the guard", timing{due: deadlines{windowEnds: past}, notBefore: ahead}, woke{wokeByNudge, false}, false, false},
-		{"a nudge, nothing new, a deadline ahead", timing{due: deadlines{heldDue: ahead}}, woke{wokeByNudge, false}, false, false},
+		{"the timer", timing{}, woke{wokeByTimer, false, false}, true, true},
+		{"a nudge, the queue changed", timing{}, woke{wokeByNudge, true, false}, true, false},
+		{"a nudge, the queue changed, under the guard", timing{notBefore: ahead}, woke{wokeByNudge, true, false}, true, false},
+		{"a nudge, nothing new", timing{}, woke{wokeByNudge, false, false}, false, false},
+		{"a nudge, nothing new, a deadline come", timing{due: deadlines{windowEnds: past}}, woke{wokeByNudge, false, false}, true, true},
+		{"a nudge, nothing new, a deadline come, under the guard", timing{due: deadlines{windowEnds: past}, notBefore: ahead}, woke{wokeByNudge, false, false}, false, false},
+		{"a nudge, nothing new, a deadline ahead", timing{due: deadlines{heldDue: ahead}}, woke{wokeByNudge, false, false}, false, false},
+		{"a resume, nothing new", timing{}, woke{wokeByNudge, false, true}, true, false},
+		{"a resume, nothing new, under the guard", timing{due: deadlines{windowEnds: past}, notBefore: ahead}, woke{wokeByNudge, false, true}, true, false},
 	} {
-		run, forDeadline := c.t.wake(c.woke.cause, c.woke.changed, now)
+		run, forDeadline := c.t.wake(c.woke.cause, c.woke.changed, c.woke.resumed, now)
 		if run != c.run || forDeadline != c.forDeadline {
 			t.Errorf("%s: wake = %v, %v; want %v, %v", c.name, run, forDeadline, c.run, c.forDeadline)
 		}

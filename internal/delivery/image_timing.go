@@ -22,12 +22,15 @@ const (
 	wokeByTimer
 )
 
-// wake decides whether a wake runs a pass, and whether that pass is a deadline's. The timer
-// is armed at wakeAt, so its firing runs one, for the deadline. A nudge runs one when the
-// queue changed since the last pass read it; otherwise only for a deadline that has come,
-// and not while notBefore holds deadlines off.
-func (t timing) wake(cause wakeCause, queueChanged bool, now time.Time) (run, forDeadline bool) {
+// wake decides whether a wake runs a pass, and whether that pass is a deadline's. A resume
+// always runs one: the halt it undoes may have cut a pass short, leaving work the queue's
+// stamp does not show. The timer is armed at wakeAt, so its firing runs one, for the
+// deadline. A nudge runs one when the queue changed since the last pass read it; otherwise
+// only for a deadline that has come, and not while notBefore holds deadlines off.
+func (t timing) wake(cause wakeCause, queueChanged, resumed bool, now time.Time) (run, forDeadline bool) {
 	switch {
+	case resumed:
+		return true, false
 	case cause == wokeByTimer:
 		return true, true
 	case queueChanged:

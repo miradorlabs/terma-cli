@@ -25,11 +25,16 @@ type ImageSender struct {
 	// Logf, when set, is told of a pass that could not deliver everything it tried.
 	Logf func(format string, args ...any)
 
-	wake    chan struct{}
-	state   atomic.Int32
-	halting atomic.Bool
-	passes  atomic.Int64
-	loops   atomic.Int64
+	wake chan struct{}
+	// state is the sender's phase and flags in one word (senderState), changed only by
+	// update's compare-and-swap.
+	state  atomic.Uint32
+	passes atomic.Int64
+	loops  atomic.Int64
+	// seams, for tests: casSeam runs between update's load and its swap, afterPass between
+	// a pass's end and Run's look at the state.
+	casSeam   func(op string)
+	afterPass func()
 	// after is the project the last pass started with; read the queue as it read it, and
 	// seen each watched file as it stood then.
 	after   string
@@ -52,14 +57,42 @@ type ImageSender struct {
 	timer func(d time.Duration) (<-chan time.Time, func() bool)
 }
 
-// The sender's states. It moves between idle and uploading around each image, and from idle
-// to stopped (TryHalt), for good; each move is a compare-and-swap, so a halt never lands
-// mid-upload and an upload never starts once halted.
+// The sender's state, one word: its phase, and two flags. It moves between idle and
+// uploading around each image, and from idle to stopped (TryHalt), until a Resume; halting
+// (a final halt) has the next begin stop it rather than upload; resumed is a Resume the loop
+// has not yet run its pass for. Every change is one compare-and-swap of the whole word, so a
+// halt never lands mid-upload, an upload never starts once halted, and a Resume is never
+// lost between a read and a write.
 const (
-	senderIdle int32 = iota
+	senderIdle uint32 = iota
 	senderUploading
 	senderStopped
+
+	phaseMask   uint32 = 3
+	haltingFlag uint32 = 1 << 2
+	resumedFlag uint32 = 1 << 3
 )
+
+// update changes the state by f, retrying until no other change came between its load and
+// its swap, and returns the state before and after.
+func (s *ImageSender) update(op string, f func(w uint32) uint32) (before, after uint32) {
+	for {
+		before = s.state.Load()
+		if s.casSeam != nil {
+			s.casSeam(op)
+		}
+		after = f(before)
+		if s.state.CompareAndSwap(before, after) {
+			return before, after
+		}
+	}
+}
+
+// phase is w's phase.
+func phase(w uint32) uint32 { return w & phaseMask }
+
+// withPhase is w in phase p.
+func withPhase(w, p uint32) uint32 { return w&^phaseMask | p }
 
 // NewImageSender sends r.Images under the profile config reads at each pass, since keys and
 // hosts change while the relay runs. events is the events' spool, read before stored bytes
@@ -81,42 +114,74 @@ func (s *ImageSender) Nudge() {
 	}
 }
 
-// TryHalt stops the sender for good if it is between two images, and reports whether it
-// is stopped: the relay asks it last before an idle exit, a restart or making way, and
-// waits while an image is on its way. A final halt (a restart, making way: the relay goes
-// whatever happens) also has the sender start no further image, so it stops at the next
-// image's end; an idle exit's is not, since a new export may yet keep the relay.
+// TryHalt stops the sender if it is between two images, and reports whether it is
+// stopped: the relay asks it last before an idle exit, a restart or making way, and waits
+// while an image is on its way. A final halt (a restart, making way: the relay goes whatever
+// happens) also has the sender start no further image, so it stops at the next image's end;
+// an idle exit's is not, since a new export may yet keep the relay.
 func (s *ImageSender) TryHalt(final bool) bool {
-	if final {
-		s.halting.Store(true)
-	}
-	return s.state.CompareAndSwap(senderIdle, senderStopped) || s.state.Load() == senderStopped
+	_, after := s.update("halt", func(w uint32) uint32 {
+		if final {
+			w |= haltingFlag
+		}
+		if phase(w) == senderIdle {
+			w = withPhase(w, senderStopped)
+		}
+		return w
+	})
+	return phase(after) == senderStopped
 }
 
 // Resume undoes a halt the relay asked for and then did not stop for (an export came): the
-// sender starts images again and runs a pass. It must not block: the relay calls it under
-// its lock.
+// sender starts images again, and its loop runs a pass for the resume whatever the queue
+// says (timing.wake). It must not block: the relay calls it under its lock.
 func (s *ImageSender) Resume() {
-	s.halting.Store(false)
-	s.state.CompareAndSwap(senderStopped, senderIdle)
+	s.update("resume", func(w uint32) uint32 {
+		w = w&^haltingFlag | resumedFlag
+		if phase(w) == senderStopped {
+			w = withPhase(w, senderIdle)
+		}
+		return w
+	})
 	s.Nudge()
 }
 
 // uploading reports whether an image is on its way.
-func (s *ImageSender) uploading() bool { return s.state.Load() == senderUploading }
+func (s *ImageSender) uploading() bool { return phase(s.state.Load()) == senderUploading }
+
+// stopped reports whether the sender is halted.
+func (s *ImageSender) stopped() bool { return phase(s.state.Load()) == senderStopped }
 
 // begin moves the sender to uploading before an image, unless it was halted, or a final
 // halt was asked, which stops it now.
 func (s *ImageSender) begin() bool {
-	if s.halting.Load() {
-		s.state.CompareAndSwap(senderIdle, senderStopped)
-		return false
-	}
-	return s.state.CompareAndSwap(senderIdle, senderUploading)
+	_, after := s.update("begin", func(w uint32) uint32 {
+		switch {
+		case phase(w) != senderIdle:
+			return w
+		case w&haltingFlag != 0:
+			return withPhase(w, senderStopped)
+		}
+		return withPhase(w, senderUploading)
+	})
+	return phase(after) == senderUploading
 }
 
 // end moves it back once the image is done.
-func (s *ImageSender) end() { s.state.CompareAndSwap(senderUploading, senderIdle) }
+func (s *ImageSender) end() {
+	s.update("end", func(w uint32) uint32 {
+		if phase(w) == senderUploading {
+			return withPhase(w, senderIdle)
+		}
+		return w
+	})
+}
+
+// takeResumed clears the resumed flag, and reports whether it was set.
+func (s *ImageSender) takeResumed() bool {
+	before, _ := s.update("resumed", func(w uint32) uint32 { return w &^ resumedFlag })
+	return before&resumedFlag != 0
+}
 
 // Run delivers the queue at once, then each time it is woken, until ctx ends or it is
 // halted. An upload in flight as ctx ends is cut off, and its record stays queued.
@@ -126,37 +191,42 @@ func (s *ImageSender) Run(ctx context.Context) {
 	}
 	s.pass(ctx, false)
 	for {
+		if s.afterPass != nil {
+			s.afterPass()
+		}
 		s.loops.Add(1)
-		if s.state.Load() == senderStopped {
-			// Halted: only a resume (Resume, then a nudge) or the end wakes it, no deadline.
+		if s.stopped() {
+			// Halted: only a Resume (then a nudge) or the end wakes it, no deadline.
 			select {
 			case <-ctx.Done():
 				return
 			case <-s.wake:
 			}
-			if s.state.Load() != senderStopped {
-				s.pass(ctx, false)
-			}
 			continue
 		}
-		var fired <-chan time.Time
-		stop := func() bool { return false }
-		if at := s.timing.wakeAt(); !at.IsZero() {
-			fired, stop = s.timer(at.Sub(s.clock()))
+		cause := wokeByNudge
+		// A resume not yet run for wakes the loop at once: its nudge may have gone already.
+		if s.state.Load()&resumedFlag == 0 {
+			var fired <-chan time.Time
+			stop := func() bool { return false }
+			if at := s.timing.wakeAt(); !at.IsZero() {
+				fired, stop = s.timer(at.Sub(s.clock()))
+			}
+			cause = wokeByTimer
+			select {
+			case <-ctx.Done():
+			case <-s.wake:
+				cause = wokeByNudge
+			case <-fired:
+			}
+			stop()
 		}
-		cause := wokeByTimer
-		select {
-		case <-ctx.Done():
-		case <-s.wake:
-			cause = wokeByNudge
-		case <-fired:
-		}
-		stop()
 		if ctx.Err() != nil {
 			return
 		}
+		resumed := s.takeResumed()
 		changed := cause == wokeByNudge && (!s.router.Images.Stamp().Same(s.read) || !slices.Equal(marks(s.watched), s.seen))
-		if run, forDeadline := s.timing.wake(cause, changed, s.clock()); run {
+		if run, forDeadline := s.timing.wake(cause, changed, resumed, s.clock()); run {
 			s.pass(ctx, forDeadline)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -396,10 +397,11 @@ func TestANewKeyWakesHeldImagesAtTheNextExport(t *testing.T) {
 	waitFor(t, "the held image", func() bool { return len(rec.requests()) == 1 })
 }
 
-// A final halt the relay then does not stop for (an export came) is resumed: the sender,
-// stopped at the next image's boundary, sends again.
-func TestAResumedSenderSendsAgain(t *testing.T) {
-	t.Parallel()
+// twoImagesHaltedMidUpload queues two images for p1 and runs a sender whose first upload
+// waits; once it is under way, a final halt is asked (an update's quiesce), and the upload
+// is let go. It returns the sender and the recorder of what reached the host.
+func twoImagesHaltedMidUpload(t *testing.T, seams func(s *ImageSender)) (*ImageSender, *recorder) {
+	t.Helper()
 	arrived, release := make(chan struct{}), make(chan struct{})
 	var once, freed sync.Once
 	free := func() { freed.Do(func() { close(release) }) }
@@ -415,16 +417,45 @@ func TestAResumedSenderSendsAgain(t *testing.T) {
 	first, second := pixelN(1), pixelN(2)
 	store(t, stateDir, first, second)
 	queue(t, r.Images, imageEvent(first), imageEvent(second))
-	s, _, _ := startSenderNoWait(t, r, cfg)
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	seams(s)
+	runSender(t, s)
 	<-arrived
-	if s.TryHalt(true) { // an update's quiesce, mid-upload
+	if s.TryHalt(true) {
 		t.Fatal("the sender halted mid-upload")
 	}
 	free()
-	waitFor(t, "the halt at the boundary", func() bool { return s.passes.Load() >= 1 && s.TryHalt(false) })
-	if n := len(rec.requests()); n != 1 {
-		t.Fatalf("%d uploads before the resume", n)
-	}
-	s.Resume() // an export kept the relay
+	return s, rec
+}
+
+// A Resume that lands as a halted pass ends, before the loop looks at the state, runs a
+// pass all the same: the queue's stamp, which the pass's compaction left as it was, does not
+// show the image the halt held back.
+func TestAResumeAsAHaltedPassEndsSendsAgain(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	armed.Store(true)
+	_, rec := twoImagesHaltedMidUpload(t, func(s *ImageSender) {
+		s.afterPass = func() {
+			if armed.CompareAndSwap(true, false) {
+				s.Resume() // an export kept the relay, just as the halted pass ended
+			}
+		}
+	})
+	waitFor(t, "the second image", func() bool { return len(rec.requests()) == 2 })
+}
+
+// A Resume that lands between begin's look at the state and its change of it is not lost:
+// begin sees it and uploads, rather than stopping on the halt the Resume undid.
+func TestAResumeInsideBeginIsNotLost(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	_, rec := twoImagesHaltedMidUpload(t, func(s *ImageSender) {
+		s.casSeam = func(op string) {
+			if op == "begin" && s.state.Load()&haltingFlag != 0 && armed.CompareAndSwap(false, true) {
+				s.Resume()
+			}
+		}
+	})
 	waitFor(t, "the second image", func() bool { return len(rec.requests()) == 2 })
 }
