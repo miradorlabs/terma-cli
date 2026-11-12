@@ -186,6 +186,18 @@ func (q *Queue) Take(ctx context.Context, p Pending) (*Taken, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The log and the queue are read under the append lock every writer of either takes, so
+	// they are read as one state.
+	if err := q.underAppendLock(func() error { return q.checkQueued(p) }); err != nil {
+		unlock()
+		return nil, err
+	}
+	return &Taken{q: q, p: p, release: unlock}, nil
+}
+
+// checkQueued is nil when p is still queued: it compares the stamp Read saw, and reads the
+// queue only when that changed or the log names p's line.
+func (q *Queue) checkQueued(p Pending) error {
 	settled, err := q.settled()
 	if err == nil {
 		switch {
@@ -197,11 +209,19 @@ func (q *Queue) Take(ctx context.Context, p Pending) (*Taken, error) {
 			err = q.stillQueued(p, settled)
 		}
 	}
+	return err
+}
+
+// underAppendLock runs fn holding the append lock, waiting ackTimeout for it at most.
+func (q *Queue) underAppendLock(fn func() error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ackTimeout)
+	defer cancel()
+	unlock, err := flock.Lock(ctx, filepath.Join(q.s.dir, lockFile))
 	if err != nil {
-		unlock()
-		return nil, err
+		return err
 	}
-	return &Taken{q: q, p: p, release: unlock}, nil
+	defer unlock()
+	return fn()
 }
 
 // Release lets the event go to another sender.
