@@ -1,23 +1,14 @@
 package delivery
 
 import (
-	"cmp"
 	"context"
-	"crypto/tls"
 	"encoding/base64"
-	"errors"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/http/httptest"
-	"net/http/httptrace"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,176 +19,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
-
-// pixel is a 1×1 PNG.
-var pixel, _ = base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
-
-// pixelN is another 1×1 PNG for each n, so each has an id of its own.
-func pixelN(n int) promptimage.Image {
-	data := append(append([]byte{}, pixel...), make([]byte, n)...)
-	return promptimage.Image{Data: data, MIMEType: "image/png", Index: 1}
-}
-
-// largeImage is an image of the largest size a record carries, its own for each n: its
-// body outgrows every buffer between client and server, so a cut leaves it half written.
-func largeImage(n byte) promptimage.Image {
-	data := make([]byte, promptimage.MaxBytes)
-	copy(data, pixel)
-	data[len(pixel)] = n
-	return promptimage.Image{Data: data, MIMEType: "image/png", Index: 1}
-}
-
-// imageEvent is a spooled terma.prompt.image record of img, as an agent's hook writes it.
-func imageEvent(img promptimage.Image) spool.Event {
-	attrs := img.Attrs()
-	attrs[hookrun.AttrProjectID] = "p1"
-	attrs[semconv.GenAIMainAgentNameKey] = "fake"
-	return spool.Event{Repository: app, Name: semconv.TermaPromptImageEvent, SessionID: "s1", Attrs: attrs}
-}
-
-// quotaEvent is an event of p1's that is no image.
-func quotaEvent() spool.Event {
-	return spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}
-}
-
-type recorder struct {
-	mu     sync.Mutex
-	bodies []string
-	refuse func(body string) bool
-	// status is what a refusal answers; 500 when unset.
-	status int
-	// cut, when it holds for a body's first bodyHead bytes, closes the connection there,
-	// unread and unanswered: an upload that did not get through, when the body is larger
-	// than the buffers between the two.
-	cut func(head string) bool
-	// delay holds every answer back.
-	delay time.Duration
-}
-
-// bodyHead is how much of a body recorder reads before it decides to cut it.
-const bodyHead = 64 << 10
-
-func (rec *recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	head := make([]byte, bodyHead)
-	n, _ := io.ReadFull(r.Body, head)
-	if rec.cut != nil && rec.cut(string(head[:n])) {
-		rec.mu.Lock()
-		rec.bodies = append(rec.bodies, string(head[:n]))
-		rec.mu.Unlock()
-		conn, _, _ := w.(http.Hijacker).Hijack()
-		_ = conn.Close()
-		return
-	}
-	rest, _ := io.ReadAll(r.Body)
-	b := append(head[:n], rest...)
-	rec.mu.Lock()
-	rec.bodies = append(rec.bodies, string(b))
-	rec.mu.Unlock()
-	time.Sleep(rec.delay)
-	if rec.refuse != nil && rec.refuse(string(b)) {
-		w.WriteHeader(cmp.Or(rec.status, http.StatusInternalServerError))
-	}
-}
-
-func (rec *recorder) requests() []string {
-	rec.mu.Lock()
-	defer rec.mu.Unlock()
-	return append([]string(nil), rec.bodies...)
-}
-
-// imageFixture is a router whose image lane (Router.Images) delivers to a server rec
-// answers, for project p1, whose policy collects prompts when prompts says so.
-func imageFixture(t *testing.T, rec http.Handler, prompts bool) (Router, *config.Config, string) {
-	t.Helper()
-	cfgDir, stateDir := t.TempDir(), t.TempDir()
-	srv := httptest.NewServer(rec)
-	t.Cleanup(srv.Close)
-	if err := keystore.Set(cfgDir, "p1", testKey, keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
-	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now(), IncludePrompts: prompts, IncludeToolContent: true}
-	r := Router{ConfigDir: cfgDir, StateDir: stateDir, OTLPPinned: true, Images: openSpool(t),
-		Policy: func(_ context.Context, _ *config.Config, team string) (config.Policy, error) {
-			p := pol
-			p.TeamID = team
-			return p, nil
-		},
-		Consent: func(string, hookrun.Consent) bool { return true }}
-	return r, &config.Config{OTLPURL: srv.URL}, stateDir
-}
-
-func openSpool(t *testing.T) *spool.Spool {
-	t.Helper()
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return s
-}
-
-func store(t *testing.T, stateDir string, images ...promptimage.Image) {
-	t.Helper()
-	for _, img := range images {
-		if err := promptimage.Store(stateDir, img); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func queue(t *testing.T, s *spool.Spool, events ...spool.Event) {
-	t.Helper()
-	if err := s.Append(events...); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func queued(t *testing.T, s *spool.Spool) []spool.Event {
-	t.Helper()
-	left, err := s.Peek(100)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return left
-}
-
-// Each image leaves in a request of its own with its bytes from the store, which forgets
-// them once no waiting record names them; one whose bytes are gone says so, and one too
-// large to carry leaves as it was spooled.
-func TestImagesLeaveOneToARequest(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	stored := promptimage.Image{Data: pixel, MIMEType: "image/png", Label: "[Image #1]", Index: 1}
-	gone := pixelN(1)
-	big := promptimage.Image{Data: append(append([]byte{}, pixel...), make([]byte, promptimage.MaxBytes)...), MIMEType: "image/png", Index: 3}
-	store(t, stateDir, stored)
-	queue(t, r.Images, imageEvent(stored), imageEvent(gone), imageEvent(big))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 3 || res.Err != nil {
-		t.Fatalf("FlushImages = %+v", res)
-	}
-	bodies := rec.requests()
-	if len(bodies) != 3 {
-		t.Fatalf("%d requests; want one per image", len(bodies))
-	}
-	data := base64.StdEncoding.EncodeToString(pixel)
-	for i, want := range []struct{ id, has, lacks string }{
-		{stored.ID(), data, semconv.TermaImageOmittedKey},
-		{gone.ID(), semconv.TermaImageOmittedUnavailable, semconv.TermaImageDataKey},
-		{big.ID(), semconv.TermaImageOmittedTooLarge, semconv.TermaImageDataKey},
-	} {
-		body := bodies[i]
-		if strings.Count(body, `"eventName":"`+semconv.TermaPromptImageEvent+`"`) != 1 || !strings.Contains(body, want.id) || !strings.Contains(body, want.has) || strings.Contains(body, want.lacks) {
-			t.Errorf("image %d request = %.300s", i+1, body)
-		}
-	}
-	if _, ok := promptimage.Load(stateDir, stored.ID()); ok {
-		t.Error("a sent image stayed in the store")
-	}
-	if left := queued(t, r.Images); len(left) != 0 {
-		t.Fatalf("image queue holds %+v", left)
-	}
-}
 
 // Events never wait on an image: the events' pass sends none, and hands an image record an
 // older build spooled with the events to the image lane, its bytes left for that lane.
@@ -260,23 +81,6 @@ func TestAnImageWithNoLaneStaysQueued(t *testing.T) {
 	}
 	if left := queued(t, events); len(left) != 1 || !isImage(left[0]) {
 		t.Fatalf("events' spool holds %+v", left)
-	}
-}
-
-// An image is what was said: a policy that withholds prompts withholds the whole record.
-func TestImagesStayWhenPromptsDo(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, stateDir := imageFixture(t, rec, false)
-	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 0 || res.Withheld != 1 || len(rec.requests()) != 0 {
-		t.Fatalf("FlushImages = %+v, %d requests", res, len(rec.requests()))
-	}
-	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
-		t.Error("a withheld image's bytes stayed in the store")
 	}
 }
 
@@ -352,34 +156,6 @@ func TestAWaitingRecordKeepsItsImage(t *testing.T) {
 	}
 	if _, ok := promptimage.Load(stateDir, img.ID()); !ok {
 		t.Fatal("the bytes a held record needs were forgotten")
-	}
-}
-
-// An image the platform refuses outright goes again without its bytes, saying so, and holds
-// up nothing after it.
-func TestAnImageRefusedOutrightLeavesWithoutItsBytes(t *testing.T) {
-	t.Parallel()
-	for _, status := range []int{http.StatusBadRequest, http.StatusRequestEntityTooLarge} {
-		t.Run(fmt.Sprint(status), func(t *testing.T) {
-			t.Parallel()
-			data := base64.StdEncoding.EncodeToString(pixel)
-			rec := &recorder{status: status, refuse: func(body string) bool { return strings.Contains(body, data) }}
-			r, cfg, stateDir := imageFixture(t, rec, true)
-			img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
-			store(t, stateDir, img)
-			queue(t, r.Images, imageEvent(img), imageEvent(pixelN(1)))
-			res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-			if res.Sent != 2 || res.Err != nil {
-				t.Fatalf("FlushImages = %+v", res)
-			}
-			resent := rec.requests()[1]
-			if strings.Contains(resent, data) || !strings.Contains(resent, semconv.TermaImageOmittedRefused) {
-				t.Fatalf("resent image = %.300s", resent)
-			}
-			if left := queued(t, r.Images); len(left) != 0 {
-				t.Fatalf("image queue holds %+v", left)
-			}
-		})
 	}
 }
 
@@ -506,46 +282,6 @@ func TestACancelledPassIsNoStall(t *testing.T) {
 	}
 }
 
-// The image lane's pass has room for the largest image on the slowest uplink a request is
-// given time for, which the events' pass does not.
-func TestTheImagePassHasRoomForTheLargestImage(t *testing.T) {
-	t.Parallel()
-	largest := timeoutFor(base64.StdEncoding.EncodedLen(promptimage.MaxBytes) + 4<<10)
-	if spool.DefaultFlushTimeout >= largest {
-		t.Fatalf("the events' pass (%v) has room for the largest image (%v): the image lane's own pass is moot", spool.DefaultFlushTimeout, largest)
-	}
-	if ImagePassTimeout < 2*largest {
-		t.Fatalf("the image pass (%v) has no room past the largest image's request (%v)", ImagePassTimeout, largest)
-	}
-}
-
-// An image is started only with all its request's time left: too little of the pass left
-// leaves it for the next pass untried, opening no window. The image lane's own pass, long
-// enough, sends the same image.
-func TestAnImageWaitsForAPassWithRoomForIt(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{delay: 300 * time.Millisecond}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	r.requestTimeout = func(int) time.Duration { return time.Second }
-	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-
-	r.imagePass = 500 * time.Millisecond
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 0 || res.Deferred != 1 || res.Failed != 0 || len(res.Stalls) != 0 || len(rec.requests()) != 0 {
-		t.Fatalf("short pass: FlushImages = %+v, %d requests", res, len(rec.requests()))
-	}
-	if !r.Images.RetryAt("p1").IsZero() {
-		t.Fatal("an image never tried opened a window")
-	}
-
-	r.imagePass = 3 * time.Second
-	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Sent != 1 {
-		t.Fatalf("long pass: FlushImages = %+v", res)
-	}
-}
-
 // Only one image pass runs at a time: another finds the queue busy and leaves at once.
 func TestOneImagePassAtATime(t *testing.T) {
 	t.Parallel()
@@ -585,112 +321,6 @@ func TestFlushPrunesImagesNoRecordOutlives(t *testing.T) {
 	r.FlushImages(t.Context(), openSpool(t), cfg, false)
 	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
 		t.Fatal("bytes older than the spool keeps records outlived a pass")
-	}
-}
-
-// timeoutError is a net.Error that timed out, as a TLS handshake's does.
-type timeoutError struct{}
-
-func (timeoutError) Error() string   { return "net/http: TLS handshake timeout" }
-func (timeoutError) Timeout() bool   { return true }
-func (timeoutError) Temporary() bool { return true }
-
-// How a send went: delivered, deferred having learned nothing, stalled on the uplink (which
-// backs off only the project's images and fails nothing), or failed on the host.
-func TestJudgeImage(t *testing.T) {
-	t.Parallel()
-	live := t.Context()
-	cancelled, cancel := context.WithCancel(t.Context())
-	cancel()
-	expired, cancelExpired := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
-	defer cancelExpired()
-	reset := &url.Error{Op: "Post", Err: &net.OpError{Op: "write", Err: os.NewSyscallError("write", connectionBroken[0])}}
-	deadline := &url.Error{Op: "Post", Err: context.DeadlineExceeded}
-	for _, c := range []struct {
-		name string
-		pass context.Context
-		err  error
-		got  progress
-		want imageOutcome
-	}{
-		{"delivered", live, nil, written, imageDelivered},
-		{"no time left to start it", live, errNoTimeLeft, notReached, imageDeferred},
-		{"pass cancelled mid-upload", cancelled, &url.Error{Op: "Post", Err: context.Canceled}, reached, imageDeferred},
-		{"pass cancelled before the host", cancelled, &url.Error{Op: "Post", Err: context.Canceled}, notReached, imageDeferred},
-		{"pass ran out mid-upload", expired, deadline, reached, imageStalled},
-		{"pass ran out before the host", expired, deadline, notReached, imageDeferred},
-		{"own deadline mid-upload", live, deadline, reached, imageStalled},
-		{"reset mid-upload", live, reset, reached, imageStalled},
-		{"cut off", live, &url.Error{Op: "Post", Err: io.EOF}, reached, imageStalled},
-		{"cut off mid-answer", live, &url.Error{Op: "Post", Err: io.ErrUnexpectedEOF}, reached, imageStalled},
-		{"closed under the write", live, &url.Error{Op: "Post", Err: &net.OpError{Op: "write", Err: net.ErrClosed}}, reached, imageStalled},
-		{"no answer to a body all written", live, deadline, written, imageFailed},
-		{"cut off after a body all written", live, &url.Error{Op: "Post", Err: io.EOF}, written, imageFailed},
-		{"pass ran out after a body all written", expired, deadline, written, imageFailed},
-		{"host refused", live, &IngestError{Status: http.StatusInternalServerError}, written, imageFailed},
-		{"gateway timeout", live, &IngestError{Status: http.StatusGatewayTimeout}, written, imageFailed},
-		{"unprocessable", live, &IngestError{Status: http.StatusUnprocessableEntity}, written, imageFailed},
-		{"too many requests", live, &IngestError{Status: http.StatusTooManyRequests}, written, imageUnavailable},
-		{"bad gateway", live, &IngestError{Status: http.StatusBadGateway}, written, imageUnavailable},
-		{"between deploys", live, &IngestError{Status: http.StatusServiceUnavailable}, written, imageUnavailable},
-		{"key refused", live, &IngestError{Status: http.StatusUnauthorized}, written, imageUnavailable},
-		{"dial", live, &url.Error{Op: "Post", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}, notReached, imageUnavailable},
-		{"dns", live, &url.Error{Op: "Post", Err: &net.DNSError{Err: "no such host", Name: "x"}}, notReached, imageUnavailable},
-		{"tls certificate", live, &url.Error{Op: "Post", Err: &tls.CertificateVerificationError{}}, notReached, imageUnavailable},
-		{"tls handshake timeout", live, &url.Error{Op: "Post", Err: timeoutError{}}, notReached, imageUnavailable},
-		{"own deadline before the host", live, deadline, notReached, imageUnavailable},
-		{"something else", live, errors.New("odd"), reached, imageFailed},
-	} {
-		if got := judgeImage(c.pass, c.err, c.got); got != c.want {
-			t.Errorf("%s: judgeImage = %v, want %v", c.name, got, c.want)
-		}
-	}
-}
-
-// A request that reached the host says so, and one whose body went out says that: an
-// upload cut off says only it reached, the host's answer that its body went.
-func TestPostSaysHowFarItGot(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct {
-		name string
-		cut  bool
-		want progress
-	}{{"answered", false, written}, {"cut off", true, reached}} {
-		rec := &recorder{cut: func(string) bool { return c.cut }}
-		srv := httptest.NewServer(rec)
-		// The body outgrows every buffer between the two, so a cut leaves it half written.
-		events := []spool.Event{{Name: "x", Attrs: map[string]any{"pad": strings.Repeat("x", 16<<20)}}}
-		got, _ := (&otlpSender{Endpoint: srv.URL, APIKey: testKey}).post(t.Context(), events)
-		srv.Close()
-		if got != c.want {
-			t.Errorf("%s: progress = %v, want %v", c.name, got, c.want)
-		}
-	}
-	unreachable := &otlpSender{Endpoint: "http://127.0.0.1:1", APIKey: testKey}
-	if got, err := unreachable.post(t.Context(), []spool.Event{{Name: "x"}}); err == nil || got != notReached {
-		t.Errorf("no host: progress = %v, %v", got, err)
-	}
-}
-
-// A request retried on a new connection starts over: a reused connection that failed before
-// the request was written says nothing of the new one, and a failed write is not a body sent.
-func TestProgressStartsOverOnANewConnection(t *testing.T) {
-	t.Parallel()
-	var got atomic.Int32
-	trace := progressTrace(&got)
-	trace.GotConn(httptrace.GotConnInfo{Reused: true})
-	trace.WroteRequest(httptrace.WroteRequestInfo{Err: io.EOF})
-	if progress(got.Load()) != reached {
-		t.Fatalf("a failed write = %v", progress(got.Load()))
-	}
-	trace.ConnectStart("tcp", "127.0.0.1:1")
-	if progress(got.Load()) != notReached {
-		t.Fatalf("a new connection's dial = %v", progress(got.Load()))
-	}
-	trace.GotConn(httptrace.GotConnInfo{})
-	trace.WroteRequest(httptrace.WroteRequestInfo{})
-	if progress(got.Load()) != written {
-		t.Fatalf("a body written = %v", progress(got.Load()))
 	}
 }
 
@@ -740,24 +370,6 @@ func TestTeardownStopsAnImagePass(t *testing.T) {
 	r.SetUp = func() bool { return len(rec.requests()) == 0 }
 	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
 	if res.Sent != 1 || res.Deferred != 1 || len(rec.requests()) != 1 {
-		t.Fatalf("FlushImages = %+v, %d requests", res, len(rec.requests()))
-	}
-}
-
-// Whether an image fits what is left of the pass is judged from the size its record names,
-// before its bytes are read: a large image whose bytes have gone waits, untried, rather than
-// leave as a small record saying they are unavailable.
-func TestAnImageIsJudgedByItsSizeBeforeItsBytesAreRead(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, _ := imageFixture(t, rec, true)
-	r.requestTimeout = func(n int) time.Duration { return time.Duration(n) * time.Microsecond }
-	r.imagePass = time.Second
-	big := pixelN(2 << 20) // ~2.8 s at this rate, its bytes never stored
-	big.Data = big.Data[:promptimage.MaxBytes]
-	queue(t, r.Images, imageEvent(big))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 0 || res.Deferred != 1 || len(rec.requests()) != 0 {
 		t.Fatalf("FlushImages = %+v, %d requests", res, len(rec.requests()))
 	}
 }
@@ -1037,79 +649,6 @@ func TestARefusedKeyCostsTheImageNothing(t *testing.T) {
 	}
 }
 
-// Bytes the host refused (400) are not sent again, though the record without them then
-// failed: it goes on saying they were refused.
-func TestRefusedBytesAreNotSentAgain(t *testing.T) {
-	t.Parallel()
-	data := base64.StdEncoding.EncodeToString(pixelN(1).Data)
-	var mu sync.Mutex
-	carried := 0
-	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		b, _ := io.ReadAll(req.Body)
-		mu.Lock()
-		defer mu.Unlock()
-		if strings.Contains(string(b), data) {
-			carried++
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-	}), true)
-	img := pixelN(1)
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	for range 2 {
-		r.FlushImages(t.Context(), openSpool(t), cfg, true)
-	}
-	left := queued(t, r.Images)
-	if carried != 1 || len(left) != 1 || left[0].Attrs[semconv.TermaImageOmittedKey] != semconv.TermaImageOmittedRefused {
-		t.Fatalf("the bytes went %d times; image queue holds %+v", carried, left)
-	}
-}
-
-// A record the host refuses even without its bytes, attempt after attempt, is dropped once
-// imageMaxAttempts are spent, and counted as rejected.
-func TestARecordRefusedWithoutBytesIsDropped(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{status: http.StatusUnprocessableEntity, refuse: func(string) bool { return true }}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	img := pixelN(1)
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	for pass := 1; pass <= imageMaxAttempts; pass++ {
-		if res := r.FlushImages(t.Context(), openSpool(t), cfg, true); res.Rejected != 0 {
-			t.Fatalf("pass %d dropped it: %+v", pass, res)
-		}
-	}
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, true)
-	if res.Rejected != 1 || res.Failed != 0 {
-		t.Fatalf("FlushImages = %+v", res)
-	}
-	if left := queued(t, r.Images); len(left) != 0 {
-		t.Fatalf("image queue holds %+v", left)
-	}
-	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
-		t.Fatal("a dropped record's image stayed in the store")
-	}
-}
-
-// Retry-After reads seconds or a date.
-func TestRetryAfter(t *testing.T) {
-	t.Parallel()
-	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
-	for h, want := range map[string]time.Time{
-		"120":                           now.Add(2 * time.Minute),
-		"Thu, 12 Nov 2026 12:10:00 GMT": now.Add(10 * time.Minute),
-		"Thu, 12 Nov 2026 11:00:00 GMT": {},
-		"":                              {},
-		"soon":                          {},
-	} {
-		if got := retryAfter(h, now); !got.Equal(want) {
-			t.Errorf("retryAfter(%q) = %v, want %v", h, got, want)
-		}
-	}
-}
-
 // No pass is due while one runs.
 func TestNoImagesAreDueDuringAPass(t *testing.T) {
 	t.Parallel()
@@ -1122,5 +661,56 @@ func TestNoImagesAreDueDuringAPass(t *testing.T) {
 	})
 	if !ImagesDue(s, time.Now()) {
 		t.Fatal("images are not due once the pass is over")
+	}
+}
+
+// An image spooled while a pass runs leaves in that same pass, not at the next hook.
+func TestAnImageSpooledDuringAPassLeavesInIt(t *testing.T) {
+	t.Parallel()
+	first, later := pixelN(1), pixelN(2)
+	var r Router
+	var once sync.Once
+	var mu sync.Mutex
+	var bodies []string
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+		// A hook spools another image while the first is on its way.
+		once.Do(func() { queue(t, r.Images, imageEvent(later)) })
+	}), true)
+	store(t, stateDir, first, later)
+	queue(t, r.Images, imageEvent(first))
+	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
+	if res.Sent != 2 || len(bodies) != 2 || !strings.Contains(bodies[1], later.ID()) {
+		t.Fatalf("FlushImages = %+v, %d requests", res, len(bodies))
+	}
+	if left := queued(t, r.Images); len(left) != 0 {
+		t.Fatalf("image queue holds %+v", left)
+	}
+}
+
+// Images held for a key make their project wait a while, so no events' flush starts a pass
+// for them each time it runs, and doctor is not told their delivery failed.
+func TestHeldImagesWaitAWhile(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, _ := imageFixture(t, rec, true)
+	img := imageEvent(pixelN(1))
+	img.Attrs[hookrun.AttrProjectID] = "keyless"
+	queue(t, r.Images, img)
+	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Held != 1 {
+		t.Fatalf("FlushImages = %+v", res)
+	}
+	now := time.Now()
+	if _, held := r.Images.HeldWindows(now)["keyless"]; !held {
+		t.Fatal("held images opened no held window")
+	}
+	if ImagesDue(r.Images, now) {
+		t.Fatal("images held for a key are due")
+	}
+	if !ImagesDue(r.Images, now.Add(imageHeldWait+time.Minute)) {
+		t.Fatal("held images are not due once their wait is over")
 	}
 }

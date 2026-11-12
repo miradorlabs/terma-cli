@@ -326,3 +326,19 @@ func TestSpoolFlushStartsNoImagePassWhileImagesWait(t *testing.T) {
 		t.Fatalf("image passes started: %d, want 1 once the window closed", started)
 	}
 }
+
+// Images waiting for a key are no failed delivery: the image queue's report leaves their
+// window out, which doctor's key check covers.
+func TestHeldImagesAreNoFailedDelivery(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	images, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	images.DestinationHeld("keyless", time.Now().Add(time.Minute))
+	images.DestinationFailed("failing", time.Now())
+	q := testApp.imageQueue()
+	if _, held := q.Windows["keyless"]; held || q.Windows["failing"].IsZero() {
+		t.Fatalf("image queue windows = %v", q.Windows)
+	}
+}

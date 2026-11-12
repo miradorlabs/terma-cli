@@ -50,21 +50,22 @@ const (
 //	429, 502, 503     busy, or between deploys: unavailable, its Retry-After honoured
 //	any other         failed: an attempt
 //
-// Short of an answer: not reached (DNS, the dial, the TLS handshake) is unavailable, or
-// deferred when the pass ran out first; a body cut off mid-upload stalled; one all written
-// and unanswered failed.
+// Short of an answer: cut off by the pass's end is deferred; not reached (DNS, the dial,
+// the TLS handshake) is unavailable; a body cut off mid-upload stalled; one all written and
+// unanswered failed. What each outcome then does is imageRules'.
 func judgeImage(pass context.Context, err error, got progress) imageOutcome {
 	var ingest *IngestError
 	switch {
 	case err == nil:
 		return imageDelivered
-	case errors.Is(err, errNoTimeLeft), errors.Is(pass.Err(), context.Canceled):
+	case errors.Is(err, errNoTimeLeft):
 		return imageDeferred
 	case errors.As(err, &ingest) && hostUnavailable(ingest.Status):
 		return imageUnavailable
 	case errors.As(err, &ingest):
 		return imageFailed
-	case got == notReached && errors.Is(pass.Err(), context.DeadlineExceeded):
+	case pass.Err() != nil:
+		// Cut off by the pass's end, its deadline or a cancel: nothing learned.
 		return imageDeferred
 	case got == notReached:
 		return imageUnavailable
@@ -113,7 +114,7 @@ func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event
 	if err := ctx.Err(); err != nil {
 		return imageSend{outcome: judgeImage(ctx, err, notReached), err: err}
 	}
-	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < r.timeout(imageRequestSize(e)) {
+	if !r.timeLeft(ctx, imageRequestSize(e)) {
 		return imageSend{outcome: imageDeferred, err: errNoTimeLeft}
 	}
 	rec := withImageData(r.StateDir, e)
@@ -122,6 +123,9 @@ func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event
 	var ingest *IngestError
 	refused := carried && errors.As(err, &ingest) &&
 		(ingest.Status == http.StatusBadRequest || ingest.Status == http.StatusRequestEntityTooLarge)
+	if refused && !r.timeLeft(ctx, imageEnvelope) {
+		return imageSend{outcome: imageDeferred, err: errNoTimeLeft, refused: true, bare: true}
+	}
 	if refused {
 		delete(rec.Attrs, semconv.TermaImageDataKey)
 		rec.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedRefused
@@ -149,6 +153,12 @@ func imageRequestSize(e spool.Event) int {
 		size = n
 	}
 	return base64.StdEncoding.EncodedLen(min(max(size, 0), promptimage.MaxBytes)) + imageEnvelope
+}
+
+// timeLeft reports whether ctx leaves a request of n bytes all the time it may take.
+func (r Router) timeLeft(ctx context.Context, n int) bool {
+	deadline, ok := ctx.Deadline()
+	return ctx.Err() == nil && (!ok || time.Until(deadline) >= r.timeout(n))
 }
 
 // timeout is how long a request of n bytes may take.

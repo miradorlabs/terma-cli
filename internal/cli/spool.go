@@ -331,7 +331,12 @@ func (app *App) imageQueue() doctor.ImageQueue {
 	for id := range s.StalledWindows(now) {
 		stalled[id] = true
 	}
-	return doctor.ImageQueue{Queued: n, Windows: s.RetryWindows(now), Stalled: stalled}
+	// Images waiting for a key or a policy are no failed delivery; doctor's other checks say why.
+	windows := s.RetryWindows(now)
+	for id := range s.HeldWindows(now) {
+		delete(windows, id)
+	}
+	return doctor.ImageQueue{Queued: n, Windows: windows, Stalled: stalled}
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

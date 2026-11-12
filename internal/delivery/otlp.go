@@ -267,7 +267,8 @@ type IngestError struct {
 // retryAfter reads a Retry-After header, in seconds or as an HTTP date; zero for none.
 func retryAfter(h string, now time.Time) time.Time {
 	if secs, err := strconv.Atoi(strings.TrimSpace(h)); err == nil && secs > 0 {
-		return now.Add(time.Duration(secs) * time.Second)
+		// No window outlasts an hour; a larger number would overflow the multiplication.
+		return now.Add(time.Duration(min(secs, 3600)) * time.Second)
 	}
 	if at, err := http.ParseTime(h); err == nil && at.After(now) {
 		return at
