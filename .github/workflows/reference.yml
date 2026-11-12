@@ -69,7 +69,7 @@ jobs:
           ASKED: ${{ inputs.builds }}
         run: |
           if [ -n "$ASKED" ]; then
-            builds=$(tr ' ' '\n' <<<"$ASKED" | grep -E '^[a-z][a-z-]*=[0-9A-Za-z.,+_-]+$' || true)
+            builds=$(tr ' ' '\n' <<<"$ASKED" | grep -E '^[a-z][a-z0-9-]*=[0-9A-Za-z.,+_-]+$' || true)
           else
             builds=$(test/e2e/reference/new-builds.sh)
           fi
