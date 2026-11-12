@@ -497,7 +497,7 @@ func TestTheFirstProjectTakesTurns(t *testing.T) {
 		other := imageEvent(theirs)
 		other.Attrs[hookrun.AttrProjectID] = "p2"
 		queue(t, r.Images, imageEvent(mine), other)
-		sender.pass(t.Context())
+		sender.pass(t.Context(), false)
 		first := rec.requests()[2*pass]
 		order = append(order, map[bool]string{true: "p1", false: "p2"}[strings.Contains(first, mine.ID())])
 	}

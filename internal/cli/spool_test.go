@@ -16,7 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -327,13 +327,14 @@ func TestAnImageFlushDeliversOnceTheKeyIsThere(t *testing.T) {
 }
 
 // The relay runs the image sender: it is a worker, an accepted export nudges it without
-// waiting, and its upload counts as the relay's work.
+// waiting, its upload counts as the relay's work, and a relay winding down tells it.
 func TestTheRelayRunsTheImageSender(t *testing.T) {
 	useConfigDir(t, t.TempDir())
-	var engine relay.Options
-	workers := testApp.relayImages(&engine, nil)
-	if len(workers) != 1 || engine.Accepted == nil || engine.Busy == nil {
-		t.Fatalf("workers %d, accepted set %v, busy set %v", len(workers), engine.Accepted != nil, engine.Busy != nil)
+	var run daemon.Config
+	testApp.relayImages(&run, nil)
+	engine := run.Engine
+	if len(run.Workers) != 1 || engine.Accepted == nil || engine.Busy == nil || run.WindDown == nil {
+		t.Fatalf("workers %d, accepted set %v, busy set %v, wind-down set %v", len(run.Workers), engine.Accepted != nil, engine.Busy != nil, run.WindDown != nil)
 	}
 	done := make(chan struct{})
 	go func() {

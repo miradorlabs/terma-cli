@@ -230,3 +230,42 @@ func TestHeldImagesAreLookedAtAgain(t *testing.T) {
 	}
 	waitFor(t, "the held image", func() bool { return len(rec.requests()) == 1 })
 }
+
+// The wait for held images grows only when its own look finds them still held, not on a
+// pass a nudge started.
+func TestTheHeldWaitGrowsOnlyOnItsOwnLook(t *testing.T) {
+	t.Parallel()
+	r, cfg, _ := imageFixture(t, &recorder{}, true)
+	e := imageEvent(pixelN(1))
+	e.Attrs[hookrun.AttrProjectID] = "keyless"
+	queue(t, r.Images, e)
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	s.pass(t.Context(), false)
+	s.pass(t.Context(), false)
+	if s.held != s.heldMin {
+		t.Fatalf("after a nudged pass the held wait is %v, want %v", s.held, s.heldMin)
+	}
+	s.pass(t.Context(), true)
+	if s.held != 2*s.heldMin {
+		t.Fatalf("after its own look the held wait is %v, want %v", s.held, 2*s.heldMin)
+	}
+}
+
+// A sender winding down starts no new upload, so the relay waits for none.
+func TestAWindingDownSenderStartsNoUpload(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	s.WindDown()
+	s.pass(t.Context(), false)
+	if len(rec.requests()) != 0 || s.Busy() {
+		t.Fatalf("%d uploads from a sender winding down", len(rec.requests()))
+	}
+	if left := queued(t, r.Images); len(left) != 1 {
+		t.Fatalf("image queue holds %+v", left)
+	}
+}

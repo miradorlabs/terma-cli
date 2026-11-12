@@ -23,17 +23,19 @@ type ImageSender struct {
 	// Logf, when set, is told of a pass that could not deliver everything it tried.
 	Logf func(format string, args ...any)
 
-	wake   chan struct{}
-	busy   atomic.Bool
-	passes atomic.Int64
-	// after is the project the last pass started with; read the queue as it read it; due
-	// the next deadline, zero for none.
-	after string
-	read  spool.Stamp
-	due   time.Time
-	// held is how long images held for what they need wait for the next look: heldMin,
-	// doubling to heldMax while they stay held.
+	wake    chan struct{}
+	busy    atomic.Bool
+	winding atomic.Bool
+	passes  atomic.Int64
+	// after is the project the last pass started with; read the queue as it read it;
+	// windowEnds the earliest retry window's end, zero for none.
+	after      string
+	read       spool.Stamp
+	windowEnds time.Time
+	// held is how long images held for what they need wait for the next look, which is
+	// heldDue: heldMin, doubling to heldMax each time that look finds them still held.
 	held             time.Duration
+	heldDue          time.Time
 	heldMin, heldMax time.Duration
 }
 
@@ -56,26 +58,30 @@ func (s *ImageSender) Nudge() {
 // Busy reports whether an image is being uploaded, which an idle exit or a quiesce waits for.
 func (s *ImageSender) Busy() bool { return s.busy.Load() }
 
+// WindDown has the sender start no new upload: the relay is about to make way, or to
+// restart on a newer terma, and waits only for the one under way (Busy).
+func (s *ImageSender) WindDown() { s.winding.Store(true) }
+
 // Run delivers the queue at once, then each time it is woken, until ctx ends. An upload in
 // flight then is cut off, and its record stays queued.
 func (s *ImageSender) Run(ctx context.Context) {
 	if s.router.Images == nil {
 		return
 	}
-	s.pass(ctx)
+	s.pass(ctx, false)
 	for {
-		var windowEnds <-chan time.Time
+		var deadline <-chan time.Time
 		var timer *time.Timer
-		if !s.due.IsZero() {
-			timer = time.NewTimer(time.Until(s.due))
-			windowEnds = timer.C
+		if next := s.next(); !next.IsZero() {
+			timer = time.NewTimer(time.Until(next))
+			deadline = timer.C
 		}
 		woken := false
 		select {
 		case <-ctx.Done():
 		case <-s.wake:
 			woken = true
-		case <-windowEnds:
+		case <-deadline:
 		}
 		if timer != nil {
 			timer.Stop()
@@ -83,17 +89,32 @@ func (s *ImageSender) Run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if woken && s.router.Images.Stamp().Same(s.read) && (s.due.IsZero() || time.Now().Before(s.due)) {
+		now := time.Now()
+		heldLook := !s.heldDue.IsZero() && !now.Before(s.heldDue)
+		windowEnded := !s.windowEnds.IsZero() && !now.Before(s.windowEnds)
+		if s.winding.Load() || woken && !heldLook && !windowEnded && s.router.Images.Stamp().Same(s.read) {
 			continue
 		}
-		s.pass(ctx)
+		s.pass(ctx, heldLook)
 	}
+}
+
+// next is the sender's next deadline: a window's end or the next look at held images.
+func (s *ImageSender) next() time.Time {
+	switch {
+	case s.windowEnds.IsZero():
+		return s.heldDue
+	case s.heldDue.IsZero() || s.windowEnds.Before(s.heldDue):
+		return s.windowEnds
+	}
+	return s.heldDue
 }
 
 // pass delivers the queue once, then notes what the next wake compares against: the queue
 // as the pass read it, so whatever was queued or settled since, by a hook or by the pass
-// itself, makes the next nudge run another pass.
-func (s *ImageSender) pass(ctx context.Context) {
+// itself, makes the next nudge run another pass. heldLook says the held images' deadline
+// started it: only that look, finding them still held, lengthens the next wait.
+func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 	defer s.passes.Add(1)
 	held := false
 	if cfg, err := s.config(); err != nil {
@@ -102,7 +123,7 @@ func (s *ImageSender) pass(ctx context.Context) {
 	} else {
 		first := s.after
 		res := s.router.flushImages(ctx, s.events, cfg, false,
-			imageTurns{after: s.after, first: &first, read: &s.read, uploading: s.busy.Store})
+			imageTurns{after: s.after, first: &first, read: &s.read, uploading: s.busy.Store, halt: s.winding.Load})
 		s.after = first
 		held = res.Held > 0
 		if res.Err != nil && ctx.Err() == nil {
@@ -110,17 +131,22 @@ func (s *ImageSender) pass(ctx context.Context) {
 		}
 	}
 	now := time.Now()
-	s.due = time.Time{}
-	if held {
+	switch {
+	case !held:
+		s.held, s.heldDue = 0, time.Time{}
+	case s.held == 0:
 		// Nothing tells the sender a key or a policy arrived: it looks again, less often.
-		s.held = min(max(2*s.held, s.heldMin), s.heldMax)
-		s.due = now.Add(s.held)
-	} else {
-		s.held = 0
+		s.held = s.heldMin
+	case heldLook:
+		s.held = min(2*s.held, s.heldMax)
 	}
+	if held {
+		s.heldDue = now.Add(s.held)
+	}
+	s.windowEnds = time.Time{}
 	for _, end := range s.router.Images.RetryWindows(now) {
-		if s.due.IsZero() || end.Before(s.due) {
-			s.due = end
+		if s.windowEnds.IsZero() || end.Before(s.windowEnds) {
+			s.windowEnds = end
 		}
 	}
 }

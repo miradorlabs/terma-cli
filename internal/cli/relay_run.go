@@ -16,7 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -52,18 +51,19 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			install := app.installed()
 			engine.InstallMethod = install.Method
 			engine.UpdateAuto = func() string { return app.updateAuto(install) }
-			workers := append([]func(context.Context){deps.Refresher().Run, app.sweepHookState}, app.relayImages(&engine, log.Printf)...)
-			res, err := daemon.Run(ctx, daemon.Config{
+			run := daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
-				Workers: workers,
+				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
 				Updater: app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
 					}
 				},
-			})
+			}
+			app.relayImages(&run, log.Printf)
+			res, err := daemon.Run(ctx, run)
 			if err != nil {
 				if res.LastBeatDue() {
 					res.ExitBeat()
@@ -95,18 +95,20 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 }
 
 // relayImages wires the relay's image lane, sending the image queue as this build
-// delivers, into engine, and returns it as the relay's worker: an agent's export ends its
-// turn, and wakes the sender for the images its hooks queued; an upload keeps the relay
-// from idling out or making way. None when the queue cannot be opened.
-func (app *App) relayImages(engine *relay.Options, logf func(string, ...any)) []func(context.Context) {
+// delivers, into run: it is one of its workers; an agent's export ends its turn, and wakes
+// the sender for the images its hooks queued; an upload keeps the relay from idling out or
+// making way, and a relay about to make way or restart starts no new one. Nothing when the
+// queue cannot be opened.
+func (app *App) relayImages(run *daemon.Config, logf func(string, ...any)) {
 	r := app.delivery()
 	if r.Images == nil {
-		return nil
+		return
 	}
 	images := delivery.NewImageSender(r, app.openSpool(), app.loadConfig)
 	images.Logf = logf
-	engine.Accepted, engine.Busy = images.Nudge, images.Busy
-	return []func(context.Context){images.Run}
+	run.Engine.Accepted, run.Engine.Busy = images.Nudge, images.Busy
+	run.WindDown = images.WindDown
+	run.Workers = append(run.Workers, images.Run)
 }
 
 // afterRelay ends a relay's run. A relay that should run again exits for the service manager

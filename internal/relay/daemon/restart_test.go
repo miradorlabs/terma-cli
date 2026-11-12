@@ -418,3 +418,22 @@ func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
 		t.Fatalf("Run = %+v, want Replaced", r.res)
 	}
 }
+
+// A relay asked to make way has the work beside it wind down first.
+func TestAReplacedRelayWindsItsWorkDown(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	var wound atomic.Bool
+	c.WindDown = func() { wound.Store(true) }
+	r := startRun(t, c)
+	awaitRecord(t, r, dir)
+	askToMakeWay(t, dir)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay did not make way")
+	}
+	if !wound.Load() {
+		t.Fatal("the relay made way without winding its work down")
+	}
+}

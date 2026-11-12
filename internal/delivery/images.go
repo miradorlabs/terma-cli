@@ -91,12 +91,14 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 // imageTurns is how a pass shares out its sends among projects and tells of them: it starts
 // after the project after names, so the one that went first last time goes last, and
 // records the one it started with in first; read, set, gets the queue's Stamp as the pass
-// read it; uploading, set, is told as each upload starts and ends.
+// read it; uploading, set, is told as each upload starts and ends; halt, set, stops the
+// pass before its next image (a relay winding down).
 type imageTurns struct {
 	after     string
 	first     *string
 	read      *spool.Stamp
 	uploading func(bool)
+	halt      func() bool
 }
 
 // flushImages is FlushImages, with turns.
@@ -174,7 +176,7 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	for len(queues) > 0 {
 		var next []*imageQueue
 		for _, q := range queues {
-			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil {
+			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil || turns.halt != nil && turns.halt() {
 				// Torn down, or the sender is stopping: what is left stays queued.
 				for _, q := range queues {
 					res.Deferred += len(q.items)
