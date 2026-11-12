@@ -210,8 +210,8 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	for len(queues) > 0 {
 		var next []*imageQueue
 		for _, q := range queues {
-			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil || turns.gate != nil && !turns.gate.begin() {
-				// Torn down, or the sender is stopping or halted: what is left stays queued.
+			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil {
+				// Torn down, or the sender is stopping: what is left stays queued.
 				for _, q := range queues {
 					res.Deferred += len(q.items)
 				}
@@ -219,9 +219,14 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 			}
 			item := q.items[0]
 			q.items = q.items[1:]
-			sent := p.send(ctx, r, q, item)
-			if turns.gate != nil {
-				turns.gate.end()
+			sent, halted := p.send(ctx, r, q, item, turns.gate)
+			if halted {
+				// The sender was halted: this image and what is left stay queued.
+				res.Deferred++
+				for _, q := range queues {
+					res.Deferred += len(q.items)
+				}
+				return p.finish(r, events, now, turns.prune)
 			}
 			if !sent {
 				// The project's other images wait for the window just opened.
@@ -250,27 +255,35 @@ type imagePass struct {
 	ids []string
 }
 
-// send takes item from the queue, sends it and records how that went, unless another
-// sender settled it meanwhile; false when the project's other images wait.
-func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imageItem) bool {
+// send takes item from the queue, then asks gate to begin, sends it and records how that
+// went, unless another sender settled it meanwhile; sent is false when the project's other
+// images wait, halted true when gate said no. The take comes first: a sender waiting for the
+// queue behind another (a manual flush) is not uploading, and may be halted meanwhile.
+func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imageItem, gate imageGate) (sent, halted bool) {
 	taken, err := p.s.Take(ctx, item.queued)
 	switch {
 	case errors.Is(err, spool.ErrNotQueued):
-		return true
+		return true, false
 	case err != nil && ctx.Err() != nil:
 		// The sender stopped while another sender held the queue.
 		p.res.Deferred++
-		return true
+		return true, false
 	case err != nil:
 		// The queue's lock cannot be taken: a failure here, not the host's, with a window,
 		// so the image is tried again when it ends rather than at once.
 		p.res.Failures = append(p.res.Failures, Failure{ProjectID: q.id, Err: err, RetryAt: p.s.DestinationFailed(q.id, p.now())})
 		p.errs = append(p.errs, fmt.Errorf("take an image record: %w", err))
 		p.res.Failed++
-		return false
+		return false, false
 	}
 	defer taken.Release()
-	return p.record(ctx, q, item, taken, r.sendImage(ctx, q.sender, item.out))
+	if gate != nil {
+		if !gate.begin() {
+			return false, true
+		}
+		defer gate.end()
+	}
+	return p.record(ctx, q, item, taken, r.sendImage(ctx, q.sender, item.out)), false
 }
 
 // finish compacts what the pass settled out of the queue, in one rewrite, sweeps the bytes

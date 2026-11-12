@@ -31,10 +31,7 @@ type ImageSender struct {
 	state  atomic.Uint32
 	passes atomic.Int64
 	loops  atomic.Int64
-	// seams, for tests: casSeam runs between update's load and its swap, afterPass between
-	// a pass's end and Run's look at the state.
-	casSeam   func(op string)
-	afterPass func()
+
 	// after is the project the last pass started with; read the queue as it read it, and
 	// seen each watched file as it stood then.
 	after   string
@@ -73,14 +70,19 @@ const (
 	resumedFlag uint32 = 1 << 3
 )
 
+// Seams, which only tests set: casSeam runs between update's load and its swap, afterPass
+// between a pass's end and Run's look at the state.
+var (
+	casSeam   = func(*ImageSender, string) {}
+	afterPass = func(*ImageSender) {}
+)
+
 // update changes the state by f, retrying until no other change came between its load and
 // its swap, and returns the state before and after.
 func (s *ImageSender) update(op string, f func(w uint32) uint32) (before, after uint32) {
 	for {
 		before = s.state.Load()
-		if s.casSeam != nil {
-			s.casSeam(op)
-		}
+		casSeam(s, op)
 		after = f(before)
 		if s.state.CompareAndSwap(before, after) {
 			return before, after
@@ -191,9 +193,7 @@ func (s *ImageSender) Run(ctx context.Context) {
 	}
 	s.pass(ctx, false)
 	for {
-		if s.afterPass != nil {
-			s.afterPass()
-		}
+		afterPass(s)
 		s.loops.Add(1)
 		if s.stopped() {
 			// Halted: only a Resume (then a nudge) or the end wakes it, no deadline.

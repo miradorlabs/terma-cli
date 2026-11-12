@@ -400,7 +400,7 @@ func TestANewKeyWakesHeldImagesAtTheNextExport(t *testing.T) {
 // twoImagesHaltedMidUpload queues two images for p1 and runs a sender whose first upload
 // waits; once it is under way, a final halt is asked (an update's quiesce), and the upload
 // is let go. It returns the sender and the recorder of what reached the host.
-func twoImagesHaltedMidUpload(t *testing.T, seams func(s *ImageSender)) (*ImageSender, *recorder) {
+func twoImagesHaltedMidUpload(t *testing.T) (*ImageSender, *recorder) {
 	t.Helper()
 	arrived, release := make(chan struct{}), make(chan struct{})
 	var once, freed sync.Once
@@ -418,7 +418,6 @@ func twoImagesHaltedMidUpload(t *testing.T, seams func(s *ImageSender)) (*ImageS
 	store(t, stateDir, first, second)
 	queue(t, r.Images, imageEvent(first), imageEvent(second))
 	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
-	seams(s)
 	runSender(t, s)
 	<-arrived
 	if s.TryHalt(true) {
@@ -428,34 +427,87 @@ func twoImagesHaltedMidUpload(t *testing.T, seams func(s *ImageSender)) (*ImageS
 	return s, rec
 }
 
+// withSeams sets the sender's seams for the test, and puts them back after. A test that
+// sets them does not run in parallel: they are the package's.
+func withSeams(t *testing.T, cas func(*ImageSender, string), after func(*ImageSender)) {
+	t.Helper()
+	prevCas, prevAfter := casSeam, afterPass
+	if cas != nil {
+		casSeam = cas
+	}
+	if after != nil {
+		afterPass = after
+	}
+	t.Cleanup(func() { casSeam, afterPass = prevCas, prevAfter })
+}
+
+// A sender halted at a pass's end waits; a Resume then sends what the halt held back.
+func TestAResumeAfterAHaltedPassSendsAgain(t *testing.T) {
+	t.Parallel()
+	s, rec := twoImagesHaltedMidUpload(t)
+	waitFor(t, "the halted pass", func() bool { return s.passes.Load() >= 1 && s.stopped() })
+	time.Sleep(50 * time.Millisecond)
+	if n := len(rec.requests()); n != 1 {
+		t.Fatalf("%d uploads from a halted sender", n)
+	}
+	s.Resume()
+	waitFor(t, "the second image", func() bool { return len(rec.requests()) == 2 })
+}
+
 // A Resume that lands as a halted pass ends, before the loop looks at the state, runs a
 // pass all the same: the queue's stamp, which the pass's compaction left as it was, does not
 // show the image the halt held back.
 func TestAResumeAsAHaltedPassEndsSendsAgain(t *testing.T) {
-	t.Parallel()
 	var armed atomic.Bool
 	armed.Store(true)
-	_, rec := twoImagesHaltedMidUpload(t, func(s *ImageSender) {
-		s.afterPass = func() {
-			if armed.CompareAndSwap(true, false) {
-				s.Resume() // an export kept the relay, just as the halted pass ended
-			}
+	withSeams(t, nil, func(s *ImageSender) {
+		if armed.CompareAndSwap(true, false) {
+			s.Resume() // an export kept the relay, just as the halted pass ended
 		}
 	})
+	_, rec := twoImagesHaltedMidUpload(t)
 	waitFor(t, "the second image", func() bool { return len(rec.requests()) == 2 })
 }
 
 // A Resume that lands between begin's look at the state and its change of it is not lost:
 // begin sees it and uploads, rather than stopping on the halt the Resume undid.
 func TestAResumeInsideBeginIsNotLost(t *testing.T) {
-	t.Parallel()
 	var armed atomic.Bool
-	_, rec := twoImagesHaltedMidUpload(t, func(s *ImageSender) {
-		s.casSeam = func(op string) {
-			if op == "begin" && s.state.Load()&haltingFlag != 0 && armed.CompareAndSwap(false, true) {
-				s.Resume()
-			}
+	withSeams(t, func(s *ImageSender, op string) {
+		if op == "begin" && s.state.Load()&haltingFlag != 0 && armed.CompareAndSwap(false, true) {
+			s.Resume()
 		}
-	})
+	}, nil)
+	_, rec := twoImagesHaltedMidUpload(t)
 	waitFor(t, "the second image", func() bool { return len(rec.requests()) == 2 })
+}
+
+// A sender waiting for the queue behind another sender (a manual --images flush) is not
+// uploading: the relay can halt it meanwhile, and it then sends nothing.
+func TestASenderWaitingForTheQueueCanBeHalted(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	pending, _, _, err := r.Images.Read(t.Context(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manual, err := r.Images.Take(t.Context(), pending[0]) // the manual flush holds it
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	runSender(t, s)
+	time.Sleep(100 * time.Millisecond) // the sender is waiting for the queue
+	if !s.TryHalt(false) {
+		t.Fatal("a sender waiting for the queue would not halt: it counted as uploading")
+	}
+	manual.Release()
+	waitFor(t, "the pass", func() bool { return s.passes.Load() >= 1 })
+	if n := len(rec.requests()); n != 0 {
+		t.Fatalf("a halted sender sent %d images", n)
+	}
 }
