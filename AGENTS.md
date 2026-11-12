@@ -76,9 +76,10 @@ await-push`, which waits for `git push` to exit, reads whether the remote-tracki
 moved, walks the pushed commits and spools one `terma.push` per branch. Hooks never
 touch the network: they append events to the spool, and a detached `terma spool flush`
 delivers them to each project. An image a user put in a prompt goes to a spool of its own,
-which a detached `terma spool flush --images` delivers in a longer pass, one image to a
-request, so no event waits on an upload. `internal/boundary` keeps `net/http` out of the
-hook, spool and agent packages.
+which the relay sends, one image to a request, so no event waits on an upload: an agent's
+export the relay accepts wakes its image sender, as do its start and a retry window's end
+(`delivery.ImageSender`); `terma spool flush --images` sends the same queue by hand.
+`internal/boundary` keeps `net/http` out of the hook, spool and agent packages.
 
 **Files.** The config directory (`config.Dir`) holds what the developer chose and what
 setup changed: `config.json` (profiles and settings), `credentials.json`, `keys.json`, and
@@ -87,9 +88,9 @@ credentials' secrets, sign-in tokens and server keys, live in the system keychai
 (`internal/account/secret`), as gh keeps its token: `credentials.json` and `keys.json`
 index them, and hold them only where there is no keychain or `--insecure-storage` asks.
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
-`spool/`, `image-spool/` (the records of those images, apart from the events), `images/`
-(the images a user put in a prompt, until delivery sends them), `policies/`,
-`agents/<agent>/` (each agent's hook state), `funding/`,
+`spool/`, `image-spool/` (the records of those images and their teams' retry windows,
+which the relay sends), `images/` (the images a user put in a prompt, until delivery sends
+them), `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
