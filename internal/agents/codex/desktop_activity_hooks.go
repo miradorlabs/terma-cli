@@ -73,9 +73,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		default:
 			return nil
 		}
-		// Spooled without Env.EmitFor, so it is stamped here: with no project id the flush
-		// drops it as unroutable.
-		return e.Spool.Append(e.Stamp(r, ev))
+		return e.Append(r, ev)
 	})
 	if err != nil {
 		e.Logf("desktop activity (%s): %v", status, err)

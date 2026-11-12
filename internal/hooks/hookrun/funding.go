@@ -62,8 +62,7 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence FundingEvid
 	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < QuotaHeartbeat {
 		return
 	}
-	ev := e.Stamp(r, spool.Event{Time: e.Time(), Name: name, SessionID: id, Attrs: attrs})
-	if e.Spool.Append(ev) != nil {
+	if e.Append(r, spool.Event{Time: e.Time(), Name: name, SessionID: id, Attrs: attrs}) != nil {
 		return
 	} // Retry a failed append at the next hook.
 	data, _ := json.Marshal(next)

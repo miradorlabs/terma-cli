@@ -292,7 +292,7 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 // EmitFor spools an event stamped with the repository's project, parking it in the
 // repository's store when the spool cannot be written, and reports whether it was kept.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
-	ev = e.Stamp(r, ev)
+	ev = e.stamp(r, ev)
 	e.claimForRelay(r, ev)
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
@@ -300,10 +300,22 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
-// Stamp names the event's repository, for delivery's admission, whether a global policy
+// errNoSpool is an append with no spool to take it.
+var errNoSpool = errors.New("no spool")
+
+// Append stamps ev for r and appends it to the spool, for an agent that keeps its own record
+// of what it spooled and so neither claims nor parks: it is how an agent reaches the spool.
+func (e Env) Append(r *Repo, ev spool.Event) error {
+	if e.Spool == nil {
+		return errNoSpool
+	}
+	return e.Spool.Append(e.stamp(r, ev))
+}
+
+// stamp names the event's repository, for delivery's admission, whether a global policy
 // collected it, which delivery checks again as it leaves, and its project. Every event a
-// hook spools goes through it, appended directly or emitted.
-func (e Env) Stamp(r *Repo, ev spool.Event) spool.Event {
+// hook spools goes through it, appended or emitted.
+func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	ev.Global = e.Policy.Global()
 	if r != nil {
 		ev.Repository = r.Repository
