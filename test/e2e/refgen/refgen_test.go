@@ -1145,6 +1145,47 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("a surface tonight's probe did not see lost its type: %v", m)
 	}
 
+	// A surface that is not an object is nothing measured, never a crash.
+	odd := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":null}}`)
+	if got = merge(snap(parse(whole)), snap(odd), now).Telemetry; got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
+		t.Errorf("a null surface tonight: %v", got)
+	}
+
+	// A partial night (its profile's turn failed) took a truncated probe: the whole one's findings
+	// stay, and the census, which ran apart, still counts.
+	truncated := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"logs/a":{"keys":{"k":{"class":"safe"},"k2":{"class":"safe"}}},"metrics/m":{"keys":{},"type":"gauge"}}}`))
+	truncated.Capture.Partial = true
+	got = merge(snap(parse(whole)), truncated, now).Telemetry
+	if got["export"].(map[string]any)["protocol"] != "http/protobuf" || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
+		t.Errorf("a partial night's probe replaced a whole one's: %v", got)
+	}
+	if keys := got["surfaces"].(map[string]any)["logs/a"].(map[string]any)["keys"].(map[string]any); keys["k2"] == nil {
+		t.Errorf("a partial night's census was not taken: %v", keys)
+	}
+
+	// A partial night of a harness the census never covers measured nothing it can be trusted
+	// with: the surfaces stay as they were.
+	truncatedProbe := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"gauge"}}}`))
+	truncatedProbe.Capture.Partial = true
+	probesWhole := parse(`{"export":{"protocol":"http/protobuf"},"surfaces":{"metrics/m":{"type":"sum"},"metrics/n":{"type":"sum"}}}`)
+	got = merge(snap(probesWhole), truncatedProbe, now).Telemetry
+	if surfaces := got["surfaces"].(map[string]any); surfaces["metrics/n"] == nil || surfaces["metrics/m"].(map[string]any)["type"] != "sum" {
+		t.Errorf("a partial probe-only night changed the surfaces: %v", surfaces)
+	}
+
+	// Nor does it give a build without telemetry a section of empty surfaces.
+	if got = merge(snap(nil), truncatedProbe, now).Telemetry; got != nil {
+		t.Errorf("a partial probe-only night over no telemetry: %v", got)
+	}
+
+	// A harness the census never covers lists its surfaces by its probe: one tonight's probe no
+	// longer saw is gone.
+	probes := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"sum"},"metrics/gone":{"type":"sum"}}}`)
+	got = merge(snap(probes), snap(probeOnly), now).Telemetry
+	if g, ok := got["surfaces"].(map[string]any)["metrics/gone"]; ok {
+		t.Errorf("a surface no census lists and tonight's probe did not see stayed: %v", g)
+	}
+
 	// The census sees every surface: one it did not see tonight is gone, probe findings and all.
 	withoutLogs := parse(`{"surfaces":{"metrics/m":{"keys":{}}}}`)
 	got = merge(snap(parse(whole)), snap(withoutLogs), now).Telemetry

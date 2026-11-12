@@ -41,7 +41,7 @@ func comparableTelemetry(a, b map[string]any) (map[string]any, map[string]any) {
 }
 
 // measuredByBoth is what two captures both measured: the census's keys, the probe's findings,
-// and which surfaces are sent.
+// and which surfaces are sent. sameSurfaces is keys, or both probes where neither took the census.
 type measuredByBoth struct{ keys, probe, sameSurfaces bool }
 
 // Probed says whether the probe saw surface s: it has a probe field (a metric's type, a span's
