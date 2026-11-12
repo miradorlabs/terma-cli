@@ -191,8 +191,8 @@ func TestDiscardWaitsForASenderThenEmptiesTheQueue(t *testing.T) {
 		// No sender gets the lock while fn runs.
 		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 		defer cancel()
-		if _, err := s.Take(ctx, events[0]); err == nil {
-			t.Error("a sender took an event while Discard ran its fn")
+		if _, err := s.Take(ctx, events[0]); !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Take while Discard ran its fn = %v, want it to wait for the lock", err)
 		}
 		return nil
 	})
@@ -417,5 +417,34 @@ func TestACrashMidCompactionDropsATwin(t *testing.T) {
 	}
 	if got := names(t, s); got != "other" {
 		t.Fatalf("after the crash and the next compaction the queue holds %s", got)
+	}
+}
+
+// A sender waiting for the delivery lock when the queue's folder goes finds nothing queued,
+// rather than failing to take the lock.
+func TestTakeFromAGoneQueueIsNotQueued(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "q")
+	s, err := OpenQueue(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "x", Time: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _, err := s.Read(t.Context(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Take(t.Context(), events[0]); !errors.Is(err, ErrNotQueued) {
+		t.Fatalf("Take = %v, want ErrNotQueued", err)
+	}
+	if err := s.Remove(events...); !errors.Is(err, ErrNotQueued) {
+		t.Fatalf("Remove = %v, want ErrNotQueued", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("the queue's folder came back: %v", err)
 	}
 }

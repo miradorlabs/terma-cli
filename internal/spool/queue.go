@@ -96,7 +96,8 @@ func stampOf(f *os.File) Stamp {
 	return Stamp{size: info.Size(), mod: info.ModTime(), file: info}
 }
 
-// ErrNotQueued is an event whose line the queue no longer holds: another sender settled it.
+// ErrNotQueued is an event whose line the queue no longer holds: another sender settled it,
+// or the queue was discarded.
 var ErrNotQueued = errors.New("the event is no longer queued")
 
 // Append queues events, as Spool.Append does.
@@ -183,6 +184,10 @@ type Taken struct {
 // ErrNotQueued is p settled meanwhile, by whoever held the lock.
 func (q *Queue) Take(ctx context.Context, p Pending) (*Taken, error) {
 	unlock, err := flock.Lock(ctx, filepath.Join(q.s.dir, deliveryLockFile))
+	if errors.Is(err, fs.ErrNotExist) {
+		// The queue's folder went (teardown) while this sender waited: nothing is queued.
+		return nil, ErrNotQueued
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -295,6 +300,10 @@ func (q *Queue) settle(ps []Pending, tail []byte, check bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ackTimeout)
 	defer cancel()
 	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, lockFile))
+	if check && errors.Is(err, fs.ErrNotExist) {
+		// The queue's folder went (teardown): nothing is queued.
+		return ErrNotQueued
+	}
 	if err != nil {
 		return err
 	}
@@ -305,7 +314,11 @@ func (q *Queue) settle(ps []Pending, tail []byte, check bool) error {
 	}
 	var data []byte
 	if check {
-		if data, err = os.ReadFile(s.path()); err != nil {
+		data, err = os.ReadFile(s.path())
+		if errors.Is(err, fs.ErrNotExist) {
+			return ErrNotQueued
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -389,14 +402,15 @@ func (q *Queue) Discard(ctx context.Context, fn func() error) error {
 		return err
 	}
 	defer unlock()
+	// The queue goes first and the settled log only once it has, as a compaction removes
+	// them: a log gone while the queue stayed would queue again what was sent.
 	err = q.underAppendLock(func() error {
-		var errs []error
 		for _, path := range []string{q.s.path(), filepath.Join(q.s.dir, settledFile)} {
 			if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				errs = append(errs, err)
+				return err
 			}
 		}
-		return errors.Join(errs...)
+		return nil
 	})
 	if err != nil {
 		return err

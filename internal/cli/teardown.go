@@ -172,7 +172,7 @@ func (app *App) removeHookState() error {
 	case errors.Is(sending, context.DeadlineExceeded):
 		return errors.New("an image is still being sent, so its queue is kept")
 	default:
-		return fmt.Errorf("could not check the image queue, so it is kept: %w", sending)
+		return fmt.Errorf("the image queue is kept: %w", sending)
 	}
 }
 
@@ -200,7 +200,12 @@ func (app *App) discardImages() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
-	return s.Discard(ctx, func() error { return os.RemoveAll(filepath.Join(app.stateDir, promptimage.DirName)) })
+	return s.Discard(ctx, func() error {
+		if err := os.RemoveAll(filepath.Join(app.stateDir, promptimage.DirName)); err != nil {
+			return fmt.Errorf("remove the images' bytes: %w", err)
+		}
+		return nil
+	})
 }
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.

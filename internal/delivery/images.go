@@ -174,7 +174,7 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		p.ids = append(p.ids, imageID(q.Event))
 	}
 	// What never leaves goes in one rewrite; a delivered image is settled on its own.
-	if err := s.Remove(gone...); err != nil {
+	if err := s.Remove(gone...); err != nil && !errors.Is(err, spool.ErrNotQueued) {
 		p.errs = append(p.errs, fmt.Errorf("remove image records that cannot leave: %w", err))
 	}
 	var queues []*imageQueue
