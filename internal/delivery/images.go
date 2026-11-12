@@ -45,6 +45,25 @@ type ImageResult struct {
 	Endpoints []string
 }
 
+// nextWindow is the earliest end of the windows the pass waited out (Waiting) or opened
+// (Failures, Stalls; one cut short by the sender stopping has none), zero for none. Every
+// window a pass learns of is named in one of them, and read here alone.
+func (res ImageResult) nextWindow() time.Time {
+	var next time.Time
+	ends := func(at time.Time) {
+		if !at.IsZero() && (next.IsZero() || at.Before(next)) {
+			next = at
+		}
+	}
+	for _, w := range res.Waiting {
+		ends(w.RetryAt)
+	}
+	for _, f := range slices.Concat(res.Failures, res.Stalls) {
+		ends(f.RetryAt)
+	}
+	return next
+}
+
 // isImage reports whether e is a terma.prompt.image record.
 func isImage(e spool.Event) bool { return e.Name == semconv.TermaPromptImageEvent }
 
@@ -221,10 +240,17 @@ func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imag
 	switch {
 	case errors.Is(err, spool.ErrNotQueued):
 		return true
-	case err != nil:
-		// The sender is stopping while another holds the queue.
+	case err != nil && ctx.Err() != nil:
+		// The sender stopped while another sender held the queue.
 		p.res.Deferred++
 		return true
+	case err != nil:
+		// The queue's lock cannot be taken: a failure here, not the host's, with a window,
+		// so the image is tried again when it ends rather than at once.
+		p.res.Failures = append(p.res.Failures, Failure{ProjectID: q.id, Err: err, RetryAt: p.s.DestinationFailed(q.id, time.Now())})
+		p.errs = append(p.errs, fmt.Errorf("take an image record: %w", err))
+		p.res.Failed++
+		return false
 	}
 	defer release()
 	return p.record(ctx, q, item, r.sendImage(ctx, q.sender, item.out))

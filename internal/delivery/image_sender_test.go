@@ -2,9 +2,12 @@ package delivery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // startSender runs a sender for r until the test ends, and returns it once its first pass,
@@ -342,18 +346,19 @@ func TestAWindowEndingMidPassWakesTheSender(t *testing.T) {
 	img := pixelN(1)
 	store(t, stateDir, img)
 	queue(t, r.Images, imageEvent(img))
-	// A window that ends within a second, and a first policy lookup that takes longer.
-	r.Images.DestinationFailed("p1", time.Now().Add(-29*time.Second))
+	// A window that ends within two seconds, and a first policy lookup that takes well longer:
+	// the window surely ends while the pass that deferred to it still runs.
+	r.Images.DestinationFailed("p1", time.Now().Add(-28*time.Second))
 	policy := r.Policy
 	var lookups atomic.Int64
 	r.Policy = func(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
 		if lookups.Add(1) == 1 {
-			time.Sleep(1500 * time.Millisecond)
+			time.Sleep(3500 * time.Millisecond)
 		}
 		return policy(ctx, cfg, team)
 	}
-	startSender(t, r, cfg)
-	waitWithin(t, 4*time.Second, "the image, with no nudge", func() bool { return len(rec.requests()) == 1 })
+	startSenderNoWait(t, r, cfg)
+	waitWithin(t, 8*time.Second, "the image, with no nudge", func() bool { return len(rec.requests()) == 1 })
 }
 
 // A final halt asked mid-upload (a restart, making way) lets that image end and starts no
@@ -405,4 +410,80 @@ func startSenderNoWait(t *testing.T, r Router, cfg *config.Config) (*ImageSender
 	go func() { s.Run(ctx); close(done) }()
 	t.Cleanup(func() { cancel(); <-done })
 	return s, cancel, done
+}
+
+// Every window a pass learns of is a deadline: those it waited out, and those its failures
+// and stalls opened; one a stopping sender left without an end is none.
+func TestNextWindow(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		name string
+		res  ImageResult
+		want time.Time
+	}{
+		{"none", ImageResult{}, time.Time{}},
+		{"waiting", ImageResult{Waiting: []Wait{{ProjectID: "p1", RetryAt: at}}}, at},
+		{"failed", ImageResult{Failures: []Failure{{ProjectID: "p1", RetryAt: at}}}, at},
+		{"stalled", ImageResult{Stalls: []Failure{{ProjectID: "p1", RetryAt: at}}}, at},
+		{"cut short", ImageResult{Failures: []Failure{{ProjectID: "p1"}}}, time.Time{}},
+		{"earliest", ImageResult{Waiting: []Wait{{RetryAt: at.Add(time.Hour)}}, Failures: []Failure{{}, {RetryAt: at.Add(time.Minute)}},
+			Stalls: []Failure{{RetryAt: at}}}, at},
+	} {
+		if got := c.res.nextWindow(); !got.Equal(c.want) {
+			t.Errorf("%s: nextWindow = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// A queue whose lock cannot be taken is a failure with a window, not a skip: the image is
+// tried again when the window ends.
+func TestATakeThatFailsOpensAWindow(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	dir := t.TempDir()
+	images, err := spool.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Images = images
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, images, imageEvent(img))
+	// The lock is a folder: it cannot be opened, let alone locked.
+	if err := os.Mkdir(filepath.Join(dir, "delivery.lock"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
+	if res.Failed != 1 || len(res.Failures) != 1 || res.nextWindow().IsZero() || len(rec.requests()) != 0 {
+		t.Fatalf("FlushImages = %+v, %d requests", res, len(rec.requests()))
+	}
+	if images.RetryAt("p1").IsZero() {
+		t.Fatal("no window opened")
+	}
+}
+
+// A profile that cannot be read runs no pass: the deadlines stand, a look within heldMin is
+// added, and the error is logged once however often it repeats.
+func TestAnUnreadableProfileKeepsTheDeadlines(t *testing.T) {
+	t.Parallel()
+	r, _, _ := imageFixture(t, &recorder{}, true)
+	var logged atomic.Int64
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return nil, errors.New("config.json: unreadable") })
+	s.Logf = func(string, ...any) { logged.Add(1) }
+	window := time.Now().Add(time.Hour)
+	s.windowEnds = window
+	for range 3 {
+		s.pass(t.Context(), false)
+	}
+	if !s.windowEnds.Equal(window) {
+		t.Fatalf("the window's end became %v", s.windowEnds)
+	}
+	if s.heldDue.IsZero() || s.heldDue.After(time.Now().Add(s.heldMin)) {
+		t.Fatalf("the next look is %v, want within %v", s.heldDue, s.heldMin)
+	}
+	if n := logged.Load(); n != 1 {
+		t.Fatalf("the same error was logged %d times", n)
+	}
 }

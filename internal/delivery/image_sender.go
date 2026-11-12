@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"context"
-	"slices"
 	"sync/atomic"
 	"time"
 
@@ -39,6 +38,9 @@ type ImageSender struct {
 	held             time.Duration
 	heldDue          time.Time
 	heldMin, heldMax time.Duration
+	// lastErr is the error last logged, when.
+	lastErr    string
+	lastLogged time.Time
 }
 
 // The sender's states. It moves between idle and uploading around each image, and from idle
@@ -154,28 +156,28 @@ func (s *ImageSender) next() time.Time {
 // started it: only that look, finding them still held, lengthens the next wait.
 func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 	defer s.passes.Add(1)
-	held := false
-	s.windowEnds = time.Time{}
-	if cfg, err := s.config(); err != nil {
-		s.logf("image sender: %v", err)
+	cfg, err := s.config()
+	if err != nil {
+		// No pass, so the deadlines stand; and nothing says when the profile is readable
+		// again, so the sender looks again within heldMin as for held images.
+		s.logError(err)
 		s.read = spool.Stamp{}
-	} else {
-		first := s.after
-		res := s.router.flushImages(ctx, s.events, cfg, false,
-			imageTurns{after: s.after, first: &first, read: &s.read, begin: s.begin, end: s.end})
-		s.after = first
-		held = res.Held > 0
-		if res.Err != nil && ctx.Err() == nil {
-			s.logf("image sender: %v", res.Err)
+		if next := time.Now().Add(s.heldMin); s.heldDue.IsZero() || next.Before(s.heldDue) {
+			s.heldDue = next
 		}
-		// The windows this pass waited out or opened, as it saw them: one that ended while the
-		// pass ran is a deadline already past, which wakes the next pass at once.
-		for _, end := range windowsOf(res) {
-			if s.windowEnds.IsZero() || end.Before(s.windowEnds) {
-				s.windowEnds = end
-			}
-		}
+		return
 	}
+	first := s.after
+	res := s.router.flushImages(ctx, s.events, cfg, false,
+		imageTurns{after: s.after, first: &first, read: &s.read, begin: s.begin, end: s.end})
+	s.after = first
+	held := res.Held > 0
+	if res.Err != nil && ctx.Err() == nil {
+		s.logError(res.Err)
+	}
+	// The windows this pass waited out or opened, as it saw them: one that ended while the
+	// pass ran is a deadline already past, which wakes the next pass at once.
+	s.windowEnds = res.nextWindow()
 	now := time.Now()
 	switch {
 	case !held:
@@ -191,22 +193,15 @@ func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 	}
 }
 
-// windowsOf is the end of each window a pass waited out or opened.
-func windowsOf(res ImageResult) []time.Time {
-	var ends []time.Time
-	for _, w := range res.Waiting {
-		ends = append(ends, w.RetryAt)
-	}
-	for _, f := range slices.Concat(res.Failures, res.Stalls) {
-		if !f.RetryAt.IsZero() {
-			ends = append(ends, f.RetryAt)
-		}
-	}
-	return ends
-}
+// errorLogEvery is how often the sender logs an error it already logged.
+const errorLogEvery = 10 * time.Minute
 
-func (s *ImageSender) logf(format string, args ...any) {
-	if s.Logf != nil {
-		s.Logf(format, args...)
+// logError tells Logf of err, once while it repeats, again every errorLogEvery.
+func (s *ImageSender) logError(err error) {
+	msg := err.Error()
+	if s.Logf == nil || msg == s.lastErr && time.Since(s.lastLogged) < errorLogEvery {
+		return
 	}
+	s.lastErr, s.lastLogged = msg, time.Now()
+	s.Logf("image sender: %s", msg)
 }

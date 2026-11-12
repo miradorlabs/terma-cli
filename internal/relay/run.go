@@ -104,13 +104,6 @@ func (r *Relay) countQueuedAtExit() {
 	}
 }
 
-// Holding reports whether any part waits in the hold.
-func (r *Relay) Holding() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.heldN > 0
-}
-
 // Quiesce prepares the relay to stop without losing what it holds in memory: when nothing is
 // held, no export is being read or routed, none has arrived for quiet, and the work beside
 // it halts (TryHalt, asked last), it answers every later export 503, which an exporter sends
