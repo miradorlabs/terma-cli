@@ -239,6 +239,45 @@ func (s *Spool) Mentions(needles []string) (map[string]bool, error) {
 	return found, nil
 }
 
+// Values reports the string values the queued events hold under attribute key, "" for one
+// that holds none. Like Mentions it reads the file as it stands, without the append lock,
+// and decodes only that attribute of each line.
+func (s *Spool) Values(key string) (map[string]bool, error) {
+	data, err := os.ReadFile(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	values := map[string]bool{}
+	for line := range bytes.Lines(data) {
+		if !bytes.HasSuffix(line, []byte{'\n'}) {
+			break // still being written
+		}
+		var e struct {
+			Attrs map[string]json.RawMessage `json:"attrs"`
+		}
+		if json.Unmarshal(line, &e) != nil {
+			continue
+		}
+		var v string
+		_ = json.Unmarshal(e.Attrs[key], &v)
+		values[v] = true
+	}
+	return values, nil
+}
+
+// Busy reports whether a flusher is delivering the spool now.
+func (s *Spool) Busy() bool {
+	unlock, err := flock.TryLock(filepath.Join(s.dir, deliveryLockFile))
+	if err != nil {
+		return flock.IsBusy(err)
+	}
+	unlock()
+	return false
+}
+
 // Peek returns up to n queued events without consuming them.
 func (s *Spool) Peek(n int) ([]Event, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), localLockTimeout)

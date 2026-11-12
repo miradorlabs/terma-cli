@@ -65,24 +65,31 @@ func (s *Spool) RetryAt(dest string) time.Time {
 
 // DestinationFailed records a failed send to dest and returns when it may be retried (30s doubling to 1h).
 func (s *Spool) DestinationFailed(dest string, now time.Time) time.Time {
-	return s.openWindow(dest, now, false)
+	return s.openWindow(dest, now, false, time.Time{})
+}
+
+// DestinationFailedUntil is DestinationFailed for a host that said when to ask again: the
+// window lasts until then at least, and an hour at most.
+func (s *Spool) DestinationFailedUntil(dest string, now, until time.Time) time.Time {
+	return s.openWindow(dest, now, false, until)
 }
 
 // DestinationStalled records a send to dest that did not get through in its time, which is
 // news about the uplink rather than the host, and returns when it may be retried, as
 // DestinationFailed does; StalledWindows tells the two apart.
 func (s *Spool) DestinationStalled(dest string, now time.Time) time.Time {
-	return s.openWindow(dest, now, true)
+	return s.openWindow(dest, now, true, time.Time{})
 }
 
-// openWindow opens or doubles dest's window, saying whether a stall opened it.
-func (s *Spool) openWindow(dest string, now time.Time, stalled bool) time.Time {
+// openWindow opens or doubles dest's window, to until at least, saying whether a stall
+// opened it.
+func (s *Spool) openWindow(dest string, now time.Time, stalled bool, until time.Time) time.Time {
 	windows := s.loadRetryWindows()
 	wait := minBackoff
 	if prev := windows[dest].Wait; prev > 0 {
 		wait = time.Duration(prev) * time.Second * 2
 	}
-	wait = min(wait, maxBackoff)
+	wait = min(max(wait, until.Sub(now)), maxBackoff)
 	next := now.Add(wait)
 	windows[dest] = retryWindow{Next: next.Unix(), Wait: int64(wait / time.Second), Stalled: stalled}
 	s.saveRetryWindows(windows, now)

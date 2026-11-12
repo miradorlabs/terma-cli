@@ -246,12 +246,13 @@ func TestSpoolFlushLeavesImagesToTheirOwnPass(t *testing.T) {
 // An image pass's clauses name the images, and a stall apart from a failure.
 func TestDescribeFlushWordsTheImagePass(t *testing.T) {
 	at := time.Date(2026, 11, 12, 15, 4, 0, 0, time.Local)
-	delivered, undelivered := describeImagePass(delivery.ImageResult{Sent: 1, Deferred: 2,
+	delivered, undelivered := describeImagePass(delivery.ImageResult{Sent: 1, Deferred: 2, Rejected: 1,
 		Stalls: []delivery.Failure{{ProjectID: "p1", RetryAt: at}}, Waiting: []delivery.Wait{{ProjectID: "p2", RetryAt: at}}})
 	want := []string{
 		"an image for team p1 did not finish uploading in its time; its images retry after 3:04PM",
 		"retrying team p2's images after 3:04PM",
 		"leaving 2 for a later pass",
+		"dropped 1 the host refused even without its image",
 	}
 	if delivered != "1 image" || strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Fatalf("describeFlush = %q, %q", delivered, undelivered)

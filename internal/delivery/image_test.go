@@ -64,7 +64,7 @@ type recorder struct {
 	mu     sync.Mutex
 	bodies []string
 	refuse func(body string) bool
-	// status is what a refusal answers; 503 when unset.
+	// status is what a refusal answers; 500 when unset.
 	status int
 	// cut, when it holds for a body's first bodyHead bytes, closes the connection there,
 	// unread and unanswered: an upload that did not get through, when the body is larger
@@ -95,7 +95,7 @@ func (rec *recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rec.mu.Unlock()
 	time.Sleep(rec.delay)
 	if rec.refuse != nil && rec.refuse(string(b)) {
-		w.WriteHeader(cmp.Or(rec.status, http.StatusServiceUnavailable))
+		w.WriteHeader(cmp.Or(rec.status, http.StatusInternalServerError))
 	}
 }
 
@@ -627,13 +627,18 @@ func TestJudgeImage(t *testing.T) {
 		{"no answer to a body all written", live, deadline, written, imageFailed},
 		{"cut off after a body all written", live, &url.Error{Op: "Post", Err: io.EOF}, written, imageFailed},
 		{"pass ran out after a body all written", expired, deadline, written, imageFailed},
-		{"host refused", live, &IngestError{Status: http.StatusServiceUnavailable}, written, imageFailed},
-		{"key refused", live, &IngestError{Status: http.StatusUnauthorized}, written, imageUnreached},
-		{"dial", live, &url.Error{Op: "Post", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}, notReached, imageUnreached},
-		{"dns", live, &url.Error{Op: "Post", Err: &net.DNSError{Err: "no such host", Name: "x"}}, notReached, imageUnreached},
-		{"tls certificate", live, &url.Error{Op: "Post", Err: &tls.CertificateVerificationError{}}, notReached, imageUnreached},
-		{"tls handshake timeout", live, &url.Error{Op: "Post", Err: timeoutError{}}, notReached, imageUnreached},
-		{"own deadline before the host", live, deadline, notReached, imageUnreached},
+		{"host refused", live, &IngestError{Status: http.StatusInternalServerError}, written, imageFailed},
+		{"gateway timeout", live, &IngestError{Status: http.StatusGatewayTimeout}, written, imageFailed},
+		{"unprocessable", live, &IngestError{Status: http.StatusUnprocessableEntity}, written, imageFailed},
+		{"too many requests", live, &IngestError{Status: http.StatusTooManyRequests}, written, imageUnavailable},
+		{"bad gateway", live, &IngestError{Status: http.StatusBadGateway}, written, imageUnavailable},
+		{"between deploys", live, &IngestError{Status: http.StatusServiceUnavailable}, written, imageUnavailable},
+		{"key refused", live, &IngestError{Status: http.StatusUnauthorized}, written, imageUnavailable},
+		{"dial", live, &url.Error{Op: "Post", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}, notReached, imageUnavailable},
+		{"dns", live, &url.Error{Op: "Post", Err: &net.DNSError{Err: "no such host", Name: "x"}}, notReached, imageUnavailable},
+		{"tls certificate", live, &url.Error{Op: "Post", Err: &tls.CertificateVerificationError{}}, notReached, imageUnavailable},
+		{"tls handshake timeout", live, &url.Error{Op: "Post", Err: timeoutError{}}, notReached, imageUnavailable},
+		{"own deadline before the host", live, deadline, notReached, imageUnavailable},
 		{"something else", live, errors.New("odd"), reached, imageFailed},
 	} {
 		if got := judgeImage(c.pass, c.err, c.got); got != c.want {
@@ -947,5 +952,175 @@ func TestImagesDue(t *testing.T) {
 	}
 	if !ImagesDue(s, now.Add(time.Hour)) {
 		t.Fatal("an image whose window closed is not due")
+	}
+}
+
+// A teardown later in the round counts each image left untried once, those a failure
+// deferred included.
+func TestTeardownAfterAFailureCountsEachImageOnce(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{refuse: func(body string) bool { return strings.Contains(body, "s-fail") }}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	if err := keystore.Set(r.ConfigDir, "p2", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	a, b, d := pixelN(1), pixelN(2), pixelN(3)
+	store(t, stateDir, a, b, d)
+	failing, theirs := imageEvent(a), imageEvent(d)
+	failing.SessionID = "s-fail"
+	theirs.Attrs[hookrun.AttrProjectID] = "p2"
+	queue(t, r.Images, failing, imageEvent(b), theirs)
+	r.SetUp = func() bool { return len(rec.requests()) == 0 }
+	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
+	if res.Failed != 1 || res.Deferred != 2 || res.Sent != 0 {
+		t.Fatalf("FlushImages = %+v; want one failed and two deferred", res)
+	}
+}
+
+// A deploy's 503s say nothing about the record: it counts no attempt, waits as long as
+// Retry-After asks, and once the host is back leaves with its bytes.
+func TestAnUnavailableHostCostsTheImageNothing(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	answered := 0
+	var bodies []string
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		bodies = append(bodies, string(b))
+		if answered++; answered <= imageMaxAttempts {
+			w.Header().Set("Retry-After", "600")
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}), true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	for pass := 1; pass <= imageMaxAttempts; pass++ {
+		res := r.FlushImages(t.Context(), openSpool(t), cfg, true)
+		if len(res.Failures) != 1 || res.Failures[0].RetryAt.Before(time.Now().Add(9*time.Minute)) {
+			t.Fatalf("pass %d: FlushImages = %+v; want a window as long as Retry-After", pass, res)
+		}
+	}
+	if left := queued(t, r.Images); len(left) != 1 || left[0].Attempts != 0 {
+		t.Fatalf("image queue holds %+v", left)
+	}
+	if res := r.FlushImages(t.Context(), openSpool(t), cfg, true); res.Sent != 1 {
+		t.Fatalf("FlushImages = %+v", res)
+	}
+	if last := bodies[len(bodies)-1]; !strings.Contains(last, base64.StdEncoding.EncodeToString(img.Data)) {
+		t.Fatalf("the image left without its bytes: %.300s", last)
+	}
+}
+
+// A refused key says nothing about the record either, and holds up no other team's images.
+func TestARefusedKeyCostsTheImageNothing(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{status: http.StatusUnauthorized, refuse: func(body string) bool { return strings.Contains(body, "s-mine") }}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	if err := keystore.Set(r.ConfigDir, "p2", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	mine, theirs := pixelN(1), pixelN(2)
+	store(t, stateDir, mine, theirs)
+	refused, other := imageEvent(mine), imageEvent(theirs)
+	refused.SessionID = "s-mine"
+	other.Attrs[hookrun.AttrProjectID] = "p2"
+	queue(t, r.Images, refused, other)
+	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
+	if res.Sent != 1 || len(res.Failures) != 1 || res.Failures[0].ProjectID != "p1" {
+		t.Fatalf("FlushImages = %+v", res)
+	}
+	if left := queued(t, r.Images); len(left) != 1 || left[0].Attempts != 0 || left[0].SessionID != "s-mine" {
+		t.Fatalf("image queue holds %+v", left)
+	}
+}
+
+// Bytes the host refused (400) are not sent again, though the record without them then
+// failed: it goes on saying they were refused.
+func TestRefusedBytesAreNotSentAgain(t *testing.T) {
+	t.Parallel()
+	data := base64.StdEncoding.EncodeToString(pixelN(1).Data)
+	var mu sync.Mutex
+	carried := 0
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		if strings.Contains(string(b), data) {
+			carried++
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}), true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	for range 2 {
+		r.FlushImages(t.Context(), openSpool(t), cfg, true)
+	}
+	left := queued(t, r.Images)
+	if carried != 1 || len(left) != 1 || left[0].Attrs[semconv.TermaImageOmittedKey] != semconv.TermaImageOmittedRefused {
+		t.Fatalf("the bytes went %d times; image queue holds %+v", carried, left)
+	}
+}
+
+// A record the host refuses even without its bytes, attempt after attempt, is dropped once
+// imageMaxAttempts are spent, and counted as rejected.
+func TestARecordRefusedWithoutBytesIsDropped(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{status: http.StatusUnprocessableEntity, refuse: func(string) bool { return true }}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	for pass := 1; pass <= imageMaxAttempts; pass++ {
+		if res := r.FlushImages(t.Context(), openSpool(t), cfg, true); res.Rejected != 0 {
+			t.Fatalf("pass %d dropped it: %+v", pass, res)
+		}
+	}
+	res := r.FlushImages(t.Context(), openSpool(t), cfg, true)
+	if res.Rejected != 1 || res.Failed != 0 {
+		t.Fatalf("FlushImages = %+v", res)
+	}
+	if left := queued(t, r.Images); len(left) != 0 {
+		t.Fatalf("image queue holds %+v", left)
+	}
+	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
+		t.Fatal("a dropped record's image stayed in the store")
+	}
+}
+
+// Retry-After reads seconds or a date.
+func TestRetryAfter(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	for h, want := range map[string]time.Time{
+		"120":                           now.Add(2 * time.Minute),
+		"Thu, 12 Nov 2026 12:10:00 GMT": now.Add(10 * time.Minute),
+		"Thu, 12 Nov 2026 11:00:00 GMT": {},
+		"":                              {},
+		"soon":                          {},
+	} {
+		if got := retryAfter(h, now); !got.Equal(want) {
+			t.Errorf("retryAfter(%q) = %v, want %v", h, got, want)
+		}
+	}
+}
+
+// No pass is due while one runs.
+func TestNoImagesAreDueDuringAPass(t *testing.T) {
+	t.Parallel()
+	s := openSpool(t)
+	queue(t, s, imageEvent(pixelN(1)))
+	s.Drain(t.Context(), spool.DrainOptions{}, func(context.Context, []spool.Pending) {
+		if ImagesDue(s, time.Now()) {
+			t.Error("images are due while a pass runs")
+		}
+	})
+	if !ImagesDue(s, time.Now()) {
+		t.Fatal("images are not due once the pass is over")
 	}
 }

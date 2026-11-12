@@ -11,6 +11,7 @@ import (
 	"net/http/httptrace"
 	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -249,7 +250,8 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, 
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return written, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
+		return written, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail)),
+			RetryAfter: retryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
 	return written, nil
 }
@@ -258,6 +260,19 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, 
 type IngestError struct {
 	Status int
 	Detail string
+	// RetryAfter is when the host's Retry-After asked to be asked again; zero when it did not.
+	RetryAfter time.Time
+}
+
+// retryAfter reads a Retry-After header, in seconds or as an HTTP date; zero for none.
+func retryAfter(h string, now time.Time) time.Time {
+	if secs, err := strconv.Atoi(strings.TrimSpace(h)); err == nil && secs > 0 {
+		return now.Add(time.Duration(secs) * time.Second)
+	}
+	if at, err := http.ParseTime(h); err == nil && at.After(now) {
+		return at
+	}
+	return time.Time{}
 }
 
 func (e *IngestError) Error() string {

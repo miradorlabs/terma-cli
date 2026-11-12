@@ -694,3 +694,42 @@ func TestMark(t *testing.T) {
 		t.Fatalf("mark = %q", again.Mark())
 	}
 }
+
+// Values reads one attribute of each whole queued line, "" for a line without it.
+func TestValues(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "a", Attrs: map[string]any{"project": "p1"}}, Event{Name: "b"}, Event{Name: "c", Attrs: map[string]any{"project": "p2"}}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(s.path(), os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString(`{"name":"d","attrs":{"project":"p3"}}`) // still being written
+	_ = f.Close()
+	got, err := s.Values("project")
+	if err != nil || len(got) != 3 || !got["p1"] || !got["p2"] || !got[""] {
+		t.Fatalf("Values = %v, %v", got, err)
+	}
+}
+
+// A host's Retry-After stretches the window, up to an hour.
+func TestDestinationFailedUntil(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if got := s.DestinationFailedUntil("p1", now, now.Add(10*time.Minute)); got.Before(now.Add(10*time.Minute - time.Second)) {
+		t.Fatalf("window ends %v after now, want 10m", got.Sub(now))
+	}
+	if got := s.DestinationFailedUntil("p2", now, now.Add(5*time.Hour)); got.After(now.Add(maxBackoff + time.Second)) {
+		t.Fatalf("window ends %v after now, want at most an hour", got.Sub(now))
+	}
+	if got := s.DestinationFailedUntil("p3", now, time.Time{}); got.Sub(now) > minBackoff+time.Second {
+		t.Fatalf("window with no Retry-After ends %v after now", got.Sub(now))
+	}
+}

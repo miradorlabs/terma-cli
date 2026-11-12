@@ -167,6 +167,9 @@ func describeImagePass(res delivery.ImageResult) (delivered string, undelivered 
 	if res.Deferred > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("leaving %d for a later pass", res.Deferred))
 	}
+	if res.Rejected > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d the host refused even without its image", res.Rejected))
+	}
 	return delivered, append(undelivered, lossClauses(res.Expired, res.Pruned, res.Unroutable, res.Dropped, res.Withheld)...)
 }
 
@@ -183,7 +186,7 @@ func reportImagePass(out io.Writer, res delivery.ImageResult) error {
 		return res.Err
 	}
 	if res.Held > 0 || res.Failed > 0 || res.Deferred > 0 || len(res.Stalls) > 0 ||
-		res.Expired > 0 || res.Pruned > 0 || res.Dropped > 0 || res.Unroutable > 0 {
+		res.Expired > 0 || res.Pruned > 0 || res.Dropped > 0 || res.Unroutable > 0 || res.Rejected > 0 {
 		return exitWith(ExitIncomplete)
 	}
 	return nil
