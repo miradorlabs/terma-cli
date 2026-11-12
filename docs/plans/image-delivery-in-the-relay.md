@@ -1,6 +1,7 @@
 # Image delivery in the relay
 
-Status: proposal (2026-11-12), for terma-cli #126. Nothing here is built yet.
+Status: built (2026-11-12) in terma-cli #126: `delivery.ImageSender`, wired in
+`cli/relay_run.go` (`relayImages`).
 
 ## Why
 
@@ -45,13 +46,17 @@ woken, then delivers what the image queue holds, one image at a time:
 1. **The agent's own telemetry for the turn.** Claude Code's Stop hook queues an image moments
    before Claude Code exports that turn's logs (every 5 s, and on shutdown); Codex sends its turn's
    spans at turn end. Each OTLP request the relay accepts nudges the sender (a non-blocking send on
-   a channel). The sender then reads the queue's size and does nothing if it hasn't grown and no
-   window has closed. The cost per export is one `stat`.
+   a channel). The sender then compares the queue's stamp (size, modification time and the file
+   itself, `spool.Stamp`) with the one its last pass read, and does nothing if they are the same
+   and no deadline has passed. The cost per export is one open and `stat`.
 2. **Start.** The relay drains the queue once when it starts. A hook that queues an image already
    reaches `daemon.Spawn` (emitting an image claims the session), so a relay that wasn't running is
    started and drains on start.
 3. **A retry window closing.** After a failure the sender knows when each project may next be tried;
    it sleeps until the earliest such time (a timer on a known deadline, a safety net, not a poll).
+4. **Held images' next look.** Images held for a key or a policy have no window and nothing that
+   says their key arrived: the sender looks again 30 s on, doubling to an hour each time that look
+   finds them still held, on the same timer.
 
 **What goes away** (in `delivery`, `spool`, `cli`, `hookrun`, `dispatch` and the agents):
 `ImagePassTimeout`, `DrainOptions.Timeout`, `errNoTimeLeft`/`timeLeft`, "cut off by the pass" as an

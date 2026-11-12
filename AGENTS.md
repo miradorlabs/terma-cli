@@ -77,8 +77,9 @@ moved, walks the pushed commits and spools one `terma.push` per branch. Hooks ne
 touch the network: they append events to the spool, and a detached `terma spool flush`
 delivers them to each project. An image a user put in a prompt goes to a spool of its own,
 which the relay sends, one image to a request, so no event waits on an upload: an agent's
-export the relay accepts wakes its image sender, as do its start and a retry window's end
-(`delivery.ImageSender`); `terma spool flush --images` sends the same queue by hand. An
+export the relay accepts wakes its image sender, as do its start, a retry window's end and
+the next look at images held for a key or a policy (`delivery.ImageSender`); `terma spool
+flush --images` sends the same queue by hand. An
 image record an older build left in the events' spool, which the events' flush moves to
 the image queue, waits for the next of those wakes.
 `internal/boundary` keeps `net/http` out of the hook, spool and agent packages.
