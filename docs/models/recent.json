@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T18:17:01.427562636Z",
+  "generated_at": "2026-11-12T18:27:17.685902446Z",
   "events": [
+    {
+      "at": "2026-11-12T18:27:17.685902446Z",
+      "model": "gemini-4-hydrogen",
+      "vendor": "google",
+      "name": "Gemini 4 Hydrogen",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Knowledge cutoff: now 2026-03",
+        "Open weights: now no",
+        "Sampling parameters: now yes"
+      ]
+    },
     {
       "at": "2026-11-12T18:17:01.427562636Z",
       "model": "gemini-4-hydrogen",

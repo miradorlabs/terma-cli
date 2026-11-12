@@ -3,6 +3,63 @@
   "id": "gemini-4-hydrogen",
   "steps": [
     {
+      "at": "2026-11-12T18:27:17.685902446Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/knowledge_cutoff",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "knowledge_cutoff"
+          ],
+          "title": "Knowledge cutoff: now 2026-03",
+          "impact": "notable",
+          "before": null,
+          "after": "2026-03",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/open_weights",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "open_weights"
+          ],
+          "title": "Open weights: now no",
+          "impact": "notable",
+          "before": null,
+          "after": false,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/sampling_parameters",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "sampling_parameters"
+          ],
+          "title": "Sampling parameters: now yes",
+          "impact": "notable",
+          "before": null,
+          "after": true,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T18:17:01.427562636Z",
       "event": "changed",
       "changes": [

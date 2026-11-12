@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T18:17:01.427562636Z",
+  "generated_at": "2026-11-12T18:27:17.685902446Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -44,12 +44,12 @@
       "successor": null,
       "context_window": 1048576,
       "max_output": 65536,
-      "knowledge_cutoff": null,
+      "knowledge_cutoff": "2026-03",
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T18:17:01.427562636Z",
-        "changes": 2
+        "at": "2026-11-12T18:27:17.685902446Z",
+        "changes": 3
       },
       "probed": false
     },

@@ -30,19 +30,22 @@
       "audio",
       "pdf"
     ],
+    "knowledge_cutoff": "2026-03",
     "max_output": 65536,
     "name": "Gemini 4 Hydrogen",
+    "open_weights": false,
     "output_modalities": [
       "text"
     ],
     "reasoning": true,
     "reasoning_efforts": [
-      "xhigh",
-      "high",
+      "low",
       "medium",
-      "low"
+      "high",
+      "xhigh"
     ],
     "released_at": "2026-11-12",
+    "sampling_parameters": true,
     "snapshots": [
       "gemini-4-hydrogen"
     ],
@@ -58,6 +61,7 @@
   "provenance": {
     "context_window": {
       "google-docs": 1048576,
+      "models.dev": 1048576,
       "openrouter": 1048576
     },
     "default_effort": {
@@ -89,6 +93,13 @@
         "audio",
         "pdf"
       ],
+      "models.dev": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
       "openrouter": [
         "audio",
         "file",
@@ -97,16 +108,27 @@
         "video"
       ]
     },
+    "knowledge_cutoff": {
+      "models.dev": "2026-03"
+    },
     "max_output": {
       "google-docs": 65536,
+      "models.dev": 65536,
       "openrouter": 943718
     },
     "name": {
       "google-docs": "Gemini 4 Hydrogen",
+      "models.dev": "Gemini 4 Hydrogen",
       "openrouter": "Gemini 4 Hydrogen"
+    },
+    "open_weights": {
+      "models.dev": false
     },
     "output_modalities": {
       "google-docs": [
+        "text"
+      ],
+      "models.dev": [
         "text"
       ],
       "openrouter": [
@@ -115,9 +137,16 @@
     },
     "reasoning": {
       "google-docs": true,
+      "models.dev": true,
       "openrouter": true
     },
     "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
       "openrouter": [
         "xhigh",
         "high",
@@ -126,7 +155,11 @@
       ]
     },
     "released_at": {
-      "google-docs": "2026-11-12"
+      "google-docs": "2026-11-12",
+      "models.dev": "2026-11-12"
+    },
+    "sampling_parameters": {
+      "models.dev": true
     },
     "snapshots": {
       "google-docs": [
@@ -137,10 +170,12 @@
       "google-docs": "active"
     },
     "structured_outputs": {
-      "google-docs": true
+      "google-docs": true,
+      "models.dev": true
     },
     "tool_calling": {
       "google-docs": true,
+      "models.dev": true,
       "openrouter": true
     },
     "unsupported_features": {
@@ -156,6 +191,7 @@
   ],
   "sources": {
     "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-4-hydrogen",
+    "models.dev": "https://models.dev",
     "openrouter": "https://openrouter.ai/google/gemini-4-hydrogen"
   },
   "docs": {
