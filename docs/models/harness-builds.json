@@ -7318,7 +7318,7 @@
           ]
         },
         "2.1.322": {
-          "captured_at": "2026-11-11T23:00:33.595186074Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -9890,7 +9890,7 @@
           ]
         },
         "0.162.0": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -9922,7 +9922,7 @@
           ]
         },
         "0.162.1": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -9954,7 +9954,7 @@
           ]
         },
         "0.163.0": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -9986,7 +9986,7 @@
           ]
         },
         "0.164.0": {
-          "captured_at": "2026-11-05T09:54:28.532441Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -10114,7 +10114,7 @@
           ]
         },
         "0.167.1": {
-          "captured_at": "2026-11-11T23:00:33.595186074Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -10146,7 +10146,7 @@
           ]
         },
         "0.167.2": {
-          "captured_at": "2026-11-11T23:00:33.595186074Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -10570,7 +10570,7 @@
           ]
         },
         "1.0.109": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -11856,7 +11856,7 @@
           ]
         },
         "0.2.2-rc.1": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -12228,7 +12228,7 @@
                         "preset": "workspace-write"
                       },
                       "seq": 0,
-                      "time": 1794372394785,
+                      "time": 1794458749914,
                       "type": "permission/preset"
                     },
                     {
@@ -12236,7 +12236,7 @@
                         "mode": "workspace-write"
                       },
                       "seq": 1,
-                      "time": 1794372394787,
+                      "time": 1794458749926,
                       "type": "sandbox/mode"
                     },
                     {
@@ -12244,7 +12244,7 @@
                         "policy": "ask"
                       },
                       "seq": 2,
-                      "time": 1794372394787,
+                      "time": 1794458749927,
                       "type": "approval/policy"
                     },
                     {
@@ -12268,7 +12268,7 @@
                         "target": "next-turn"
                       },
                       "seq": 3,
-                      "time": 1794372394788,
+                      "time": 1794458749930,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -12276,7 +12276,7 @@
                         "turn": 1
                       },
                       "seq": 4,
-                      "time": 1794372394789,
+                      "time": 1794458749932,
                       "type": "turn/start"
                     },
                     {
@@ -12287,7 +12287,7 @@
                         "target": "next-turn"
                       },
                       "seq": 5,
-                      "time": 1794372394789,
+                      "time": 1794458749933,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -12296,7 +12296,7 @@
                         "turn": 1
                       },
                       "seq": 6,
-                      "time": 1794372394860,
+                      "time": 1794458750033,
                       "type": "step/start"
                     },
                     {
@@ -12319,7 +12319,7 @@
                       },
                       "seq": 7,
                       "surfaceOp": "append",
-                      "time": 1794372394863,
+                      "time": 1794458750036,
                       "type": "system/message"
                     },
                     {
@@ -12338,7 +12338,7 @@
                       },
                       "seq": 8,
                       "surfaceOp": "append",
-                      "time": 1794372394863,
+                      "time": 1794458750036,
                       "type": "user/message"
                     },
                     {
@@ -12372,7 +12372,7 @@
                       },
                       "seq": 9,
                       "surfaceOp": "append",
-                      "time": 1794372394864,
+                      "time": 1794458750037,
                       "type": "user/message"
                     },
                     {
@@ -13008,7 +13008,7 @@
                         "reason": "initial"
                       },
                       "seq": 10,
-                      "time": 1794372394865,
+                      "time": 1794458750037,
                       "type": "request/header"
                     },
                     {
@@ -13019,7 +13019,7 @@
                         "systemPromptUpdate": "in-history"
                       },
                       "seq": 11,
-                      "time": 1794372394866,
+                      "time": 1794458750038,
                       "type": "request/context"
                     },
                     {
@@ -13033,7 +13033,7 @@
                         "title": "<prompt>"
                       },
                       "seq": 12,
-                      "time": 1794372394871,
+                      "time": 1794458750040,
                       "type": "session/title"
                     },
                     {
@@ -13066,12 +13066,12 @@
                         "titleProvider": "session-title-first-prompt-llm"
                       },
                       "seq": 13,
-                      "time": 1794372394873,
+                      "time": 1794458750041,
                       "type": "session/title-llm-request"
                     }
                   ],
                   "session": {
-                    "createdAt": 1794372394779,
+                    "createdAt": 1794458749901,
                     "cwd": "<repo>",
                     "id": "session-<uuid>",
                     "version": 4
@@ -13128,7 +13128,7 @@
           "captured": true
         },
         "0.68.0": {
-          "captured_at": "2026-11-11T23:00:33.595186074Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true
         }
       }
@@ -13202,7 +13202,7 @@
           "captured": false
         },
         "1.19.5": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
@@ -13256,7 +13256,7 @@
           ]
         },
         "1.5.2": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-12T05:15:55.281711967Z",
           "captured": true,
           "uses": [
             {
