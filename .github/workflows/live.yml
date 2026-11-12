@@ -1,7 +1,7 @@
 name: E2E harness contracts
 
 # A harness's build is tested when it comes out: the reference's frequent check (reference.yml)
-# captures each new build of the harnesses it watches (reference/new-builds.sh --tracked) once,
+# captures each new build of the harnesses it watches (reference/new-builds.sh) once,
 # fully, terma's contracts included, and says in its Slack announcement whether terma works with
 # it; terma's own changes are tested by CI. So nothing runs here on a schedule: this is a full run
 # by hand, every contract of every harness at the builds its variables pick, subscription logins
@@ -175,16 +175,11 @@ jobs:
     needs: [e2e]
     if: always()
     runs-on: ubuntu-latest
-    environment: live-harnesses
+    # It reads the published reference and pushes nothing: no secret, no write token.
     permissions:
-      contents: write
-    # The frequent new-build check (reference.yml) publishes the reference to the same
-    # branch: never both at once.
-    concurrency:
-      group: compat-matrix
-      cancel-in-progress: false
+      contents: read
     steps:
-      # Keeps its token: this job pushes to compat-matrix (publish.sh).
+      # Keeps its read token: the restore fetches compat-matrix (publish.sh).
       - uses: actions/checkout@v7
       - name: Start from the published history and catalog
         run: test/e2e/compatgen/publish.sh restore

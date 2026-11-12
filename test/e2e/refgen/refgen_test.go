@@ -286,6 +286,54 @@ func TestAttemptedBuildIsPublished(t *testing.T) {
 	}
 }
 
+// A capture that fails again takes nothing new, so the build's captured_at stays; its
+// attempted_at is the last attempt's, which the frequent check waits from before it tries again.
+func TestEveryAttemptIsStamped(t *testing.T) {
+	dir := t.TempDir()
+	first := time.Date(2026, 11, 12, 6, 0, 0, 0, time.UTC)
+	again := first.Add(7 * time.Hour)
+	for _, at := range []time.Time{first, again} {
+		if _, err := publish(dir, night{now: at, attempted: []buildID{{"codex", "0.200.0"}}}, options{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var idx HarnessIndex
+	if err := readJSON(filepath.Join(dir, "codex", "index.json"), &idx); err != nil {
+		t.Fatal(err)
+	}
+	e := idx.Versions[0]
+	if !e.Partial || !e.CapturedAt.Equal(first) || e.AttemptedAt == nil || !e.AttemptedAt.Equal(again) {
+		t.Errorf("index entry: partial %v, captured_at %v, attempted_at %v; want partial, %v, %v", e.Partial, e.CapturedAt, e.AttemptedAt, first, again)
+	}
+}
+
+// A job of the run that did not finish (a platform's capture) leaves the build partial, though
+// another job captured it whole; a later whole run makes it whole.
+func TestUnfinishedJobLeavesTheBuildPartial(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"claude", "1.0.0"}
+	whole := []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}
+	read := func() Snapshot {
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if _, err := publish(dir, night{now: time.Now(), profiles: whole, attempted: []buildID{id}, unfinished: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !s.Capture.Partial || !slices.ContainsFunc(s.Capture.Notes, func(n string) bool { return strings.Contains(n, "did not finish") }) {
+		t.Errorf("an unfinished job's build: %+v", s.Capture)
+	}
+	if _, err := publish(dir, night{now: time.Now(), profiles: whole, attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); s.Capture.Partial {
+		t.Errorf("a whole capture left the build partial: %+v", s.Capture)
+	}
+}
+
 // A build's signature is published with its binary, and its certificate's revocation reads as
 // a notable change; when it was checked does not.
 func TestSigningChange(t *testing.T) {

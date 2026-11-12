@@ -101,7 +101,7 @@ The main CI workflow runs this module's offline contracts with the race detector
 and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
-A watched harness's build (`reference/new-builds.sh --tracked`) is tested when it comes out:
+A watched harness's build (`reference/new-builds.sh`) is tested when it comes out:
 the Harness Reference's frequent check (`reference.yml`, below) runs every scenario of the
 harness's against it once, terma's contracts included, and its Slack announcement says whether
 terma works with it. Nothing runs on a schedule. `E2E harness contracts` (`live.yml`) is a full
@@ -421,25 +421,24 @@ Each build is captured once, whole, when it comes out. `reference.yml` checks ev
 hour: `reference/new-builds.sh` asks each registry for the builds the reference has yet to
 capture whole (a few requests, no build; nothing else runs when there are none): a new release
 among each harness's newest five, or its newest build where that one's capture was partial and
-is six hours old. Only then does it capture them, everything the suite does with a build: on
+its last attempt (`attempted_at`) is six hours old. It reads the published index through
+GitHub's API, so a check queued behind a capture sees what that capture published. Only then does it capture them, everything the suite does with a build: on
 macOS, one job a harness, every scenario of the harness's against these builds alone
 (`TERMA_E2E_ONLY` and the versions: its profile and probes, its files profile, terma's contracts
 and the field census); on Linux, Claude Code's and Codex's relay contracts and files profiles;
 and a desktop app's on a machine of its own. The publish job waits for all of them, so a build's
 page and changelog are published once, complete, with terma's verdict, and announced then
-(`publish.sh publish-reference`). A capture that failed is published partial (`refgen
--attempted`), marked `partial` in the index and not announced; the capture that makes it whole
-announces it. The announcement says whether terma works with the build: "Works", "Partly
-broken" or "Broken" with the checks that failed, or "Not tested", and that its capture failed in
-part where it did. Its publish job and `live.yml`'s compat job share a concurrency group, so they
-never push `compat-matrix` at once.
+(`publish.sh publish-reference`). A capture that failed, or a job of it that did not finish (it
+wrote no `compat.json`: `refgen -unfinished`), is published partial (`refgen -attempted`) and
+marked `partial` in the index. Each version newer than any captured before is announced once, when
+first published: whether terma works with the build, "Works", "Partly broken" or "Broken" with the
+checks that failed, or "Not tested", and that its capture failed in part where it did. Its publish
+job and Model Reference's share a concurrency group, so they never push `compat-matrix` at once.
 
-The night does not capture or test those builds again: a build is tested when it comes out,
-which is when it can stop sending what terma expects, and terma's own changes are tested by CI.
-It runs everything else (`TERMA_E2E_EXCEPT`, the watched harnesses from `new-builds.sh
---tracked`): the harnesses the frequent check does not watch (Pi, omp, Hermes, T3 Code, at their
-newest), the scenarios of no one harness, and the matrix, catalog and digest. Terma's checks alone
-never begin a build's page (`refgen`).
+A build is tested when it comes out, which is when it can stop sending what terma expects, and
+terma's own changes are tested by CI: nothing else runs on a schedule. A harness the frequent
+check does not watch (omp, Hermes) is tested by `live.yml`, by hand. Terma's checks alone never
+begin a build's page (`refgen`).
 
 ## Model Reference
 

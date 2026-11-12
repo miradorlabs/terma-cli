@@ -160,29 +160,21 @@ func TestSkipUnlessSelected(t *testing.T) {
 	}
 }
 
-// TERMA_E2E_EXCEPT skips the harnesses it names, the night's run leaving the watched ones to the
-// frequent check; beside TERMA_E2E_ONLY, both apply.
-func TestSkipExcepted(t *testing.T) {
-	unrestricted(t)
-	for _, tc := range []struct {
-		only, except, harness string
-		skipped               bool
-	}{
-		{"", "claude,codex", "pi", false},
-		{"", "claude,codex", "codex", true},
-		{"", "claude", "claude-desktop", false},
-		{"pi,codex", "codex", "codex", true},
-		{"pi,codex", "codex", "pi", false},
-	} {
-		t.Setenv("TERMA_E2E_ONLY", tc.only)
-		t.Setenv("TERMA_E2E_EXCEPT", tc.except)
-		skipped := false
-		t.Run(tc.harness, func(t *testing.T) {
-			defer func() { skipped = t.Skipped() }()
-			skipUnlessSelected(t, tc.harness)
-		})
-		if skipped != tc.skipped {
-			t.Errorf("ONLY=%q EXCEPT=%q, %s: skipped %v, want %v", tc.only, tc.except, tc.harness, skipped, tc.skipped)
+// A vendor's package is installed without the run's credentials: its install scripts run as soon
+// as the release is out.
+func TestInstallEnvHoldsNoCredential(t *testing.T) {
+	credentials := []string{"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "TERMA_E2E_CODEX_AUTH"}
+	for _, name := range credentials {
+		t.Setenv(name, "secret")
+	}
+	t.Setenv("TERMA_E2E_HARNESSES", "codex")
+	env := installEnv()
+	for _, kv := range env {
+		if name, _, _ := strings.Cut(kv, "="); slices.Contains(credentials, name) {
+			t.Errorf("the install environment holds %s", name)
 		}
+	}
+	if !slices.Contains(env, "TERMA_E2E_HARNESSES=codex") {
+		t.Error("the install environment lost a variable that is no credential")
 	}
 }

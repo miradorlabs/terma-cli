@@ -47,8 +47,11 @@ type night struct {
 	// attempted are builds a run set out to capture: one it captured nothing of is still
 	// published, partial, so the frequent check captures it again only after a while.
 	attempted []buildID
-	now       time.Time
-	sources   *sourceConfigs // what public builds' source says of their configuration; nil reads none
+	// unfinished are builds a job of the run set out to capture and did not finish (a platform's
+	// capture that failed): published partial, whatever the other jobs took.
+	unfinished []buildID
+	now        time.Time
+	sources    *sourceConfigs // what public builds' source says of their configuration; nil reads none
 }
 
 type buildID struct{ harness, version string }
@@ -211,7 +214,7 @@ func (n night) tonight(id buildID) *Snapshot {
 	n.deriveSupport(s)
 	scrubMachine(s)
 	if len(present(s)) == 0 && slices.Contains(n.attempted, id) {
-		s.Capture = Capture{Partial: true, Notes: []string{"This build's capture failed; the next nightly run tries it again."}}
+		s.Capture = Capture{Partial: true, Notes: []string{"This build's capture failed; the frequent check tries it again."}}
 	}
 	return s
 }

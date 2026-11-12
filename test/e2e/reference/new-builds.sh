@@ -8,21 +8,29 @@
 #
 # A build to capture is one of a harness's newest TERMA_REFERENCE_MAX (5) releases the reference
 # has not published (a backport released late among them), or its newest published build where
-# that one's capture was partial and is TERMA_REFERENCE_RETRY_AFTER seconds old (6 h): a capture
-# that failed is tried again, but not every quarter hour. A harness the reference has never
-# published is its newest build alone.
-#
-# `new-builds.sh --tracked` prints the harnesses it watches, one a line, and reads nothing: the
-# night skips their reference scenarios, which this check's capture takes.
+# that one's capture was partial and its last attempt is TERMA_REFERENCE_RETRY_AFTER seconds old
+# (6 h): a capture that failed is tried again, but not every quarter hour. Only the newest: an
+# older build's partial capture stays as it is. A harness the reference has never published is
+# its newest build alone.
 #
 # A registry or the reference that cannot be read is a warning, not a failure: the next check
 # catches up. Only a reference that says it has no index for a harness (404) makes it a harness
 # never published.
+#
+# The published index is read through GitHub's API (with GITHUB_TOKEN where it is set), not
+# raw.githubusercontent.com, which serves a copy up to five minutes old: a check queued behind a
+# long capture would read the index from before that capture and capture its builds again.
+# TERMA_REFERENCE_URL reads <url>/<harness>/index.json instead, TERMA_NPM_REGISTRY another npm
+# registry, and TERMA_REFERENCE_HARNESSES (a comma list) asks about those harnesses alone.
 set -euo pipefail
 
-base=${TERMA_REFERENCE_URL:-https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses}
 max=${TERMA_REFERENCE_MAX:-5}
 retry_after=${TERMA_REFERENCE_RETRY_AFTER:-21600}
+registry=${TERMA_NPM_REGISTRY:-https://registry.npmjs.org}
+only=${TERMA_REFERENCE_HARNESSES:-}
+
+# watched says whether this run asks about harness.
+watched() { [ -z "$only" ] || [[ ",$only," == *",$1,"* ]]; }
 
 # The builds the suite can fetch by version (TERMA_E2E_<HARNESS>_VERSIONS), each with its
 # npm package, read in npm's abbreviated form (versions and tags, not every manifest).
@@ -47,13 +55,6 @@ desktop=(
 	"codex-desktop https://persistent.oaistatic.com/codex-app-prod/appcast.xml sparkle"
 )
 
-if [ "${1:-}" = --tracked ]; then
-	for entry in "${harnesses[@]}" "${desktop[@]}"; do
-		echo "${entry%% *}"
-	done
-	exit 0
-fi
-
 # vsort sorts versions as the reference ranks them: it is refdiff.VersionCompare itself
 # (refdiff/cmd/versionsort, built once here from test/e2e's go.mod and refdiff alone, no module
 # to download), so the frequent check and the published order never disagree. Its arguments are
@@ -69,9 +70,17 @@ vsort() { "$vsort_dir/versionsort" "$@"; }
 # 5xx), which the caller skips rather than take for never published: an outage of the host
 # would otherwise start every capture each quarter hour.
 read_index() {
-	local code
+	local code url
+	local -a auth=()
 	index=""
-	code=$(curl -sSL --max-time 30 -o "$vsort_dir/index.json" -w '%{http_code}' "$base/$1/index.json" 2>/dev/null) || code=000
+	if [ -n "${TERMA_REFERENCE_URL:-}" ]; then
+		url="$TERMA_REFERENCE_URL/$1/index.json"
+	else
+		url="https://api.github.com/repos/miradorlabs/terma-cli/contents/docs/harnesses/$1/index.json?ref=compat-matrix"
+		auth=(-H "Accept: application/vnd.github.raw+json")
+		if [ -n "${GITHUB_TOKEN:-}" ]; then auth+=(-H "Authorization: Bearer $GITHUB_TOKEN"); fi
+	fi
+	code=$(curl -sSL --max-time 30 ${auth[@]+"${auth[@]}"} -o "$vsort_dir/index.json" -w '%{http_code}' "$url" 2>/dev/null) || code=000
 	case "$code" in
 	200) index=$(cat "$vsort_dir/index.json") ;;
 	404) return 1 ;;
@@ -82,19 +91,23 @@ read_index() {
 	esac
 }
 
-# retry is harness's newest published build when its capture was partial and is old enough to
-# try again, else nothing.
+# retry is harness's newest published build when its capture was partial and its last attempt
+# (attempted_at; captured_at before there was one) is old enough to try again, else nothing. A
+# time that does not parse is an old one: the build is tried again rather than never.
 retry() {
 	jq -r --argjson after "$retry_after" --arg newest "$1" '
 		[.versions[] | select(.version == $newest)][0] // empty
 		| select(.partial == true)
-		| select(now - (.captured_at | sub("\\.[0-9]+"; "") | fromdateiso8601) > $after)
+		| ((.attempted_at // .captured_at) as $at
+			| try ($at | sub("\\.[0-9]+"; "") | sub("[+-]00:00$"; "Z") | fromdateiso8601) catch 0) as $t
+		| select(now - $t > $after)
 		| .version' <<<"$index"
 }
 
 for entry in "${harnesses[@]}"; do
 	read -r harness pkg mode <<<"$entry"
-	if ! doc=$(curl -fsSL --max-time 30 -H "Accept: application/vnd.npm.install-v1+json" "https://registry.npmjs.org/${pkg//\//%2F}"); then
+	watched "$harness" || continue
+	if ! doc=$(curl -fsSL --max-time 30 -H "Accept: application/vnd.npm.install-v1+json" "$registry/${pkg//\//%2F}"); then
 		echo "::warning::could not read $pkg's releases" >&2
 		continue
 	fi
@@ -128,6 +141,7 @@ done
 
 for entry in "${desktop[@]}"; do
 	read -r harness feed kind <<<"$entry"
+	watched "$harness" || continue
 	if ! doc=$(curl -fsSL --max-time 30 "$feed"); then
 		echo "::warning::could not read $harness's update feed" >&2
 		continue

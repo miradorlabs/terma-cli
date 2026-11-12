@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -78,24 +79,31 @@ func CodexBinaries(t *testing.T) []Binary {
 }
 
 // skipUnlessSelected skips a scenario of harness when TERMA_E2E_ONLY, a comma list of
-// harness ids, does not name it, or TERMA_E2E_EXCEPT does: the frequent check runs the
-// scenarios of the harness with a new build alone (reference.yml), and the night those of the
-// harnesses that check does not watch (live.yml). Unset, every harness's scenarios run.
+// harness ids, does not name it: the frequent check runs each harness's scenarios on a job of
+// its own (reference.yml). Unset, every harness's scenarios run.
 func skipUnlessSelected(t *testing.T, harness string) {
 	t.Helper()
-	if except := os.Getenv("TERMA_E2E_EXCEPT"); listed(except, harness) {
-		t.Skipf("%s is among TERMA_E2E_EXCEPT (%s)", harness, except)
-	}
 	if only := os.Getenv("TERMA_E2E_ONLY"); only != "" && !listed(only, harness) {
 		t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, only)
 	}
 }
 
-// unrestricted clears TERMA_E2E_ONLY and TERMA_E2E_EXCEPT for t: an offline test of a
-// harness's scenario runs whatever harnesses its run is limited to.
+// unrestricted clears TERMA_E2E_ONLY for t: an offline test of a harness's scenario runs
+// whatever harness its run is limited to.
 func unrestricted(t *testing.T) {
 	t.Setenv("TERMA_E2E_ONLY", "")
-	t.Setenv("TERMA_E2E_EXCEPT", "")
+}
+
+// installEnv is the environment a vendor's package is installed with: the test's own without
+// any credential (an API key, a token, a secret, an auth file), since its install scripts run as
+// soon as the release is out. Only a scenario that needs a credential hands it to the build.
+func installEnv() []string {
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		name = strings.ToUpper(name)
+		return strings.Contains(name, "PASSWORD") || slices.ContainsFunc([]string{"_KEY", "_TOKEN", "_SECRET", "_AUTH"},
+			func(suffix string) bool { return strings.HasSuffix(name, suffix) })
+	})
 }
 
 // listed reports whether the comma list names harness.
@@ -531,6 +539,7 @@ func ensureNpmBuild(harness, pkg, bin string) func(version string) (string, erro
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", dir, pkg+"@"+version)
+		cmd.Env = installEnv()
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return "", fmt.Errorf("npm install %s@%s: %v\n%s", pkg, version, err, out)
 		}

@@ -94,8 +94,9 @@ type VersionEntry struct {
 	// "revoked", "rejected" or "unsigned"; nil where it was not checked (off macOS, a script).
 	Signing *string `json:"signing"`
 	// Partial marks a build whose capture failed, whole or in part: the frequent check captures
-	// it again (reference/new-builds.sh), and it is announced once a capture of it is whole.
-	Partial bool `json:"partial,omitempty"`
+	// it again (reference/new-builds.sh), some hours after AttemptedAt, the last attempt.
+	Partial     bool       `json:"partial,omitempty"`
+	AttemptedAt *time.Time `json:"attempted_at,omitempty"`
 }
 
 // Changelogs is docs/harnesses/<harness>/changelog.json: what the vendor's changelog says of

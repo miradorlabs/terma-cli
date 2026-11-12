@@ -191,6 +191,15 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			continue
 		}
 		merged := merge(old, n.tonight(id), n.now)
+		if slices.Contains(n.attempted, id) {
+			at := n.now
+			merged.Capture.AttemptedAt = &at
+		}
+		// A job of the run that did not finish took less of the build than it set out to.
+		if slices.Contains(n.unfinished, id) && !merged.Capture.Partial {
+			merged.Capture.Partial = true
+			merged.Capture.Notes = append(merged.Capture.Notes, "Part of this build's capture did not finish; the frequent check tries it again.")
+		}
 		if old == nil || !sameSections(old, merged) {
 			changed[id] = true
 		}
@@ -306,7 +315,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			s := byVersion[v]
 			e := VersionEntry{Version: v, CapturedAt: s.CapturedAt, Platforms: platformsOf(s), Support: supportOf(s),
 				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{},
-				Partial: s.Capture.Partial}
+				Partial: s.Capture.Partial, AttemptedAt: s.Capture.AttemptedAt}
 			var bin binaryView
 			view(s.Binary, &bin)
 			if bin.Signing != nil {

@@ -57,6 +57,7 @@ func ensureDsh(version string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", dir, "@deepseek-ai/dsh@"+version)
+	cmd.Env = installEnv()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("npm install @deepseek-ai/dsh@%s: %v\n%s", version, err, out)
 	}
