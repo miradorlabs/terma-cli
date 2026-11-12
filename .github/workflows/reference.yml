@@ -303,12 +303,17 @@ jobs:
           TERMA_E2E_DSH_VERSIONS: ${{ needs.detect.outputs.dsh }}
         # The capture job takes the profiles and probes.
         run: ./bin/e2e.test -test.v -test.timeout 75m -test.skip '(Profile|Probe)'
-      - name: Upload the contracts' rows
+      # The rows, and the field census the same run took: a new build's telemetry section is
+      # then the census's, as the night's is, not the profile probe's alone.
+      - name: Upload the contracts' rows and census
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: compat-macos
-          path: test/e2e/report-contracts/compat.json
+          path: |
+            test/e2e/report-contracts/compat.json
+            test/e2e/report-contracts/fields.json
+            test/e2e/report-contracts/census.json
           if-no-files-found: ignore
           retention-days: 30
 
@@ -366,6 +371,9 @@ jobs:
           fi
           args=()
           for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
+          # The contracts' census of the new builds; the catalog stays the night's.
+          for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
+          for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
           while read -r line; do
             case "$line" in
               claude-desktop=*|codex-desktop=*) [ "$DESKTOP_CAPTURE" = success ] || continue ;;
