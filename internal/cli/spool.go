@@ -65,9 +65,9 @@ func (app *App) newSpoolFlushCommand() *cobra.Command {
 		Short: "Deliver queued events to Terma now",
 		Long: `Deliver everything queued, one request per team.
 
-The images a user put in a prompt wait in a queue of their own and leave in the
-background, one to a request, so no event waits on an upload. --images delivers
-that queue now, in a pass of up to ` + delivery.ImagePassTimeout.String() + `.
+The images a user put in a prompt wait in a queue of their own, which the relay
+sends one to a request, so no event waits on an upload. --images delivers that
+queue now, in the foreground, one image at a time beside the relay.
 
 The exit status distinguishes the outcomes a script needs apart:
 
@@ -75,10 +75,10 @@ The exit status distinguishes the outcomes a script needs apart:
   1  delivery failed for at least one team; its events stay queued and that
      team backs off on its own, while every other team's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force
-     overrides), or another flush is already delivering the images
+     overrides)
   3  the pass ran but left work: events held for a team key or waiting out
-     their team's retry window (--force overrides), images left for a later
-     pass, or events given up on for age, disk pressure, or being unreadable`,
+     their team's retry window (--force overrides), images left for later, or
+     events given up on for age, disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if images {
 				res, err := app.flushImages(cmd.Context(), force)
@@ -123,7 +123,7 @@ The exit status distinguishes the outcomes a script needs apart:
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "ignore the failure backoff")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "never print or fail (used by background flushes)")
-	cmd.Flags().BoolVar(&images, "images", false, "deliver the queue of images users put in prompts, which otherwise leaves in the background")
+	cmd.Flags().BoolVar(&images, "images", false, "deliver the queue of images users put in prompts now, which the relay otherwise sends")
 	cmd.Flags().DurationVar(&minInterval, "min-interval", 0, "skip when a flush completed more recently than this (optional throttle for repeated invocations)")
 	return cmd
 }
@@ -147,7 +147,7 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 	return delivered, append(undelivered, lossClauses(res.Expired, res.Pruned, res.Unroutable, res.Dropped, res.Withheld)...)
 }
 
-// describeImagePass words an image pass as describeFlush words the events', telling an
+// describeImagePass words a pass over the images as describeFlush words the events', telling an
 // image that did not finish uploading (the uplink) from a failed delivery (the host).
 func describeImagePass(res delivery.ImageResult) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d image%s", res.Sent, plural(res.Sent))
@@ -165,7 +165,7 @@ func describeImagePass(res delivery.ImageResult) (delivered string, undelivered 
 		undelivered = append(undelivered, fmt.Sprintf("retrying team %s's images after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
 	}
 	if res.Deferred > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("leaving %d for a later pass", res.Deferred))
+		undelivered = append(undelivered, fmt.Sprintf("leaving %d for later", res.Deferred))
 	}
 	if res.Rejected > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d the host refused even without its image", res.Rejected))
@@ -173,13 +173,9 @@ func describeImagePass(res delivery.ImageResult) (delivered string, undelivered 
 	return delivered, append(undelivered, lossClauses(res.Expired, res.Pruned, res.Unroutable, res.Dropped, res.Withheld)...)
 }
 
-// reportImagePass prints an image pass and returns its exit status, as the command does
+// reportImagePass prints a pass over the images and returns its exit status, as the command does
 // for the events'.
 func reportImagePass(out io.Writer, res delivery.ImageResult) error {
-	if res.Skipped {
-		fmt.Fprintln(out, "Skipped: another flush is already delivering the images.")
-		return exitWith(ExitBackoff)
-	}
 	delivered, undelivered := describeImagePass(res)
 	fmt.Fprintf(out, "Flushed %s.\n", strings.Join(append([]string{delivered}, undelivered...), ", "))
 	if res.Err != nil {
@@ -231,7 +227,7 @@ func describeImageQueue(q doctor.ImageQueue) string {
 	if q.Queued == 0 {
 		return ""
 	}
-	line := fmt.Sprintf("Images: %d queued, delivered in the background (rerun with --images to deliver them now)", q.Queued)
+	line := fmt.Sprintf("Images: %d queued, which the relay sends (rerun with --images to deliver them now)", q.Queued)
 	for _, id := range slices.Sorted(maps.Keys(q.Windows)) {
 		why := "a failed delivery"
 		if q.Stalled[id] {
@@ -294,16 +290,11 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
 	}
-	res := r.Flush(ctx, s, cfg, force, minInterval)
-	// Images leave in a pass of their own, detached, so no event waits on an upload; one
-	// starts only when a queued image's project is not waiting out its window.
-	if r.Images != nil && app.startImageFlush != nil && delivery.ImagesDue(r.Images, time.Now()) {
-		app.startImageFlush()
-	}
-	return res, nil
+	// The relay sends images; a record an older build queued here goes on to its queue.
+	return r.Flush(ctx, s, cfg, force, minInterval), nil
 }
 
-// flushImages delivers the image queue, in a pass of its own (delivery.ImagePassTimeout).
+// flushImages delivers the image queue once, in the foreground, beside the relay's sender.
 func (app *App) flushImages(ctx context.Context, force bool) (delivery.ImageResult, error) {
 	if !claim.Enabled(app.stateDir) {
 		return delivery.ImageResult{}, errTornDown
@@ -316,12 +307,7 @@ func (app *App) flushImages(ctx context.Context, force bool) (delivery.ImageResu
 	if err != nil {
 		return delivery.ImageResult{}, err
 	}
-	res := r.FlushImages(ctx, app.openSpool(), cfg, force)
-	// An image spooled as the pass ended found it running and started none.
-	if res.Grew && app.startImageFlush != nil {
-		app.startImageFlush()
-	}
-	return res, nil
+	return r.FlushImages(ctx, app.openSpool(), cfg, force), nil
 }
 
 // imageQueue is the image lane's spool as the events' flush and doctor report it.

@@ -398,7 +398,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 		return Check{Status: Warn, Detail: detail, Fix: othersFix}
 	}
 	if len(images) > 0 {
-		return Check{Status: Warn, Detail: detail, Fix: "images leave in the background, which this run started again; run `terma doctor` later to see them go"}
+		return Check{Status: Warn, Detail: detail, Fix: "the relay sends images, and tries a team's again when its window ends; run `terma doctor` later to see them go"}
 	}
 	if res.Sent == 0 {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail}
@@ -417,9 +417,9 @@ func imageNotes(q ImageQueue, projectID string) []string {
 		}
 		at := q.Windows[id].Local().Format(time.Kitchen)
 		if q.Stalled[id] {
-			notes = append(notes, "one of "+team+" images did not finish uploading in its time (a slow connection); they retry after "+at)
+			notes = append(notes, "one of "+team+" images did not finish uploading in its time (a slow connection); the relay tries them again at "+at)
 		} else {
-			notes = append(notes, "one of "+team+" images was not delivered; they retry after "+at)
+			notes = append(notes, "one of "+team+" images was not delivered; the relay tries them again at "+at)
 		}
 	}
 	return notes

@@ -37,12 +37,11 @@ type Router struct {
 	// Images is the image lane's spool, which FlushImages delivers; Flush hands it any image
 	// record an older build spooled with the events.
 	Images *spool.Spool
-	// SetUp reports whether terma is still set up on this machine: an image pass stops
+	// SetUp reports whether terma is still set up on this machine: a pass over the images stops
 	// before its next image once teardown has begun. Nil is set up.
 	SetUp func() bool
 
-	// imagePass and requestTimeout stand in for ImagePassTimeout and timeoutFor when set.
-	imagePass      time.Duration
+	// requestTimeout stands in for timeoutFor when set.
 	requestTimeout func(n int) time.Duration
 }
 

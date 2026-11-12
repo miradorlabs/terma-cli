@@ -282,32 +282,6 @@ func TestACancelledPassIsNoStall(t *testing.T) {
 	}
 }
 
-// Only one image pass runs at a time: another finds the queue busy and leaves at once.
-func TestOneImagePassAtATime(t *testing.T) {
-	t.Parallel()
-	started, release := make(chan struct{}), make(chan struct{})
-	var once sync.Once
-	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_, _ = io.ReadAll(req.Body)
-		once.Do(func() { close(started) })
-		<-release
-	}), true)
-	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	done := make(chan ImageResult)
-	go func() { done <- r.FlushImages(t.Context(), openSpool(t), cfg, false) }()
-	<-started
-	second := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	close(release)
-	if !second.Skipped || second.Reason != spool.SkipBusy {
-		t.Fatalf("second pass = %+v", second)
-	}
-	if first := <-done; first.Sent != 1 {
-		t.Fatalf("first pass = %+v", first)
-	}
-}
-
 // A pass prunes bytes older than any record the spool still keeps.
 func TestFlushPrunesImagesNoRecordOutlives(t *testing.T) {
 	t.Parallel()
@@ -507,7 +481,7 @@ func TestTheOldestImageGoesFirst(t *testing.T) {
 	}
 }
 
-// The project that went first in a pass goes last in the next.
+// The project that went first in the sender's pass goes last in its next.
 func TestTheFirstProjectTakesTurns(t *testing.T) {
 	t.Parallel()
 	rec := &recorder{}
@@ -515,6 +489,7 @@ func TestTheFirstProjectTakesTurns(t *testing.T) {
 	if err := keystore.Set(r.ConfigDir, "p2", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
+	sender := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
 	var order []string
 	for pass := range 2 {
 		mine, theirs := pixelN(10*pass+1), pixelN(10*pass+2)
@@ -522,7 +497,7 @@ func TestTheFirstProjectTakesTurns(t *testing.T) {
 		other := imageEvent(theirs)
 		other.Attrs[hookrun.AttrProjectID] = "p2"
 		queue(t, r.Images, imageEvent(mine), other)
-		r.FlushImages(t.Context(), openSpool(t), cfg, false)
+		sender.pass(t.Context())
 		first := rec.requests()[2*pass]
 		order = append(order, map[bool]string{true: "p1", false: "p2"}[strings.Contains(first, mine.ID())])
 	}
@@ -543,27 +518,6 @@ func TestAPassThatCannotReadTheEventsSweepsNothing(t *testing.T) {
 	}
 	if _, ok := promptimage.Load(stateDir, img.ID()); !ok {
 		t.Fatal("a pass that could not read the events' spool swept an image")
-	}
-}
-
-// An image pass is due once a queued image's project is not waiting out its window.
-func TestImagesDue(t *testing.T) {
-	t.Parallel()
-	s := openSpool(t)
-	now := time.Now()
-	if ImagesDue(s, now) {
-		t.Fatal("an empty queue is due")
-	}
-	queue(t, s, imageEvent(pixelN(1)))
-	if !ImagesDue(s, now) {
-		t.Fatal("an image with no window is not due")
-	}
-	s.DestinationFailed("p1", now)
-	if ImagesDue(s, now) {
-		t.Fatal("an image waiting out its window is due")
-	}
-	if !ImagesDue(s, now.Add(time.Hour)) {
-		t.Fatal("an image whose window closed is not due")
 	}
 }
 
@@ -649,85 +603,6 @@ func TestARefusedKeyCostsTheImageNothing(t *testing.T) {
 	}
 }
 
-// No pass is due while one runs.
-func TestNoImagesAreDueDuringAPass(t *testing.T) {
-	t.Parallel()
-	s := openSpool(t)
-	queue(t, s, imageEvent(pixelN(1)))
-	s.Drain(t.Context(), spool.DrainOptions{}, func(context.Context, []spool.Pending) {
-		if ImagesDue(s, time.Now()) {
-			t.Error("images are due while a pass runs")
-		}
-	})
-	if !ImagesDue(s, time.Now()) {
-		t.Fatal("images are not due once the pass is over")
-	}
-}
-
-// An image spooled while a pass runs leaves in that same pass, not at the next hook.
-func TestAnImageSpooledDuringAPassLeavesInIt(t *testing.T) {
-	t.Parallel()
-	first, later := pixelN(1), pixelN(2)
-	var r Router
-	var once sync.Once
-	var mu sync.Mutex
-	var bodies []string
-	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		b, _ := io.ReadAll(req.Body)
-		mu.Lock()
-		bodies = append(bodies, string(b))
-		mu.Unlock()
-		// A hook spools another image while the first is on its way.
-		once.Do(func() { queue(t, r.Images, imageEvent(later)) })
-	}), true)
-	store(t, stateDir, first, later)
-	queue(t, r.Images, imageEvent(first))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 2 || len(bodies) != 2 || !strings.Contains(bodies[1], later.ID()) {
-		t.Fatalf("FlushImages = %+v, %d requests", res, len(bodies))
-	}
-	if left := queued(t, r.Images); len(left) != 0 {
-		t.Fatalf("image queue holds %+v", left)
-	}
-}
-
-// Images held for a key start no pass of their own for a while, so no events' flush starts
-// one for them each time it runs; a pass still looks, and delivers once the key is there.
-func TestHeldImagesWaitAWhile(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, _ := imageFixture(t, rec, true)
-	img := imageEvent(pixelN(1))
-	img.Attrs[hookrun.AttrProjectID] = "keyless"
-	queue(t, r.Images, img)
-	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Held != 1 || len(res.Waiting) != 0 {
-		t.Fatalf("FlushImages = %+v", res)
-	}
-	now := time.Now()
-	if _, held := r.Images.Holds(now)["keyless"]; !held {
-		t.Fatal("held images were not held")
-	}
-	if !r.Images.RetryAt("keyless").IsZero() {
-		t.Fatal("held images opened a retry window")
-	}
-	if ImagesDue(r.Images, now) {
-		t.Fatal("images held for a key are due")
-	}
-	if !ImagesDue(r.Images, now.Add(imageHeldWait+time.Minute)) {
-		t.Fatal("held images are not due once their wait is over")
-	}
-	// The key arrives: the next pass, not forced, delivers.
-	if err := keystore.Set(r.ConfigDir, "keyless", testKey, keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
-	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Sent != 1 {
-		t.Fatalf("FlushImages once the key is there = %+v", res)
-	}
-	if _, held := r.Images.Holds(time.Now())["keyless"]; held {
-		t.Fatal("a delivered project stayed held")
-	}
-}
-
 // Every outcome has a rule, and every rule a count or a stall's name.
 func TestEveryOutcomeHasARule(t *testing.T) {
 	t.Parallel()
@@ -735,24 +610,5 @@ func TestEveryOutcomeHasARule(t *testing.T) {
 		if rule := imageRules[o]; rule.counter == nil && rule.window != stallWindow {
 			t.Errorf("outcome %d has no rule, or counts nowhere", o)
 		}
-	}
-}
-
-// A project is named once in a pass, however many rounds see it: a failure in one round and
-// its window in the next make one failure.
-func TestAProjectIsNamedOncePerPass(t *testing.T) {
-	t.Parallel()
-	var r Router
-	var once sync.Once
-	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_, _ = io.ReadAll(req.Body)
-		once.Do(func() { queue(t, r.Images, imageEvent(pixelN(2))) })
-		w.WriteHeader(http.StatusInternalServerError)
-	}), true)
-	store(t, stateDir, pixelN(1), pixelN(2))
-	queue(t, r.Images, imageEvent(pixelN(1)))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if len(res.Failures) != 1 || len(res.Waiting) != 0 || res.Deferred != 1 {
-		t.Fatalf("FlushImages = %+v", res)
 	}
 }

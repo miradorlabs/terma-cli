@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -50,10 +51,17 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			install := app.installed()
 			engine.InstallMethod = install.Method
 			engine.UpdateAuto = func() string { return app.updateAuto(install) }
+			workers := []func(context.Context){deps.Refresher().Run, app.sweepHookState}
+			if images := app.imageSender(); images != nil {
+				// An agent's export ends its turn, and the images its hooks queued for it.
+				images.Logf = log.Printf
+				engine.Accepted, engine.Busy = images.Nudge, images.Busy
+				workers = append(workers, images.Run)
+			}
 			res, err := daemon.Run(ctx, daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
-				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
+				Workers: workers,
 				Updater: app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
@@ -89,6 +97,16 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	_ = cmd.Flags().MarkHidden("follow")
 	_ = cmd.Flags().MarkHidden("service")
 	return cmd
+}
+
+// imageSender is the relay's image lane, sending the image queue as this build delivers;
+// nil when the queue cannot be opened.
+func (app *App) imageSender() *delivery.ImageSender {
+	r := app.delivery()
+	if r.Images == nil {
+		return nil
+	}
+	return delivery.NewImageSender(r, app.openSpool(), app.loadConfig)
 }
 
 // afterRelay ends a relay's run. A relay that should run again exits for the service manager

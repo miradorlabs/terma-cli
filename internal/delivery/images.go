@@ -10,44 +10,31 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // A terma.prompt.image record leaves in a lane of its own: hooks spool it to the image
-// spool (spool.ImageDir) and a detached pass sends it, so no event waits on an upload. The
-// record holds no bytes; they wait in the image store (promptimage) and join the record only
-// in its own request, and the store forgets them once no queued record names them.
-
-// ImagePassTimeout bounds a pass of the image lane. The largest image's request (about
-// 2.8 MB) gets timeoutFor's minute at 64 KiB/s and starts only with all of it left: five fit
-// in a pass, none in the events' 30 s.
-const ImagePassTimeout = 5 * time.Minute
+// spool (spool.ImageDir), and the relay's image sender (ImageSender) sends it, so no event
+// waits on an upload and no upload on a deadline of a pass. The record holds no bytes; they
+// wait in the image store (promptimage) and join the record only in its own request, and the
+// store forgets them once no queued record names them.
 
 // imageMaxAttempts is how many sends of an image that reached the host and did not get
 // through it is given before its record is sent without its bytes (unsent).
 const imageMaxAttempts = 4
 
-// imageEnvelope bounds an image request's size besides the image itself.
-const imageEnvelope = 8 << 10
-
-// errNoTimeLeft is an image not sent because too little of the pass was left for it.
-var errNoTimeLeft = errors.New("too little of the pass left for the image")
-
-// ImageResult summarizes one pass of the image lane; its counters are disjoint, one per
+// ImageResult summarizes one pass over the image queue; its counters are disjoint, one per
 // reason, and count image records.
 type ImageResult struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	// Deferred counts the images left untried for a later pass: a window was open, too
-	// little of the pass was left, or the pass ended first.
+	// Deferred counts the images left untried: their project's window was open, or the
+	// sender stopped first.
 	Deferred int
 	// Rejected counts the records dropped because the host refused them even without their
 	// bytes, more than imageMaxAttempts times.
 	Rejected int
-	Skipped  bool
-	Reason   spool.SkipReason
 	Err      error
 	// Failures names each project whose image the host refused, left unanswered or could not
 	// be reached for; Stalls each whose upload did not finish in its time (the uplink, which
@@ -56,9 +43,6 @@ type ImageResult struct {
 	// Waiting names each project whose images window was open.
 	Waiting   []Wait
 	Endpoints []string
-	// Grew says images were spooled as the pass ended, which it did not see: another pass
-	// has work.
-	Grew bool
 }
 
 // isImage reports whether e is a terma.prompt.image record.
@@ -95,12 +79,27 @@ type imageItem struct {
 	out    spool.Event
 }
 
-// FlushImages delivers the image lane, r.Images, one image to a request, settling each in
-// the queue as it goes so a pass cut short resends none. Projects take turns, one image
-// each, starting a project further on each pass; a project's images go fewest attempts
-// first, then oldest. Only one pass runs at a time. events is the events' spool, whose
+// FlushImages delivers the image queue, r.Images, once: each image in a request of its own,
+// taken from the queue before it is sent (so it never goes alongside the relay's sender) and
+// settled as soon as it went. `terma spool flush --images` runs it in the foreground; the
+// relay's ImageSender runs it whenever it is woken. events is the events' spool, whose
 // records from an older build may still name stored bytes; nil keeps every stored image.
 func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *config.Config, force bool) ImageResult {
+	return r.flushImages(ctx, events, cfg, force, imageTurns{})
+}
+
+// imageTurns is how a pass shares out its sends among projects and tells of them: it starts
+// after the project after names, so the one that went first last time goes last, and
+// records the one it started with in first; uploading, set, is told as each upload starts
+// and ends.
+type imageTurns struct {
+	after     string
+	first     *string
+	uploading func(bool)
+}
+
+// flushImages is FlushImages, with turns.
+func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *config.Config, force bool, turns imageTurns) ImageResult {
 	s := r.Images
 	if s == nil {
 		return ImageResult{Err: errNoImageLane}
@@ -108,113 +107,92 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	now := time.Now()
 	p := &imagePass{s: s, accepted: map[string]bool{}}
 	res := &p.res
-	fr := s.Drain(ctx, spool.DrainOptions{Timeout: cmp.Or(r.imagePass, ImagePassTimeout), NoWait: true, Now: now},
-		func(ctx context.Context, queued []spool.Pending) {
-			// Each round of the pass sees the windows as they are now.
-			now := time.Now()
-			byProject := map[string][]imageItem{}
-			places := r.places(cfg)
-			held := map[string]bool{}
-			var gone []spool.Pending
-			for _, q := range queued {
-				id, out, place := places.of(ctx, q.Event)
-				switch place {
-				case placeSend:
-					byProject[id] = append(byProject[id], imageItem{queued: q, out: out})
-					continue
-				case placeHeld:
-					res.Held++
-					held[id] = true
-					continue
-				case placeUnroutable:
-					res.Unroutable++
-				case placeWithheld:
-					res.Withheld++
-				}
-				gone = append(gone, q)
-				p.ids = append(p.ids, imageID(q.Event))
-			}
-			// What never leaves goes in one rewrite; a delivered image is settled on its own.
-			if err := s.Remove(gone...); err != nil {
-				p.errs = append(p.errs, fmt.Errorf("remove image records that cannot leave: %w", err))
-			}
-			var turns []*imageQueue
-			for _, id := range startingAfter(slices.Sorted(maps.Keys(byProject)), s.Mark()) {
-				items := byProject[id]
-				// The window first: a project waiting out one needs no key this pass.
-				if next := s.RetryAt(id); !force && now.Before(next) {
-					p.wait(id, next)
-					res.Deferred += len(items)
-					continue
-				}
-				sender, err := r.senderFor(cfg, id)
-				if err != nil {
-					// The keychain is locked or out of reach: as for the events, a failure,
-					// asked again by the next pass.
-					p.errs = append(p.errs, fmt.Errorf("%s: %w", id, err))
-					res.Failed += len(items)
-					held[id] = true
-					continue
-				}
-				if sender == nil {
-					res.Held += len(items)
-					held[id] = true
-					continue
-				}
-				s.Unhold(id)
-				slices.SortStableFunc(items, func(a, b imageItem) int {
-					return cmp.Or(cmp.Compare(a.out.Attempts, b.out.Attempts), a.out.Time.Compare(b.out.Time))
-				})
-				turns = append(turns, &imageQueue{id: id, sender: sender, items: items})
-			}
-			// A project held starts no pass for a while (ImagesDue); a pass still looks.
-			s.Hold(now.Add(imageHeldWait), slices.Sorted(maps.Keys(held))...)
-			if len(turns) > 0 {
-				s.SetMark(turns[0].id)
-			}
-			for len(turns) > 0 {
-				var next []*imageQueue
-				for _, q := range turns {
-					if r.SetUp != nil && !r.SetUp() {
-						// Torn down: what is left is teardown's to remove.
-						for _, q := range turns {
-							res.Deferred += len(q.items)
-						}
-						return
-					}
-					item := q.items[0]
-					q.items = q.items[1:]
-					if !p.record(ctx, q, item, r.sendImage(ctx, q.sender, item.out)) {
-						// The project's other images wait for the window just opened.
-						res.Deferred += len(q.items)
-						q.items = nil
-					}
-					if len(q.items) > 0 {
-						next = append(next, q)
-					}
-				}
-				turns = next
-			}
-		})
-	if !fr.Skipped {
-		r.forgetImages(p.ids, now, events, s)
+	queued, read, err := s.Read(ctx, now)
+	res.Expired, res.Pruned, res.Dropped = read.Expired, read.Pruned, read.Dropped
+	if err != nil {
+		res.Err = err
+		return *res
 	}
-	res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
-	res.Expired = fr.Expired
-	res.Pruned = fr.Pruned
-	res.Dropped = fr.Dropped
-	res.Skipped = fr.Skipped
-	res.Reason = fr.Reason
-	res.Grew = fr.Grew
-	res.Err = errors.Join(append([]error{fr.Err}, p.errs...)...)
-	return *res
+	byProject := map[string][]imageItem{}
+	places := r.places(cfg)
+	var gone []spool.Pending
+	for _, q := range queued {
+		id, out, place := places.of(ctx, q.Event)
+		switch place {
+		case placeSend:
+			byProject[id] = append(byProject[id], imageItem{queued: q, out: out})
+			continue
+		case placeHeld:
+			res.Held++
+			continue
+		case placeUnroutable:
+			res.Unroutable++
+		case placeWithheld:
+			res.Withheld++
+		}
+		gone = append(gone, q)
+		p.ids = append(p.ids, imageID(q.Event))
+	}
+	// What never leaves goes in one rewrite; a delivered image is settled on its own.
+	if err := s.Remove(gone...); err != nil {
+		p.errs = append(p.errs, fmt.Errorf("remove image records that cannot leave: %w", err))
+	}
+	var queues []*imageQueue
+	for _, id := range startingAfter(slices.Sorted(maps.Keys(byProject)), turns.after) {
+		items := byProject[id]
+		// The window first: a project waiting out one needs no key this pass.
+		if next := s.RetryAt(id); !force && now.Before(next) {
+			res.Waiting = append(res.Waiting, Wait{ProjectID: id, RetryAt: next})
+			res.Deferred += len(items)
+			continue
+		}
+		sender, err := r.senderFor(cfg, id)
+		if err != nil {
+			// The keychain is locked or out of reach: as for the events, a failure, asked
+			// again next time.
+			p.errs = append(p.errs, fmt.Errorf("%s: %w", id, err))
+			res.Failed += len(items)
+			continue
+		}
+		if sender == nil {
+			res.Held += len(items)
+			continue
+		}
+		slices.SortStableFunc(items, func(a, b imageItem) int {
+			return cmp.Or(cmp.Compare(a.out.Attempts, b.out.Attempts), a.out.Time.Compare(b.out.Time))
+		})
+		queues = append(queues, &imageQueue{id: id, sender: sender, items: items})
+	}
+	if len(queues) > 0 && turns.first != nil {
+		*turns.first = queues[0].id
+	}
+	for len(queues) > 0 {
+		var next []*imageQueue
+		for _, q := range queues {
+			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil {
+				// Torn down, or the sender is stopping: what is left stays queued.
+				for _, q := range queues {
+					res.Deferred += len(q.items)
+				}
+				return p.finish(r, events, now)
+			}
+			item := q.items[0]
+			q.items = q.items[1:]
+			if !p.send(ctx, r, q, item, turns.uploading) {
+				// The project's other images wait for the window just opened.
+				res.Deferred += len(q.items)
+				q.items = nil
+			}
+			if len(q.items) > 0 {
+				next = append(next, q)
+			}
+		}
+		queues = next
+	}
+	return p.finish(r, events, now)
 }
 
-// imageHeldWait is how long a project held for what it needs (a key, a policy, the
-// keychain) starts no pass of its own, so the events' flush does not start one each time.
-const imageHeldWait = 5 * time.Minute
-
-// imagePass is what one pass of the image lane has done so far.
+// imagePass is what one pass over the image queue has done so far.
 type imagePass struct {
 	s        *spool.Spool
 	res      ImageResult
@@ -225,25 +203,38 @@ type imagePass struct {
 	ids []string
 }
 
+// send takes item from the queue, sends it and records how that went, unless another
+// sender settled it meanwhile; false when the project's other images wait.
+func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imageItem, uploading func(bool)) bool {
+	release, err := p.s.Take(ctx, item.queued)
+	switch {
+	case errors.Is(err, spool.ErrNotQueued):
+		return true
+	case err != nil:
+		// The sender is stopping while another holds the queue.
+		p.res.Deferred++
+		return true
+	}
+	defer release()
+	if uploading != nil {
+		uploading(true)
+		defer uploading(false)
+	}
+	return p.record(ctx, q, item, r.sendImage(ctx, q.sender, item.out))
+}
+
+// finish sweeps the bytes the pass let go and sums it up.
+func (p *imagePass) finish(r Router, events *spool.Spool, start time.Time) ImageResult {
+	r.forgetImages(p.ids, start, events, p.s)
+	p.res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
+	p.res.Err = errors.Join(append([]error{p.res.Err}, p.errs...)...)
+	return p.res
+}
+
 // settle takes q out of the queue, appending requeue at its tail.
 func (p *imagePass) settle(q spool.Pending, requeue ...spool.Event) {
 	if err := p.s.Settle(q, requeue...); err != nil {
 		p.errs = append(p.errs, fmt.Errorf("settle an image record: %w", err))
-	}
-}
-
-// reported reports whether the pass has already named project id as waiting, failed or
-// stalled: a project is named once, however many rounds see it.
-func (p *imagePass) reported(id string) bool {
-	has := func(f Failure) bool { return f.ProjectID == id }
-	return slices.ContainsFunc(p.res.Waiting, func(w Wait) bool { return w.ProjectID == id }) ||
-		slices.ContainsFunc(p.res.Failures, has) || slices.ContainsFunc(p.res.Stalls, has)
-}
-
-// wait names project id as waiting out its window until next, once.
-func (p *imagePass) wait(id string, next time.Time) {
-	if !p.reported(id) {
-		p.res.Waiting = append(p.res.Waiting, Wait{ProjectID: id, RetryAt: next})
 	}
 }
 
@@ -301,18 +292,14 @@ func (p *imagePass) record(ctx context.Context, q *imageQueue, item imageItem, s
 		p.accepted[q.sender.Endpoint] = true
 	case stallWindow:
 		f := Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: sent.err, RetryAt: p.s.DestinationStalled(q.id, now)}
-		if !p.reported(q.id) {
-			p.res.Stalls = append(p.res.Stalls, f)
-		}
+		p.res.Stalls = append(p.res.Stalls, f)
 	case failWindow:
 		f := Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: sent.err}
-		// A pass cut short by its own deadline learned nothing about the host.
+		// A sender stopping mid-send learned nothing about the host.
 		if ctx.Err() == nil {
 			f.RetryAt = p.s.DestinationFailedUntil(q.id, now, sent.retryAfter)
 		}
-		if !p.reported(q.id) {
-			p.res.Failures = append(p.res.Failures, f)
-		}
+		p.res.Failures = append(p.res.Failures, f)
 		p.errs = append(p.errs, fmt.Errorf("%s (%s): %w", q.id, q.sender.Endpoint, sent.err))
 	}
 	again := item.queued.Event
@@ -342,27 +329,6 @@ func (p *imagePass) record(ctx context.Context, q *imageQueue, item imageItem, s
 		*counter(&p.res)++
 	}
 	return rule.window == keepWindow || rule.window == closeWindow
-}
-
-// ImagesDue reports whether a pass of the image lane s has work at now: none runs, and a
-// queued record's project is neither waiting out its images window nor held, or the
-// record names none. It reads the queue without its lock, and only the records' projects.
-func ImagesDue(s *spool.Spool, now time.Time) bool {
-	if s.Busy() {
-		return false
-	}
-	projects, err := s.Values(hookrun.AttrProjectID)
-	if err != nil {
-		return true
-	}
-	windows, holds := s.RetryWindows(now), s.Holds(now)
-	for id := range projects {
-		_, waiting := windows[id]
-		if _, held := holds[id]; !waiting && !held {
-			return true
-		}
-	}
-	return false
 }
 
 // startingAfter is ids, sorted, rotated to start with the first after mark, so the

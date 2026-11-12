@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"io"
 	"maps"
@@ -17,8 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Sending one image record, and judging how it went: the image lane's pass (images.go)
-// decides what that means for the record and its project.
+// Sending one image record, and judging how it went: the pass over the image queue
+// (images.go) decides what that means for the record and its project.
 
 // imageOutcome is how one image's send went.
 type imageOutcome int
@@ -26,7 +25,8 @@ type imageOutcome int
 const (
 	// imageDelivered is an image the host took.
 	imageDelivered imageOutcome = iota
-	// imageDeferred is an image untried, or cut off by the pass having learned nothing.
+	// imageDeferred is an image cut off by its sender stopping (the relay, a manual flush's
+	// interrupt): nothing learned.
 	imageDeferred
 	// imageStalled is an upload that reached the host and did not finish in its time: the
 	// uplink. It counts an attempt.
@@ -52,22 +52,20 @@ const (
 //	429, 502, 503     busy, or between deploys: unavailable, its Retry-After honoured
 //	any other         failed: an attempt
 //
-// Short of an answer: cut off by the pass's end is deferred; not reached (DNS, the dial,
-// the TLS handshake) is unavailable; a body cut off mid-upload stalled; one all written and
-// unanswered failed. What each outcome then does is imageRules'.
-func judgeImage(pass context.Context, err error, got progress) imageOutcome {
+// Short of an answer: cut off by its sender stopping is deferred; not reached (DNS, the
+// dial, the TLS handshake) is unavailable; a body cut off mid-upload, in its own time,
+// stalled; one all written and unanswered failed. What each outcome then does is
+// imageRules'.
+func judgeImage(sending context.Context, err error, got progress) imageOutcome {
 	var ingest *IngestError
 	switch {
 	case err == nil:
 		return imageDelivered
-	case errors.Is(err, errNoTimeLeft):
-		return imageDeferred
 	case errors.As(err, &ingest) && hostUnavailable(ingest.Status):
 		return imageUnavailable
 	case errors.As(err, &ingest):
 		return imageFailed
-	case pass.Err() != nil:
-		// Cut off by the pass's end, its deadline or a cancel: nothing learned.
+	case sending.Err() != nil:
 		return imageDeferred
 	case got == notReached:
 		return imageUnavailable
@@ -109,15 +107,11 @@ type imageSend struct {
 	retryAfter time.Time
 }
 
-// sendImage sends one image record with its bytes from the store. It starts only with all
-// its request's time left, judged from the record's size before the bytes are read. One
-// whose bytes the host refuses goes again without them, saying so.
+// sendImage sends one image record with its bytes from the store, in the time its size
+// gives it (timeoutFor). One whose bytes the host refuses goes again without them, saying so.
 func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event) imageSend {
 	if err := ctx.Err(); err != nil {
 		return imageSend{outcome: judgeImage(ctx, err, notReached), err: err}
-	}
-	if !r.timeLeft(ctx, imageRequestSize(e)) {
-		return imageSend{outcome: imageDeferred, err: errNoTimeLeft}
 	}
 	rec := withImageData(r.StateDir, e)
 	_, carried := rec.Attrs[semconv.TermaImageDataKey]
@@ -125,9 +119,6 @@ func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event
 	var ingest *IngestError
 	refused := carried && errors.As(err, &ingest) &&
 		(ingest.Status == http.StatusBadRequest || ingest.Status == http.StatusRequestEntityTooLarge)
-	if refused && !r.timeLeft(ctx, imageEnvelope) {
-		return imageSend{outcome: imageDeferred, err: errNoTimeLeft, refused: true, bare: true}
-	}
 	if refused {
 		delete(rec.Attrs, semconv.TermaImageDataKey)
 		rec.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedRefused
@@ -138,37 +129,6 @@ func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event
 		sent.retryAfter = ingest.RetryAfter
 	}
 	return sent
-}
-
-// imageRequestSize is how large e's request will be at most, from the size its record names:
-// its bytes in base64 when it will carry them, and its envelope.
-func imageRequestSize(e spool.Event) int {
-	if _, omitted := e.Attrs[semconv.TermaImageOmittedKey]; omitted || e.Attempts >= imageMaxAttempts {
-		return imageEnvelope
-	}
-	// A spooled number decodes as float64; a record not yet spooled holds an int.
-	size := promptimage.MaxBytes
-	switch n := e.Attrs[semconv.TermaImageSizeKey].(type) {
-	case float64:
-		size = int(n)
-	case int:
-		size = n
-	}
-	return base64.StdEncoding.EncodedLen(min(max(size, 0), promptimage.MaxBytes)) + imageEnvelope
-}
-
-// timeLeft reports whether ctx leaves a request of n bytes all the time it may take.
-func (r Router) timeLeft(ctx context.Context, n int) bool {
-	deadline, ok := ctx.Deadline()
-	return ctx.Err() == nil && (!ok || time.Until(deadline) >= r.timeout(n))
-}
-
-// timeout is how long a request of n bytes may take.
-func (r Router) timeout(n int) time.Duration {
-	if r.requestTimeout != nil {
-		return r.requestTimeout(n)
-	}
-	return timeoutFor(n)
 }
 
 // withImageData is the image record e with its bytes from the store, or saying why it has

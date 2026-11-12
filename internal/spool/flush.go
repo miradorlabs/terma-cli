@@ -38,8 +38,6 @@ const (
 	SkipBackoff SkipReason = "backing off after a failed delivery"
 	// SkipMinInterval means a flush completed more recently than the caller's throttle.
 	SkipMinInterval SkipReason = "a flush completed within the throttle interval"
-	// SkipBusy means another flusher was delivering the spool (DrainOptions.NoWait).
-	SkipBusy SkipReason = "another flush is delivering this queue"
 )
 
 // Result summarizes a flush; its counts are disjoint, and only Expired, Pruned and
@@ -59,9 +57,6 @@ type Result struct {
 	Skipped bool
 	Reason  SkipReason
 	Err     error
-	// Grew says a Drain left lines appended after it last read the queue, which it did not
-	// hand out: another pass has work.
-	Grew bool
 }
 
 // add folds one read's losses into the pass; Sent and Held are counted at delivery.

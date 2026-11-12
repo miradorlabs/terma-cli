@@ -206,8 +206,8 @@ func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
 }
 
 // The events' flush sends no image: it hands one an older build queued with the events to
-// the image queue, starts that queue's own pass, and says what waits there; `--images`
-// runs that pass here.
+// the image queue, which the relay sends, and says what waits there; `--images` sends it
+// here.
 func TestSpoolFlushLeavesImagesToTheirOwnPass(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	acceptingOTLP(t)
@@ -218,17 +218,9 @@ func TestSpoolFlushLeavesImagesToTheirOwnPass(t *testing.T) {
 	if err := s.Append(image); err != nil {
 		t.Fatal(err)
 	}
-	started := 0
-	prev := testApp.startImageFlush
-	testApp.startImageFlush = func() { started++ }
-	t.Cleanup(func() { testApp.startImageFlush = prev })
-
 	out, _ := runTerma(t, "spool", "flush")
 	if !strings.Contains(out, "handed 1 image record to the image queue") || !strings.Contains(out, "Images: 1 queued") {
 		t.Fatalf("the report should say where the image went:\n%s", out)
-	}
-	if started != 1 {
-		t.Fatalf("the image queue's pass started %d times, want once", started)
 	}
 	if n, _, _ := s.Pending(); n != 1 {
 		t.Fatalf("the events' spool should hold only the keyless event, pending=%d", n)
@@ -252,7 +244,7 @@ func TestDescribeFlushWordsTheImagePass(t *testing.T) {
 	want := []string{
 		"an image for team p1 did not finish uploading in its time; its images retry after 3:04PM",
 		"retrying team p2's images after 3:04PM",
-		"leaving 2 for a later pass",
+		"leaving 2 for later",
 		"dropped 1 the host refused even without its image",
 	}
 	if delivered != "1 image" || strings.Join(undelivered, "|") != strings.Join(want, "|") {
@@ -260,8 +252,8 @@ func TestDescribeFlushWordsTheImagePass(t *testing.T) {
 	}
 }
 
-// Teardown waits for a running image pass, which stops before its next image without the
-// relay's token, so its open lock does not keep Windows from removing the image queue.
+// Teardown waits for an image being sent, as the relay stops, so the queue's open lock does
+// not keep Windows from removing it.
 func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	s, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
@@ -271,15 +263,24 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	if err := s.Append(spool.Event{Name: semconv.TermaPromptImageEvent}); err != nil {
 		t.Fatal(err)
 	}
+	queued, _, err := s.Read(t.Context(), time.Now())
+	if err != nil || len(queued) != 1 {
+		t.Fatalf("Read = %v, %v", queued, err)
+	}
 	draining, done := make(chan struct{}), make(chan struct{})
 	var ended time.Time
 	go func() {
-		s.Drain(t.Context(), spool.DrainOptions{}, func(context.Context, []spool.Pending) {
+		defer close(done)
+		release, err := s.Take(t.Context(), queued[0])
+		if err != nil {
+			t.Error(err)
 			close(draining)
-			time.Sleep(200 * time.Millisecond)
-			ended = time.Now()
-		})
-		close(done)
+			return
+		}
+		close(draining)
+		time.Sleep(200 * time.Millisecond)
+		ended = time.Now()
+		release()
 	}()
 	<-draining
 	if err := testApp.removeHookState(); err != nil {
@@ -292,39 +293,6 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(testApp.stateDir, spool.ImageDir)); !os.IsNotExist(err) {
 		t.Fatalf("the image queue outlived teardown: %v", err)
-	}
-}
-
-// The events' flush starts no image pass while every queued image's team waits out its
-// images window.
-func TestSpoolFlushStartsNoImagePassWhileImagesWait(t *testing.T) {
-	useConfigDir(t, t.TempDir())
-	acceptingOTLP(t)
-	spoolForTest(t)
-	images, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := images.Append(spool.Event{Name: semconv.TermaPromptImageEvent, Attrs: map[string]any{hookrun.AttrProjectID: spoolTestProject}}); err != nil {
-		t.Fatal(err)
-	}
-	images.DestinationStalled(spoolTestProject, time.Now())
-	started := 0
-	prev := testApp.startImageFlush
-	testApp.startImageFlush = func() { started++ }
-	t.Cleanup(func() { testApp.startImageFlush = prev })
-	if _, err := testApp.flushSpool(t.Context(), true, 0); err != nil {
-		t.Fatal(err)
-	}
-	if started != 0 {
-		t.Fatal("an image pass started while its team's images wait")
-	}
-	images.DestinationDelivered(spoolTestProject, time.Now())
-	if _, err := testApp.flushSpool(t.Context(), true, 0); err != nil {
-		t.Fatal(err)
-	}
-	if started != 1 {
-		t.Fatalf("image passes started: %d, want 1 once the window closed", started)
 	}
 }
 

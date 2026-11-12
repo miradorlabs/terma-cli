@@ -45,9 +45,8 @@ func TestJudgeImage(t *testing.T) {
 		want imageOutcome
 	}{
 		{"delivered", live, nil, written, imageDelivered},
-		{"no time left to start it", live, errNoTimeLeft, notReached, imageDeferred},
-		{"pass cancelled mid-upload", cancelled, &url.Error{Op: "Post", Err: context.Canceled}, reached, imageDeferred},
-		{"pass cancelled before the host", cancelled, &url.Error{Op: "Post", Err: context.Canceled}, notReached, imageDeferred},
+		{"sender stopped mid-upload", cancelled, &url.Error{Op: "Post", Err: context.Canceled}, reached, imageDeferred},
+		{"sender stopped before the host", cancelled, &url.Error{Op: "Post", Err: context.Canceled}, notReached, imageDeferred},
 		{"pass ran out mid-upload", expired, deadline, reached, imageDeferred},
 		{"pass ran out after the host answered", expired, &IngestError{Status: http.StatusInternalServerError}, written, imageFailed},
 		{"pass ran out before the host", expired, deadline, notReached, imageDeferred},

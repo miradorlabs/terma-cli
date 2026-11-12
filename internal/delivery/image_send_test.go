@@ -8,11 +8,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // Each image leaves in a request of its own with its bytes from the store, which forgets
@@ -99,64 +97,6 @@ func TestAnImageRefusedOutrightLeavesWithoutItsBytes(t *testing.T) {
 	}
 }
 
-// The image lane's pass has room for the largest image on the slowest uplink a request is
-// given time for, which the events' pass does not.
-func TestTheImagePassHasRoomForTheLargestImage(t *testing.T) {
-	t.Parallel()
-	largest := timeoutFor(base64.StdEncoding.EncodedLen(promptimage.MaxBytes) + 4<<10)
-	if spool.DefaultFlushTimeout >= largest {
-		t.Fatalf("the events' pass (%v) has room for the largest image (%v): the image lane's own pass is moot", spool.DefaultFlushTimeout, largest)
-	}
-	if ImagePassTimeout < 2*largest {
-		t.Fatalf("the image pass (%v) has no room past the largest image's request (%v)", ImagePassTimeout, largest)
-	}
-}
-
-// An image is started only with all its request's time left: too little of the pass left
-// leaves it for the next pass untried, opening no window. The image lane's own pass, long
-// enough, sends the same image.
-func TestAnImageWaitsForAPassWithRoomForIt(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{delay: 300 * time.Millisecond}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	r.requestTimeout = func(int) time.Duration { return time.Second }
-	img := promptimage.Image{Data: pixel, MIMEType: "image/png", Index: 1}
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-
-	r.imagePass = 500 * time.Millisecond
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 0 || res.Deferred != 1 || res.Failed != 0 || len(res.Stalls) != 0 || len(rec.requests()) != 0 {
-		t.Fatalf("short pass: FlushImages = %+v, %d requests", res, len(rec.requests()))
-	}
-	if !r.Images.RetryAt("p1").IsZero() {
-		t.Fatal("an image never tried opened a window")
-	}
-
-	r.imagePass = 3 * time.Second
-	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Sent != 1 {
-		t.Fatalf("long pass: FlushImages = %+v", res)
-	}
-}
-
-// Whether an image fits what is left of the pass is judged from the size its record names,
-// before its bytes are read: a large image whose bytes have gone waits, untried, rather than
-// leave as a small record saying they are unavailable.
-func TestAnImageIsJudgedByItsSizeBeforeItsBytesAreRead(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, _ := imageFixture(t, rec, true)
-	r.requestTimeout = func(n int) time.Duration { return time.Duration(n) * time.Microsecond }
-	r.imagePass = time.Second
-	big := pixelN(2 << 20) // ~2.8 s at this rate, its bytes never stored
-	big.Data = big.Data[:promptimage.MaxBytes]
-	queue(t, r.Images, imageEvent(big))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 0 || res.Deferred != 1 || len(rec.requests()) != 0 {
-		t.Fatalf("FlushImages = %+v, %d requests", res, len(rec.requests()))
-	}
-}
-
 // Bytes the host refused (400) are not sent again, though the record without them then
 // failed: it goes on saying they were refused.
 func TestRefusedBytesAreNotSentAgain(t *testing.T) {
@@ -210,28 +150,5 @@ func TestARecordRefusedWithoutBytesIsDropped(t *testing.T) {
 	}
 	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
 		t.Fatal("a dropped record's image stayed in the store")
-	}
-}
-
-// Bytes the host refused with too little of the pass left for the record without them:
-// that request waits for the next pass, the record saying the bytes were refused, at no
-// attempt.
-func TestARefusalLateInThePassLeavesTheRetryForTheNext(t *testing.T) {
-	t.Parallel()
-	data := base64.StdEncoding.EncodeToString(pixelN(1).Data)
-	rec := &recorder{status: http.StatusBadRequest, delay: 200 * time.Millisecond, refuse: func(body string) bool { return strings.Contains(body, data) }}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	r.requestTimeout = func(int) time.Duration { return 250 * time.Millisecond }
-	r.imagePass = 400 * time.Millisecond
-	img := pixelN(1)
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
-	if res.Sent != 0 || res.Deferred != 1 || len(rec.requests()) != 1 {
-		t.Fatalf("FlushImages = %+v, %d requests", res, len(rec.requests()))
-	}
-	left := queued(t, r.Images)
-	if len(left) != 1 || left[0].Attempts != 0 || left[0].Attrs[semconv.TermaImageOmittedKey] != semconv.TermaImageOmittedRefused {
-		t.Fatalf("image queue holds %+v", left)
 	}
 }
