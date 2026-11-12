@@ -34,6 +34,8 @@ harnesses=(
 	"opencode opencode-ai releases"
 	"copilot @github/copilot releases"
 	"dsh @deepseek-ai/dsh latest"
+	"pi @earendil-works/pi-coding-agent releases"
+	"t3 t3 releases"
 )
 
 # The desktop apps (TERMA_E2E_<APP>_APP_VERSIONS), by the update feed each one's updater reads:

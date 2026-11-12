@@ -137,6 +137,7 @@ func countOf(vs []string, v string) int {
 
 // TERMA_E2E_ONLY runs the harnesses it names and skips the rest; unset, it skips none.
 func TestSkipUnlessSelected(t *testing.T) {
+	unrestricted(t)
 	for _, tc := range []struct {
 		only, harness string
 		skipped       bool
@@ -162,6 +163,7 @@ func TestSkipUnlessSelected(t *testing.T) {
 // TERMA_E2E_EXCEPT skips the harnesses it names, the night's run leaving the watched ones to the
 // frequent check; beside TERMA_E2E_ONLY, both apply.
 func TestSkipExcepted(t *testing.T) {
+	unrestricted(t)
 	for _, tc := range []struct {
 		only, except, harness string
 		skipped               bool

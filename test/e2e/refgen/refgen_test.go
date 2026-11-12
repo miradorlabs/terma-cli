@@ -854,8 +854,9 @@ func TestSlackMessageJSON(t *testing.T) {
 	for a, want := range map[*Announcement]string{
 		{Harness: "claude", Name: "Claude Code", Version: "2.1.319", Previous: "2.1.318", URL: "https://terma.ai/h/claude/2.1.319",
 			CompareURL: "https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319", Changes: 4, Impact: ImpactN{"breaking": 1, "notable": 2, "degrading": 0},
-			Undocumented: &undoc, Highlights: []string{"New tool: Monitor", "a <b> & c"}, Signing: &sig}: `{"blocks":[{"text":{"text":"*Claude Code 2.1.319* is out: 4 changes since 2.1.318\n1 breaking · 2 notable · 2 not in the vendor's changelog · code signature revoked","type":"mrkdwn"},"type":"section"},{"text":{"text":"• New tool: Monitor\n• a &lt;b&gt; &amp; c","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/claude/2.1.319"},{"text":{"text":"Compare with 2.1.318","type":"plain_text"},"type":"button","url":"https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319"}],"type":"actions"}],"text":"Claude Code 2.1.319 is out: https://terma.ai/h/claude/2.1.319","unfurl_links":false}`,
-		{Harness: "codex", Name: "Codex CLI", Version: "0.167.0", URL: "https://terma.ai/h/codex/0.167.0", Highlights: []string{}}: `{"blocks":[{"text":{"text":"*Codex CLI 0.167.0* is out","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/codex/0.167.0"}],"type":"actions"}],"text":"Codex CLI 0.167.0 is out: https://terma.ai/h/codex/0.167.0","unfurl_links":false}`,
+			Undocumented: &undoc, Highlights: []string{"New tool: Monitor", "a <b> & c"}, Signing: &sig,
+			Support: "unsupported", Failed: []string{"Telemetry reaches the project through the local relay (linux/amd64)"}}: `{"blocks":[{"text":{"text":"*Claude Code 2.1.319* is out: 4 changes since 2.1.318\n1 breaking · 2 notable · 2 not in the vendor's changelog · code signature revoked","type":"mrkdwn"},"type":"section"},{"text":{"text":":x: *Broken with terma*: Telemetry reaches the project through the local relay (linux/amd64)","type":"mrkdwn"},"type":"section"},{"text":{"text":"• New tool: Monitor\n• a &lt;b&gt; &amp; c","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/claude/2.1.319"},{"text":{"text":"Compare with 2.1.318","type":"plain_text"},"type":"button","url":"https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319"}],"type":"actions"}],"text":"Claude Code 2.1.319 is out (broken with terma): https://terma.ai/h/claude/2.1.319","unfurl_links":false}`,
+		{Harness: "codex", Name: "Codex CLI", Version: "0.167.0", URL: "https://terma.ai/h/codex/0.167.0", Highlights: []string{}, Support: "supported"}: `{"blocks":[{"text":{"text":"*Codex CLI 0.167.0* is out","type":"mrkdwn"},"type":"section"},{"text":{"text":":white_check_mark: *Works with terma*","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/codex/0.167.0"}],"type":"actions"}],"text":"Codex CLI 0.167.0 is out (works with terma): https://terma.ai/h/codex/0.167.0","unfurl_links":false}`,
 	} {
 		if got := string(marshalPlain(slackMessage(*a))); got != want {
 			t.Errorf("slack message:\n got %s\nwant %s", got, want)
@@ -970,9 +971,10 @@ func TestTimelineArchives(t *testing.T) {
 	}
 }
 
-// A partial capture is published, marked partial in the index, and not announced: the news is
-// never a partial changelog. The capture that makes it whole announces it, once.
-func TestPartialBuildIsAnnouncedWhenWhole(t *testing.T) {
+// A release is announced once, at its first publication, with terma's verdict and the checks that
+// failed: a capture that failed in part too, saying so, since that is news of a break as well. The
+// capture that makes it whole announces nothing again.
+func TestReleaseIsAnnouncedOnceWithTermasVerdict(t *testing.T) {
 	dir := t.TempDir()
 	opt := options{site: "https://terma.ai"}
 	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}, opt); err != nil {
@@ -980,20 +982,30 @@ func TestPartialBuildIsAnnouncedWhenWhole(t *testing.T) {
 	}
 	partial := claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")
 	partial.Failed = true
-	news, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{partial}}, opt)
-	if err != nil || len(news) != 0 {
-		t.Fatalf("a partial capture announced %+v (%v)", news, err)
+	rows := []HistoryEntry{
+		{Harness: "claude", Version: "1.0.1", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"},
+		{Harness: "claude", Version: "1.0.1", Platform: "linux/amd64", Capability: "relay.telemetry", Result: "fail"},
+	}
+	news, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{partial}, history: rows,
+		labels: map[string]string{"relay.telemetry": "Telemetry reaches the project"}}, opt)
+	if err != nil || len(news) != 1 {
+		t.Fatalf("announced %+v (%v)", news, err)
+	}
+	a := news[0]
+	// relay.telemetry is the core check: failing it on a platform is the build unsupported.
+	if a.Support != "unsupported" || !a.Partial || len(a.Failed) != 1 || a.Failed[0] != "Telemetry reaches the project (linux/amd64)" {
+		t.Errorf("announcement = %+v", a)
+	}
+	if v := teamVerdict(a); !strings.Contains(v, "Broken with terma*: Telemetry reaches the project (linux/amd64)") || !strings.Contains(v, "captured again") {
+		t.Errorf("verdict = %q", v)
 	}
 	var idx HarnessIndex
-	if err := readJSON(filepath.Join(dir, "claude", "index.json"), &idx); err != nil || len(idx.Versions) != 2 || !idx.Versions[0].Partial || idx.Versions[1].Partial {
+	if err := readJSON(filepath.Join(dir, "claude", "index.json"), &idx); err != nil || !idx.Versions[0].Partial {
 		t.Fatalf("index = %+v (%v)", idx.Versions, err)
 	}
 	whole := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")}}
-	if news, _ = publish(dir, whole, opt); len(news) != 1 || news[0].Version != "1.0.1" {
-		t.Fatalf("the whole capture announced %+v", news)
-	}
 	if news, _ = publish(dir, whole, opt); len(news) != 0 {
-		t.Errorf("announced again: %+v", news)
+		t.Errorf("the whole capture announced again: %+v", news)
 	}
 }
 

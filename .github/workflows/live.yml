@@ -2,10 +2,10 @@ name: E2E harness contracts
 
 # A harness's build is tested when it comes out: the reference's frequent check (reference.yml)
 # captures each new build of the harnesses it watches (reference/new-builds.sh --tracked) once,
-# fully, terma's contracts included, which is when a build stops sending what terma expects;
-# terma's own changes are tested by CI. So every night this runs the rest alone: the harnesses
-# that check does not watch (Pi, omp, Hermes, T3 Code, installed at their newest), the scenarios
-# of no one harness, and the matrix, field catalog and digest they feed.
+# fully, terma's contracts included, and says in its Slack announcement whether terma works with
+# it; terma's own changes are tested by CI. So nothing runs here on a schedule: this is a full run
+# by hand, every contract of every harness at the builds its variables pick, subscription logins
+# included where asked for. It publishes nothing; its report, matrix and digest are artifacts.
 
 on:
   workflow_dispatch:
@@ -14,8 +14,6 @@ on:
         description: Also test Claude and Codex subscription logins
         type: boolean
         default: false
-  schedule:
-    - cron: "23 4 * * *"
 
 permissions:
   contents: read
@@ -35,7 +33,7 @@ jobs:
       INCLUDE_SUBSCRIPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.include_subscriptions || false }}
       # The newest build each harness was checked on here, on macOS, and every release since,
       # the newest five of a burst (versions.go, sinceChecked): the build people run keeps
-      # being tested, and what is new is judged against it the same night. Without the
+      # being tested, and what is new is judged against it in the same run. Without the
       # published history, the last three releases. DeepSeek ships prereleases alone, which
       # "checked" does not pick: its newest build, as before.
       TERMA_E2E_CLAUDE_VERSIONS: checked
@@ -60,7 +58,7 @@ jobs:
             test/e2e/go.sum
       # Every contract that needs no account runs against local fixture providers. One that
       # needs an account runs where the environment has its secret and is skipped where it has
-      # not, which the summary says: a missing secret narrows the night, it does not fail it.
+      # not, which the summary says: a missing secret narrows the run, it does not fail it.
       # Subscription coverage, asked for by hand, does need its secrets.
       - name: Say which accounts this run has
         env:
@@ -109,11 +107,6 @@ jobs:
           go build -o test/e2e/bin/terma ./cmd/terma
           cd test/e2e
           go test -c -o bin/e2e.test .
-      # The frequent check tests the watched harnesses' builds as they come out: none of their
-      # scenarios runs here.
-      - name: Leave the watched harnesses to the frequent check
-        working-directory: test/e2e
-        run: echo "TERMA_E2E_EXCEPT=$(reference/new-builds.sh --tracked | paste -sd, -)" >> "$GITHUB_ENV"
       - name: Run e2e contracts (subscription coverage is opt-in)
         working-directory: test/e2e
         env:
@@ -172,18 +165,12 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
 
-  # The matrix, the field catalog and the Harness Reference: this night's rows, and the field
-  # census and profiles it takes, merged into the history, catalog
-  # and reference (docs/harnesses), rendered as docs/COMPATIBILITY.md,
-  # docs/compat/compat.json (the website's data) and docs/FIELDS.md, published as an artefact
-  # and the run's summary. Both live on the compat-matrix branch, which each scheduled run
-  # extends and pushes: that branch's docs/compat/compat.json is the published matrix.
-  #
-  # Before merging, the job says what the night changed against them (compatgen -digest): new
-  # and removed fields per harness build, fields the relay withholds as unclassified,
-  # capabilities whose result changed, and a census that did not run. It goes to the summary
-  # and to Slack every night, "no changes" included, so a quiet channel means the job did not
-  # run. Drift never fails the night.
+  # The matrix, the field catalog and the Harness Reference: this run's rows, and the field census
+  # and profiles it takes, merged into the published history, catalog and reference
+  # (docs/harnesses) and rendered, as an artefact and the run's summary; the frequent check
+  # publishes them (reference.yml). First the job says what the run changed against them
+  # (compatgen -digest): new and removed fields per harness build, fields the relay withholds as
+  # unclassified, capabilities whose result changed, and a census that did not run.
   compat:
     needs: [e2e]
     if: always()
@@ -222,10 +209,10 @@ jobs:
           go run ./compatgen "${args[@]}" -digest report -source -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
           if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
-      # The Harness Reference: each build the night captured, normalized into its snapshot and
+      # The Harness Reference: each build the run captured, normalized into its snapshot and
       # merged into the published ones, each harness's versions compared in order, changes
       # checked against the vendor's changelog (refgen; test/e2e/reference/SCHEMA.md). After
-      # compatgen, so a build's support is tonight's history.
+      # compatgen, so a build's support is this run's history.
       - name: Render the Harness Reference
         working-directory: test/e2e
         env:
@@ -236,7 +223,7 @@ jobs:
           for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
           for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
           # The catalog compatgen just merged gives each build a whole census saw its telemetry,
-          # tonight's or an earlier night's: a backfill that took no census still has it.
+          # this run's or an earlier one's: a backfill that took no census still has it.
           # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
           # load the timeline-<n>.json archives; then the default pages it.
           go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"
@@ -244,18 +231,6 @@ jobs:
           # made the diffs, built reproducibly, so an unchanged engine is no change on the branch.
           GOOS=js GOARCH=wasm go build -trimpath -buildvcs=false -ldflags='-s -w' -o ../../docs/harnesses/refdiff.wasm ./refdiff/wasm
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" ../../docs/harnesses/wasm_exec.js
-      - name: Post the digest to Slack
-        # A webhook that fails (revoked, Slack down) must not keep the night from being published.
-        continue-on-error: true
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        working-directory: test/e2e
-        run: |
-          if [ -z "$SLACK_WEBHOOK_URL" ]; then
-            echo "::notice::No SLACK_WEBHOOK_URL in the live-harnesses environment: the digest was not posted."
-            exit 0
-          fi
-          curl -fsS -X POST -H 'Content-Type: application/json' --data @report/slack.json "$SLACK_WEBHOOK_URL"
       - uses: actions/upload-artifact@v7
         with:
           name: compatibility-matrix
@@ -268,24 +243,3 @@ jobs:
             test/e2e/report/slack.json
           if-no-files-found: ignore
           retention-days: 90
-      - name: Publish to the compat-matrix branch
-        if: github.event_name == 'schedule'
-        run: test/e2e/compatgen/publish.sh publish
-      # Each version newer than any captured before, once, after it is published: never a
-      # backfill, never twice. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without
-      # it, the digest's.
-      - name: Announce new versions
-        if: github.event_name == 'schedule'
-        continue-on-error: true
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          news="$RUNNER_TEMP/announcements.json"
-          [ -s "$news" ] || exit 0
-          if [ -z "$SLACK_WEBHOOK_URL" ]; then
-            echo "::notice::No Slack webhook in the live-harnesses environment: $(jq length "$news") new versions not announced."
-            exit 0
-          fi
-          jq -c '.[].slack' "$news" | while read -r message; do
-            curl -fsS -X POST -H 'Content-Type: application/json' --data "$message" "$SLACK_WEBHOOK_URL"
-          done

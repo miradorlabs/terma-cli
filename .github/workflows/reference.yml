@@ -325,13 +325,16 @@ jobs:
           rows=()
           for f in $(find runs -name compat.json | sort); do rows+=(-run "$f"); done
           for f in $(find runs -name notes.json | sort); do rows+=(-notes "$f"); done
+          # And the census into the field catalog, which only these captures extend.
+          for f in $(find runs -name fields.json | sort); do rows+=(-fields "$f"); done
+          for f in $(find runs -name census.json | sort); do rows+=(-census "$f"); done
           if [ ${#rows[@]} -gt 0 ]; then
             go run ./compatgen "${rows[@]}"
             echo "TERMA_REFERENCE_MATRIX=1" >> "$GITHUB_ENV"
           fi
           args=()
           for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
-          # The capture's census of the builds; the catalog stays the night's.
+          # The capture's census of the builds.
           for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
           for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
           while read -r line; do
@@ -355,14 +358,20 @@ jobs:
       # Each version newer than any captured before, once, after it is published: never a
       # backfill, never twice. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without
       # it, the digest's.
+      # Each says whether terma works with the build. A dry run shows them in its summary instead.
       - name: Announce new versions
-        if: success() && (github.event_name != 'workflow_dispatch' || inputs.publish)
+        if: success()
         continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
         run: |
           news="$RUNNER_TEMP/announcements.json"
           [ -s "$news" ] || exit 0
+          if [ "$DRY_RUN" = true ]; then
+            { echo '### What would be announced'; jq -r '.[] | .slack.blocks[] | select(.text) | .text.text, ""' "$news"; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
             echo "::notice::No Slack webhook in the live-harnesses environment: $(jq length "$news") new versions not announced."
             exit 0

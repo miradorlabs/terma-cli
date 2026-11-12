@@ -103,13 +103,14 @@ tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
 A watched harness's build (`reference/new-builds.sh --tracked`) is tested when it comes out:
 the Harness Reference's frequent check (`reference.yml`, below) runs every scenario of the
-harness's against it once, terma's contracts included. `E2E harness contracts` (`live.yml`)
-runs nightly and on manual dispatch for the rest (`TERMA_E2E_EXCEPT`): the harnesses that check
-does not watch, at their newest, and the scenarios of no one harness. Every contract that needs no account runs against local fixture providers, as
+harness's against it once, terma's contracts included, and its Slack announcement says whether
+terma works with it. Nothing runs on a schedule. `E2E harness contracts` (`live.yml`) is a full
+run by hand: every contract of every harness at the builds its variables pick, publishing
+nothing. Every contract that needs no account runs against local fixture providers, as
 PR CI's do: the relay and hook contracts, the field census and the drift digest. One that needs
 an account runs where the `live-harnesses` environment has its secret, `OPENAI_API_KEY` for
 Codex's real API scenarios and `ANTHROPIC_API_KEY` for Claude's, and is skipped where it has
-not; the job summary says which. A missing secret narrows the night; it does not fail it.
+not; the job summary says which. A missing secret narrows the run; it does not fail it.
 
 The workflow file `live.yml`, its `live-harnesses` environment and CI's `live-contracts`
 check keep those names: the repository ruleset and the OpenAI secret name them.
@@ -127,8 +128,8 @@ account `terma-cli-live-ci`, with `api.responses.write` and `api.model.read`. A 
 spend limit was configured, but OpenAI returned enforcement status `inactive`; do not rely on it
 as an enforced cap until that is resolved.
 
-Subscription scenarios receive no subscription credentials on nightly runs and are reported as
-**not run**, not passed. The GitHub job summary includes the detailed coverage report.
+Subscription scenarios receive no subscription credentials unless a run asks for them
+(`include_subscriptions`), and are reported as **not run**, not passed. The GitHub job summary includes the detailed coverage report.
 
 To run subscription checks manually, enable **include_subscriptions** when
 running the workflow and supply `CLAUDE_CODE_OAUTH_TOKEN` and `CODEX_AUTH_JSON`
@@ -220,9 +221,10 @@ five censuses, and five whole ones however old (a
 partial census, one a census scenario failed before taking whole, does not push out the
 whole ones), and a key leaves once none of them saw it. The file holds one entry a line, so a night's change is a diff of what changed.
 
-Every night `live.yml`'s `compat` job starts from the published history and catalog, says
-what the night changed against them, then merges the night in and publishes it (`make
-compat` and `make drift` do the same locally, into `docs/`, where git ignores them). Its two
+The frequent check's publish job (`reference.yml`) starts from the published history and catalog,
+merges each capture in and publishes it; `live.yml`'s `compat` job, run by hand, also says what
+its run changed against them (`make compat` and `make drift` do the same locally, into `docs/`,
+where git ignores them). Its two
 git steps are `compatgen/publish.sh restore` and `publish`, which `TestPublishTwoNights`
 runs over two nights against a scratch origin. The digest,
 `report/drift.md`, `drift.json` and `slack.json`, leads with one verdict a harness: does its
@@ -304,10 +306,8 @@ did not reach a harness censused within the week or whose census scenarios ran t
 or did not reach the newest build: the
 newest the catalog had, or the newest the night's census scenarios ran (`report/census.json`).
 A census that did not run never reads as a
-quiet night. The digest goes to the run's summary and to Slack through the
-`SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
-channel means the job did not run. Drift never fails the night; a removed key on a surface
-terma parses fails its golden.
+quiet run. The digest goes to the run's summary and its artifacts. Drift never fails a run; a
+removed key on a surface terma parses fails its golden.
 
 ## Harness Reference
 
@@ -327,7 +327,7 @@ placeholders), builds its snapshot with its field census and its capability hist
 it into the published snapshots (a section the night did not capture keeps the last night's),
 compares each harness's versions in order, checks each change against the vendor's changelog,
 and writes `docs/harnesses/`. The frequent check (`reference.yml`) runs it for the builds it
-captures, and the nightly `compat` job after compatgen; both publish the tree on `compat-matrix`
+captures, and `live.yml`'s `compat` job after compatgen; both write the tree for `compat-matrix`
 beside the matrix, and `publish.sh restore` starts each from it.
 
 ```sh
@@ -429,7 +429,9 @@ and a desktop app's on a machine of its own. The publish job waits for all of th
 page and changelog are published once, complete, with terma's verdict, and announced then
 (`publish.sh publish-reference`). A capture that failed is published partial (`refgen
 -attempted`), marked `partial` in the index and not announced; the capture that makes it whole
-announces it. Its publish job and the nightly compat job share a concurrency group, so they
+announces it. The announcement says whether terma works with the build: "Works", "Partly
+broken" or "Broken" with the checks that failed, or "Not tested", and that its capture failed in
+part where it did. Its publish job and `live.yml`'s compat job share a concurrency group, so they
 never push `compat-matrix` at once.
 
 The night does not capture or test those builds again: a build is tested when it comes out,
@@ -476,7 +478,7 @@ starts, so those cells fail by design; what they lost is the measurement.
 
 Each scenario runs against the installed binary and the last three releases
 (`TERMA_E2E_CLAUDE_VERSIONS`, `TERMA_E2E_CODEX_VERSIONS`, and each harness's own: `installed`,
-`lastN`, `checked`, or a comma list), oldest first. `checked` is what the nightly runs: the
+`lastN`, `checked`, or a comma list), oldest first. `checked` is: the
 newest release the history at `TERMA_E2E_CHECKED` has a pass or a failure of on this platform
 (the Linux machine job's rows say nothing of what macOS checked), and every release since. It
 keeps terma tested on the build people run, and judges what is new against it on the same

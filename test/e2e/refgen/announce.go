@@ -27,6 +27,12 @@ type Announcement struct {
 	Undocumented *int     `json:"undocumented"`
 	Highlights   []string `json:"highlights"`
 	Signing      *string  `json:"signing"`
+	// Support is terma's verdict on the build (refdiff.Support's status), Failed the checks that
+	// failed, by label, and Partial whether its capture failed: what the team needs to know of a
+	// release first, whether terma still works with it.
+	Support string   `json:"support"`
+	Failed  []string `json:"failed,omitempty"`
+	Partial bool     `json:"partial,omitempty"`
 	// Text is the announcement as a post of at most 280 characters, a link counted as X
 	// counts one (23).
 	Text  string        `json:"text"`
@@ -64,13 +70,9 @@ type SlackText struct {
 // ImpactN counts a version's changes by impact.
 type ImpactN map[string]int
 
-// captured reports a snapshot with the build itself captured whole: something of it besides
-// terma's verdict, from a capture that did not fail. A partial build is announced once a
-// capture of it is whole, so the news is never a partial changelog.
+// captured reports a snapshot with something captured of the build itself, not only terma's
+// verdict on it.
 func captured(s *Snapshot) bool {
-	if s.Capture.Partial {
-		return false
-	}
 	for _, sec := range present(s) {
 		if sec != "support" {
 			return true
@@ -103,9 +105,10 @@ func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map
 		if !versionLess(before, e.Version) || !captured(byVersion[e.Version]) {
 			continue
 		}
+		s := byVersion[e.Version]
 		a := Announcement{Harness: entry.ID, Name: entry.Name, Version: e.Version, Changes: e.Changes, Impact: ImpactN(e.Impact),
 			Undocumented: e.Undocumented, Highlights: []string{}, Signing: e.Signing,
-			URL: fmt.Sprintf("%s/h/%s/%s", site, entry.ID, e.Version)}
+			URL: fmt.Sprintf("%s/h/%s/%s", site, entry.ID, e.Version), Support: e.Support, Failed: failedChecks(s), Partial: s.Capture.Partial}
 		if e.Previous != nil {
 			a.Previous = *e.Previous
 			a.CompareURL = fmt.Sprintf("%s/harnesses/%s/compare/%s...%s", site, entry.ID, *e.Previous, e.Version)
@@ -118,6 +121,60 @@ func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map
 		out = append(out, a)
 	}
 	return out
+}
+
+// failedChecks are the labels of s's capability checks that failed, each once, with the platforms
+// it failed on where it did not fail on all.
+func failedChecks(s *Snapshot) []string {
+	if s.Support == nil {
+		return nil
+	}
+	failed, ran := map[string][]string{}, map[string]int{}
+	var order []string
+	for _, c := range s.Support.Capabilities {
+		label := c.Label
+		if label == "" {
+			label = c.ID
+		}
+		ran[label]++
+		if c.Result != "fail" {
+			continue
+		}
+		if failed[label] == nil {
+			order = append(order, label)
+		}
+		failed[label] = append(failed[label], c.Platform)
+	}
+	out := make([]string, 0, len(order))
+	for _, label := range order {
+		if len(failed[label]) < ran[label] {
+			label += " (" + strings.Join(failed[label], ", ") + ")"
+		}
+		out = append(out, label)
+	}
+	return out
+}
+
+// teamVerdict is what a says of terma and the build, for the team: whether it works, and what broke.
+func teamVerdict(a Announcement) string {
+	var v string
+	switch a.Support {
+	case "supported":
+		v = ":white_check_mark: *Works with terma*"
+	case "degraded":
+		v = ":warning: *Partly broken with terma*"
+	case "unsupported":
+		v = ":x: *Broken with terma*"
+	default:
+		v = ":grey_question: *Not tested with terma*"
+	}
+	if len(a.Failed) > 0 {
+		v += ": " + slackEscape(strings.Join(a.Failed, "; "))
+	}
+	if a.Partial {
+		v += "\n:hourglass: Its capture failed in part; it is captured again within hours, and its page updates then."
+	}
+	return v
 }
 
 // postText is a as one short post: name and version, what changed, and the link.
@@ -171,7 +228,7 @@ func slackMessage(a Announcement) *SlackMessage {
 	button := func(label, url string) SlackButton {
 		return SlackButton{Type: "button", Text: SlackText{Type: "plain_text", Text: label}, URL: url}
 	}
-	blocks := []SlackBlock{section(summary)}
+	blocks := []SlackBlock{section(summary), section(teamVerdict(a))}
 	if len(a.Highlights) > 0 {
 		var sb strings.Builder
 		for _, h := range a.Highlights {
@@ -184,7 +241,7 @@ func slackMessage(a Announcement) *SlackMessage {
 		buttons = append(buttons, button("Compare with "+a.Previous, a.CompareURL))
 	}
 	blocks = append(blocks, SlackBlock{Type: "actions", Elements: buttons})
-	return &SlackMessage{Text: fmt.Sprintf("%s %s is out: %s", a.Name, a.Version, a.URL), Blocks: blocks}
+	return &SlackMessage{Text: fmt.Sprintf("%s %s is out (%s with terma): %s", a.Name, a.Version, verdictWord(a.Support), a.URL), Blocks: blocks}
 }
 
 func slackEscape(s string) string {
@@ -196,4 +253,17 @@ func plural(n int, one, many string) string {
 		return one
 	}
 	return many
+}
+
+// verdictWord is terma's verdict in a word, for a notification's plain text.
+func verdictWord(support string) string {
+	switch support {
+	case "supported":
+		return "works"
+	case "degraded":
+		return "partly broken"
+	case "unsupported":
+		return "broken"
+	}
+	return "not tested"
 }

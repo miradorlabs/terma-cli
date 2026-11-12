@@ -3,6 +3,7 @@ package e2e
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -87,6 +89,13 @@ func skipUnlessSelected(t *testing.T, harness string) {
 	if only := os.Getenv("TERMA_E2E_ONLY"); only != "" && !listed(only, harness) {
 		t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, only)
 	}
+}
+
+// unrestricted clears TERMA_E2E_ONLY and TERMA_E2E_EXCEPT for t: an offline test of a
+// harness's scenario runs whatever harnesses its run is limited to.
+func unrestricted(t *testing.T) {
+	t.Setenv("TERMA_E2E_ONLY", "")
+	t.Setenv("TERMA_E2E_EXCEPT", "")
 }
 
 // listed reports whether the comma list names harness.
@@ -505,4 +514,26 @@ func CheckPathName(kind, name string) error {
 		return fmt.Errorf("refusing %s %q to name a file: want a letter or digit, then letters, digits and . + _ -, and no \"..\"", kind, name)
 	}
 	return nil
+}
+
+// ensureNpmBuild installs version of an npm package under the versions directory and returns its
+// command bin, as `npm install` puts it in node_modules/.bin.
+func ensureNpmBuild(harness, pkg, bin string) func(version string) (string, error) {
+	return func(version string) (string, error) {
+		if err := CheckPathName(harness+" version", version); err != nil {
+			return "", err
+		}
+		dir := filepath.Join(versionsDir(), harness, version)
+		path := filepath.Join(dir, "node_modules", ".bin", bin)
+		if _, err := os.Stat(path); err == nil {
+			return abs(path), nil
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", dir, pkg+"@"+version)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("npm install %s@%s: %v\n%s", pkg, version, err, out)
+		}
+		return abs(path), nil
+	}
 }

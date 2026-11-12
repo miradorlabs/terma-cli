@@ -179,8 +179,8 @@ func TestPublishTwoNights(t *testing.T) {
 		t.Error("compat-matrix carries main's files")
 	}
 
-	// A check that ran the new build's contracts publishes the matrix they extended with its
-	// reference; the field catalog stays the night's.
+	// A check that captured a new build publishes the matrix and field catalog its capture
+	// extended with its reference: there is no night to publish them any more.
 	contracts := filepath.Join(tmp, "contracts")
 	run(tmp, "git", "clone", "-q", "-b", "main", origin, contracts)
 	run(contracts, "bash", script, "restore")
@@ -192,9 +192,6 @@ func TestPublishTwoNights(t *testing.T) {
 	run(check, "git", "pull", "-q")
 	for _, f := range generated {
 		want := "contracts\n"
-		if f == "docs/FIELDS.md" || f == "docs/compat/fields.json" {
-			want = "night 2\n"
-		}
 		if b, err := os.ReadFile(filepath.Join(check, f)); err != nil || string(b) != want {
 			t.Errorf("after the contracts' check, compat-matrix has %s as %q (%v), want %q", f, b, err, want)
 		}

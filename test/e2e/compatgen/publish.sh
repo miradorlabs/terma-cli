@@ -8,9 +8,9 @@
 #   publish-reference
 #            commits the reference alone (the frequent check's new builds, reference.yml),
 #            leaving the night's matrix and catalog as they are; with TERMA_REFERENCE_MATRIX
-#            set, also the matrix the check's contract run extended (the history, compat.json
-#            and COMPATIBILITY.md), so a new build's page and the matrix give it one verdict.
-#            The catalog stays the night's: only the night's census rewrites it.
+#            set, also the matrix and the field catalog the check's capture extended (the
+#            history, compat.json, COMPATIBILITY.md, fields.json and FIELDS.md), so a new build's
+#            page, the matrix and the catalog say the same of it.
 #   restore-models
 #            puts back the Model Reference (docs/models) as last published
 #   publish-models
@@ -87,7 +87,7 @@ publish-reference)
 	tmp=$(mktemp -d)
 	trap 'rm -rf "$tmp"' EXIT
 	cp -R docs/harnesses "$tmp/"
-	matrix=(docs/COMPATIBILITY.md docs/compat/history.json docs/compat/compat.json)
+	matrix=(docs/COMPATIBILITY.md docs/compat/history.json docs/compat/compat.json docs/compat/fields.json docs/FIELDS.md)
 	if [ -n "${TERMA_REFERENCE_MATRIX:-}" ]; then
 		for f in "${matrix[@]}"; do
 			mkdir -p "$tmp/matrix/$(dirname "$f")"

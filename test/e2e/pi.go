@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"os"
@@ -15,8 +16,11 @@ import (
 // extension (internal/agents/internal/pifamily/terma.ts), written into Pi's agent directory, is its
 // exporter and calls `terma hook pi-*`. `terma relay setup --harness pi` writes it
 // pointed at the relay; a direct run splices the same template pointed at the receiver,
-// so the two differ only in where the extension sends. Only the installed build is
-// tested.
+// so the two differ only in where the extension sends. The builds are the installed one, or
+// TERMA_E2E_PI_VERSIONS's from npm (the reference's frequent check captures each release).
+
+// piPackage is Pi's npm package.
+const piPackage = "@earendil-works/pi-coding-agent"
 
 func forEachPi(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
@@ -24,13 +28,15 @@ func forEachPi(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
 	skipUnlessSelected(t, "pi")
-	path, err := exec_LookPath("pi")
-	if err != nil {
+	spec := cmp.Or(os.Getenv("TERMA_E2E_PI_VERSIONS"), "installed")
+	builds := resolve(t, "pi", spec, func() ([]string, error) { return npmReleases(piPackage) }, ensureNpmBuild("pi", piPackage, "pi"))
+	if len(builds) == 0 {
 		Record(t.Name(), "not run", "pi is not installed")
 		t.Skip("pi is not installed")
 	}
-	b := Binary{Harness: "pi", Version: numberOf(Version(path)), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+	for _, b := range builds {
+		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+	}
 }
 
 // piAgentDir is the sandbox's Pi configuration directory (PI_CODING_AGENT_DIR's
