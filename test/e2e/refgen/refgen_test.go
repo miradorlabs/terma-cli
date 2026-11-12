@@ -1178,6 +1178,14 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("a partial probe-only night over no telemetry: %v", got)
 	}
 
+	// Nor does a first capture whose turn failed publish its truncated probe: its census alone.
+	if got = merge(nil, truncated, now).Telemetry; got["export"] != nil || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != nil {
+		t.Errorf("a first partial capture published its probe: %v", got)
+	}
+	if got = merge(nil, truncatedProbe, now).Telemetry; got != nil {
+		t.Errorf("a first partial probe-only capture published telemetry: %v", got)
+	}
+
 	// A harness the census never covers lists its surfaces by its probe: one tonight's probe no
 	// longer saw is gone.
 	probes := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"sum"},"metrics/gone":{"type":"sum"}}}`)

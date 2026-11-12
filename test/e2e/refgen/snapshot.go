@@ -347,8 +347,13 @@ func verdict(pass, fail int, coreFailed bool) string {
 func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if old == nil {
 		out := *tonight
+		if tonight.Capture.Partial {
+			// A first capture whose turn failed publishes no truncated probe either: the census
+			// alone, where it took one (withoutProbe).
+			out.Telemetry, _ = withoutProbe(tonight.Telemetry).(map[string]any)
+		}
 		out.Capture.Sections = map[string]time.Time{}
-		for _, sec := range present(tonight) {
+		for _, sec := range present(&out) {
 			out.Capture.Sections[sec] = now
 		}
 		return &out
