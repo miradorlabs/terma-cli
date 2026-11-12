@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -37,6 +38,8 @@ type claudeCallResponse struct {
 	StopReason     string
 	ServiceTier    string
 	InferenceGeo   string
+	// Cwd is where the call was made, as its first final record names it.
+	Cwd string
 	// Time is when the call's first final record was written, zero when it has none.
 	Time time.Time
 }
@@ -45,6 +48,7 @@ type claudeCallResponse struct {
 type claudeAssistantRecord struct {
 	Type      string    `json:"type"`
 	RequestID string    `json:"requestId"`
+	Cwd       string    `json:"cwd"`
 	Timestamp time.Time `json:"timestamp"`
 	Message   struct {
 		Model      string `json:"model"`
@@ -67,8 +71,8 @@ type callResponseState struct {
 // captureClaudeCallResponses spools what the API answered for each call the transcript
 // recorded since the last read, one terma.model_call.response per call, when a turn stops or
 // fails, a subagent stops, or the session ends. Only labels and counts leave the machine, under
-// the title's consent.
-func captureClaudeCallResponses(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
+// the title's consent, and only for calls made where the team collects.
+func captureClaudeCallResponses(ctx context.Context, e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
 	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return
 	}
@@ -93,7 +97,13 @@ func captureClaudeCallResponses(e hookrun.Env, r *hookrun.Repo, sessionID, trans
 		e.Logf("call responses: %v", err)
 		return
 	}
+	admits := e.Admission(ctx)
 	for _, c := range calls {
+		// A session moved into a listed repository, or resumed there, still holds calls made
+		// before elsewhere: those stay on the machine, and the read moves past them.
+		if !admits(c.Cwd) {
+			continue
+		}
 		attrs := map[string]any{
 			semconv.GenAIMainAgentNameKey:         claudeTool,
 			semconv.TermaEvidenceSourceKey:        sourceClaudeTranscript,
@@ -173,7 +183,7 @@ func readCallResponses(path string, offset int64) ([]claudeCallResponse, int64, 
 		if !seen {
 			i = len(calls)
 			index[rec.RequestID] = i
-			calls = append(calls, claudeCallResponse{RequestID: rec.RequestID, Time: rec.Timestamp})
+			calls = append(calls, claudeCallResponse{RequestID: rec.RequestID, Cwd: rec.Cwd, Time: rec.Timestamp})
 		}
 		// A call's final records agree; one that omits a label keeps the one before it.
 		c, u := &calls[i], rec.Message.Usage

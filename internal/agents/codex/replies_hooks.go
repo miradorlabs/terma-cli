@@ -47,7 +47,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	// long voice turn's backlog is read at once rather than one batch per turn's end.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	admits := turnAdmission(ctx, e)
+	admits := e.Admission(ctx)
 	status := ""
 	for {
 		next, s, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, admits, func(reply reply) error {

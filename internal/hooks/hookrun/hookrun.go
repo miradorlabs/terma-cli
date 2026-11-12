@@ -243,11 +243,36 @@ func (e Env) unpark(r *Repo) {
 }
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
-// judges the current directory.
+// judges the current directory. No directory is not collected: it would judge the process's
+// own.
 func (e Env) Admits(ctx context.Context, dir string) bool {
+	if dir == "" {
+		return false
+	}
 	e.Cwd = dir
 	_, _, id, _, err := e.locate(ctx)
 	return err == nil && e.Policy.Admits(id)
+}
+
+// Admission judges a transcript's records by their own working directory, once per
+// directory: a session resumed in a listed repository, or moved into one, still holds its
+// earlier records, which a hook there reads, and those stay on the machine when the team
+// does not collect where they were written. A record that names no directory, or one that
+// cannot be judged (gone, unreadable), is not collected. Global mode collects every session
+// on the machine, so it admits every record without looking.
+func (e Env) Admission(ctx context.Context) func(dir string) bool {
+	if e.Policy.Global() {
+		return func(string) bool { return true }
+	}
+	judged := map[string]bool{}
+	return func(dir string) bool {
+		ok, seen := judged[dir]
+		if !seen {
+			ok = e.Admits(ctx, dir)
+			judged[dir] = ok
+		}
+		return ok
+	}
 }
 
 // locate finds the working copy at Cwd, a Git checkout's root from any directory in it,
