@@ -339,8 +339,7 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if old == nil {
 		out := *tonight
 		if tonight.Capture.Partial {
-			// A first capture whose turn failed publishes no truncated probe either: the census
-			// alone, where it took one (withoutProbe).
+			// As below: a turn that failed publishes its census alone (withoutProbe).
 			out.Telemetry, _ = withoutProbe(tonight.Telemetry).(map[string]any)
 		}
 		out.Capture.Sections = map[string]time.Time{}
@@ -360,9 +359,10 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	}
 	if tt["telemetry"] != nil {
 		tel := tt["telemetry"]
-		if keepWhole {
+		if tonight.Capture.Partial {
 			// The probe's findings come from the profile's turn, which failed: a truncated probe
-			// replaces none of a whole one's. The census, which ran apart, still counts.
+			// is published nowhere, over a whole page or a partial one. The census, which ran
+			// apart, still counts.
 			tel = withoutProbe(tel)
 		}
 		if tel == nil {

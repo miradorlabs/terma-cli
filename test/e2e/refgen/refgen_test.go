@@ -1063,6 +1063,18 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("a partial probe-only night over no telemetry: %v", got)
 	}
 
+	// Nor does a partial night over a partial page.
+	censusOnlyPage := snap(parse(`{"surfaces":{"logs/a":{"keys":{}},"metrics/m":{"keys":{}}}}`))
+	censusOnlyPage.Capture.Partial = true
+	if got = merge(censusOnlyPage, truncated, now).Telemetry; got["export"] != nil || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != nil {
+		t.Errorf("a partial night over a partial page published its probe: %v", got)
+	}
+	emptyPage := snap(nil)
+	emptyPage.Capture.Partial = true
+	if got = merge(emptyPage, truncatedProbe, now).Telemetry; got != nil {
+		t.Errorf("a partial probe-only night over a partial page published telemetry: %v", got)
+	}
+
 	// Nor does a first capture whose turn failed publish its truncated probe: its census alone.
 	if got = merge(nil, truncated, now).Telemetry; got["export"] != nil || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != nil {
 		t.Errorf("a first partial capture published its probe: %v", got)
