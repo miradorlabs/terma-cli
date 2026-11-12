@@ -77,7 +77,7 @@ type T3 struct {
 	bin   string
 	base  string
 	cmd   *exec.Cmd
-	out   bytes.Buffer
+	out   t3Output
 	once  sync.Once
 	v2    bool // 0.1.0's API: /api/projects, the WebSocket, /api/orchestration/shell
 }
@@ -130,17 +130,46 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 		t.Fatalf("t3 auth session issue: %v\n%s", err, x.out.String())
 	}
 	x.token = strings.TrimSpace(string(tok))
-	// The API the build speaks: 0.0.x serves its orchestration snapshot as JSON (and a shell
-	// route of its own), 0.1.0 on answers that route with its web app and serves its shell
-	// snapshot instead. A build that serves neither as JSON is one the driver cannot drive.
-	switch {
-	case x.servesJSON("/api/orchestration/snapshot", nil):
-	case x.servesJSON("/api/orchestration/shell", http.Header{t3ProtocolHeader: {t3Protocol}}):
+	switch x.api() {
+	case "0.1":
 		x.v2 = true
-	default:
-		SkipBuild(t, "the test driver can't drive this version (it serves neither /api/orchestration/snapshot nor /api/orchestration/shell)")
+	case "":
+		SkipBuild(t, "the test driver can't drive this version (it serves neither /api/orchestration/snapshot nor /api/orchestration/shell for protocol "+t3Protocol+")")
 	}
 	return x
+}
+
+// api is the API the build speaks: "0.0" where it serves its orchestration snapshot as JSON
+// (0.0.x, which serves a shell route of its own too), "0.1" where it answers that route with its
+// web app and serves its shell snapshot for the driver's protocol instead (0.1.0 on), "" where
+// it does neither, as a build on another protocol does.
+func (x *T3) api() string {
+	x.t.Helper()
+	switch {
+	case x.servesJSON("/api/orchestration/snapshot", nil):
+		return "0.0"
+	case x.servesJSON("/api/orchestration/shell", http.Header{t3ProtocolHeader: {t3Protocol}}):
+		return "0.1"
+	}
+	return ""
+}
+
+// t3Output is T3's output, written by its process's copiers while a failing scenario reads it.
+type t3Output struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (o *t3Output) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.Write(p)
+}
+
+func (o *t3Output) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.String()
 }
 
 // t3Shell writes the shell T3 is given as $SHELL and returns its path. T3 puts the PATH
@@ -157,10 +186,25 @@ func (sb *Sandbox) t3Shell() string {
 }
 
 // servesJSON says whether T3 serves path as an API route: true where it answers with JSON,
-// false where it answers with its web app or a 404, as a build without the route does. Anything
-// else fails the scenario, once a server error or a dropped connection has had a few seconds
-// to clear: a build that cannot answer is broken, not one the driver cannot drive.
+// false where it answers with its web app, a 404, or a 400 (a route there, but not for this
+// client: another protocol). Anything else fails the scenario.
 func (x *T3) servesJSON(path string, header http.Header) bool {
+	x.t.Helper()
+	status, kind, body := x.get(path, header)
+	switch {
+	case status/100 == 2 && strings.HasPrefix(kind, "application/json"):
+		return true
+	case status/100 == 2 && strings.HasPrefix(kind, "text/html"), status == http.StatusNotFound, status == http.StatusBadRequest:
+		return false
+	}
+	x.t.Fatalf("t3 GET %s: %d (%s) %s\n%s", path, status, kind, body, tail(x.out.String(), 2000))
+	return false
+}
+
+// get is T3's first answer to a GET of path that is no server error, once a server error or a
+// dropped connection has had a few seconds to clear (a server still attaching its routes, a
+// moment's overload); after that, the scenario fails: a build that cannot answer is broken.
+func (x *T3) get(path string, header http.Header) (status int, kind string, body []byte) {
 	x.t.Helper()
 	var last string
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
@@ -174,22 +218,16 @@ func (x *T3) servesJSON(path string, header http.Header) bool {
 			last = err.Error()
 			continue
 		}
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2000))
+		body, _ = io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		_ = resp.Body.Close()
-		kind := resp.Header.Get("Content-Type")
-		switch {
-		case resp.StatusCode/100 == 2 && strings.HasPrefix(kind, "application/json"):
-			return true
-		case resp.StatusCode/100 == 2 && strings.HasPrefix(kind, "text/html"), resp.StatusCode == http.StatusNotFound:
-			return false
-		case resp.StatusCode/100 == 5:
+		if resp.StatusCode/100 == 5 {
 			last = resp.Status + " " + string(body)
 			continue
 		}
-		x.t.Fatalf("t3 GET %s: %s (%s) %s\n%s", path, resp.Status, kind, body, tail(x.out.String(), 2000))
+		return resp.StatusCode, resp.Header.Get("Content-Type"), body
 	}
 	x.t.Fatalf("t3 GET %s: %s\n%s", path, last, tail(x.out.String(), 2000))
-	return false
+	return 0, "", nil
 }
 
 // t3Client bounds every request: a server that accepts and never answers must fail the
@@ -218,11 +256,6 @@ func (x *T3) Stop() {
 
 func (x *T3) request(method, path string, body any) []byte {
 	x.t.Helper()
-	return x.requestWith(method, path, body, nil)
-}
-
-func (x *T3) requestWith(method, path string, body any, header http.Header) []byte {
-	x.t.Helper()
 	var rd io.Reader
 	if body != nil {
 		data, _ := json.Marshal(body)
@@ -231,11 +264,6 @@ func (x *T3) requestWith(method, path string, body any, header http.Header) []by
 	req, _ := http.NewRequest(method, x.url+path, rd)
 	req.Header.Set("Authorization", "Bearer "+x.token)
 	req.Header.Set("Content-Type", "application/json")
-	for k, vs := range header {
-		for _, v := range vs {
-			req.Header.Add(k, v)
-		}
-	}
 	resp, err := t3Client.Do(req)
 	if err != nil {
 		x.t.Fatalf("t3 %s %s: %v\n%s", method, path, err, tail(x.out.String(), 2000))
@@ -395,7 +423,10 @@ func (x *T3) shellThread(thread string) (t3ShellThread, bool) {
 	var snap struct {
 		Threads []t3ShellThread `json:"threads"`
 	}
-	data := x.requestWith(http.MethodGet, "/api/orchestration/shell", nil, http.Header{t3ProtocolHeader: {t3Protocol}})
+	status, _, data := x.get("/api/orchestration/shell", http.Header{t3ProtocolHeader: {t3Protocol}})
+	if status/100 != 2 {
+		x.t.Fatalf("t3 shell snapshot: %d %s\n%s", status, tail(string(data), 2000), tail(x.out.String(), 2000))
+	}
 	if err := json.Unmarshal(data, &snap); err != nil {
 		x.t.Fatalf("t3 shell snapshot: %v\n%s", err, tail(string(data), 2000))
 	}
@@ -450,7 +481,7 @@ func (x *T3) rpc(tag string, payload any) json.RawMessage {
 		switch {
 		case msg.Tag == "Exit" && msg.RequestID == id:
 			if msg.Exit.Tag != "Success" {
-				x.t.Fatalf("t3 %s: %s %s", tag, msg.Exit.Tag, tail(string(msg.Exit.Cause), 2000))
+				x.t.Fatalf("t3 %s: %s %s\n%s", tag, msg.Exit.Tag, tail(string(msg.Exit.Cause), 2000), tail(x.out.String(), 2000))
 			}
 			return msg.Exit.Value
 		case msg.Tag == "Defect":
