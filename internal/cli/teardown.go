@@ -152,36 +152,49 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 // removeHookState removes what hooks kept per session, which only they would prune, what
 // they queued, the images among it, and the policies they ran under.
 func (app *App) removeHookState() error {
-	app.awaitImageSend()
+	names := append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir)
+	// An image still being sent keeps its queue and bytes: removing them under the sender
+	// would let it write the queue back. Teardown's warning says to run it again.
+	sending := app.awaitImageSend()
+	if sending == nil {
+		names = append(names, spool.ImageDir, promptimage.DirName)
+	}
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, spool.ImageDir, promptimage.DirName, config.PoliciesDir) {
+	for _, name := range names {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}
+	if sending != nil {
+		return fmt.Errorf("an image is still being sent, so its queue is kept: %w", sending)
+	}
 	return nil
 }
 
-// imageSendWait is how long teardown waits for an image being sent.
-const imageSendWait = 10 * time.Second
+// defaultImageSendWait is how long teardown waits for an image being sent.
+const defaultImageSendWait = 10 * time.Second
 
 // awaitImageSend waits, briefly, for an image being sent to settle: the relay has stopped,
 // cutting its upload off, but a manual `terma spool flush --images` stops before its next
-// image only, and Windows keeps the image queue while its lock is open. One still uploading
-// after the wait leaves teardown's warning to run again.
-func (app *App) awaitImageSend() {
+// image only, and Windows keeps the image queue while its lock is open. It says when one is
+// still uploading after the wait.
+func (app *App) awaitImageSend() error {
 	dir := filepath.Join(app.stateDir, spool.ImageDir)
 	if _, err := os.Stat(dir); err != nil {
-		return
+		return nil
 	}
 	s, err := spool.OpenQueue(dir)
 	if err != nil {
-		return
+		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), imageSendWait)
+	wait := app.imageSendWait
+	if wait == 0 {
+		wait = defaultImageSendWait
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
-	_ = s.Idle(ctx)
+	return s.Idle(ctx)
 }
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.

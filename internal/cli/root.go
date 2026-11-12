@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"slices"
 	"syscall"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -191,6 +192,9 @@ type App struct {
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.
 	binary os.FileInfo
+	// imageSendWait is how long teardown waits for an image being sent; 0 is
+	// defaultImageSendWait.
+	imageSendWait time.Duration
 }
 
 // New is the command line for the agents agentsFor registers under a config directory, at

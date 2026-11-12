@@ -297,6 +297,39 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	}
 }
 
+// An image still being sent after teardown's wait keeps its queue and bytes, and teardown
+// says so, rather than removing them under the sender.
+func TestTeardownKeepsTheImageQueueWhileAnImageIsSent(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	testApp.imageSendWait = 50 * time.Millisecond
+	t.Cleanup(func() { testApp.imageSendWait = 0 })
+	s, err := spool.OpenQueue(filepath.Join(testApp.stateDir, spool.ImageDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(spool.Event{Name: semconv.TermaPromptImageEvent}); err != nil {
+		t.Fatal(err)
+	}
+	queued, _, _, err := s.Read(t.Context(), time.Now())
+	if err != nil || len(queued) != 1 {
+		t.Fatalf("Read = %v, %v", queued, err)
+	}
+	taken, err := s.Take(t.Context(), queued[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer taken.Release()
+	if err := testApp.removeHookState(); err == nil || !strings.Contains(err.Error(), "still being sent") {
+		t.Fatalf("removeHookState = %v; want it to say an image is still being sent", err)
+	}
+	if _, err := os.Stat(filepath.Join(testApp.stateDir, spool.ImageDir)); err != nil {
+		t.Fatalf("the image queue was removed under its sender: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(testApp.stateDir, spool.Dir)); !os.IsNotExist(err) {
+		t.Fatalf("the events' spool outlived teardown: %v", err)
+	}
+}
+
 // A manual image flush delivers what waited for a key as soon as the key is there.
 func TestAnImageFlushDeliversOnceTheKeyIsThere(t *testing.T) {
 	useConfigDir(t, t.TempDir())

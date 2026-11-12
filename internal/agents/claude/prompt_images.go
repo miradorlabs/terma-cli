@@ -80,6 +80,10 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 	collect, _ := e.Policy.Content()
 	spooled := 0
 	offset, err := readPromptImages(transcript, last.Offset, func(p claudePrompt) bool {
+		// A team that does not collect prompts never gets the image: nothing of it is kept.
+		if !collect {
+			return true
+		}
 		// A record with no id the platform can take is skipped before its bytes are kept.
 		ids := map[string]any{}
 		hookrun.BoundedAttr(ids, semconv.TermaMessageIDKey, p.UUID)

@@ -127,15 +127,15 @@ func TestClaudeImagesKeepTheirPlace(t *testing.T) {
 	}
 }
 
-// A team that does not collect prompts never gets the image, so its bytes are not copied;
-// the record still says what was pasted, for delivery to withhold.
-func TestClaudeImagesKeepNoBytesWhenPromptsAreOff(t *testing.T) {
+// A team that does not collect prompts never gets the image, so nothing of it is kept: no
+// record and no bytes.
+func TestClaudeImagesKeepNothingWhenPromptsAreOff(t *testing.T) {
 	env := titleEnv(t)
 	env.Policy.IncludePrompts = false
 	path := transcript(t, t.TempDir(), pastedRecord("u1", "p1", []int{1}, claudePixel))
 	stopClaude(t, env, path)
-	if got := spooledImages(t, env.Images); len(got) != 1 {
-		t.Fatalf("spooled %d images", len(got))
+	if got := spooledImages(t, env.Images); len(got) != 0 {
+		t.Fatalf("spooled %d images the team does not collect", len(got))
 	}
 	img, _ := promptimage.FromBase64("image/png", claudePixel)
 	if _, ok := promptimage.Load(env.StateDir, img.ID()); ok {
