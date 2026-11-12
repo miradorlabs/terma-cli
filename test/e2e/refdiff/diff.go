@@ -53,6 +53,15 @@ func compare(a, b *Snapshot) []Change {
 			diffFilesystem(at[sec], bt[sec], &out) // part by part (filesystem.go)
 			continue
 		}
+		if sec == "telemetry" {
+			if a, ok := at[sec].(map[string]any); ok {
+				if b, ok := bt[sec].(map[string]any); ok {
+					a, b = comparableTelemetry(a, b) // the parts both captures measured (telemetry.go)
+					diffValue([]string{sec}, a, b, &out)
+					continue
+				}
+			}
+		}
 		if a, b, ok := configs(sec, at[sec], bt[sec]); ok {
 			diffConfig(a, b, &out) // option by option (config.go)
 			continue

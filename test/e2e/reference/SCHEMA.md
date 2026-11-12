@@ -293,6 +293,22 @@ so). `live` is the same turn as it ran with the vendor's live server-side flags 
 night whatever the build, so it is no section: it is never compared, and a diff never says it.
 Absent where there was no proxied turn to compare it with.
 
+### telemetry
+
+The build's own OTLP export, from two measurements. The field census (the relay workloads'
+scenarios, nightly) gives every surface the build sent with its `keys`; the telemetry probe
+(the profile's turn) gives `export` (protocol, compression, each signal's measured
+`interval_ms` and the `interval_batches` it rests on) and each surface's `type`, `unit`,
+`temporality`, `monotonic`, `parent`, `parents` and `root`. A capture can hold one without the
+other: the frequent check runs the probe alone, and a capture older than the probe has none of
+its fields.
+
+Two builds' telemetry is compared only in what both captures measured: keys where both have a
+census, the probe's fields and `export` where both ran the probe, and which surfaces exist
+only where both measured them the same way. What one did not measure is not observed there,
+never a surface "no longer sent" or an export "added". `interval_batches` is the run's, and an
+interval is compared only where both rest on at least two batches: from one, it is a stall's.
+
 ### hooks
 
 Every hook event the build knows, and what it hands a hook when one fires (the hooks probe,
