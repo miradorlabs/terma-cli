@@ -3,6 +3,7 @@ package claude
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ type claudeUserRecord struct {
 	UUID          string    `json:"uuid"`
 	PromptID      string    `json:"promptId"`
 	IsSidechain   bool      `json:"isSidechain"`
+	Cwd           string    `json:"cwd"`
 	Timestamp     time.Time `json:"timestamp"`
 	ImagePasteIDs []int     `json:"imagePasteIds"`
 	Message       struct {
@@ -44,8 +46,10 @@ type claudeUserRecord struct {
 // claudePrompt is one user record's images.
 type claudePrompt struct {
 	UUID, PromptID string
-	Time           time.Time
-	Images         []promptimage.Image
+	// Cwd is where the prompt was typed.
+	Cwd    string
+	Time   time.Time
+	Images []promptimage.Image
 }
 
 // promptImageState is the transcript offset up to which images were spooled.
@@ -57,7 +61,7 @@ type promptImageState struct {
 // prompt since the last read to the image lane, its bytes kept aside for delivery, when a
 // turn stops or fails or the session ends; the relay sends them. They leave under the
 // title's consent while the team collects prompts.
-func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
+func captureClaudePromptImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
 	if transcript == "" || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return
 	}
@@ -78,10 +82,12 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 		last = promptImageState{}
 	}
 	collect, _ := e.Policy.Content()
+	admits := e.Admission(ctx)
 	spooled := 0
 	offset, err := readPromptImages(transcript, last.Offset, func(p claudePrompt) bool {
-		// A team that does not collect prompts never gets the image: nothing of it is kept.
-		if !collect {
+		// A team that does not collect prompts never gets the image, nor one typed where the
+		// team does not collect: nothing of it is kept.
+		if !collect || !admits(p.Cwd) {
 			return true
 		}
 		// A record with no id the platform can take is skipped before its bytes are kept.
@@ -191,7 +197,7 @@ func claudePromptFrom(line []byte) (claudePrompt, bool) {
 	if json.Unmarshal(rec.Message.Content, &blocks) != nil {
 		return claudePrompt{}, false
 	}
-	p := claudePrompt{UUID: rec.UUID, PromptID: rec.PromptID, Time: rec.Timestamp}
+	p := claudePrompt{UUID: rec.UUID, PromptID: rec.PromptID, Cwd: rec.Cwd, Time: rec.Timestamp}
 	// n counts the record's image blocks, one that cannot be read included, so each image
 	// keeps its own position and placeholder.
 	n := 0

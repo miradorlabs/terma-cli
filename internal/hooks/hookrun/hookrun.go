@@ -253,6 +253,23 @@ func (e Env) Admits(ctx context.Context, dir string) bool {
 	return err == nil && e.Policy.Admits(id)
 }
 
+// Admission judges a transcript's records by their own working directory, once per
+// directory: a session resumed in a listed repository, or moved into one, still holds its
+// earlier records, which a hook there reads, and those stay on the machine when the team
+// does not collect where they were written. A record that names no directory is not
+// collected.
+func (e Env) Admission(ctx context.Context) func(dir string) bool {
+	judged := map[string]bool{}
+	return func(dir string) bool {
+		ok, seen := judged[dir]
+		if !seen {
+			ok = dir != "" && e.Admits(ctx, dir)
+			judged[dir] = ok
+		}
+		return ok
+	}
+}
+
 // locate finds the working copy at Cwd, a Git checkout's root from any directory in it,
 // how admission names it, and its origin's URL.
 func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Repository, remote string, err error) {

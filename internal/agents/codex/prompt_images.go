@@ -78,7 +78,7 @@ func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in 
 	defer cancel()
 	collect, _ := e.Policy.Content()
 	spooled := 0
-	next, err := readRolloutImages(ctx, rollout, in.TranscriptPath, cursor, turnAdmission(ctx, e), func(p codexPrompt) error {
+	next, err := readRolloutImages(ctx, rollout, in.TranscriptPath, cursor, e.Admission(ctx), func(p codexPrompt) error {
 		// A team that does not collect prompts never gets the image: nothing of it is kept.
 		if !collect {
 			return nil
