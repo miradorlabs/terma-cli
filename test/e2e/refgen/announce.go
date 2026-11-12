@@ -64,9 +64,13 @@ type SlackText struct {
 // ImpactN counts a version's changes by impact.
 type ImpactN map[string]int
 
-// captured reports a snapshot with something captured of the build itself, not only terma's
-// verdict on it.
+// captured reports a snapshot with the build itself captured whole: something of it besides
+// terma's verdict, from a capture that did not fail. A partial build is announced once a
+// capture of it is whole, so the news is never a partial changelog.
 func captured(s *Snapshot) bool {
+	if s.Capture.Partial {
+		return false
+	}
 	for _, sec := range present(s) {
 		if sec != "support" {
 			return true

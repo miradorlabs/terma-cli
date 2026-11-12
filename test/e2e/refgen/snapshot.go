@@ -45,7 +45,7 @@ type night struct {
 	history  []HistoryEntry
 	labels   map[string]string // capability id → label
 	// attempted are builds a run set out to capture: one it captured nothing of is still
-	// published, partial, so the hourly check does not set out to capture it again.
+	// published, partial, so the frequent check captures it again only after a while.
 	attempted []buildID
 	now       time.Time
 	sources   *sourceConfigs // what public builds' source says of their configuration; nil reads none

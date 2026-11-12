@@ -969,3 +969,58 @@ func TestTimelineArchives(t *testing.T) {
 		t.Errorf("a timeline with every step says archives:\n%s", data)
 	}
 }
+
+// A partial capture is published, marked partial in the index, and not announced: the news is
+// never a partial changelog. The capture that makes it whole announces it, once.
+func TestPartialBuildIsAnnouncedWhenWhole(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}, opt); err != nil {
+		t.Fatal(err)
+	}
+	partial := claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")
+	partial.Failed = true
+	news, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{partial}}, opt)
+	if err != nil || len(news) != 0 {
+		t.Fatalf("a partial capture announced %+v (%v)", news, err)
+	}
+	var idx HarnessIndex
+	if err := readJSON(filepath.Join(dir, "claude", "index.json"), &idx); err != nil || len(idx.Versions) != 2 || !idx.Versions[0].Partial || idx.Versions[1].Partial {
+		t.Fatalf("index = %+v (%v)", idx.Versions, err)
+	}
+	whole := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")}}
+	if news, _ = publish(dir, whole, opt); len(news) != 1 || news[0].Version != "1.0.1" {
+		t.Fatalf("the whole capture announced %+v", news)
+	}
+	if news, _ = publish(dir, whole, opt); len(news) != 0 {
+		t.Errorf("announced again: %+v", news)
+	}
+}
+
+// A build's page begins with its capture: terma's checks of a build no capture took (the night's
+// contracts of one the frequent check has yet to capture) begin no page, and update one there is.
+func TestChecksAloneBeginNoPage(t *testing.T) {
+	dir := t.TempDir()
+	row := func(v, result string) HistoryEntry {
+		return HistoryEntry{Harness: "claude", Version: v, Platform: "darwin/arm64", Capability: "relay.telemetry", Result: result}
+	}
+	n := night{now: time.Now(), history: []HistoryEntry{row("2.0.0", "pass")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "claude", "versions", "2.0.0.json")); err == nil {
+		t.Fatal("terma's checks alone began a page")
+	}
+	n = night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("2.0.0", "Be brief.", []string{"Bash"}, "", "")}, history: []HistoryEntry{row("2.0.0", "pass")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	n = night{now: time.Now(), history: []HistoryEntry{row("2.0.0", "fail")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	var s Snapshot
+	if err := readJSON(filepath.Join(dir, "claude", "versions", "2.0.0.json"), &s); err != nil || s.Support == nil {
+		t.Fatalf("the published page lost its verdict: %+v (%v)", s.Support, err)
+	}
+}

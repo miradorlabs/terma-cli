@@ -184,6 +184,12 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			pub.snapshots[id.harness] = map[string]*Snapshot{}
 		}
 		old := pub.snapshots[id.harness][id.version]
+		// A build's page begins with its capture: terma's checks and the field census of a build
+		// no capture took (the night's contracts of a build the frequent check has yet to
+		// capture) update a published page, never begin one.
+		if old == nil && !n.captures(id) {
+			continue
+		}
 		merged := merge(old, n.tonight(id), n.now)
 		if old == nil || !sameSections(old, merged) {
 			changed[id] = true
@@ -299,7 +305,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		for i, v := range versions {
 			s := byVersion[v]
 			e := VersionEntry{Version: v, CapturedAt: s.CapturedAt, Platforms: platformsOf(s), Support: supportOf(s),
-				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{}}
+				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{},
+				Partial: s.Capture.Partial}
 			var bin binaryView
 			view(s.Binary, &bin)
 			if bin.Signing != nil {
@@ -800,4 +807,17 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 			}
 		}
 	}
+}
+
+// captures reports a build the night captured, or set out to: a profile of it, or an attempt.
+func (n night) captures(id buildID) bool {
+	if slices.Contains(n.attempted, id) {
+		return true
+	}
+	for _, p := range n.profiles {
+		if p.Harness == id.harness && p.Version == id.version {
+			return true
+		}
+	}
+	return false
 }

@@ -93,6 +93,9 @@ type VersionEntry struct {
 	// Signing is Gatekeeper's verdict on the build's signature when last checked: "valid",
 	// "revoked", "rejected" or "unsigned"; nil where it was not checked (off macOS, a script).
 	Signing *string `json:"signing"`
+	// Partial marks a build whose capture failed, whole or in part: the frequent check captures
+	// it again (reference/new-builds.sh), and it is announced once a capture of it is whole.
+	Partial bool `json:"partial,omitempty"`
 }
 
 // Changelogs is docs/harnesses/<harness>/changelog.json: what the vendor's changelog says of
