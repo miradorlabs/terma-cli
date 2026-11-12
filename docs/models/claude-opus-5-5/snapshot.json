@@ -454,8 +454,8 @@
       "name": "Claude Code",
       "role": "default",
       "first": "2.1.280",
-      "last": "2.1.322",
-      "builds": 39,
+      "last": "2.1.323",
+      "builds": 40,
       "current": true,
       "params": {
         "context_management": {
@@ -481,8 +481,8 @@
       "role": "alias",
       "label": "opus",
       "first": "2.1.280",
-      "last": "2.1.322",
-      "builds": 39,
+      "last": "2.1.323",
+      "builds": 40,
       "current": true
     },
     {
@@ -491,8 +491,8 @@
       "role": "alias",
       "label": "opus[1m]",
       "first": "2.1.280",
-      "last": "2.1.322",
-      "builds": 39,
+      "last": "2.1.323",
+      "builds": 40,
       "current": true
     },
     {
@@ -500,8 +500,8 @@
       "name": "Claude Code",
       "role": "subagents",
       "first": "2.1.280",
-      "last": "2.1.322",
-      "builds": 39,
+      "last": "2.1.323",
+      "builds": 40,
       "current": true
     },
     {
@@ -509,8 +509,8 @@
       "name": "Claude Code",
       "role": "compaction",
       "first": "2.1.285",
-      "last": "2.1.322",
-      "builds": 34,
+      "last": "2.1.323",
+      "builds": 35,
       "current": true
     },
     {
