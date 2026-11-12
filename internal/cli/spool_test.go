@@ -257,7 +257,7 @@ func TestDescribeFlushWordsTheImagePass(t *testing.T) {
 // not keep Windows from removing it.
 func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	useConfigDir(t, t.TempDir())
-	s, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
+	s, err := spool.OpenQueue(filepath.Join(testApp.stateDir, spool.ImageDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	var ended time.Time
 	go func() {
 		defer close(done)
-		release, err := s.Take(t.Context(), queued[0])
+		taken, err := s.Take(t.Context(), queued[0])
 		if err != nil {
 			t.Error(err)
 			close(draining)
@@ -281,7 +281,7 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 		close(draining)
 		time.Sleep(200 * time.Millisecond)
 		ended = time.Now()
-		release()
+		taken.Release()
 	}()
 	<-draining
 	if err := testApp.removeHookState(); err != nil {
@@ -305,7 +305,7 @@ func TestAnImageFlushDeliversOnceTheKeyIsThere(t *testing.T) {
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Harnesses = []string{"claude"} }); err != nil {
 		t.Fatal(err)
 	}
-	images, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
+	images, err := spool.OpenQueue(filepath.Join(testApp.stateDir, spool.ImageDir))
 	if err != nil {
 		t.Fatal(err)
 	}

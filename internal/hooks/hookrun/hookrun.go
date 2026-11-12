@@ -43,7 +43,7 @@ type Env struct {
 	Spool *spool.Spool
 	// Images is the image lane's spool, where terma.prompt.image records wait apart from the
 	// events (EmitImageFor); nil, as for Spool, when it could not be opened.
-	Images  *spool.Spool
+	Images  *spool.Queue
 	Version string
 	Debug   bool
 	// OnClaim, when set, is called after a relay claim with the claimed checkout's root, so

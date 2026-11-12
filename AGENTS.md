@@ -81,7 +81,7 @@ which the relay sends, one image to a request, so no event waits on an upload: a
 export the relay accepts wakes its image sender, as do its start, a retry window's end and
 the next look at images held for a key or a policy (`delivery.ImageSender`). The relay
 halts it, between two images, only once nothing else keeps the relay (an idle exit, an
-update, making way). `terma spool flush --images` sends the same queue by hand. An image
+update, making way), and resumes it if something then does. `terma spool flush --images` sends the same queue by hand. An image
 record an older build left in the events' spool, which the events' flush moves to the
 image queue, waits for the next of those wakes.
 `internal/boundary` keeps `net/http` out of the hook, spool and agent packages.

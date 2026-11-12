@@ -106,7 +106,7 @@ func imageFixture(t *testing.T, rec http.Handler, prompts bool) (Router, *config
 		t.Fatal(err)
 	}
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now(), IncludePrompts: prompts, IncludeToolContent: true}
-	r := Router{ConfigDir: cfgDir, StateDir: stateDir, OTLPPinned: true, Images: openSpool(t),
+	r := Router{ConfigDir: cfgDir, StateDir: stateDir, OTLPPinned: true, Images: openQueue(t),
 		Policy: func(_ context.Context, _ *config.Config, team string) (config.Policy, error) {
 			p := pol
 			p.TeamID = team
@@ -114,6 +114,15 @@ func imageFixture(t *testing.T, rec http.Handler, prompts bool) (Router, *config
 		},
 		Consent: func(string, hookrun.Consent) bool { return true }}
 	return r, &config.Config{OTLPURL: srv.URL}, stateDir
+}
+
+func openQueue(t *testing.T) *spool.Queue {
+	t.Helper()
+	q, err := spool.OpenQueue(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q
 }
 
 func openSpool(t *testing.T) *spool.Spool {
@@ -134,14 +143,16 @@ func store(t *testing.T, stateDir string, images ...promptimage.Image) {
 	}
 }
 
-func queue(t *testing.T, s *spool.Spool, events ...spool.Event) {
+func queue(t *testing.T, s interface{ Append(...spool.Event) error }, events ...spool.Event) {
 	t.Helper()
 	if err := s.Append(events...); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func queued(t *testing.T, s *spool.Spool) []spool.Event {
+func queued(t *testing.T, s interface {
+	Peek(int) ([]spool.Event, error)
+}) []spool.Event {
 	t.Helper()
 	left, err := s.Peek(100)
 	if err != nil {

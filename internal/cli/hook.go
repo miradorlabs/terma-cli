@@ -111,9 +111,9 @@ func (app *App) openSpool() *spool.Spool {
 	return s
 }
 
-// openImageSpool is the image lane's spool, nil as for openSpool.
-func (app *App) openImageSpool() *spool.Spool {
-	s, err := spool.Open(filepath.Join(app.stateDir, spool.ImageDir))
+// openImageSpool is the image lane's queue, nil as for openSpool.
+func (app *App) openImageSpool() *spool.Queue {
+	s, err := spool.OpenQueue(filepath.Join(app.stateDir, spool.ImageDir))
 	if err != nil {
 		return nil
 	}

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func names(t *testing.T, s *Spool) string {
+func names(t *testing.T, s *Queue) string {
 	t.Helper()
 	left, err := s.Peek(10)
 	if err != nil {
@@ -29,7 +29,7 @@ func names(t *testing.T, s *Spool) string {
 // leaves the queue at once, a requeued one goes to its tail, the rest stay where they were,
 // and what was appended meanwhile is kept.
 func TestReadAndSettleEachEventOnItsOwn(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestReadAndSettleEachEventOnItsOwn(t *testing.T) {
 	if err := s.Append(Event{Name: "a", Time: now}, Event{Name: "old", Time: now.Add(-MaxAge - time.Hour)}, Event{Name: "b", Time: now}, Event{Name: "c", Time: now}); err != nil {
 		t.Fatal(err)
 	}
-	f, err := os.OpenFile(s.path(), os.O_APPEND|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(s.s.path(), os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestReadAndSettleEachEventOnItsOwn(t *testing.T) {
 // Take keeps a second sender from an event the first is sending, and once the first
 // settled it, tells the second it is gone.
 func TestTakeKeepsTwoSendersApart(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestTakeKeepsTwoSendersApart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	release, err := s.Take(t.Context(), events[0])
+	taken, err := s.Take(t.Context(), events[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,16 +94,16 @@ func TestTakeKeepsTwoSendersApart(t *testing.T) {
 	}
 	second := make(chan error, 1)
 	go func() {
-		release, err := s.Take(t.Context(), events[0])
+		taken, err := s.Take(t.Context(), events[0])
 		if err == nil {
-			release()
+			taken.Release()
 		}
 		second <- err
 	}()
 	if err := s.Settle(events[0]); err != nil {
 		t.Fatal(err)
 	}
-	release()
+	taken.Release()
 	if err := <-second; !errors.Is(err, ErrNotQueued) {
 		t.Fatalf("the second sender's take = %v, want ErrNotQueued", err)
 	}
@@ -111,7 +111,7 @@ func TestTakeKeepsTwoSendersApart(t *testing.T) {
 
 // Settle takes one line of two alike.
 func TestSettleTakesOneOfTwinLines(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestSettleTakesOneOfTwinLines(t *testing.T) {
 
 // Remove takes several events out in one rewrite, and none when one is gone.
 func TestRemove(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestRemove(t *testing.T) {
 
 // Idle waits out a sender holding an event.
 func TestIdleWaitsForASender(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,13 +177,13 @@ func TestIdleWaitsForASender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	release, err := s.Take(t.Context(), events[0])
+	taken, err := s.Take(t.Context(), events[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		release()
+		taken.Release()
 	}()
 	start := time.Now()
 	if err := s.Idle(t.Context()); err != nil {
@@ -197,7 +197,7 @@ func TestIdleWaitsForASender(t *testing.T) {
 // A settle and an append of the same length leave the queue as long as it was, and, its
 // time put back, as old: still another state of it, by the file's identity.
 func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,14 +212,14 @@ func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
 	if err := s.Settle(events[0]); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Compact(); err != nil { // the rewrite
+	if _, err := s.Compact(Stamp{}); err != nil { // the rewrite
 		t.Fatal(err)
 	}
 	if err := s.Append(Event{Name: "c", Time: at}); err != nil {
 		t.Fatal(err)
 	}
 	// The same size and, put back, the same time: only the file's identity tells them apart.
-	if err := os.Chtimes(s.path(), stamp.mod, stamp.mod); err != nil {
+	if err := os.Chtimes(s.s.path(), stamp.mod, stamp.mod); err != nil {
 		t.Fatal(err)
 	}
 	if now := s.Stamp(); now.size != stamp.size || !now.mod.Equal(stamp.mod) || now.Same(stamp) {
@@ -229,7 +229,7 @@ func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
 
 // Senders writing windows at once lose none of each other's.
 func TestWindowsWrittenAtOnceAreAllKept(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestWindowsWrittenAtOnceAreAllKept(t *testing.T) {
 // Take finds a line where Read found it, after an append, and elsewhere after a rewrite;
 // one settled meanwhile is not queued.
 func TestTakeFindsTheLineWhereverItIs(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,9 +260,9 @@ func TestTakeFindsTheLineWhereverItIs(t *testing.T) {
 		t.Fatal(err)
 	}
 	take := func(p Pending) error {
-		release, err := s.Take(t.Context(), p)
+		taken, err := s.Take(t.Context(), p)
 		if err == nil {
-			release()
+			taken.Release()
 		}
 		return err
 	}
@@ -293,7 +293,7 @@ func TestTakeFindsTheLineWhereverItIs(t *testing.T) {
 // Settling every image of a pass rewrites the queue not once: each settle appends to the
 // settled log, and one compaction rewrites the queue at the end.
 func TestSettlesDoNotRewriteTheQueue(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestSettlesDoNotRewriteTheQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.Stat(s.path())
+	before, err := os.Stat(s.s.path())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,14 +316,14 @@ func TestSettlesDoNotRewriteTheQueue(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	after, err := os.Stat(s.path())
+	after, err := os.Stat(s.s.path())
 	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() {
 		t.Fatal("a settle rewrote the queue")
 	}
 	if n, _, _ := s.Pending(); n != 1 {
 		t.Fatalf("%d pending; settled lines still count", n)
 	}
-	if err := s.Compact(); err != nil {
+	if _, err := s.Compact(Stamp{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := names(t, s); got != "e19" {
@@ -335,7 +335,7 @@ func TestSettlesDoNotRewriteTheQueue(t *testing.T) {
 // again: the settled log outlives it, and the next Read compacts.
 func TestASettledLineIsNeverHandedOutAgain(t *testing.T) {
 	dir := t.TempDir()
-	s, err := Open(dir)
+	s, err := OpenQueue(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +351,7 @@ func TestASettledLineIsNeverHandedOutAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The sender dies here; the next one opens the queue afresh.
-	again, err := Open(dir)
+	again, err := OpenQueue(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,5 +364,42 @@ func TestASettledLineIsNeverHandedOutAgain(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, settledFile)); !os.IsNotExist(err) {
 		t.Fatalf("the settled log outlived the compaction: %v", err)
+	}
+}
+
+// A crash between a compaction's rewrite and its removal of the settled log leaves hashes
+// the next compaction applies again: of two lines alike, the one left goes too. They are one
+// record queued twice, so nothing is lost; this pins that.
+func TestACrashMidCompactionDropsATwin(t *testing.T) {
+	s, err := OpenQueue(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	twin := Event{Name: "twin", Time: at}
+	if err := s.Append(twin, twin, Event{Name: "other", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _, err := s.Read(t.Context(), at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Settle(events[0]); err != nil {
+		t.Fatal(err)
+	}
+	// The compaction's rewrite lands; the crash comes before the log goes.
+	data, err := os.ReadFile(s.s.path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	settled, err := s.settled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(s.s.path(), withoutSettled(data, settled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(t, s); got != "other" {
+		t.Fatalf("after the crash and the next compaction the queue holds %s", got)
 	}
 }

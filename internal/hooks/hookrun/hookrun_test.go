@@ -585,11 +585,11 @@ func TestEmitImageForParksWithTheEvents(t *testing.T) {
 	if n, _, _ := sp.Pending(); n != 0 {
 		t.Fatalf("the events' spool holds %d before the next hook", n)
 	}
-	env.Images = hookruntest.Spool(t)
+	env.Images = hookruntest.Queue(t)
 	if !env.EmitImageFor(r, image) {
 		t.Fatal("an image record was not kept")
 	}
-	queued := hookruntest.Spooled(t, env.Images)
+	queued := hookruntest.Queued(t, env.Images)
 	if len(queued) != 1 || queued[0].Attrs[AttrProjectID] != hookruntest.Team || queued[0].Repository != r.Repository {
 		t.Fatalf("image queue holds %+v", queued)
 	}

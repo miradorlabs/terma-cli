@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -257,7 +258,7 @@ func TestAnUnreadableQueueIsMarked(t *testing.T) {
 	t.Parallel()
 	r, cfg, _ := imageFixture(t, &recorder{}, true)
 	dir := t.TempDir()
-	images, err := spool.Open(dir)
+	images, err := spool.OpenQueue(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,5 +385,48 @@ func TestAPassKeepsItsOwnClock(t *testing.T) {
 	}
 	if at := res.Failures[0].RetryAt; at.After(then.Add(time.Minute)) {
 		t.Fatalf("the window ends at %v, by another clock than the pass's %v", at, then)
+	}
+}
+
+// A pass's own compaction is no news to the sender: after a pass that only settled, a
+// nudge with nothing new finds the queue as the pass left it.
+func TestAPassesCompactionIsNoNews(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	s.pass(t.Context(), false)
+	if len(rec.requests()) != 1 {
+		t.Fatalf("%d requests", len(rec.requests()))
+	}
+	if !r.Images.Stamp().Same(s.read) {
+		t.Fatal("the pass's compaction reads as a change: the next nudge would run another pass")
+	}
+}
+
+// The sender prunes the image store at most hourly: a listing a pass need not repeat.
+func TestTheSenderPrunesHourly(t *testing.T) {
+	t.Parallel()
+	r, cfg, stateDir := imageFixture(t, &recorder{}, true)
+	clk := newFakeClock()
+	s := onClock(NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil }), clk)
+	s.pass(t.Context(), false) // prunes, as the first
+	img := pixelN(1)
+	store(t, stateDir, img)
+	old := time.Now().Add(-spool.MaxAge - time.Hour)
+	if err := os.Chtimes(filepath.Join(promptimage.Dir(stateDir), img.ID()), old, old); err != nil {
+		t.Fatal(err)
+	}
+	s.pass(t.Context(), false)
+	if _, ok := promptimage.Load(stateDir, img.ID()); !ok {
+		t.Fatal("a pass within the hour pruned again")
+	}
+	clk.Advance(time.Hour)
+	s.pass(t.Context(), false)
+	if _, ok := promptimage.Load(stateDir, img.ID()); ok {
+		t.Fatal("an hour on, the pass did not prune")
 	}
 }

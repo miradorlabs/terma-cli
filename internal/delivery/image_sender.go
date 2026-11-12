@@ -42,6 +42,8 @@ type ImageSender struct {
 	// heldMin and heldMax bound the wait for held images; heldMin is also the least a
 	// deadline-started pass that sent nothing waits before the next.
 	heldMin, heldMax time.Duration
+	// pruned is when a pass last pruned the image store.
+	pruned time.Time
 	// lastErr is the error last logged, when.
 	lastErr    string
 	lastLogged time.Time
@@ -91,6 +93,15 @@ func (s *ImageSender) TryHalt(final bool) bool {
 	return s.state.CompareAndSwap(senderIdle, senderStopped) || s.state.Load() == senderStopped
 }
 
+// Resume undoes a halt the relay asked for and then did not stop for (an export came): the
+// sender starts images again and runs a pass. It must not block: the relay calls it under
+// its lock.
+func (s *ImageSender) Resume() {
+	s.halting.Store(false)
+	s.state.CompareAndSwap(senderStopped, senderIdle)
+	s.Nudge()
+}
+
 // uploading reports whether an image is on its way.
 func (s *ImageSender) uploading() bool { return s.state.Load() == senderUploading }
 
@@ -117,9 +128,16 @@ func (s *ImageSender) Run(ctx context.Context) {
 	for {
 		s.loops.Add(1)
 		if s.state.Load() == senderStopped {
-			// Halted for good: nothing more to wake for.
-			<-ctx.Done()
-			return
+			// Halted: only a resume (Resume, then a nudge) or the end wakes it, no deadline.
+			select {
+			case <-ctx.Done():
+				return
+			case <-s.wake:
+			}
+			if s.state.Load() != senderStopped {
+				s.pass(ctx, false)
+			}
+			continue
 		}
 		var fired <-chan time.Time
 		stop := func() bool { return false }
@@ -158,7 +176,11 @@ func (s *ImageSender) pass(ctx context.Context, forDeadline bool) {
 		s.logError(err)
 		out.unread = true
 	} else {
-		res := s.router.flushImages(ctx, s.events, cfg, false, imageTurns{after: s.after, gate: s, now: s.clock})
+		prune := s.clock().Sub(s.pruned) >= imagePruneEvery
+		if prune {
+			s.pruned = s.clock()
+		}
+		res := s.router.flushImages(ctx, s.events, cfg, false, imageTurns{after: s.after, gate: s, now: s.clock, prune: prune})
 		s.read = res.read
 		if res.first != "" {
 			s.after = res.first
@@ -199,6 +221,10 @@ func marks(paths []string) []fileMark {
 	}
 	return out
 }
+
+// imagePruneEvery is how often the sender prunes the image store of what outlived every
+// record: a listing of the folder, which a pass need not repeat.
+const imagePruneEvery = time.Hour
 
 // errorLogEvery is how often the sender logs an error it already logged.
 const errorLogEvery = 10 * time.Minute

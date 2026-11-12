@@ -109,7 +109,7 @@ func (app *App) relayImages(run *daemon.Config, logf func(string, ...any)) {
 	images := delivery.NewImageSender(r, app.openSpool(), app.loadConfig)
 	images.Logf = logf
 	images.Watch(keystore.FilePath(app.dir), filepath.Join(app.stateDir, config.PoliciesDir))
-	run.Engine.Accepted, run.Engine.Halt = images.Nudge, images.TryHalt
+	run.Engine.Accepted, run.Engine.Halt, run.Engine.Resume = images.Nudge, images.TryHalt, images.Resume
 	run.Workers = append(run.Workers, images.Run)
 }
 

@@ -36,7 +36,7 @@ type Router struct {
 	User func(cfg *config.Config, projectID, endpoint string) string
 	// Images is the image lane's spool, which FlushImages delivers; Flush hands it any image
 	// record an older build spooled with the events.
-	Images *spool.Spool
+	Images *spool.Queue
 	// SetUp reports whether terma is still set up on this machine: a pass over the images stops
 	// before its next image once teardown has begun. Nil is set up.
 	SetUp func() bool

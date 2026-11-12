@@ -28,10 +28,10 @@ func pastedRecord(uuid, promptID string, pasteIDs []int, images ...string) strin
 	return string(b)
 }
 
-func spooledImages(t *testing.T, sp *spool.Spool) []spool.Event {
+func spooledImages(t *testing.T, sp *spool.Queue) []spool.Event {
 	t.Helper()
 	var out []spool.Event
-	for _, e := range hookruntest.Spooled(t, sp) {
+	for _, e := range hookruntest.Queued(t, sp) {
 		if e.Name == semconv.TermaPromptImageEvent {
 			out = append(out, e)
 		}

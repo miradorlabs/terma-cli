@@ -353,7 +353,7 @@ func TestATakeThatFailsOpensAWindow(t *testing.T) {
 	rec := &recorder{}
 	r, cfg, stateDir := imageFixture(t, rec, true)
 	dir := t.TempDir()
-	images, err := spool.Open(dir)
+	images, err := spool.OpenQueue(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,4 +394,37 @@ func TestANewKeyWakesHeldImagesAtTheNextExport(t *testing.T) {
 	}
 	s.Nudge()
 	waitFor(t, "the held image", func() bool { return len(rec.requests()) == 1 })
+}
+
+// A final halt the relay then does not stop for (an export came) is resumed: the sender,
+// stopped at the next image's boundary, sends again.
+func TestAResumedSenderSendsAgain(t *testing.T) {
+	t.Parallel()
+	arrived, release := make(chan struct{}), make(chan struct{})
+	var once, freed sync.Once
+	free := func() { freed.Do(func() { close(release) }) }
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		once.Do(func() {
+			close(arrived)
+			<-release
+		})
+		rec.ServeHTTP(w, req)
+	}), true)
+	t.Cleanup(free)
+	first, second := pixelN(1), pixelN(2)
+	store(t, stateDir, first, second)
+	queue(t, r.Images, imageEvent(first), imageEvent(second))
+	s, _, _ := startSenderNoWait(t, r, cfg)
+	<-arrived
+	if s.TryHalt(true) { // an update's quiesce, mid-upload
+		t.Fatal("the sender halted mid-upload")
+	}
+	free()
+	waitFor(t, "the halt at the boundary", func() bool { return s.passes.Load() >= 1 && s.TryHalt(false) })
+	if n := len(rec.requests()); n != 1 {
+		t.Fatalf("%d uploads before the resume", n)
+	}
+	s.Resume() // an export kept the relay
+	waitFor(t, "the second image", func() bool { return len(rec.requests()) == 2 })
 }

@@ -175,7 +175,7 @@ func (app *App) awaitImageSend() {
 	if _, err := os.Stat(dir); err != nil {
 		return
 	}
-	s, err := spool.Open(dir)
+	s, err := spool.OpenQueue(dir)
 	if err != nil {
 		return
 	}

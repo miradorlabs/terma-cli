@@ -111,7 +111,7 @@ type imageItem struct {
 // relay's ImageSender runs it whenever it is woken. events is the events' spool, whose
 // records from an older build may still name stored bytes; nil keeps every stored image.
 func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *config.Config, force bool) ImageResult {
-	return r.flushImages(ctx, events, cfg, force, imageTurns{})
+	return r.flushImages(ctx, events, cfg, force, imageTurns{prune: true})
 }
 
 // imageTurns is how the relay's sender runs a pass: it starts after the project after
@@ -122,6 +122,8 @@ type imageTurns struct {
 	after string
 	gate  imageGate
 	now   func() time.Time
+	// prune has the pass prune the image store of what outlived every record.
+	prune bool
 }
 
 // imageGate is the sender's say over each image a pass sends: begin is asked first, and a
@@ -213,7 +215,7 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 				for _, q := range queues {
 					res.Deferred += len(q.items)
 				}
-				return p.finish(r, events, now)
+				return p.finish(r, events, now, turns.prune)
 			}
 			item := q.items[0]
 			q.items = q.items[1:]
@@ -232,12 +234,12 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		}
 		queues = next
 	}
-	return p.finish(r, events, now)
+	return p.finish(r, events, now, turns.prune)
 }
 
 // imagePass is what one pass over the image queue has done so far.
 type imagePass struct {
-	s *spool.Spool
+	s *spool.Queue
 	// now is the pass's clock, for the windows it judges and opens.
 	now      func() time.Time
 	res      ImageResult
@@ -251,7 +253,7 @@ type imagePass struct {
 // send takes item from the queue, sends it and records how that went, unless another
 // sender settled it meanwhile; false when the project's other images wait.
 func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imageItem) bool {
-	release, err := p.s.Take(ctx, item.queued)
+	taken, err := p.s.Take(ctx, item.queued)
 	switch {
 	case errors.Is(err, spool.ErrNotQueued):
 		return true
@@ -267,124 +269,23 @@ func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imag
 		p.res.Failed++
 		return false
 	}
-	defer release()
-	return p.record(ctx, q, item, r.sendImage(ctx, q.sender, item.out))
+	defer taken.Release()
+	return p.record(ctx, q, item, taken, r.sendImage(ctx, q.sender, item.out))
 }
 
-// finish sweeps the bytes the pass let go and sums it up.
-func (p *imagePass) finish(r Router, events *spool.Spool, start time.Time) ImageResult {
-	// What the pass settled leaves the queue in one rewrite.
-	if err := p.s.Compact(); err != nil {
+// finish compacts what the pass settled out of the queue, in one rewrite, sweeps the bytes
+// it let go and sums it up.
+func (p *imagePass) finish(r Router, events *spool.Spool, start time.Time, prune bool) ImageResult {
+	read, err := p.s.Compact(p.res.read)
+	if err != nil {
 		p.errs = append(p.errs, fmt.Errorf("compact the image queue: %w", err))
 	}
-	r.forgetImages(p.ids, start, events, p.s)
+	// The compaction is no news to the sender: only what came since is.
+	p.res.read = read
+	r.forgetImages(p.ids, start, events, p.s, prune)
 	p.res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
 	p.res.Err = errors.Join(append([]error{p.res.Err}, p.errs...)...)
 	return p.res
-}
-
-// settle takes q out of the queue, appending requeue at its tail.
-func (p *imagePass) settle(q spool.Pending, requeue ...spool.Event) {
-	if err := p.s.Settle(q, requeue...); err != nil {
-		p.errs = append(p.errs, fmt.Errorf("settle an image record: %w", err))
-	}
-}
-
-// imageWindow is what an outcome does to its project's images window.
-type imageWindow int
-
-const (
-	// keepWindow leaves the window as it is; the project's next image goes on.
-	keepWindow imageWindow = iota
-	// closeWindow closes it: the host took an image.
-	closeWindow
-	// stallWindow and failWindow open a stall's or a failure's (doctor words them apart);
-	// the project's other images wait for it.
-	stallWindow
-	failWindow
-)
-
-// imageRule is what an outcome does with its record and its project.
-type imageRule struct {
-	// settle takes the record out of the queue: it went.
-	settle bool
-	// attempt counts an attempt and requeues the record at the queue's tail.
-	attempt bool
-	window  imageWindow
-	// counter is the ImageResult count the record adds to; a stall is named in Stalls.
-	counter func(*ImageResult) *int
-}
-
-// imageRules is what each of judgeImage's outcomes does:
-//
-//	outcome       settle  attempt  window  counted in
-//	delivered     yes     -        close   Sent
-//	deferred      -       -        keep    Deferred
-//	stalled       -       yes      stall   Stalls
-//	failed        -       yes      fail    Failures, Failed (Rejected once dropped)
-//	unavailable   -       -        fail    Failures, Failed
-//
-// A record whose bytes the host refused goes on without them, whatever the outcome.
-var imageRules = [imageOutcomes]imageRule{
-	imageDelivered:   {settle: true, window: closeWindow, counter: func(r *ImageResult) *int { return &r.Sent }},
-	imageDeferred:    {window: keepWindow, counter: func(r *ImageResult) *int { return &r.Deferred }},
-	imageStalled:     {attempt: true, window: stallWindow},
-	imageFailed:      {attempt: true, window: failWindow, counter: func(r *ImageResult) *int { return &r.Failed }},
-	imageUnavailable: {window: failWindow, counter: func(r *ImageResult) *int { return &r.Failed }},
-}
-
-// record does what imageRules says sent calls for with item, project q's; false when the
-// project's other images wait for the window it opened.
-func (p *imagePass) record(ctx context.Context, q *imageQueue, item imageItem, sent imageSend) bool {
-	rule := imageRules[sent.outcome]
-	now := p.now()
-	switch rule.window {
-	case closeWindow:
-		p.s.DestinationDelivered(q.id, now)
-		p.accepted[q.sender.Endpoint] = true
-	case stallWindow:
-		f := Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: sent.err, RetryAt: p.s.DestinationStalled(q.id, now)}
-		p.res.Stalls = append(p.res.Stalls, f)
-	case failWindow:
-		f := Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: sent.err}
-		// A sender stopping mid-send learned nothing about the host.
-		if ctx.Err() == nil {
-			until := time.Time{}
-			if sent.retryAfter > 0 {
-				until = now.Add(sent.retryAfter)
-			}
-			f.RetryAt = p.s.DestinationFailedUntil(q.id, now, until)
-		}
-		p.res.Failures = append(p.res.Failures, f)
-		p.errs = append(p.errs, fmt.Errorf("%s (%s): %w", q.id, q.sender.Endpoint, sent.err))
-	}
-	again := item.queued.Event
-	if sent.refused {
-		// The host would not take the bytes: the record goes on without them.
-		again.Attrs = maps.Clone(again.Attrs)
-		again.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedRefused
-	}
-	counter := rule.counter
-	var ingest *IngestError
-	switch {
-	case rule.settle:
-		p.settle(item.queued)
-		p.ids = append(p.ids, imageID(item.out))
-	case rule.attempt && sent.bare && again.Attempts >= imageMaxAttempts && errors.As(sent.err, &ingest) && ingest.Status/100 == 4:
-		// Refused once more after imageMaxAttempts, carrying no bytes: the record itself.
-		p.settle(item.queued)
-		p.ids = append(p.ids, imageID(item.out))
-		counter = func(r *ImageResult) *int { return &r.Rejected }
-	case rule.attempt:
-		again.Attempts++
-		p.settle(item.queued, again)
-	case sent.refused:
-		p.settle(item.queued, again)
-	}
-	if counter != nil {
-		*counter(&p.res)++
-	}
-	return rule.window == keepWindow || rule.window == closeWindow
 }
 
 // startingAfter is ids, sorted, rotated to start with the first after mark, so the
@@ -407,21 +308,21 @@ func startingAfter(ids []string, mark string) []string {
 // A record parked in a repository's git directory (hookrun's park) is in no spool: should
 // its image's other record go first, it later leaves saying its bytes are unavailable.
 // Parking is a sandboxed hook's last resort and such twins rare, so that is accepted.
-func (r Router) forgetImages(ids []string, passStart time.Time, spools ...*spool.Spool) {
-	promptimage.Prune(r.StateDir, passStart.Add(-spool.MaxAge))
-	if len(ids) == 0 {
+func (r Router) forgetImages(ids []string, passStart time.Time, events *spool.Spool, images *spool.Queue, prune bool) {
+	if prune {
+		promptimage.Prune(r.StateDir, passStart.Add(-spool.MaxAge))
+	}
+	if len(ids) == 0 || events == nil {
 		return
 	}
-	named := map[string]bool{}
-	for _, s := range spools {
-		if s == nil {
-			return
-		}
-		found, err := s.Mentions(ids)
-		if err != nil {
-			return
-		}
-		maps.Copy(named, found)
+	named, err := events.Mentions(ids)
+	if err != nil {
+		return
 	}
+	found, err := images.Mentions(ids)
+	if err != nil {
+		return
+	}
+	maps.Copy(named, found)
 	promptimage.Sweep(r.StateDir, ids, func(id string) bool { return named[id] }, passStart)
 }

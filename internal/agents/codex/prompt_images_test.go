@@ -119,7 +119,7 @@ func TestCodexStopSpoolsPromptImages(t *testing.T) {
 	if spooled := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(spooled) != 0 {
 		t.Fatalf("%d images went to the events' spool", len(spooled))
 	}
-	images := hookruntest.Named(hookruntest.Spooled(t, env.Images), semconv.TermaPromptImageEvent)
+	images := hookruntest.Named(hookruntest.Queued(t, env.Images), semconv.TermaPromptImageEvent)
 	if len(images) != 2 {
 		t.Fatalf("spooled %d images, want the prompt's two", len(images))
 	}
