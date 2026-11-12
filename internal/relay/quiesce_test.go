@@ -158,3 +158,42 @@ func TestTryIdleExit(t *testing.T) {
 		t.Fatalf("did not exit once idle and halted, or asked a final halt (%d)", finals.Load())
 	}
 }
+
+// A final halt asked by a quiesce the relay then does not stop for (an export came) is
+// resumed; one it stops for is not.
+func TestAQuiesceThatDoesNotStopResumes(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	var ahead, resumed atomic.Int64
+	var uploading atomic.Bool
+	uploading.Store(true)
+	r := newRelay(Options{Dir: t.TempDir(), Token: token,
+		Now:    func() time.Time { return time.Now().Add(time.Duration(ahead.Load())) },
+		Halt:   func(bool) bool { return !uploading.Load() },
+		Resume: func() { resumed.Add(1) },
+		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	ahead.Store(int64(time.Hour))
+	if r.Quiesce(time.Minute) {
+		t.Fatal("quiesced mid-upload")
+	}
+	// The sender stops at the image's end; an export comes before the relay stops.
+	ahead.Store(0)
+	body, err := proto.Marshal(logsOf("session", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("export = %d", code)
+	}
+	if r.Quiesce(time.Minute) || resumed.Load() != 1 {
+		t.Fatalf("quiesced with a fresh export, or resumed the sender %d times", resumed.Load())
+	}
+	if r.Quiesce(time.Minute); resumed.Load() != 1 {
+		t.Fatal("resumed a halt it had not asked for again")
+	}
+}

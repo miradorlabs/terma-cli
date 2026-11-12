@@ -111,7 +111,11 @@ func (r *Relay) countQueuedAtExit() {
 func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet || !r.halt(true) {
+	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+		r.resume()
+		return false
+	}
+	if !r.finalHalt() {
 		return false
 	}
 	r.refusing = true
@@ -124,7 +128,27 @@ func (r *Relay) Quiesce(quiet time.Duration) bool {
 func (r *Relay) TryStop() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.heldN == 0 && r.halt(true)
+	if r.heldN > 0 {
+		r.resume()
+		return false
+	}
+	return r.finalHalt()
+}
+
+// finalHalt asks the work beside the engine to halt for good (Options.Halt, final), and
+// remembers it asked: a stop that does not come after all resumes it.
+func (r *Relay) finalHalt() bool {
+	r.haltAsked = true
+	return r.halt(true)
+}
+
+// resume undoes a final halt the relay asked for, now that it is not stopping
+// (Options.Resume).
+func (r *Relay) resume() {
+	if r.haltAsked && r.opts.Resume != nil {
+		r.opts.Resume()
+	}
+	r.haltAsked = false
 }
 
 // halt asks Options.Halt.
