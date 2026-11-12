@@ -3,6 +3,33 @@
   "id": "gemini-4-argon",
   "steps": [
     {
+      "at": "2026-11-12T17:37:10.713435881Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+56 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -431,6 +431,7 @@\n ## Other models  {% id=\"other-models\" %}\n \n * [Latest Gemini models](/docs/latest-model)\n+* [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n * [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n * [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\n * [Gemini 3.6 Flash and 3.5 Flash-Lite](/docs/whats-new-gemini-3.6)\n",
+          "stats": {
+            "added_chars": 56,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

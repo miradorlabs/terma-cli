@@ -3,6 +3,33 @@
   "id": "gemini-3.6-flash",
   "steps": [
     {
+      "at": "2026-11-12T17:37:10.713435881Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+58 −175 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -5,10 +5,6 @@\n \n # What's new in Gemini 3.6 Flash and 3.5 Flash-Lite\n \n-{% button href=\"/docs/latest-model\" variant=\"ais\" %}Latest model{% /button %}\n-\n-{% button href=\"/docs/whats-new-gemini-3.6#other-models\" variant=\"ais\" %}Other models{% /button %}\n-\n Gemini 3.6 Flash (`gemini-3.6-flash`) and Gemini 3.5 Flash-Lite\n (`gemini-3.5-flash-lite`) are previous-generation releases in the Gemini 3\n series and remain available for production use. For our newest Flash model, see\n@@ -291,6 +287,7 @@\n ## Other models  {% id=\"other-models\" %}\n \n *   [Latest Gemini models](/docs/latest-model)\n+*   [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n *   [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n *   [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n *   [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\n",
+          "stats": {
+            "added_chars": 58,
+            "removed_chars": 175
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []
